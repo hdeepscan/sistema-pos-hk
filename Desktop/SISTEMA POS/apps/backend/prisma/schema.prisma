@@ -1,0 +1,176 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RolUsuario {
+  ADMIN
+  GERENTE
+  CAJERO
+}
+
+enum TipoSucursal {
+  FISICA
+  ECOMMERCE
+}
+
+enum TipoMovimiento {
+  ENTRADA
+  SALIDA
+  TRASLADO
+  AJUSTE
+  VENTA
+}
+
+enum MetodoPago {
+  EFECTIVO
+  TARJETA
+  TRANSFERENCIA
+  OTRO
+}
+
+model Empresa {
+  id             String   @id @default(uuid())
+  nombre         String
+  plan           String   @default("TRIAL")
+  activo         Boolean  @default(true)
+  fechaRegistro  DateTime @default(now())
+
+  usuarios       Usuario[]
+  sucursales     Sucursal[]
+  productos      Producto[]
+  ventas         Venta[]
+
+  @@map("empresas")
+}
+
+model Usuario {
+  id           String     @id @default(uuid())
+  empresaId    String
+  empresa      Empresa    @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nombre       String
+  email        String     @unique
+  passwordHash String
+  rol          RolUsuario @default(CAJERO)
+  activo       Boolean    @default(true)
+  creadoEn     DateTime   @default(now())
+
+  ventas          Venta[]
+  movimientos     MovimientoInventario[]
+
+  @@index([empresaId])
+  @@map("usuarios")
+}
+
+model Sucursal {
+  id         String        @id @default(uuid())
+  empresaId  String
+  empresa    Empresa       @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nombre     String
+  tipo       TipoSucursal  @default(FISICA)
+  direccion  String?
+  activo     Boolean       @default(true)
+  creadoEn   DateTime      @default(now())
+
+  inventario         InventarioSucursal[]
+  movimientos        MovimientoInventario[]     @relation("MovimientoSucursalOrigen")
+  movimientosDestino MovimientoInventario[]     @relation("MovimientoSucursalDestino")
+  ventas             Venta[]
+
+  @@index([empresaId])
+  @@map("sucursales")
+}
+
+model Producto {
+  id            String   @id @default(uuid())
+  empresaId     String
+  empresa       Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  sku           String
+  nombre        String
+  categoria     String?
+  precio        Decimal  @db.Decimal(12, 2)
+  costo         Decimal  @db.Decimal(12, 2) @default(0)
+  codigoBarras  String?
+  activo        Boolean  @default(true)
+  creadoEn      DateTime @default(now())
+
+  inventario    InventarioSucursal[]
+  movimientos   MovimientoInventario[]
+  ventaItems    VentaItem[]
+
+  @@unique([empresaId, sku])
+  @@index([empresaId, codigoBarras])
+  @@map("productos")
+}
+
+model InventarioSucursal {
+  id          String   @id @default(uuid())
+  productoId  String
+  producto    Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  sucursalId  String
+  sucursal    Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
+  cantidad    Int      @default(0)
+  actualizadoEn DateTime @updatedAt
+
+  @@unique([productoId, sucursalId])
+  @@index([sucursalId])
+  @@map("inventario_sucursal")
+}
+
+model MovimientoInventario {
+  id                 String         @id @default(uuid())
+  productoId         String
+  producto           Producto       @relation(fields: [productoId], references: [id])
+  sucursalId         String
+  sucursal           Sucursal       @relation("MovimientoSucursalOrigen", fields: [sucursalId], references: [id])
+  sucursalDestinoId  String?
+  sucursalDestino    Sucursal?      @relation("MovimientoSucursalDestino", fields: [sucursalDestinoId], references: [id])
+  tipo               TipoMovimiento
+  cantidad           Int
+  motivo             String?
+  usuarioId          String
+  usuario            Usuario        @relation(fields: [usuarioId], references: [id])
+  fecha              DateTime       @default(now())
+
+  @@index([productoId])
+  @@index([sucursalId])
+  @@map("movimientos_inventario")
+}
+
+model Venta {
+  id            String      @id @default(uuid())
+  clienteUuid   String      @unique // uuid generado en el cliente para deduplicar reintentos offline
+  empresaId     String
+  empresa       Empresa     @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  sucursalId    String
+  sucursal      Sucursal    @relation(fields: [sucursalId], references: [id])
+  usuarioId     String
+  usuario       Usuario     @relation(fields: [usuarioId], references: [id])
+  consecutivo   Int
+  total         Decimal     @db.Decimal(12, 2)
+  metodoPago    MetodoPago
+  fecha         DateTime    @default(now())
+
+  items         VentaItem[]
+
+  @@unique([empresaId, consecutivo])
+  @@index([empresaId, sucursalId])
+  @@map("ventas")
+}
+
+model VentaItem {
+  id              String   @id @default(uuid())
+  ventaId         String
+  venta           Venta    @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  productoId      String
+  producto        Producto @relation(fields: [productoId], references: [id])
+  cantidad        Int
+  precioUnitario  Decimal  @db.Decimal(12, 2)
+
+  @@index([ventaId])
+  @@map("venta_items")
+}

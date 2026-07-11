@@ -1,0 +1,17 @@
+{
+  "name": "sistema-pos",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "backend:dev": "npm run dev -w apps/backend",
+    "desktop:dev": "npm run dev -w apps/desktop",
+    "backend:migrate": "npm run migrate -w apps/backend"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
