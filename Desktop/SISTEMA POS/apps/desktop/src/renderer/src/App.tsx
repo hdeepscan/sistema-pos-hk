@@ -1,8 +1,9 @@
 import { useEffect } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useSesionStore } from "./lib/store";
 import { connectSocket } from "./lib/socket";
 import { api } from "./lib/api";
+import { ErrorBoundary } from "./lib/ErrorBoundary";
 import Login from "./screens/Login";
 import SeleccionSucursal from "./screens/SeleccionSucursal";
 import Layout from "./screens/Layout";
@@ -29,6 +30,9 @@ import MetaAds from "./screens/MetaAds";
 export default function App() {
   const { token, sucursalActivaId, hidratado, setApiBaseUrl, setSesion, setSucursalActiva, setHidratado } =
     useSesionStore();
+  // La key por ruta hace que el ErrorBoundary se "resetee" al navegar a otra
+  // pantalla, en vez de quedarse trabado mostrando el error anterior.
+  const location = useLocation();
 
   useEffect(() => {
     window.pos.getConfig().then(async (config) => {
@@ -73,6 +77,7 @@ export default function App() {
 
   return (
     <Layout>
+      <ErrorBoundary key={location.pathname}>
       <Routes>
         <Route path="/" element={<Navigate to="/pos" replace />} />
         <Route path="/pos" element={<Pos />} />
@@ -96,6 +101,7 @@ export default function App() {
         <Route path="/meta-ads" element={<MetaAds />} />
         <Route path="*" element={<Navigate to="/pos" replace />} />
       </Routes>
+      </ErrorBoundary>
     </Layout>
   );
 }

@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { AbrirCajaSchema, CerrarCajaSchema } from "@sistema-pos/shared";
 import { prisma } from "../lib/prisma.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
+import { mensajeDeValidacion } from "../lib/errores.js";
 
 export async function cajaRoutes(app: FastifyInstance) {
   app.addHook("preHandler", app.authenticate);
@@ -24,7 +25,7 @@ export async function cajaRoutes(app: FastifyInstance) {
       return reply.code(403).send({ error: "No tienes permiso para abrir la caja" });
     }
     const parsed = AbrirCajaSchema.safeParse(request.body);
-    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    if (!parsed.success) return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
     const { sucursalId, montoInicial } = parsed.data;
 
     const sucursal = await prisma.sucursal.findFirst({ where: { id: sucursalId, empresaId } });
@@ -58,7 +59,7 @@ export async function cajaRoutes(app: FastifyInstance) {
       return reply.code(403).send({ error: "No tienes permiso para cerrar la caja" });
     }
     const parsed = CerrarCajaSchema.safeParse(request.body);
-    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    if (!parsed.success) return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
     const { sucursalId, montoContado } = parsed.data;
 
     const turno = await prisma.turnoCaja.findFirst({

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { PERMISOS, ETIQUETAS_PERMISOS, PERMISOS_POR_ROL } from "@sistema-pos/shared";
 import type { Permiso, RolUsuario } from "@sistema-pos/shared";
+import { mensajeError } from "../lib/errores";
 
 interface Usuario {
   id: string;
@@ -140,7 +141,7 @@ function FormularioUsuario({
       onGuardado();
       onClose();
     } catch (err: any) {
-      setError(err?.response?.data?.error ?? "No se pudo guardar el usuario");
+      setError(mensajeError(err, "No se pudo guardar el usuario"));
     } finally {
       setGuardando(false);
     }

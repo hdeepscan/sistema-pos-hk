@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma.js";
 import { emitInventarioActualizado } from "../lib/ws.js";
 import { ajustarInventarioEnShopifySiCorresponde } from "../lib/shopify.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
+import { mensajeDeValidacion } from "../lib/errores.js";
 
 async function ajustarStock(productoId: string, sucursalId: string, delta: number) {
   const inv = await prisma.inventarioSucursal.upsert({
@@ -71,7 +72,7 @@ export async function inventarioRoutes(app: FastifyInstance) {
     }
     const parsed = RegistrarMovimientoSchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: parsed.error.flatten() });
+      return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
     }
     const { productoId, sucursalId, tipo, cantidad, motivo, sucursalDestinoId } = parsed.data;
 
@@ -146,7 +147,7 @@ export async function inventarioRoutes(app: FastifyInstance) {
       return reply.code(403).send({ error: "No tienes permiso para administrar el inventario" });
     }
     const parsed = AjustarStockDirectoSchema.safeParse(request.body);
-    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    if (!parsed.success) return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
     const { productoId, sucursalId, cantidad, motivo } = parsed.data;
 
     const producto = await prisma.producto.findFirst({ where: { id: productoId, empresaId } });

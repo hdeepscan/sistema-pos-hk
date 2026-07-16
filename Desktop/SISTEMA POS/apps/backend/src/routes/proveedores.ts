@@ -3,6 +3,7 @@ import { CrearProveedorSchema, CrearCompraSchema } from "@sistema-pos/shared";
 import { prisma } from "../lib/prisma.js";
 import { emitInventarioActualizado } from "../lib/ws.js";
 import { ajustarInventarioEnShopifySiCorresponde } from "../lib/shopify.js";
+import { mensajeDeValidacion } from "../lib/errores.js";
 
 export async function proveedoresRoutes(app: FastifyInstance) {
   app.addHook("preHandler", app.authenticate);
@@ -23,7 +24,7 @@ export async function proveedoresRoutes(app: FastifyInstance) {
   app.post("/proveedores", async (request, reply) => {
     const { empresaId } = request.user;
     const parsed = CrearProveedorSchema.safeParse(request.body);
-    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    if (!parsed.success) return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
 
     const { email, ...resto } = parsed.data;
     const proveedor = await prisma.proveedor.create({
@@ -52,7 +53,7 @@ export async function proveedoresRoutes(app: FastifyInstance) {
   app.post("/compras", async (request, reply) => {
     const { empresaId, usuarioId } = request.user;
     const parsed = CrearCompraSchema.safeParse(request.body);
-    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    if (!parsed.success) return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
     const { proveedorId, sucursalId, items } = parsed.data;
 
     const [proveedor, sucursal] = await Promise.all([

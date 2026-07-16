@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { useSesionStore } from "../lib/store";
+import { mensajeError } from "../lib/errores";
 
 interface TurnoAbierto {
   id: string;
@@ -56,7 +57,7 @@ export default function Caja() {
       setMontoInicial("");
       await cargar();
     } catch (err: any) {
-      setError(err?.response?.data?.error ?? "No se pudo abrir la caja");
+      setError(mensajeError(err, "No se pudo abrir la caja"));
     } finally {
       setProcesando(false);
     }
@@ -71,7 +72,7 @@ export default function Caja() {
       await cargar();
       await imprimirCierre(data);
     } catch (err: any) {
-      setError(err?.response?.data?.error ?? "No se pudo cerrar la caja");
+      setError(mensajeError(err, "No se pudo cerrar la caja"));
     } finally {
       setProcesando(false);
     }

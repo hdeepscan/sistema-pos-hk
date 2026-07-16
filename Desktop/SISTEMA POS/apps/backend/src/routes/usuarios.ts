@@ -3,6 +3,7 @@ import { CrearUsuarioSchema, ActualizarUsuarioSchema, PERMISOS_POR_ROL } from "@
 import { prisma } from "../lib/prisma.js";
 import { hashPassword } from "../lib/password.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
+import { mensajeDeValidacion } from "../lib/errores.js";
 
 function permisosDe(usuario: { rol: keyof typeof PERMISOS_POR_ROL; permisos: string[] }) {
   return usuario.permisos.length > 0 ? usuario.permisos : PERMISOS_POR_ROL[usuario.rol];
@@ -31,7 +32,7 @@ export async function usuariosRoutes(app: FastifyInstance) {
     }
     const { empresaId } = request.user;
     const parsed = CrearUsuarioSchema.safeParse(request.body);
-    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    if (!parsed.success) return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
 
     const existente = await prisma.usuario.findUnique({ where: { email: parsed.data.email } });
     if (existente) return reply.code(409).send({ error: "Ya existe un usuario con ese email" });
@@ -67,7 +68,7 @@ export async function usuariosRoutes(app: FastifyInstance) {
     const { empresaId } = request.user;
     const { id } = request.params as { id: string };
     const parsed = ActualizarUsuarioSchema.safeParse(request.body);
-    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    if (!parsed.success) return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
 
     const usuario = await prisma.usuario.findFirst({ where: { id, empresaId } });
     if (!usuario) return reply.code(404).send({ error: "Usuario no encontrado" });

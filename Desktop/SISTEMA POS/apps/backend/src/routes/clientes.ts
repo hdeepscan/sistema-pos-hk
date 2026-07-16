@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { CrearClienteSchema, RegistrarAbonoSchema } from "@sistema-pos/shared";
 import { prisma } from "../lib/prisma.js";
+import { mensajeDeValidacion } from "../lib/errores.js";
 
 async function calcularSaldo(clienteId: string) {
   const [deuda, abonado] = await Promise.all([
@@ -52,7 +53,7 @@ export async function clientesRoutes(app: FastifyInstance) {
     }
     const { empresaId } = request.user;
     const parsed = CrearClienteSchema.safeParse(request.body);
-    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    if (!parsed.success) return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
 
     const { email, ...resto } = parsed.data;
     const cliente = await prisma.cliente.create({
@@ -88,7 +89,7 @@ export async function clientesRoutes(app: FastifyInstance) {
     const { empresaId } = request.user;
     const { id } = request.params as { id: string };
     const parsed = CrearClienteSchema.partial().safeParse(request.body);
-    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    if (!parsed.success) return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
 
     const cliente = await prisma.cliente.findFirst({ where: { id, empresaId } });
     if (!cliente) return reply.code(404).send({ error: "Cliente no encontrado" });
@@ -112,7 +113,7 @@ export async function clientesRoutes(app: FastifyInstance) {
     if (!cliente) return reply.code(404).send({ error: "Cliente no encontrado" });
 
     const parsed = RegistrarAbonoSchema.safeParse({ ...(request.body as object), clienteId: id });
-    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    if (!parsed.success) return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
 
     const abono = await prisma.abono.create({
       data: {

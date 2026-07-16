@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
+import { mensajeError } from "../lib/errores";
 
 interface Pedido {
   id: string;
@@ -32,7 +33,7 @@ export default function Notificaciones() {
       setError(
         err?.response?.status === 404
           ? "Esta funcion no existe todavia en el servidor. Actualiza el servidor a la ultima version."
-          : err?.response?.data?.error ?? "No se pudo cargar el centro de notificaciones"
+          : mensajeError(err, "No se pudo cargar el centro de notificaciones")
       );
     } finally {
       setCargando(false);

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
 import { BotonesExportar } from "../lib/BotonesExportar";
 import type { ColumnaExport } from "../lib/export";
+import { mensajeError } from "../lib/errores";
 
 interface EntradaAuditoria {
   id: string;
@@ -73,7 +74,7 @@ export default function Auditoria() {
       setError(
         err?.response?.status === 404
           ? "Esta funcion no existe todavia en el servidor. Actualiza el servidor a la ultima version."
-          : err?.response?.data?.error ?? "No se pudo cargar la auditoria"
+          : mensajeError(err, "No se pudo cargar la auditoria")
       );
     } finally {
       setCargando(false);

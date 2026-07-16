@@ -5,6 +5,7 @@ import { useSesionStore } from "../lib/store";
 import { leerArchivoComoDataUrl } from "../lib/files";
 import { construirReciboHtml } from "../../../shared/recibo-html";
 import type { ReciboData } from "../../../shared/api-types";
+import { mensajeError } from "../lib/errores";
 
 interface PlantillaForm {
   logoUrl: string | null;
@@ -123,7 +124,7 @@ export default function PlantillaRecibo() {
       await api.put("/plantilla-recibo", form);
       setMensaje("Plantilla guardada");
     } catch (err: any) {
-      setMensaje(err?.response?.data?.error ?? "No se pudo guardar la plantilla");
+      setMensaje(mensajeError(err, "No se pudo guardar la plantilla"));
     } finally {
       setGuardando(false);
     }

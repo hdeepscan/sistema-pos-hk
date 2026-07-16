@@ -4,6 +4,7 @@ import { useSesionStore, usePermiso } from "../lib/store";
 import { useVentaCreada } from "../lib/socket";
 import { BotonesExportar } from "../lib/BotonesExportar";
 import type { ColumnaExport } from "../lib/export";
+import { mensajeError } from "../lib/errores";
 
 interface VentaItem {
   id: string;
@@ -396,7 +397,7 @@ function DetalleVenta({
       await api.delete(`/ventas/${venta.id}`);
       onEliminada();
     } catch (err: any) {
-      setError(err?.response?.data?.error ?? "No se pudo eliminar la venta");
+      setError(mensajeError(err, "No se pudo eliminar la venta"));
       setEliminando(false);
     }
   }
@@ -419,7 +420,7 @@ function DetalleVenta({
       });
       onDevuelta();
     } catch (err: any) {
-      setError(err?.response?.data?.error ?? "No se pudo registrar la devolucion");
+      setError(mensajeError(err, "No se pudo registrar la devolucion"));
       setProcesandoDev(false);
     }
   }

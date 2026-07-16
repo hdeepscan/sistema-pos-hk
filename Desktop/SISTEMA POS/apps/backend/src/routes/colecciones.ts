@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { CrearColeccionSchema, AgregarProductoColeccionSchema } from "@sistema-pos/shared";
 import { prisma } from "../lib/prisma.js";
+import { mensajeDeValidacion } from "../lib/errores.js";
 import {
   sincronizarColecciones,
   crearColeccionEnShopify,
@@ -31,7 +32,7 @@ export async function coleccionesRoutes(app: FastifyInstance) {
   app.post("/colecciones", async (request, reply) => {
     const { empresaId } = request.user;
     const parsed = CrearColeccionSchema.safeParse(request.body);
-    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    if (!parsed.success) return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
 
     let shopifyCollectionId: string | undefined;
     const config = await prisma.shopifyConfig.findUnique({ where: { empresaId } });
@@ -80,7 +81,7 @@ export async function coleccionesRoutes(app: FastifyInstance) {
     const { empresaId } = request.user;
     const { id } = request.params as { id: string };
     const parsed = AgregarProductoColeccionSchema.safeParse(request.body);
-    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    if (!parsed.success) return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
 
     const [coleccion, producto] = await Promise.all([
       prisma.coleccion.findFirst({ where: { id, empresaId } }),

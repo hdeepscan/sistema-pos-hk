@@ -6,6 +6,7 @@ import { emitInventarioActualizado, emitVentaCreada } from "../lib/ws.js";
 import { ajustarInventarioEnShopifySiCorresponde } from "../lib/shopify.js";
 import { enviarEventoCompraAMeta } from "../lib/meta.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
+import { mensajeDeValidacion } from "../lib/errores.js";
 
 const MS_DIA = 24 * 60 * 60 * 1000;
 
@@ -109,7 +110,7 @@ export async function ventasRoutes(app: FastifyInstance) {
     }
     const parsed = CrearVentaSchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: parsed.error.flatten() });
+      return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
     }
     const { clienteUuid, sucursalId, contactoCliente, metodoPago, items, dineroRecibido, descuento, puntosARedimir } =
       parsed.data;
@@ -339,7 +340,7 @@ export async function ventasRoutes(app: FastifyInstance) {
     }
     const { id } = request.params as { id: string };
     const parsed = DevolucionParcialSchema.safeParse(request.body);
-    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    if (!parsed.success) return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
 
     const venta = await prisma.venta.findFirst({
       where: { id, empresaId },

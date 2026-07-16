@@ -5,6 +5,7 @@ import { leerArchivoComoDataUrl } from "../lib/files";
 import { generarSvgCodigoBarras } from "../lib/barcode";
 import { BotonesExportar } from "../lib/BotonesExportar";
 import type { ColumnaExport } from "../lib/export";
+import { mensajeError } from "../lib/errores";
 
 interface Producto {
   id: string;
@@ -205,7 +206,7 @@ function NuevoProducto({ onClose, onCreado }: { onClose: () => void; onCreado: (
       onCreado(data.id);
       onClose();
     } catch (err: any) {
-      setError(err?.response?.data?.error ?? "No se pudo crear el producto");
+      setError(mensajeError(err, "No se pudo crear el producto"));
     } finally {
       setGuardando(false);
     }
@@ -329,7 +330,7 @@ function DetalleProducto({
       setMensaje("Cambios guardados" + (producto.shopifyProductId ? " y sincronizados con Shopify" : ""));
       onActualizado();
     } catch (err: any) {
-      setError(err?.response?.data?.error ?? "No se pudo guardar");
+      setError(mensajeError(err, "No se pudo guardar"));
     } finally {
       setGuardando(false);
     }
@@ -580,7 +581,7 @@ function VariantesCard({ producto, onActualizado }: { producto: ProductoDetalle;
       setSku("");
       onActualizado();
     } catch (err: any) {
-      setError(err?.response?.data?.error ?? "No se pudo crear la variante");
+      setError(mensajeError(err, "No se pudo crear la variante"));
     } finally {
       setGuardando(false);
     }

@@ -3,6 +3,7 @@ import { api } from "../lib/api";
 import { useSesionStore } from "../lib/store";
 import { BotonesExportar } from "../lib/BotonesExportar";
 import type { ColumnaExport } from "../lib/export";
+import { mensajeError } from "../lib/errores";
 
 interface Credito {
   ventaId: string;
@@ -83,7 +84,7 @@ export default function Creditos() {
       await api.patch("/creditos/config", { diasVencimientoCredito: Number(diasVencimiento) });
       setMensajeConfig("Guardado. Aplica a los creditos que se generen de ahora en adelante.");
     } catch (err: any) {
-      setMensajeConfig(err?.response?.data?.error ?? "No se pudo guardar");
+      setMensajeConfig(mensajeError(err, "No se pudo guardar"));
     } finally {
       setGuardandoConfig(false);
     }

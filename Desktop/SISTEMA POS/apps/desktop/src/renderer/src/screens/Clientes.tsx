@@ -3,6 +3,7 @@ import { api } from "../lib/api";
 import { reproducir } from "../lib/sonidos";
 import { BotonesExportar } from "../lib/BotonesExportar";
 import type { ColumnaExport } from "../lib/export";
+import { mensajeError } from "../lib/errores";
 
 interface Cliente {
   id: string;
@@ -175,7 +176,7 @@ function FormularioCliente({
       onClose();
     } catch (err: any) {
       void reproducir("error");
-      setError(err?.response?.data?.error ?? "No se pudo guardar el cliente");
+      setError(mensajeError(err, "No se pudo guardar el cliente"));
     } finally {
       setGuardando(false);
     }
@@ -251,7 +252,7 @@ function RegistrarAbono({
       onRegistrado();
       onClose();
     } catch (err: any) {
-      setError(err?.response?.data?.error ?? "No se pudo registrar el abono");
+      setError(mensajeError(err, "No se pudo registrar el abono"));
     } finally {
       setGuardando(false);
     }

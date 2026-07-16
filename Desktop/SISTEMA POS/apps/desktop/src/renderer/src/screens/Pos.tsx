@@ -8,6 +8,7 @@ import { useInventarioActualizado } from "../lib/socket";
 import { reproducir } from "../lib/sonidos";
 import type { MetodoPago } from "@sistema-pos/shared";
 import type { ReciboData } from "../../../shared/api-types";
+import { mensajeError } from "../lib/errores";
 
 interface Producto {
   id: string;
@@ -301,7 +302,7 @@ export default function Pos() {
     } catch (err: any) {
       if (err?.response?.status === 409 || err?.response?.status === 403 || err?.response?.status === 400) {
         void reproducir("error");
-        setError(err?.response?.data?.error ?? "No se pudo registrar la venta");
+        setError(mensajeError(err, "No se pudo registrar la venta"));
         setProcesando(false);
         return;
       }

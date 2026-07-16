@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
+import { mensajeError } from "../lib/errores";
 
 interface Coleccion {
   id: string;
@@ -41,7 +42,7 @@ export default function Colecciones() {
       setMensaje(`Sincronizado: ${data.coleccionesCreadas} nuevas, ${data.coleccionesActualizadas} actualizadas`);
       await cargar();
     } catch (err: any) {
-      setMensaje(err?.response?.data?.error ?? "No se pudo sincronizar");
+      setMensaje(mensajeError(err, "No se pudo sincronizar"));
     } finally {
       setSincronizando(false);
     }
@@ -123,7 +124,7 @@ function NuevaColeccion({ onClose, onCreada }: { onClose: () => void; onCreada: 
       onCreada();
       onClose();
     } catch (err: any) {
-      setError(err?.response?.data?.error ?? "No se pudo crear la coleccion");
+      setError(mensajeError(err, "No se pudo crear la coleccion"));
     } finally {
       setGuardando(false);
     }

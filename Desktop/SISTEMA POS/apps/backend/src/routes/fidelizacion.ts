@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { FidelizacionConfigSchema } from "@sistema-pos/shared";
 import { prisma } from "../lib/prisma.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
+import { mensajeDeValidacion } from "../lib/errores.js";
 
 export async function fidelizacionRoutes(app: FastifyInstance) {
   app.addHook("preHandler", app.authenticate);
@@ -24,7 +25,7 @@ export async function fidelizacionRoutes(app: FastifyInstance) {
       return reply.code(403).send({ error: "No tienes permiso para administrar la configuracion" });
     }
     const parsed = FidelizacionConfigSchema.safeParse(request.body);
-    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    if (!parsed.success) return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
 
     const empresa = await prisma.empresa.update({
       where: { id: empresaId },

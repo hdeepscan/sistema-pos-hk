@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { bufferABase64, base64ABuffer } from "../lib/base64";
+import { mensajeError } from "../lib/errores";
 
 function formatoTamano(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -51,7 +52,7 @@ export default function Backups() {
         setUltimoBackup(info.ultimoBackup);
       }
     } catch (err: any) {
-      setError(err?.response?.data?.error ?? "No se pudo generar la copia de seguridad");
+      setError(mensajeError(err, "No se pudo generar la copia de seguridad"));
     } finally {
       setGenerando(false);
     }
@@ -73,7 +74,7 @@ export default function Backups() {
       await api.post("/backup/restaurar", bytes, { headers: { "Content-Type": "application/sql" } });
       setMensaje("Respaldo restaurado. Cierra sesion y vuelve a entrar para ver los datos restaurados.");
     } catch (err: any) {
-      setError(err?.response?.data?.error ?? "No se pudo restaurar el respaldo");
+      setError(mensajeError(err, "No se pudo restaurar el respaldo"));
     } finally {
       setRestaurando(false);
     }

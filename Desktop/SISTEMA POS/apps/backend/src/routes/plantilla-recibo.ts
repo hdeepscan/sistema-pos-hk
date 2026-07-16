@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { GuardarPlantillaReciboSchema } from "@sistema-pos/shared";
 import { prisma } from "../lib/prisma.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
+import { mensajeDeValidacion } from "../lib/errores.js";
 
 export async function plantillaReciboRoutes(app: FastifyInstance) {
   app.addHook("preHandler", app.authenticate);
@@ -18,7 +19,7 @@ export async function plantillaReciboRoutes(app: FastifyInstance) {
     }
     const { empresaId } = request.user;
     const parsed = GuardarPlantillaReciboSchema.safeParse(request.body);
-    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    if (!parsed.success) return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
 
     const plantilla = await prisma.plantillaRecibo.upsert({
       where: { empresaId },

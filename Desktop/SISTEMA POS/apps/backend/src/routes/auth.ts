@@ -3,6 +3,7 @@ import { LoginSchema, RegistroEmpresaSchema, PERMISOS_POR_ROL } from "@sistema-p
 import { prisma } from "../lib/prisma.js";
 import { hashPassword, verifyPassword } from "../lib/password.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
+import { mensajeDeValidacion } from "../lib/errores.js";
 
 function permisosDe(usuario: { rol: keyof typeof PERMISOS_POR_ROL; permisos: string[] }) {
   return usuario.permisos.length > 0 ? usuario.permisos : PERMISOS_POR_ROL[usuario.rol];
@@ -12,7 +13,7 @@ export async function authRoutes(app: FastifyInstance) {
   app.post("/auth/registro-empresa", async (request, reply) => {
     const parsed = RegistroEmpresaSchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: parsed.error.flatten() });
+      return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
     }
     const { empresaNombre, adminNombre, adminEmail, adminPassword } = parsed.data;
 
@@ -58,7 +59,7 @@ export async function authRoutes(app: FastifyInstance) {
   app.post("/auth/login", async (request, reply) => {
     const parsed = LoginSchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: parsed.error.flatten() });
+      return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
     }
     const { email, password } = parsed.data;
 

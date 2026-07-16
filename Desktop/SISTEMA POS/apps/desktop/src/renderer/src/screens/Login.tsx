@@ -2,6 +2,7 @@ import { useState } from "react";
 import { api } from "../lib/api";
 import { useSesionStore } from "../lib/store";
 import logo from "../assets/logo.png";
+import { mensajeError } from "../lib/errores";
 
 export default function Login() {
   const [modo, setModo] = useState<"login" | "registro">("login");
@@ -41,7 +42,7 @@ export default function Login() {
       const { data } = await api.post("/auth/login", { email, password });
       await aplicarSesion(data);
     } catch (err: any) {
-      setError(err?.response?.data?.error ?? "No se pudo iniciar sesion");
+      setError(mensajeError(err, "No se pudo iniciar sesion"));
     } finally {
       setCargando(false);
     }
@@ -60,7 +61,7 @@ export default function Login() {
       });
       await aplicarSesion(data);
     } catch (err: any) {
-      setError(err?.response?.data?.error ?? "No se pudo registrar la empresa");
+      setError(mensajeError(err, "No se pudo registrar la empresa"));
     } finally {
       setCargando(false);
     }

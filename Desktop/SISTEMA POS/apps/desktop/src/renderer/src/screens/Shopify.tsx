@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { useSesionStore } from "../lib/store";
+import { mensajeError } from "../lib/errores";
 
 interface ShopifyConfigResp {
   conectado: boolean;
@@ -43,7 +44,7 @@ export default function Shopify() {
       setConfig(data);
       setClientSecret("");
     } catch (err: any) {
-      setError(err?.response?.data?.error ?? "No se pudo guardar la configuracion");
+      setError(mensajeError(err, "No se pudo guardar la configuracion"));
     } finally {
       setGuardando(false);
     }
@@ -62,7 +63,7 @@ export default function Shopify() {
       const { data: cfg } = await api.get<ShopifyConfigResp>("/shopify/config");
       setConfig(cfg);
     } catch (err: any) {
-      setError(err?.response?.data?.error ?? "No se pudo sincronizar con Shopify");
+      setError(mensajeError(err, "No se pudo sincronizar con Shopify"));
     } finally {
       setSincronizando(false);
     }

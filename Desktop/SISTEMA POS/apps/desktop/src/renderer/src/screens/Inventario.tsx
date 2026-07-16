@@ -7,6 +7,7 @@ import { reproducir } from "../lib/sonidos";
 import { BotonesExportar } from "../lib/BotonesExportar";
 import type { ColumnaExport } from "../lib/export";
 import type { TipoMovimiento } from "@sistema-pos/shared";
+import { mensajeError } from "../lib/errores";
 
 const UMBRAL_STOCK_BAJO = 5;
 
@@ -310,7 +311,7 @@ function EditarProductoModal({
       });
       onGuardado();
     } catch (err: any) {
-      setError(err?.response?.data?.error ?? "No se pudo guardar el producto");
+      setError(mensajeError(err, "No se pudo guardar el producto"));
     } finally {
       setGuardando(false);
     }
@@ -415,7 +416,7 @@ function EdicionMasivaBar({
       });
       onAplicado();
     } catch (err: any) {
-      setError(err?.response?.data?.error ?? "No se pudo aplicar la edicion masiva");
+      setError(mensajeError(err, "No se pudo aplicar la edicion masiva"));
     } finally {
       setGuardando(false);
     }
@@ -588,7 +589,7 @@ function RegistrarMovimiento({
       onRegistrado();
       onClose();
     } catch (err: any) {
-      setError(err?.response?.data?.error ?? "No se pudo registrar el movimiento");
+      setError(mensajeError(err, "No se pudo registrar el movimiento"));
     } finally {
       setGuardando(false);
     }

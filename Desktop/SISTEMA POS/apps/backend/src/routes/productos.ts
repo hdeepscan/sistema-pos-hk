@@ -4,6 +4,7 @@ import { CrearProductoSchema, CrearVarianteSchema, EdicionMasivaProductosSchema 
 import { prisma } from "../lib/prisma.js";
 import { empujarProductoAShopify, subirImagenAShopify, crearVarianteEnShopify } from "../lib/shopify.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
+import { mensajeDeValidacion } from "../lib/errores.js";
 
 // Sin filas en ProductoSucursal = disponible en todas las sucursales.
 // sucursalIds=[] limpia la restriccion (vuelve a "disponible en todas").
@@ -118,7 +119,7 @@ export async function productosRoutes(app: FastifyInstance) {
     }
     const parsed = CrearProductoSchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: parsed.error.flatten() });
+      return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
     }
     const { sucursalIds, ...datosProducto } = parsed.data;
 
@@ -175,7 +176,7 @@ export async function productosRoutes(app: FastifyInstance) {
       return reply.code(403).send({ error: "No tienes permiso para administrar productos" });
     }
     const parsed = EdicionMasivaProductosSchema.safeParse(request.body);
-    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    if (!parsed.success) return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
     const { productoIds, ...cambios } = parsed.data;
     if (Object.keys(cambios).length === 0) {
       return reply.code(400).send({ error: "No hay cambios para aplicar" });
@@ -205,7 +206,7 @@ export async function productosRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string };
     const parsed = CrearProductoSchema.partial().safeParse(request.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: parsed.error.flatten() });
+      return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
     }
     const producto = await prisma.producto.findFirst({ where: { id, empresaId } });
     if (!producto) return reply.code(404).send({ error: "Producto no encontrado" });
@@ -303,7 +304,7 @@ export async function productosRoutes(app: FastifyInstance) {
     const { empresaId } = request.user;
     const { id } = request.params as { id: string };
     const parsed = CrearVarianteSchema.safeParse(request.body);
-    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    if (!parsed.success) return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
 
     const producto = await prisma.producto.findFirst({ where: { id, empresaId } });
     if (!producto) return reply.code(404).send({ error: "Producto no encontrado" });

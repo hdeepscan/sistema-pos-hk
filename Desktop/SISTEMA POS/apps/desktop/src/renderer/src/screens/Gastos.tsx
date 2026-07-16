@@ -3,6 +3,7 @@ import { api } from "../lib/api";
 import { useSesionStore } from "../lib/store";
 import { BotonesExportar } from "../lib/BotonesExportar";
 import type { ColumnaExport } from "../lib/export";
+import { mensajeError } from "../lib/errores";
 
 interface Gasto {
   id: string;
@@ -124,7 +125,7 @@ function NuevoGasto({ onClose, onCreado }: { onClose: () => void; onCreado: () =
       onCreado();
       onClose();
     } catch (err: any) {
-      setError(err?.response?.data?.error ?? "No se pudo registrar el gasto");
+      setError(mensajeError(err, "No se pudo registrar el gasto"));
     } finally {
       setGuardando(false);
     }

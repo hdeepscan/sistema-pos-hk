@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { useSesionStore } from "../lib/store";
 import { LineChart, BarraHorizontal, formatoMoneda } from "../lib/charts";
+import { mensajeError } from "../lib/errores";
 
 interface MetaConfigResp {
   conectado: boolean;
@@ -77,7 +78,7 @@ export default function MetaAds() {
       setConfig(data);
       setAccessToken("");
     } catch (err: any) {
-      setError(err?.response?.data?.error ?? "No se pudo guardar la configuracion");
+      setError(mensajeError(err, "No se pudo guardar la configuracion"));
     } finally {
       setGuardando(false);
     }
@@ -94,7 +95,7 @@ export default function MetaAds() {
       setConfig(cfg);
       await cargarGasto();
     } catch (err: any) {
-      setError(err?.response?.data?.error ?? "No se pudo sincronizar con Meta Ads");
+      setError(mensajeError(err, "No se pudo sincronizar con Meta Ads"));
     } finally {
       setSincronizando(false);
     }

@@ -3,6 +3,7 @@ import { ActualizarConfigCreditoSchema } from "@sistema-pos/shared";
 import type { EstadoCredito } from "@sistema-pos/shared";
 import { prisma } from "../lib/prisma.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
+import { mensajeDeValidacion } from "../lib/errores.js";
 
 const MS_DIA = 24 * 60 * 60 * 1000;
 const DIAS_PROXIMO_A_VENCER = 5;
@@ -100,7 +101,7 @@ export async function creditosRoutes(app: FastifyInstance) {
     }
     const { empresaId } = request.user;
     const parsed = ActualizarConfigCreditoSchema.safeParse(request.body);
-    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    if (!parsed.success) return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
 
     const empresa = await prisma.empresa.update({
       where: { id: empresaId },

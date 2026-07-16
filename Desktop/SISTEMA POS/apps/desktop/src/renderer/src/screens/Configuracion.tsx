@@ -4,6 +4,7 @@ import { useSesionStore } from "../lib/store";
 import { useHardwareStore } from "../lib/hardwareStore";
 import { reproducir } from "../lib/sonidos";
 import type { EstadoActualizacion } from "../../../shared/api-types";
+import { mensajeError } from "../lib/errores";
 
 function tiempoRelativo(fecha: Date): string {
   const segundos = Math.floor((Date.now() - fecha.getTime()) / 1000);
@@ -71,7 +72,7 @@ export default function Configuracion() {
       });
       setMensajePuntos(puntosActivo ? "Programa de puntos activado" : "Programa de puntos desactivado");
     } catch (err: any) {
-      setMensajePuntos(err?.response?.data?.error ?? "No se pudo guardar");
+      setMensajePuntos(mensajeError(err, "No se pudo guardar"));
     } finally {
       setGuardandoPuntos(false);
     }

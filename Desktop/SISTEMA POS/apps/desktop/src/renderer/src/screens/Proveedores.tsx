@@ -3,6 +3,7 @@ import { api } from "../lib/api";
 import { useSesionStore } from "../lib/store";
 import { BotonesExportar } from "../lib/BotonesExportar";
 import type { ColumnaExport } from "../lib/export";
+import { mensajeError } from "../lib/errores";
 
 interface Proveedor {
   id: string;
@@ -110,7 +111,7 @@ function NuevoProveedor({ onClose, onCreado }: { onClose: () => void; onCreado: 
       onCreado();
       onClose();
     } catch (err: any) {
-      setError(err?.response?.data?.error ?? "No se pudo crear el proveedor");
+      setError(mensajeError(err, "No se pudo crear el proveedor"));
     } finally {
       setGuardando(false);
     }
@@ -193,7 +194,7 @@ function RegistrarCompra({ proveedores, onClose }: { proveedores: Proveedor[]; o
       });
       onClose();
     } catch (err: any) {
-      setError(err?.response?.data?.error ?? "No se pudo registrar la compra");
+      setError(mensajeError(err, "No se pudo registrar la compra"));
     } finally {
       setGuardando(false);
     }

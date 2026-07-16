@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { GuardarShopifyConfigSchema } from "@sistema-pos/shared";
 import { prisma } from "../lib/prisma.js";
 import { normalizarDominio, sincronizarProductos } from "../lib/shopify.js";
+import { mensajeDeValidacion } from "../lib/errores.js";
 
 function enmascarar(secreto: string) {
   return secreto.length <= 4 ? "****" : `${"*".repeat(secreto.length - 4)}${secreto.slice(-4)}`;
@@ -27,7 +28,7 @@ export async function shopifyRoutes(app: FastifyInstance) {
   app.post("/shopify/config", async (request, reply) => {
     const { empresaId } = request.user;
     const parsed = GuardarShopifyConfigSchema.safeParse(request.body);
-    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    if (!parsed.success) return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
 
     const sucursal = await prisma.sucursal.findFirst({
       where: { id: parsed.data.sucursalEcommerceId, empresaId },
