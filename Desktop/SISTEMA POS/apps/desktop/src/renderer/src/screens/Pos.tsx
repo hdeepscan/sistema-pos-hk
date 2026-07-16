@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
+import QRCode from "qrcode";
 import { api } from "../lib/api";
-import { useSesionStore } from "../lib/store";
+import { useSesionStore, usePermiso } from "../lib/store";
+import { useHardwareStore } from "../lib/hardwareStore";
 import { useInventarioActualizado } from "../lib/socket";
+import { reproducir } from "../lib/sonidos";
 import type { MetodoPago } from "@sistema-pos/shared";
+import type { ReciboData } from "../../../shared/api-types";
 
 interface Producto {
   id: string;
@@ -11,17 +15,64 @@ interface Producto {
   nombre: string;
   precio: string | number;
   codigoBarras: string | null;
+  imagenUrl: string | null;
+  stockSucursal?: number;
 }
 
 interface ItemCarrito {
   productoId: string;
   nombre: string;
+  imagenUrl: string | null;
   cantidad: number;
   precioUnitario: number;
+  stockSucursal?: number;
+}
+
+interface Cliente {
+  id: string;
+  nombre: string;
+  puntos: number;
+}
+
+interface VentaEnEspera {
+  id: string;
+  nombre: string;
+  carrito: ItemCarrito[];
+  creada: number;
+}
+
+interface ResultadoVenta {
+  total: number;
+  consecutivo: number;
+  sincronizada: boolean;
+  metodoPago: MetodoPago;
+  cambio: number | null;
+  puntosGanados: number;
+}
+
+const DIAS = ["domingo", "lunes", "martes", "miercoles", "jueves", "viernes", "sabado"];
+const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+
+function Reloj() {
+  const [ahora, setAhora] = useState(new Date());
+  useEffect(() => {
+    const t = setInterval(() => setAhora(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const fecha = `${DIAS[ahora.getDay()]}, ${ahora.getDate()} de ${MESES[ahora.getMonth()]} de ${ahora.getFullYear()}`;
+  const hora = ahora.toLocaleTimeString("es-CO");
+  return (
+    <div style={{ textAlign: "right" }}>
+      <div style={{ fontSize: 22, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{hora}</div>
+      <div style={{ fontSize: 12.5, color: "var(--text-muted)", textTransform: "capitalize" }}>{fecha}</div>
+    </div>
+  );
 }
 
 export default function Pos() {
   const { sucursalActivaId, sucursales, empresa, usuario } = useSesionStore();
+  const registrarEscaneo = useHardwareStore((s) => s.registrarEscaneo);
+  const puedeDescuentos = usePermiso("descuentos.aplicar");
   const sucursalActiva = sucursales.find((s) => s.id === sucursalActivaId);
 
   const [codigo, setCodigo] = useState("");
@@ -29,29 +80,90 @@ export default function Pos() {
   const [resultados, setResultados] = useState<Producto[]>([]);
   const [carrito, setCarrito] = useState<ItemCarrito[]>([]);
   const [metodoPago, setMetodoPago] = useState<MetodoPago>("EFECTIVO");
+  const [dineroRecibido, setDineroRecibido] = useState("");
+  const [clienteId, setClienteId] = useState<string>("");
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [mostrarDatosCliente, setMostrarDatosCliente] = useState(false);
+  const [contactoNombre, setContactoNombre] = useState("");
+  const [contactoEmail, setContactoEmail] = useState("");
+  const [contactoCelular, setContactoCelular] = useState("");
+  const [contactoCedula, setContactoCedula] = useState("");
+  const [descuentoTipo, setDescuentoTipo] = useState<"PORCENTAJE" | "VALOR">("PORCENTAJE");
+  const [descuentoValor, setDescuentoValor] = useState("");
+  const [puntosARedimir, setPuntosARedimir] = useState("");
+  const [fidelizacion, setFidelizacion] = useState<{ pesosPorPunto: number | null; valorPunto: number | null }>({
+    pesosPorPunto: null,
+    valorPunto: null,
+  });
+  const [enEspera, setEnEspera] = useState<VentaEnEspera[]>([]);
+  const [plantilla, setPlantilla] = useState<ReciboData["plantilla"] | null>(null);
   const [mensaje, setMensaje] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
+  const [ventaExitosa, setVentaExitosa] = useState<ResultadoVenta | null>(null);
   const inputCodigoRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     inputCodigoRef.current?.focus();
   }, []);
 
+  useEffect(() => {
+    api.get<Cliente[]>("/clientes").then(({ data }) => setClientes(data));
+    api.get("/fidelizacion/config").then(({ data }) => setFidelizacion(data));
+    api.get("/plantilla-recibo").then(async ({ data }) => {
+      const qrDataUrl = data.mostrarQr && data.qrContenido ? await QRCode.toDataURL(data.qrContenido, { width: 180, margin: 1 }) : null;
+      setPlantilla({
+        logoUrl: data.logoUrl ?? null,
+        direccion: data.direccion ?? null,
+        telefono: data.telefono ?? null,
+        email: data.email ?? null,
+        redesSociales: data.redesSociales ?? null,
+        mensajeAgradecimiento: data.mensajeAgradecimiento ?? null,
+        politicasCambios: data.politicasCambios ?? null,
+        piePagina: data.piePagina ?? null,
+        qrDataUrl,
+        imagenPromocionalUrl: data.imagenPromocionalUrl ?? null,
+        cuponDescuento: data.cuponDescuento ?? null,
+        promociones: data.promociones ?? null,
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    if (metodoPago !== "EFECTIVO") setDineroRecibido("");
+  }, [metodoPago]);
+
   useInventarioActualizado(
     useCallback((evt) => {
       if (evt.sucursalId === sucursalActivaId) {
-        setMensaje(`Inventario actualizado en tiempo real (producto ${evt.productoId.slice(0, 8)})`);
+        setCarrito((prev) =>
+          prev.map((i) => (i.productoId === evt.productoId ? { ...i, stockSucursal: evt.cantidad } : i))
+        );
       }
     }, [sucursalActivaId])
   );
 
+  const clienteSeleccionado = clientes.find((c) => c.id === clienteId);
+  const fidelizacionActiva = fidelizacion.pesosPorPunto != null && fidelizacion.valorPunto != null;
+
   function agregarAlCarrito(p: Producto) {
+    void reproducir("producto_agregado");
     setCarrito((prev) => {
       const existente = prev.find((i) => i.productoId === p.id);
       if (existente) {
         return prev.map((i) => (i.productoId === p.id ? { ...i, cantidad: i.cantidad + 1 } : i));
       }
-      return [...prev, { productoId: p.id, nombre: p.nombre, cantidad: 1, precioUnitario: Number(p.precio) }];
+      return [
+        ...prev,
+        {
+          productoId: p.id,
+          nombre: p.nombre,
+          imagenUrl: p.imagenUrl,
+          cantidad: 1,
+          precioUnitario: Number(p.precio),
+          stockSucursal: p.stockSucursal,
+        },
+      ];
     });
   }
 
@@ -60,26 +172,40 @@ export default function Pos() {
     const valor = codigo.trim();
     setCodigo("");
     if (!valor) return;
+    registrarEscaneo();
     try {
-      const { data } = await api.get<Producto>("/productos/buscar", { params: { codigo: valor } });
+      const { data } = await api.get<Producto>("/productos/buscar", {
+        params: { codigo: valor, sucursalId: sucursalActivaId },
+      });
       agregarAlCarrito(data);
       setMensaje(null);
     } catch {
-      setMensaje(`No se encontro ningun producto con el codigo "${valor}"`);
+      void reproducir("error");
+      setMensaje(`No se encontro ningun producto con el codigo "${valor}" en esta sucursal`);
     }
   }
 
   async function handleBusqueda(valor: string) {
     setBusqueda(valor);
-    if (valor.trim().length < 2) {
+    if (valor.trim().length < 1) {
       setResultados([]);
       return;
     }
-    const { data } = await api.get<Producto[]>("/productos", { params: { q: valor } });
+    const { data } = await api.get<Producto[]>("/productos", {
+      params: { q: valor, sucursalId: sucursalActivaId },
+    });
     setResultados(data);
   }
 
+  function seleccionarResultado(p: Producto) {
+    agregarAlCarrito(p);
+    setBusqueda("");
+    setResultados([]);
+    inputCodigoRef.current?.focus();
+  }
+
   function actualizarCantidad(productoId: string, cantidad: number) {
+    if (cantidad <= 0) void reproducir("producto_eliminado");
     setCarrito((prev) =>
       cantidad <= 0
         ? prev.filter((i) => i.productoId !== productoId)
@@ -87,29 +213,98 @@ export default function Pos() {
     );
   }
 
-  const total = carrito.reduce((acc, i) => acc + i.cantidad * i.precioUnitario, 0);
+  const subtotal = carrito.reduce((acc, i) => acc + i.cantidad * i.precioUnitario, 0);
+  const totalUnidades = carrito.reduce((acc, i) => acc + i.cantidad, 0);
+
+  const montoDescuento = (() => {
+    const v = Number(descuentoValor) || 0;
+    if (v <= 0) return 0;
+    return descuentoTipo === "PORCENTAJE" ? Math.min((subtotal * v) / 100, subtotal) : Math.min(v, subtotal);
+  })();
+
+  const puntosNum = Number(puntosARedimir) || 0;
+  const valorPuntos =
+    fidelizacionActiva && puntosNum > 0 && fidelizacion.valorPunto
+      ? Math.min(puntosNum * fidelizacion.valorPunto, subtotal - montoDescuento)
+      : 0;
+
+  const total = Math.max(0, Math.round((subtotal - montoDescuento - valorPuntos) * 100) / 100);
+  const dineroRecibidoNum = dineroRecibido.trim() === "" ? null : Number(dineroRecibido);
+  const cambio = dineroRecibidoNum !== null ? dineroRecibidoNum - total : null;
+
+  function guardarEnEspera() {
+    if (carrito.length === 0) return;
+    const nombre = prompt("Nombre o referencia para esta venta en espera:", `Cliente ${enEspera.length + 1}`);
+    if (nombre === null) return;
+    setEnEspera((prev) => [...prev, { id: uuidv4(), nombre: nombre || `Venta ${prev.length + 1}`, carrito, creada: Date.now() }]);
+    limpiarCarrito();
+    setMensaje("Venta guardada en espera");
+  }
+
+  function recuperarEspera(v: VentaEnEspera) {
+    if (carrito.length > 0 && !confirm("El carrito actual tiene productos. ¿Reemplazarlo por la venta en espera?")) return;
+    setCarrito(v.carrito);
+    setEnEspera((prev) => prev.filter((e) => e.id !== v.id));
+  }
+
+  function limpiarCarrito() {
+    setCarrito([]);
+    setDescuentoValor("");
+    setPuntosARedimir("");
+    setClienteId("");
+    setDineroRecibido("");
+  }
 
   async function cobrar() {
     if (carrito.length === 0 || !sucursalActivaId) return;
+    setError(null);
+    if (metodoPago === "CREDITO" && !clienteId) {
+      void reproducir("error");
+      setError("Selecciona el cliente para una venta a credito");
+      return;
+    }
+    if (metodoPago === "EFECTIVO" && dineroRecibidoNum !== null && dineroRecibidoNum < total) {
+      void reproducir("error");
+      setError("El dinero recibido es menor al total de la venta");
+      return;
+    }
     setProcesando(true);
     const clienteUuid = uuidv4();
+    const contactoCliente =
+      metodoPago !== "CREDITO" && !clienteId && (contactoNombre || contactoEmail || contactoCelular || contactoCedula)
+        ? {
+            nombre: contactoNombre || undefined,
+            email: contactoEmail || undefined,
+            telefono: contactoCelular || undefined,
+            cedula: contactoCedula || undefined,
+          }
+        : undefined;
     const payload = {
       clienteUuid,
       sucursalId: sucursalActivaId,
       metodoPago,
-      items: carrito.map((i) => ({
-        productoId: i.productoId,
-        cantidad: i.cantidad,
-        precioUnitario: i.precioUnitario,
-      })),
+      clienteId: clienteId || undefined,
+      contactoCliente,
+      items: carrito.map((i) => ({ productoId: i.productoId, cantidad: i.cantidad, precioUnitario: i.precioUnitario })),
+      dineroRecibido: metodoPago === "EFECTIVO" && dineroRecibidoNum !== null ? dineroRecibidoNum : undefined,
+      descuento: montoDescuento > 0 ? { tipo: descuentoTipo, valor: Number(descuentoValor) } : undefined,
+      puntosARedimir: valorPuntos > 0 ? puntosNum : undefined,
     };
 
     let consecutivo = 0;
     let sincronizada = true;
+    let puntosGanados = 0;
     try {
       const { data } = await api.post("/ventas", payload);
       consecutivo = data.consecutivo;
-    } catch {
+      puntosGanados = data.puntosGanados ?? 0;
+    } catch (err: any) {
+      if (err?.response?.status === 409 || err?.response?.status === 403 || err?.response?.status === 400) {
+        void reproducir("error");
+        setError(err?.response?.data?.error ?? "No se pudo registrar la venta");
+        setProcesando(false);
+        return;
+      }
       sincronizada = false;
       await window.pos.queueAdd({ id: clienteUuid, tipo: "venta", endpoint: "/ventas", payload });
     }
@@ -126,119 +321,397 @@ export default function Pos() {
           items: carrito.map((i) => ({ nombre: i.nombre, cantidad: i.cantidad, precioUnitario: i.precioUnitario })),
           total,
           metodoPago,
+          subtotal: montoDescuento > 0 || valorPuntos > 0 ? subtotal : undefined,
+          descuento: montoDescuento > 0 ? montoDescuento : undefined,
+          puntosRedimidos: valorPuntos > 0 ? puntosNum : undefined,
+          valorPuntosRedimidos: valorPuntos > 0 ? valorPuntos : undefined,
+          puntosGanados: puntosGanados > 0 ? puntosGanados : undefined,
+          dineroRecibido: metodoPago === "EFECTIVO" && dineroRecibidoNum !== null ? dineroRecibidoNum : undefined,
+          cambio: metodoPago === "EFECTIVO" && cambio !== null ? cambio : undefined,
+          plantilla: plantilla ?? undefined,
         },
         config.printerName
       );
     } catch {
-      // Si no hay impresora configurada, la venta igual queda registrada/encolada.
+      // Sin impresora la venta igual queda registrada/encolada.
     }
 
-    setMensaje(
-      sincronizada
-        ? `Venta registrada${consecutivo ? ` (No. ${consecutivo})` : ""}`
-        : "Venta guardada localmente, se sincronizara cuando haya conexion"
-    );
-    setCarrito([]);
+    void reproducir("venta");
+    setVentaExitosa({ total, consecutivo, sincronizada, metodoPago, cambio, puntosGanados });
+    limpiarCarrito();
+    setContactoNombre("");
+    setContactoEmail("");
+    setContactoCelular("");
+    setContactoCedula("");
+    setMostrarDatosCliente(false);
+    if (clienteId) api.get<Cliente[]>("/clientes").then(({ data }) => setClientes(data));
     setProcesando(false);
+  }
+
+  function nuevaVenta() {
+    setVentaExitosa(null);
+    setMensaje(null);
     inputCodigoRef.current?.focus();
   }
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 16 }}>
-      <div className="card">
-        <h3>Punto de venta</h3>
-        <input
-          ref={inputCodigoRef}
-          placeholder="Escanea o escribe el codigo de barras y presiona Enter"
-          value={codigo}
-          onChange={(e) => setCodigo(e.target.value)}
-          onKeyDown={handleCodigoKeyDown}
-          style={{ width: "100%", marginBottom: 12 }}
-          autoFocus
-        />
-
-        <input
-          placeholder="Buscar producto por nombre o SKU"
-          value={busqueda}
-          onChange={(e) => handleBusqueda(e.target.value)}
-          style={{ width: "100%", marginBottom: 8 }}
-        />
-        {resultados.length > 0 && (
-          <div className="card" style={{ marginBottom: 12 }}>
-            {resultados.map((p) => (
-              <div
-                key={p.id}
-                style={{ display: "flex", justifyContent: "space-between", padding: 6, cursor: "pointer" }}
-                onClick={() => {
-                  agregarAlCarrito(p);
-                  setBusqueda("");
-                  setResultados([]);
-                }}
-              >
-                <span>{p.nombre} ({p.sku})</span>
-                <span>${Number(p.precio).toFixed(2)}</span>
-              </div>
-            ))}
+    <div>
+      {/* Encabezado con contexto y reloj en vivo */}
+      <div
+        className="card"
+        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, padding: "14px 18px" }}
+      >
+        <div>
+          <h2 style={{ margin: 0, fontSize: 20 }}>Punto de venta</h2>
+          <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>
+            {usuario?.nombre} · {sucursalActiva?.nombre}
           </div>
-        )}
-
-        {mensaje && <p>{mensaje}</p>}
-
-        <table>
-          <thead>
-            <tr>
-              <th>Producto</th>
-              <th>Cant.</th>
-              <th>Precio</th>
-              <th>Subtotal</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {carrito.map((i) => (
-              <tr key={i.productoId}>
-                <td>{i.nombre}</td>
-                <td>
-                  <input
-                    type="number"
-                    min={1}
-                    value={i.cantidad}
-                    onChange={(e) => actualizarCantidad(i.productoId, Number(e.target.value))}
-                    style={{ width: 60 }}
-                  />
-                </td>
-                <td>${i.precioUnitario.toFixed(2)}</td>
-                <td>${(i.cantidad * i.precioUnitario).toFixed(2)}</td>
-                <td>
-                  <button className="secondary" onClick={() => actualizarCantidad(i.productoId, 0)} type="button">
-                    Quitar
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        </div>
+        <Reloj />
       </div>
 
-      <div className="card" style={{ height: "fit-content" }}>
-        <h3>Cobro</h3>
-        <p style={{ fontSize: 24, fontWeight: 700 }}>${total.toFixed(2)}</p>
-        <label>
-          Metodo de pago
-          <select value={metodoPago} onChange={(e) => setMetodoPago(e.target.value as MetodoPago)} style={{ width: "100%" }}>
-            <option value="EFECTIVO">Efectivo</option>
-            <option value="TARJETA">Tarjeta</option>
-            <option value="TRANSFERENCIA">Transferencia</option>
-            <option value="OTRO">Otro</option>
-          </select>
-        </label>
-        <button
-          style={{ width: "100%", marginTop: 12 }}
-          disabled={carrito.length === 0 || procesando}
-          onClick={cobrar}
-          type="button"
-        >
-          {procesando ? "Procesando..." : "Cobrar e imprimir"}
+      {enEspera.length > 0 && (
+        <div className="card" style={{ marginBottom: 16, padding: "10px 14px" }}>
+          <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-muted)", marginBottom: 6 }}>
+            Ventas en espera
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {enEspera.map((v) => (
+              <button key={v.id} type="button" className="secondary" onClick={() => recuperarEspera(v)}>
+                {v.nombre} ({v.carrito.reduce((a, i) => a + i.cantidad, 0)})
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 16 }}>
+        <div className="card">
+          <input
+            ref={inputCodigoRef}
+            placeholder="Escanea o escribe el codigo de barras y presiona Enter"
+            value={codigo}
+            onChange={(e) => setCodigo(e.target.value)}
+            onKeyDown={handleCodigoKeyDown}
+            style={{ width: "100%", marginBottom: 12 }}
+            autoFocus
+          />
+
+          <div style={{ position: "relative", marginBottom: 12 }}>
+            <input
+              placeholder="Buscar producto por nombre, SKU o codigo de barras"
+              value={busqueda}
+              onChange={(e) => handleBusqueda(e.target.value)}
+              style={{ width: "100%" }}
+            />
+            {resultados.length > 0 && (
+              <div
+                className="card"
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 4px)",
+                  left: 0,
+                  right: 0,
+                  zIndex: 20,
+                  maxHeight: 340,
+                  overflowY: "auto",
+                  padding: 6,
+                  boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+                }}
+              >
+                {resultados.map((p) => {
+                  const sinStock = (p.stockSucursal ?? 0) <= 0;
+                  return (
+                    <div
+                      key={p.id}
+                      className="list-item"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        justifyContent: "space-between",
+                        padding: 8,
+                        borderRadius: 8,
+                        cursor: "pointer",
+                      }}
+                      onClick={() => seleccionarResultado(p)}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                        {p.imagenUrl ? (
+                          <img src={p.imagenUrl} alt="" style={{ width: 32, height: 32, borderRadius: 6, objectFit: "cover" }} />
+                        ) : (
+                          <div style={{ width: 32, height: 32, borderRadius: 6, background: "#f3f4f6" }} />
+                        )}
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 500 }}>{p.nombre}</div>
+                          <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
+                            {p.sku} · {sinStock ? <span style={{ color: "var(--danger)" }}>Sin stock</span> : `${p.stockSucursal} disp.`}
+                          </div>
+                        </div>
+                      </div>
+                      <span style={{ fontWeight: 600 }}>${Number(p.precio).toLocaleString("es-CO")}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {mensaje && <p style={{ fontSize: 13, color: "var(--text-muted)" }}>{mensaje}</p>}
+
+          {carrito.length === 0 ? (
+            <div className="empty-state" style={{ padding: "48px 0" }}>
+              El carrito esta vacio — escanea un codigo de barras o busca un producto para empezar
+            </div>
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th>Cant.</th>
+                  <th>Precio</th>
+                  <th>Subtotal</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {carrito.map((i) => (
+                  <tr key={i.productoId}>
+                    <td>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        {i.imagenUrl ? (
+                          <img src={i.imagenUrl} alt="" style={{ width: 28, height: 28, borderRadius: 6, objectFit: "cover" }} />
+                        ) : (
+                          <div style={{ width: 28, height: 28, borderRadius: 6, background: "#f3f4f6" }} />
+                        )}
+                        <div>
+                          <div>{i.nombre}</div>
+                          {i.stockSucursal !== undefined && i.cantidad > i.stockSucursal && (
+                            <div style={{ fontSize: 11, color: "var(--warning)" }}>
+                              Solo {i.stockSucursal} en stock
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        <button className="secondary" type="button" style={{ padding: "2px 8px" }} onClick={() => actualizarCantidad(i.productoId, i.cantidad - 1)}>
+                          −
+                        </button>
+                        <input
+                          type="number"
+                          min={1}
+                          value={i.cantidad}
+                          onChange={(e) => actualizarCantidad(i.productoId, Number(e.target.value))}
+                          style={{ width: 44, textAlign: "center" }}
+                        />
+                        <button className="secondary" type="button" style={{ padding: "2px 8px" }} onClick={() => actualizarCantidad(i.productoId, i.cantidad + 1)}>
+                          +
+                        </button>
+                      </div>
+                    </td>
+                    <td>${i.precioUnitario.toLocaleString("es-CO")}</td>
+                    <td>${(i.cantidad * i.precioUnitario).toLocaleString("es-CO")}</td>
+                    <td>
+                      <button className="secondary" onClick={() => actualizarCantidad(i.productoId, 0)} type="button">
+                        Quitar
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          {carrito.length > 0 && (
+            <button className="secondary" type="button" style={{ marginTop: 12 }} onClick={guardarEnEspera}>
+              Dejar en espera
+            </button>
+          )}
+        </div>
+
+        <div className="card" style={{ height: "fit-content" }}>
+          <h3>Cobro</h3>
+          <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "0 0 4px" }}>
+            {totalUnidades} {totalUnidades === 1 ? "unidad" : "unidades"}
+          </p>
+
+          <label style={{ marginTop: 4 }}>
+            Cliente (opcional)
+            <select value={clienteId} onChange={(e) => setClienteId(e.target.value)} style={{ width: "100%" }}>
+              <option value="">Sin cliente</option>
+              {clientes.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nombre}
+                  {fidelizacionActiva ? ` (${c.puntos} pts)` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label style={{ marginTop: 10 }}>
+            Metodo de pago
+            <select value={metodoPago} onChange={(e) => setMetodoPago(e.target.value as MetodoPago)} style={{ width: "100%" }}>
+              <option value="EFECTIVO">Efectivo</option>
+              <option value="TARJETA">Tarjeta</option>
+              <option value="TRANSFERENCIA">Transferencia</option>
+              <option value="CREDITO">Credito (fiado)</option>
+              <option value="OTRO">Otro</option>
+            </select>
+          </label>
+
+          {puedeDescuentos && (
+            <div style={{ marginTop: 10 }}>
+              <label style={{ fontSize: 12.5 }}>Descuento</label>
+              <div style={{ display: "flex", gap: 6 }}>
+                <select value={descuentoTipo} onChange={(e) => setDescuentoTipo(e.target.value as any)} style={{ width: 90 }}>
+                  <option value="PORCENTAJE">%</option>
+                  <option value="VALOR">$</option>
+                </select>
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="0"
+                  value={descuentoValor}
+                  onChange={(e) => setDescuentoValor(e.target.value)}
+                  style={{ flex: 1 }}
+                />
+              </div>
+            </div>
+          )}
+
+          {fidelizacionActiva && clienteSeleccionado && clienteSeleccionado.puntos > 0 && (
+            <div style={{ marginTop: 10 }}>
+              <label style={{ fontSize: 12.5 }}>
+                Canjear puntos (tiene {clienteSeleccionado.puntos}, valen ${((fidelizacion.valorPunto ?? 0) * clienteSeleccionado.puntos).toLocaleString("es-CO")})
+              </label>
+              <input
+                type="number"
+                min={0}
+                max={clienteSeleccionado.puntos}
+                placeholder="0"
+                value={puntosARedimir}
+                onChange={(e) => setPuntosARedimir(e.target.value)}
+                style={{ width: "100%" }}
+              />
+            </div>
+          )}
+
+          <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border)", fontSize: 13.5 }}>
+            {(montoDescuento > 0 || valorPuntos > 0) && (
+              <>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span>Subtotal</span>
+                  <span>${subtotal.toLocaleString("es-CO")}</span>
+                </div>
+                {montoDescuento > 0 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", color: "var(--success)" }}>
+                    <span>Descuento</span>
+                    <span>-${montoDescuento.toLocaleString("es-CO")}</span>
+                  </div>
+                )}
+                {valorPuntos > 0 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", color: "var(--success)" }}>
+                    <span>Puntos ({puntosNum})</span>
+                    <span>-${valorPuntos.toLocaleString("es-CO")}</span>
+                  </div>
+                )}
+              </>
+            )}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 4 }}>
+              <span style={{ fontWeight: 700 }}>TOTAL</span>
+              <span style={{ fontSize: 26, fontWeight: 700 }}>${total.toLocaleString("es-CO")}</span>
+            </div>
+          </div>
+
+          {metodoPago === "EFECTIVO" && (
+            <div style={{ marginTop: 10 }}>
+              <label>
+                Dinero recibido
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  placeholder={total.toFixed(2)}
+                  value={dineroRecibido}
+                  onChange={(e) => setDineroRecibido(e.target.value)}
+                  style={{ width: "100%" }}
+                />
+              </label>
+              {cambio !== null && (
+                <p style={{ margin: "6px 0 0", fontSize: 14, fontWeight: 700, color: cambio < 0 ? "var(--danger)" : "var(--success)" }}>
+                  {cambio < 0
+                    ? `Falta $${Math.abs(cambio).toLocaleString("es-CO")} para completar el pago`
+                    : `Cambio: $${cambio.toLocaleString("es-CO")}`}
+                </p>
+              )}
+            </div>
+          )}
+
+          {metodoPago !== "CREDITO" && !clienteId && (
+            <div style={{ marginTop: 10 }}>
+              <button type="button" className="secondary" style={{ width: "100%", fontSize: 12.5 }} onClick={() => setMostrarDatosCliente((v) => !v)}>
+                {mostrarDatosCliente ? "Ocultar" : "+ Agregar"} datos del cliente (opcional)
+              </button>
+              {mostrarDatosCliente && (
+                <div className="grid-form" style={{ marginTop: 8 }}>
+                  <input placeholder="Nombre" value={contactoNombre} onChange={(e) => setContactoNombre(e.target.value)} />
+                  <input placeholder="Correo" type="email" value={contactoEmail} onChange={(e) => setContactoEmail(e.target.value)} />
+                  <input placeholder="Celular" value={contactoCelular} onChange={(e) => setContactoCelular(e.target.value)} />
+                  <input placeholder="Cedula" value={contactoCedula} onChange={(e) => setContactoCedula(e.target.value)} />
+                </div>
+              )}
+            </div>
+          )}
+
+          {error && <p className="error-text" style={{ marginTop: 10 }}>{error}</p>}
+          <button
+            style={{ width: "100%", marginTop: 12 }}
+            disabled={carrito.length === 0 || procesando || (cambio !== null && cambio < 0)}
+            onClick={cobrar}
+            type="button"
+          >
+            {procesando ? "Procesando..." : "Cobrar e imprimir"}
+          </button>
+        </div>
+      </div>
+
+      {ventaExitosa && <VentaExitosaModal resultado={ventaExitosa} onCerrar={nuevaVenta} />}
+    </div>
+  );
+}
+
+function VentaExitosaModal({ resultado, onCerrar }: { resultado: ResultadoVenta; onCerrar: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onCerrar, 4500);
+    return () => clearTimeout(t);
+  }, [onCerrar]);
+
+  return (
+    <div className="modal-backdrop" onClick={onCerrar}>
+      <div className="card venta-exitosa" style={{ width: 340, textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
+        <div className="check-circle">
+          <svg viewBox="0 0 52 52" width="56" height="56">
+            <circle className="check-circle-bg" cx="26" cy="26" r="25" fill="none" />
+            <path className="check-mark" fill="none" d="M14 27l7 7 16-16" />
+          </svg>
+        </div>
+        <h3 style={{ margin: "12px 0 2px" }}>¡Venta exitosa!</h3>
+        <p style={{ fontSize: 26, fontWeight: 700, margin: "4px 0" }}>${resultado.total.toLocaleString("es-CO")}</p>
+        {resultado.metodoPago === "EFECTIVO" && resultado.cambio !== null && resultado.cambio > 0 && (
+          <p style={{ fontSize: 16, fontWeight: 600, color: "var(--success)", margin: "0 0 4px" }}>
+            Cambio: ${resultado.cambio.toLocaleString("es-CO")}
+          </p>
+        )}
+        {resultado.puntosGanados > 0 && (
+          <p style={{ fontSize: 13, color: "var(--brand)", margin: "0 0 4px" }}>+{resultado.puntosGanados} puntos</p>
+        )}
+        <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "0 0 16px" }}>
+          {resultado.sincronizada ? `Comprobante No. ${resultado.consecutivo} · ${resultado.metodoPago}` : "Guardada localmente, se sincronizara sola"}
+        </p>
+        <button style={{ width: "100%" }} onClick={onCerrar} type="button">
+          Nueva venta
         </button>
       </div>
     </div>

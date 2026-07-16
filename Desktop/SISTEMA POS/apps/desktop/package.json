@@ -1,7 +1,9 @@
 {
   "name": "@sistema-pos/desktop",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "private": true,
+  "description": "Sistema POS HK - punto de venta multi-sucursal con integracion Shopify",
+  "author": "Sistema POS HK",
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
@@ -11,14 +13,21 @@
   "dependencies": {
     "@sistema-pos/shared": "*",
     "axios": "^1.7.7",
+    "electron-updater": "^6.3.9",
+    "jsbarcode": "^3.12.3",
+    "jspdf": "^2.5.2",
+    "jspdf-autotable": "^3.8.4",
+    "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.2",
     "socket.io-client": "^4.8.0",
     "uuid": "^9.0.1",
+    "xlsx": "^0.18.5",
     "zustand": "^4.5.5"
   },
   "devDependencies": {
+    "@types/qrcode": "^1.5.5",
     "@types/react": "^18.3.9",
     "@types/react-dom": "^18.3.0",
     "@types/uuid": "^9.0.8",

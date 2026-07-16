@@ -1,0 +1,204 @@
+import { useCallback, useEffect, useState } from "react";
+import { api } from "../lib/api";
+import { useSesionStore } from "../lib/store";
+
+interface TurnoAbierto {
+  id: string;
+  sucursalId: string;
+  montoInicial: string | number;
+  fechaApertura: string;
+  usuarioApertura: { nombre: string };
+}
+
+interface TurnoCerrado {
+  id: string;
+  sucursalId: string;
+  montoInicial: string | number;
+  ventasEfectivo: string | number;
+  totalEsperado: string | number;
+  montoContado: string | number;
+  diferencia: string | number;
+  fechaApertura: string;
+  fechaCierre: string;
+  usuarioApertura: { nombre: string };
+  usuarioCierre: { nombre: string } | null;
+  sucursal: { nombre: string };
+}
+
+export default function Caja() {
+  const { sucursales, sucursalActivaId, empresa } = useSesionStore();
+  const [sucursalId, setSucursalId] = useState(sucursalActivaId ?? sucursales[0]?.id ?? "");
+  const [turno, setTurno] = useState<TurnoAbierto | null>(null);
+  const [historial, setHistorial] = useState<TurnoCerrado[]>([]);
+  const [montoInicial, setMontoInicial] = useState("");
+  const [montoContado, setMontoContado] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [procesando, setProcesando] = useState(false);
+
+  const cargar = useCallback(async () => {
+    const [{ data: actual }, { data: hist }] = await Promise.all([
+      api.get<TurnoAbierto | null>("/caja/actual", { params: { sucursalId } }),
+      api.get<TurnoCerrado[]>("/caja/historial", { params: { sucursalId } }),
+    ]);
+    setTurno(actual);
+    setHistorial(hist);
+  }, [sucursalId]);
+
+  useEffect(() => {
+    cargar();
+  }, [cargar]);
+
+  async function abrir() {
+    setProcesando(true);
+    setError(null);
+    try {
+      await api.post("/caja/abrir", { sucursalId, montoInicial: Number(montoInicial) || 0 });
+      setMontoInicial("");
+      await cargar();
+    } catch (err: any) {
+      setError(err?.response?.data?.error ?? "No se pudo abrir la caja");
+    } finally {
+      setProcesando(false);
+    }
+  }
+
+  async function cerrar() {
+    setProcesando(true);
+    setError(null);
+    try {
+      const { data } = await api.post("/caja/cerrar", { sucursalId, montoContado: Number(montoContado) || 0 });
+      setMontoContado("");
+      await cargar();
+      await imprimirCierre(data);
+    } catch (err: any) {
+      setError(err?.response?.data?.error ?? "No se pudo cerrar la caja");
+    } finally {
+      setProcesando(false);
+    }
+  }
+
+  async function imprimirCierre(t: TurnoCerrado) {
+    const config = await window.pos.getConfig();
+    try {
+      await window.pos.printReporteCaja(
+        {
+          empresaNombre: empresa?.nombre ?? "",
+          sucursalNombre: t.sucursal?.nombre ?? sucursales.find((s) => s.id === sucursalId)?.nombre ?? "",
+          fechaApertura: new Date(t.fechaApertura).toLocaleString("es-CO"),
+          fechaCierre: new Date(t.fechaCierre).toLocaleString("es-CO"),
+          usuarioApertura: t.usuarioApertura?.nombre ?? "",
+          usuarioCierre: t.usuarioCierre?.nombre ?? "",
+          montoInicial: Number(t.montoInicial),
+          ventasEfectivo: Number(t.ventasEfectivo),
+          totalEsperado: Number(t.totalEsperado),
+          montoContado: Number(t.montoContado),
+          diferencia: Number(t.diferencia),
+        },
+        config.printerName
+      );
+    } catch {
+      // sin impresora igual quedo registrado
+    }
+  }
+
+  return (
+    <div>
+      <div className="page-header">
+        <div>
+          <h2>Caja</h2>
+          <p>Apertura y cierre de turno con arqueo de efectivo</p>
+        </div>
+        <label>
+          Sucursal
+          <select value={sucursalId} onChange={(e) => setSucursalId(e.target.value)}>
+            {sucursales.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.nombre}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {error && <p className="error-text" style={{ marginBottom: 12 }}>{error}</p>}
+
+      {turno ? (
+        <div className="card" style={{ maxWidth: 460, marginBottom: 16 }}>
+          <span className="badge success" style={{ marginBottom: 8 }}>Caja abierta</span>
+          <p style={{ margin: "6px 0" }}>
+            Abierta por <strong>{turno.usuarioApertura.nombre}</strong> el{" "}
+            {new Date(turno.fechaApertura).toLocaleString("es-CO")}
+          </p>
+          <p style={{ margin: "6px 0" }}>
+            Monto inicial: <strong>${Number(turno.montoInicial).toLocaleString("es-CO")}</strong>
+          </p>
+          <div className="grid-form" style={{ marginTop: 12 }}>
+            <label>
+              Dinero contado fisicamente al cerrar
+              <input type="number" min={0} value={montoContado} onChange={(e) => setMontoContado(e.target.value)} />
+            </label>
+            <button className="danger" type="button" onClick={cerrar} disabled={procesando}>
+              {procesando ? "Cerrando..." : "Cerrar caja e imprimir arqueo"}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="card" style={{ maxWidth: 460, marginBottom: 16 }}>
+          <span className="badge neutral" style={{ marginBottom: 8 }}>Caja cerrada</span>
+          <div className="grid-form" style={{ marginTop: 8 }}>
+            <label>
+              Monto inicial en efectivo
+              <input type="number" min={0} value={montoInicial} onChange={(e) => setMontoInicial(e.target.value)} />
+            </label>
+            <button type="button" onClick={abrir} disabled={procesando}>
+              {procesando ? "Abriendo..." : "Abrir caja"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="card">
+        <h4 style={{ marginTop: 0, marginBottom: 12 }}>Historial de cierres</h4>
+        {historial.length === 0 ? (
+          <p className="empty-state">Aun no hay cierres de caja</p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Apertura</th>
+                <th>Cierre</th>
+                <th>Cajero</th>
+                <th>Inicial</th>
+                <th>Ventas efvo.</th>
+                <th>Esperado</th>
+                <th>Contado</th>
+                <th>Diferencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              {historial.map((t) => {
+                const dif = Number(t.diferencia);
+                return (
+                  <tr key={t.id}>
+                    <td>{new Date(t.fechaApertura).toLocaleString("es-CO")}</td>
+                    <td>{new Date(t.fechaCierre).toLocaleString("es-CO")}</td>
+                    <td>{t.usuarioCierre?.nombre ?? t.usuarioApertura.nombre}</td>
+                    <td>${Number(t.montoInicial).toLocaleString("es-CO")}</td>
+                    <td>${Number(t.ventasEfectivo).toLocaleString("es-CO")}</td>
+                    <td>${Number(t.totalEsperado).toLocaleString("es-CO")}</td>
+                    <td>${Number(t.montoContado).toLocaleString("es-CO")}</td>
+                    <td>
+                      <span className={`badge ${dif === 0 ? "success" : dif > 0 ? "neutral" : "danger"}`}>
+                        {dif === 0 ? "Exacto" : dif > 0 ? `+$${dif.toLocaleString("es-CO")}` : `-$${Math.abs(dif).toLocaleString("es-CO")}`}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}

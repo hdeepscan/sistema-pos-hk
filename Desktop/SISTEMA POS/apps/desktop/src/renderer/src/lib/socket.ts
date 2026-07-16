@@ -1,7 +1,7 @@
 import { io, type Socket } from "socket.io-client";
 import { useEffect } from "react";
 import { useSesionStore } from "./store";
-import type { InventarioActualizadoEvent, VentaCreadaEvent } from "@sistema-pos/shared";
+import type { InventarioActualizadoEvent, VentaCreadaEvent, PedidoShopifyEvent } from "@sistema-pos/shared";
 
 let socket: Socket | undefined;
 
@@ -36,6 +36,17 @@ export function useVentaCreada(handler: (event: VentaCreadaEvent) => void) {
     s.on("venta:creada", handler);
     return () => {
       s.off("venta:creada", handler);
+    };
+  }, [handler]);
+}
+
+export function usePedidoShopify(handler: (event: PedidoShopifyEvent) => void) {
+  useEffect(() => {
+    const s = socket;
+    if (!s) return;
+    s.on("shopify:pedido-nuevo", handler);
+    return () => {
+      s.off("shopify:pedido-nuevo", handler);
     };
   }, [handler]);
 }

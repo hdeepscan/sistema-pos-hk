@@ -1,34 +1,102 @@
 import type { FastifyInstance } from "fastify";
-import { CrearVentaSchema } from "@sistema-pos/shared";
+import { CrearVentaSchema, DevolucionParcialSchema } from "@sistema-pos/shared";
+import type { MetodoPago, CanalVenta } from "@sistema-pos/shared";
 import { prisma } from "../lib/prisma.js";
 import { emitInventarioActualizado, emitVentaCreada } from "../lib/ws.js";
+import { ajustarInventarioEnShopifySiCorresponde } from "../lib/shopify.js";
+import { enviarEventoCompraAMeta } from "../lib/meta.js";
+import { registrarAuditoria } from "../lib/auditoria.js";
+
+const MS_DIA = 24 * 60 * 60 * 1000;
+
+// Busca un cliente existente por cedula, email o telefono; si no existe y hay
+// al menos un dato util, lo crea. Se usa para capturar datos de contacto en
+// cualquier venta sin obligar a elegir un cliente de una lista.
+async function encontrarOCrearCliente(
+  empresaId: string,
+  contacto: { nombre?: string; email?: string; telefono?: string; cedula?: string }
+): Promise<string | undefined> {
+  const { nombre, email, telefono, cedula } = contacto;
+  if (!nombre && !email && !telefono && !cedula) return undefined;
+
+  const existente = await prisma.cliente.findFirst({
+    where: {
+      empresaId,
+      OR: [
+        cedula ? { cedula } : undefined,
+        email ? { email } : undefined,
+        telefono ? { telefono } : undefined,
+      ].filter(Boolean) as object[],
+    },
+  });
+  if (existente) return existente.id;
+
+  const nuevo = await prisma.cliente.create({
+    data: {
+      empresaId,
+      nombre: nombre || "Cliente sin nombre",
+      email: email || undefined,
+      telefono: telefono || undefined,
+      cedula: cedula || undefined,
+    },
+  });
+  return nuevo.id;
+}
 
 export async function ventasRoutes(app: FastifyInstance) {
   app.addHook("preHandler", app.authenticate);
 
-  app.get("/ventas", async (request) => {
+  app.get("/ventas", async (request, reply) => {
     const { empresaId } = request.user;
-    const { sucursalId, desde, hasta } = request.query as {
-      sucursalId?: string;
-      desde?: string;
-      hasta?: string;
-    };
+    if (!request.user.permisos.includes("ventas.ver")) {
+      return reply.code(403).send({ error: "No tienes permiso para ver las ventas" });
+    }
+    const { sucursalId, desde, hasta, montoMin, montoMax, clienteId, usuarioId, metodoPago, canal, limit } =
+      request.query as {
+        sucursalId?: string;
+        desde?: string;
+        hasta?: string;
+        montoMin?: string;
+        montoMax?: string;
+        clienteId?: string;
+        usuarioId?: string;
+        metodoPago?: string;
+        canal?: string;
+        limit?: string;
+      };
     return prisma.venta.findMany({
       where: {
         empresaId,
         ...(sucursalId ? { sucursalId } : {}),
+        ...(clienteId ? { clienteId } : {}),
+        ...(usuarioId ? { usuarioId } : {}),
+        ...(metodoPago ? { metodoPago: metodoPago as MetodoPago } : {}),
+        ...(canal ? { canal: canal as CanalVenta } : {}),
         ...(desde || hasta
           ? {
               fecha: {
                 ...(desde ? { gte: new Date(desde) } : {}),
-                ...(hasta ? { lte: new Date(hasta) } : {}),
+                ...(hasta ? { lte: new Date(`${hasta}T23:59:59.999`) } : {}),
+              },
+            }
+          : {}),
+        ...(montoMin || montoMax
+          ? {
+              total: {
+                ...(montoMin ? { gte: Number(montoMin) } : {}),
+                ...(montoMax ? { lte: Number(montoMax) } : {}),
               },
             }
           : {}),
       },
-      include: { items: true },
+      include: {
+        items: { include: { producto: { select: { nombre: true, sku: true, imagenUrl: true, costo: true } } } },
+        cliente: { select: { nombre: true } },
+        usuario: { select: { id: true, nombre: true } },
+        devoluciones: { orderBy: { fecha: "desc" } },
+      },
       orderBy: { fecha: "desc" },
-      take: 200,
+      take: Math.min(Number(limit) || 200, 5000),
     });
   });
 
@@ -36,11 +104,20 @@ export async function ventasRoutes(app: FastifyInstance) {
   // (por ejemplo tras recuperar conexion), devuelve la venta existente.
   app.post("/ventas", async (request, reply) => {
     const { empresaId, usuarioId } = request.user;
+    if (!request.user.permisos.includes("ventas.crear")) {
+      return reply.code(403).send({ error: "No tienes permiso para registrar ventas" });
+    }
     const parsed = CrearVentaSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: parsed.error.flatten() });
     }
-    const { clienteUuid, sucursalId, metodoPago, items } = parsed.data;
+    const { clienteUuid, sucursalId, contactoCliente, metodoPago, items, dineroRecibido, descuento, puntosARedimir } =
+      parsed.data;
+    let { clienteId } = parsed.data;
+
+    if (metodoPago === "CREDITO" && !clienteId) {
+      return reply.code(400).send({ error: "Una venta a credito requiere seleccionar un cliente" });
+    }
 
     const existente = await prisma.venta.findUnique({
       where: { clienteUuid },
@@ -53,19 +130,79 @@ export async function ventasRoutes(app: FastifyInstance) {
     const sucursal = await prisma.sucursal.findFirst({ where: { id: sucursalId, empresaId } });
     if (!sucursal) return reply.code(404).send({ error: "Sucursal no encontrada" });
 
+    if (clienteId) {
+      const cliente = await prisma.cliente.findFirst({ where: { id: clienteId, empresaId } });
+      if (!cliente) return reply.code(404).send({ error: "Cliente no encontrado" });
+    } else if (contactoCliente) {
+      clienteId = await encontrarOCrearCliente(empresaId, contactoCliente);
+    }
+
     const productoIds = items.map((i) => i.productoId);
-    const inventarios = await prisma.inventarioSucursal.findMany({
-      where: { sucursalId, productoId: { in: productoIds } },
-    });
+    const [inventarios, productosDb] = await Promise.all([
+      prisma.inventarioSucursal.findMany({ where: { sucursalId, productoId: { in: productoIds } } }),
+      prisma.producto.findMany({ where: { id: { in: productoIds }, empresaId }, select: { id: true, nombre: true } }),
+    ]);
     const stockPorProducto = new Map(inventarios.map((i) => [i.productoId, i.cantidad]));
+    const nombrePorProducto = new Map(productosDb.map((p) => [p.id, p.nombre]));
+    const puedeVenderSinStock = request.user.permisos.includes("ventas.sin_stock");
     for (const item of items) {
       const disponible = stockPorProducto.get(item.productoId) ?? 0;
-      if (disponible < item.cantidad) {
-        return reply.code(409).send({ error: `Stock insuficiente para el producto ${item.productoId}` });
+      if (disponible < item.cantidad && !puedeVenderSinStock) {
+        const nombre = nombrePorProducto.get(item.productoId) ?? item.productoId;
+        return reply.code(409).send({ error: `No hay existencias disponibles para: ${nombre}` });
       }
     }
 
-    const total = items.reduce((acc, i) => acc + i.cantidad * i.precioUnitario, 0);
+    const subtotal = items.reduce((acc, i) => acc + i.cantidad * i.precioUnitario, 0);
+
+    // Descuento manual: requiere permiso; se guarda ya convertido a pesos.
+    let montoDescuento = 0;
+    if (descuento) {
+      if (!request.user.permisos.includes("descuentos.aplicar")) {
+        return reply.code(403).send({ error: "No tienes permiso para aplicar descuentos" });
+      }
+      montoDescuento =
+        descuento.tipo === "PORCENTAJE" ? (subtotal * descuento.valor) / 100 : descuento.valor;
+      montoDescuento = Math.min(Math.round(montoDescuento * 100) / 100, subtotal);
+    }
+
+    // Canje de puntos de fidelizacion.
+    const empresa = await prisma.empresa.findUnique({
+      where: { id: empresaId },
+      select: { diasVencimientoCredito: true, pesosPorPunto: true, valorPunto: true },
+    });
+    let valorPuntosRedimidos = 0;
+    if (puntosARedimir && puntosARedimir > 0) {
+      if (!clienteId) {
+        return reply.code(400).send({ error: "Selecciona un cliente para canjear puntos" });
+      }
+      const valorPunto = empresa?.valorPunto ? Number(empresa.valorPunto) : 0;
+      if (valorPunto <= 0) {
+        return reply.code(400).send({ error: "El programa de puntos no esta configurado" });
+      }
+      const cliente = await prisma.cliente.findUnique({ where: { id: clienteId }, select: { puntos: true } });
+      if (!cliente || cliente.puntos < puntosARedimir) {
+        return reply.code(400).send({ error: "El cliente no tiene suficientes puntos" });
+      }
+      valorPuntosRedimidos = Math.min(puntosARedimir * valorPunto, subtotal - montoDescuento);
+    }
+
+    const total = Math.max(0, Math.round((subtotal - montoDescuento - valorPuntosRedimidos) * 100) / 100);
+
+    if (metodoPago === "EFECTIVO" && dineroRecibido !== undefined && dineroRecibido < total) {
+      return reply.code(400).send({ error: "El dinero recibido es menor al total de la venta" });
+    }
+    const cambio = metodoPago === "EFECTIVO" && dineroRecibido !== undefined ? dineroRecibido - total : undefined;
+
+    let fechaVencimientoCredito: Date | undefined;
+    if (metodoPago === "CREDITO") {
+      const dias = empresa?.diasVencimientoCredito ?? 20;
+      fechaVencimientoCredito = new Date(Date.now() + dias * MS_DIA);
+    }
+
+    // Acumulacion de puntos sobre el total final pagado.
+    const pesosPorPunto = empresa?.pesosPorPunto ? Number(empresa.pesosPorPunto) : 0;
+    const puntosGanados = clienteId && pesosPorPunto > 0 ? Math.floor(total / pesosPorPunto) : 0;
 
     const venta = await prisma.$transaction(async (tx) => {
       const ultima = await tx.venta.findFirst({
@@ -81,9 +218,16 @@ export async function ventasRoutes(app: FastifyInstance) {
           empresaId,
           sucursalId,
           usuarioId,
+          clienteId,
           consecutivo,
           total,
           metodoPago,
+          dineroRecibido,
+          cambio,
+          fechaVencimientoCredito,
+          descuento: montoDescuento + valorPuntosRedimidos > 0 ? montoDescuento + valorPuntosRedimidos : undefined,
+          puntosGanados,
+          puntosRedimidos: puntosARedimir ?? 0,
           items: {
             create: items.map((i) => ({
               productoId: i.productoId,
@@ -96,9 +240,10 @@ export async function ventasRoutes(app: FastifyInstance) {
       });
 
       for (const item of items) {
-        await tx.inventarioSucursal.update({
+        await tx.inventarioSucursal.upsert({
           where: { productoId_sucursalId: { productoId: item.productoId, sucursalId } },
-          data: { cantidad: { decrement: item.cantidad } },
+          update: { cantidad: { decrement: item.cantidad } },
+          create: { productoId: item.productoId, sucursalId, cantidad: -item.cantidad },
         });
         await tx.movimientoInventario.create({
           data: {
@@ -112,8 +257,27 @@ export async function ventasRoutes(app: FastifyInstance) {
         });
       }
 
+      if (clienteId && (puntosARedimir || puntosGanados > 0)) {
+        const delta = puntosGanados - (puntosARedimir ?? 0);
+        await tx.cliente.update({ where: { id: clienteId }, data: { puntos: { increment: delta } } });
+        if (puntosARedimir) {
+          await tx.movimientoPuntos.create({
+            data: { clienteId, ventaId: venta.id, tipo: "REDENCION", puntos: -puntosARedimir },
+          });
+        }
+        if (puntosGanados > 0) {
+          await tx.movimientoPuntos.create({
+            data: { clienteId, ventaId: venta.id, tipo: "ACUMULACION", puntos: puntosGanados },
+          });
+        }
+      }
+
       return venta;
     });
+
+    const puntosSaldo = clienteId
+      ? (await prisma.cliente.findUnique({ where: { id: clienteId }, select: { puntos: true } }))?.puntos ?? 0
+      : 0;
 
     emitVentaCreada(empresaId, {
       ventaId: venta.id,
@@ -121,10 +285,21 @@ export async function ventasRoutes(app: FastifyInstance) {
       total: Number(venta.total),
       fecha: venta.fecha.toISOString(),
     });
+    registrarAuditoria({
+      empresaId,
+      usuarioId,
+      accion: "CREAR_VENTA",
+      entidad: "Venta",
+      entidadId: venta.id,
+      detalle: `Venta #${venta.consecutivo} por $${total} (${metodoPago})`,
+    });
     for (const item of items) {
-      const inv = await prisma.inventarioSucursal.findUnique({
-        where: { productoId_sucursalId: { productoId: item.productoId, sucursalId } },
-      });
+      const [inv, producto] = await Promise.all([
+        prisma.inventarioSucursal.findUnique({
+          where: { productoId_sucursalId: { productoId: item.productoId, sucursalId } },
+        }),
+        prisma.producto.findUnique({ where: { id: item.productoId } }),
+      ]);
       if (inv) {
         emitInventarioActualizado(empresaId, {
           productoId: item.productoId,
@@ -132,8 +307,204 @@ export async function ventasRoutes(app: FastifyInstance) {
           cantidad: inv.cantidad,
         });
       }
+      if (producto) {
+        void ajustarInventarioEnShopifySiCorresponde(empresaId, sucursalId, producto, -item.cantidad);
+      }
     }
 
-    return reply.code(201).send(venta);
+    void (async () => {
+      const metaConfig = await prisma.metaConfig.findUnique({ where: { empresaId } });
+      if (!metaConfig?.pixelId) return;
+      if (metaConfig.sucursalEcommerceId && metaConfig.sucursalEcommerceId !== sucursalId) return;
+
+      const cliente = clienteId ? await prisma.cliente.findUnique({ where: { id: clienteId } }) : null;
+      await enviarEventoCompraAMeta(empresaId, {
+        ventaId: venta.id,
+        total: Number(venta.total),
+        fecha: venta.fecha,
+        clienteEmail: cliente?.email,
+        clienteTelefono: cliente?.telefono,
+      });
+    })();
+
+    return reply.code(201).send({ ...venta, subtotal, puntosSaldo });
+  });
+
+  // Devolucion PARCIAL: devuelve solo algunos items/cantidades de una venta,
+  // restaurando inventario y ajustando el total, sin borrar la venta.
+  app.post("/ventas/:id/devoluciones", async (request, reply) => {
+    const { empresaId, usuarioId } = request.user;
+    if (!request.user.permisos.includes("devoluciones.realizar")) {
+      return reply.code(403).send({ error: "No tienes permiso para realizar devoluciones" });
+    }
+    const { id } = request.params as { id: string };
+    const parsed = DevolucionParcialSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+
+    const venta = await prisma.venta.findFirst({
+      where: { id, empresaId },
+      include: { items: { include: { producto: { select: { nombre: true } } } } },
+    });
+    if (!venta) return reply.code(404).send({ error: "Venta no encontrada" });
+
+    const detalle: { productoId: string; nombre: string; cantidad: number; precioUnitario: number }[] = [];
+    for (const item of parsed.data.items) {
+      const ventaItem = venta.items.find((vi) => vi.productoId === item.productoId);
+      if (!ventaItem) {
+        return reply.code(400).send({ error: "El producto no pertenece a esta venta" });
+      }
+      // Se valida contra lo que queda por devolver, no contra lo vendido:
+      // asi dos devoluciones parciales no pueden sumar mas que la venta.
+      const pendiente = ventaItem.cantidad - ventaItem.cantidadDevuelta;
+      if (item.cantidad > pendiente) {
+        return reply.code(400).send({
+          error: `Solo quedan ${pendiente} unidad(es) por devolver de ${ventaItem.producto.nombre}`,
+        });
+      }
+      detalle.push({
+        productoId: item.productoId,
+        nombre: ventaItem.producto.nombre,
+        cantidad: item.cantidad,
+        precioUnitario: Number(ventaItem.precioUnitario),
+      });
+    }
+    const montoDevuelto = detalle.reduce((acc, d) => acc + d.cantidad * d.precioUnitario, 0);
+
+    const devolucion = await prisma.$transaction(async (tx) => {
+      for (const d of detalle) {
+        const ventaItem = venta.items.find((vi) => vi.productoId === d.productoId)!;
+        // Se conserva "cantidad" intacta (historial de la venta original) y
+        // se acumula lo devuelto aparte.
+        await tx.ventaItem.update({
+          where: { id: ventaItem.id },
+          data: { cantidadDevuelta: { increment: d.cantidad } },
+        });
+        await tx.inventarioSucursal.upsert({
+          where: { productoId_sucursalId: { productoId: d.productoId, sucursalId: venta.sucursalId } },
+          update: { cantidad: { increment: d.cantidad } },
+          create: { productoId: d.productoId, sucursalId: venta.sucursalId, cantidad: d.cantidad },
+        });
+        await tx.movimientoInventario.create({
+          data: {
+            productoId: d.productoId,
+            sucursalId: venta.sucursalId,
+            tipo: "AJUSTE",
+            cantidad: d.cantidad,
+            motivo: `Devolucion parcial venta ${venta.consecutivo}`,
+            usuarioId,
+          },
+        });
+      }
+      await tx.venta.update({
+        where: { id },
+        data: { total: Math.max(0, Number(venta.total) - montoDevuelto) },
+      });
+      return tx.devolucionVenta.create({
+        data: {
+          empresaId,
+          ventaId: id,
+          usuarioId,
+          detalle: JSON.stringify(detalle),
+          montoDevuelto,
+          motivo: parsed.data.motivo,
+        },
+      });
+    });
+
+    registrarAuditoria({
+      empresaId,
+      usuarioId,
+      accion: "DEVOLUCION_PARCIAL",
+      entidad: "Venta",
+      entidadId: id,
+      detalle: `Venta #${venta.consecutivo}: ${detalle.map((d) => `${d.cantidad}x ${d.nombre}`).join(", ")} ($${montoDevuelto})`,
+    });
+
+    for (const d of detalle) {
+      const [inv, producto] = await Promise.all([
+        prisma.inventarioSucursal.findUnique({
+          where: { productoId_sucursalId: { productoId: d.productoId, sucursalId: venta.sucursalId } },
+        }),
+        prisma.producto.findUnique({ where: { id: d.productoId } }),
+      ]);
+      if (inv) {
+        emitInventarioActualizado(empresaId, {
+          productoId: d.productoId,
+          sucursalId: venta.sucursalId,
+          cantidad: inv.cantidad,
+        });
+      }
+      if (producto) {
+        void ajustarInventarioEnShopifySiCorresponde(empresaId, venta.sucursalId, producto, d.cantidad);
+      }
+    }
+
+    return reply.code(201).send({ ...devolucion, detalle });
+  });
+
+  // Elimina una venta (por error de cobro o devolucion) y restaura el
+  // inventario que se habia descontado, incluyendo Shopify si aplica.
+  app.delete("/ventas/:id", async (request, reply) => {
+    const { empresaId } = request.user;
+    if (!request.user.permisos.includes("ventas.eliminar")) {
+      return reply.code(403).send({ error: "No tienes permiso para eliminar ventas" });
+    }
+    const { id } = request.params as { id: string };
+
+    const venta = await prisma.venta.findFirst({
+      where: { id, empresaId },
+      include: { items: true },
+    });
+    if (!venta) return reply.code(404).send({ error: "Venta no encontrada" });
+
+    await prisma.$transaction(async (tx) => {
+      for (const item of venta.items) {
+        await tx.inventarioSucursal.update({
+          where: { productoId_sucursalId: { productoId: item.productoId, sucursalId: venta.sucursalId } },
+          data: { cantidad: { increment: item.cantidad } },
+        });
+        await tx.movimientoInventario.create({
+          data: {
+            productoId: item.productoId,
+            sucursalId: venta.sucursalId,
+            tipo: "AJUSTE",
+            cantidad: item.cantidad,
+            motivo: `Eliminacion de venta ${venta.consecutivo}`,
+            usuarioId: request.user.usuarioId,
+          },
+        });
+      }
+      await tx.venta.delete({ where: { id } });
+    });
+
+    registrarAuditoria({
+      empresaId,
+      usuarioId: request.user.usuarioId,
+      accion: "ELIMINAR_VENTA",
+      entidad: "Venta",
+      entidadId: venta.id,
+      detalle: `Venta #${venta.consecutivo} por $${venta.total}`,
+    });
+
+    for (const item of venta.items) {
+      const [inv, producto] = await Promise.all([
+        prisma.inventarioSucursal.findUnique({
+          where: { productoId_sucursalId: { productoId: item.productoId, sucursalId: venta.sucursalId } },
+        }),
+        prisma.producto.findUnique({ where: { id: item.productoId } }),
+      ]);
+      if (inv) {
+        emitInventarioActualizado(empresaId, {
+          productoId: item.productoId,
+          sucursalId: venta.sucursalId,
+          cantidad: inv.cantidad,
+        });
+      }
+      if (producto) {
+        void ajustarInventarioEnShopifySiCorresponde(empresaId, venta.sucursalId, producto, item.cantidad);
+      }
+    }
+
+    return reply.code(204).send();
   });
 }

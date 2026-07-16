@@ -2,8 +2,99 @@ import { z } from "zod";
 
 // ---------- Enums (mirror Prisma enums) ----------
 
-export const RolUsuario = z.enum(["ADMIN", "GERENTE", "CAJERO"]);
+export const RolUsuario = z.enum(["ADMIN", "GERENTE", "SUPERVISOR", "CAJERO", "BODEGA"]);
 export type RolUsuario = z.infer<typeof RolUsuario>;
+
+// ---------- Permisos ----------
+
+export const PERMISOS = [
+  "ventas.ver",
+  "ventas.crear",
+  "ventas.editar",
+  "ventas.eliminar",
+  "ventas.sin_stock",
+  "productos.administrar",
+  "inventario.administrar",
+  "reportes.ver",
+  "clientes.administrar",
+  "creditos.administrar",
+  "gastos.administrar",
+  "configuracion.administrar",
+  "sucursales.administrar",
+  "usuarios.administrar",
+  "devoluciones.realizar",
+  "descuentos.aplicar",
+  "facturas.anular",
+  "caja.administrar",
+] as const;
+export type Permiso = (typeof PERMISOS)[number];
+
+export const ETIQUETAS_PERMISOS: Record<Permiso, string> = {
+  "ventas.ver": "Ver ventas",
+  "ventas.crear": "Crear ventas",
+  "ventas.editar": "Editar ventas",
+  "ventas.eliminar": "Eliminar ventas",
+  "productos.administrar": "Administrar productos",
+  "inventario.administrar": "Administrar inventario",
+  "reportes.ver": "Ver reportes",
+  "clientes.administrar": "Administrar clientes",
+  "creditos.administrar": "Administrar creditos",
+  "gastos.administrar": "Gestionar gastos",
+  "configuracion.administrar": "Configuracion del sistema",
+  "sucursales.administrar": "Administrar sucursales",
+  "usuarios.administrar": "Administrar usuarios",
+  "devoluciones.realizar": "Realizar devoluciones",
+  "descuentos.aplicar": "Aplicar descuentos",
+  "facturas.anular": "Anular facturas",
+  "ventas.sin_stock": "Vender sin existencias",
+  "caja.administrar": "Abrir y cerrar caja",
+};
+
+// Roles predefinidos con sus permisos por defecto. "GERENTE" se mantiene solo
+// por compatibilidad con cuentas creadas antes de este cambio (equivale a
+// SUPERVISOR); ya no se ofrece al crear usuarios nuevos.
+export const PERMISOS_POR_ROL: Record<RolUsuario, Permiso[]> = {
+  ADMIN: [...PERMISOS],
+  GERENTE: [
+    "ventas.ver",
+    "ventas.crear",
+    "ventas.editar",
+    "productos.administrar",
+    "inventario.administrar",
+    "reportes.ver",
+    "clientes.administrar",
+    "creditos.administrar",
+    "gastos.administrar",
+    "devoluciones.realizar",
+    "descuentos.aplicar",
+    "caja.administrar",
+    "ventas.sin_stock",
+  ],
+  SUPERVISOR: [
+    "ventas.ver",
+    "ventas.crear",
+    "ventas.editar",
+    "productos.administrar",
+    "inventario.administrar",
+    "reportes.ver",
+    "clientes.administrar",
+    "creditos.administrar",
+    "gastos.administrar",
+    "devoluciones.realizar",
+    "descuentos.aplicar",
+    "caja.administrar",
+    "ventas.sin_stock",
+  ],
+  CAJERO: [
+    "ventas.ver",
+    "ventas.crear",
+    "clientes.administrar",
+    "creditos.administrar",
+    "descuentos.aplicar",
+    "caja.administrar",
+  ],
+  BODEGA: ["inventario.administrar", "productos.administrar", "reportes.ver"],
+};
 
 export const TipoSucursal = z.enum(["FISICA", "ECOMMERCE"]);
 export type TipoSucursal = z.infer<typeof TipoSucursal>;
@@ -11,8 +102,18 @@ export type TipoSucursal = z.infer<typeof TipoSucursal>;
 export const TipoMovimiento = z.enum(["ENTRADA", "SALIDA", "TRASLADO", "AJUSTE", "VENTA"]);
 export type TipoMovimiento = z.infer<typeof TipoMovimiento>;
 
-export const MetodoPago = z.enum(["EFECTIVO", "TARJETA", "TRANSFERENCIA", "OTRO"]);
+export const MetodoPago = z.enum(["EFECTIVO", "TARJETA", "TRANSFERENCIA", "CREDITO", "OTRO"]);
 export type MetodoPago = z.infer<typeof MetodoPago>;
+
+export const CanalVenta = z.enum(["POS", "SHOPIFY", "WHATSAPP", "OTRO"]);
+export type CanalVenta = z.infer<typeof CanalVenta>;
+
+export const ETIQUETAS_CANAL: Record<CanalVenta, string> = {
+  POS: "Punto de venta",
+  SHOPIFY: "Shopify",
+  WHATSAPP: "WhatsApp",
+  OTRO: "Otro",
+};
 
 // ---------- Auth ----------
 
@@ -48,8 +149,32 @@ export const CrearProductoSchema = z.object({
   precio: z.number().nonnegative(),
   costo: z.number().nonnegative().default(0),
   codigoBarras: z.string().optional(),
+  activo: z.boolean().optional(),
+  proveedorId: z.string().nullable().optional(),
+  // undefined u [] = disponible en todas las sucursales.
+  sucursalIds: z.array(z.string()).optional(),
 });
 export type CrearProductoInput = z.infer<typeof CrearProductoSchema>;
+
+// Edicion masiva: solo los campos incluidos se actualizan, en todos los
+// productos de la lista.
+export const EdicionMasivaProductosSchema = z.object({
+  productoIds: z.array(z.string()).min(1),
+  categoria: z.string().optional(),
+  proveedorId: z.string().nullable().optional(),
+  activo: z.boolean().optional(),
+});
+export type EdicionMasivaProductosInput = z.infer<typeof EdicionMasivaProductosSchema>;
+
+// Ajuste directo de stock (fija la cantidad absoluta, en vez de un delta por
+// movimiento) desde la edicion rapida de Inventario.
+export const AjustarStockDirectoSchema = z.object({
+  productoId: z.string(),
+  sucursalId: z.string(),
+  cantidad: z.number().int().nonnegative(),
+  motivo: z.string().optional(),
+});
+export type AjustarStockDirectoInput = z.infer<typeof AjustarStockDirectoSchema>;
 
 // ---------- Inventario ----------
 
@@ -72,13 +197,211 @@ export const VentaItemSchema = z.object({
 });
 export type VentaItemInput = z.infer<typeof VentaItemSchema>;
 
+export const ContactoClienteSchema = z.object({
+  nombre: z.string().optional(),
+  email: z.string().email().optional().or(z.literal("")),
+  telefono: z.string().optional(),
+  cedula: z.string().optional(),
+});
+export type ContactoClienteInput = z.infer<typeof ContactoClienteSchema>;
+
+export const DescuentoVentaSchema = z.object({
+  tipo: z.enum(["PORCENTAJE", "VALOR"]),
+  valor: z.number().positive(),
+});
+export type DescuentoVentaInput = z.infer<typeof DescuentoVentaSchema>;
+
 export const CrearVentaSchema = z.object({
   clienteUuid: z.string().uuid(), // generated client-side, used for offline dedupe
   sucursalId: z.string(),
+  clienteId: z.string().optional(),
+  contactoCliente: ContactoClienteSchema.optional(),
   metodoPago: MetodoPago,
   items: z.array(VentaItemSchema).min(1),
+  // Solo aplica (y se guarda) cuando metodoPago = EFECTIVO.
+  dineroRecibido: z.number().nonnegative().optional(),
+  // Requiere permiso descuentos.aplicar; el backend calcula el monto final.
+  descuento: DescuentoVentaSchema.optional(),
+  // Requiere cliente seleccionado y programa de fidelizacion configurado.
+  puntosARedimir: z.number().int().positive().optional(),
 });
 export type CrearVentaInput = z.infer<typeof CrearVentaSchema>;
+
+export const DevolucionParcialSchema = z.object({
+  items: z.array(z.object({ productoId: z.string(), cantidad: z.number().int().positive() })).min(1),
+  motivo: z.string().optional(),
+});
+export type DevolucionParcialInput = z.infer<typeof DevolucionParcialSchema>;
+
+// ---------- Clientes / cobranza ----------
+
+export const CrearClienteSchema = z.object({
+  nombre: z.string().min(1),
+  telefono: z.string().optional(),
+  email: z.string().email().optional().or(z.literal("")),
+  direccion: z.string().optional(),
+  cedula: z.string().optional(),
+  ciudad: z.string().optional(),
+});
+export type CrearClienteInput = z.infer<typeof CrearClienteSchema>;
+
+export const RegistrarAbonoSchema = z.object({
+  clienteId: z.string(),
+  monto: z.number().positive(),
+  metodoPago: MetodoPago.default("EFECTIVO"),
+});
+export type RegistrarAbonoInput = z.infer<typeof RegistrarAbonoSchema>;
+
+// ---------- Creditos ----------
+
+export const EstadoCredito = z.enum(["VIGENTE", "PROXIMO_A_VENCER", "VENCIDO", "PAGADO"]);
+export type EstadoCredito = z.infer<typeof EstadoCredito>;
+
+export const ActualizarConfigCreditoSchema = z.object({
+  diasVencimientoCredito: z.number().int().positive(),
+});
+export type ActualizarConfigCreditoInput = z.infer<typeof ActualizarConfigCreditoSchema>;
+
+// ---------- Caja ----------
+
+export const AbrirCajaSchema = z.object({
+  sucursalId: z.string(),
+  montoInicial: z.number().nonnegative(),
+});
+export type AbrirCajaInput = z.infer<typeof AbrirCajaSchema>;
+
+export const CerrarCajaSchema = z.object({
+  sucursalId: z.string(),
+  montoContado: z.number().nonnegative(),
+});
+export type CerrarCajaInput = z.infer<typeof CerrarCajaSchema>;
+
+// ---------- Fidelizacion ----------
+
+export const FidelizacionConfigSchema = z.object({
+  // null = programa desactivado
+  pesosPorPunto: z.number().positive().nullable(),
+  valorPunto: z.number().positive().nullable(),
+});
+export type FidelizacionConfigInput = z.infer<typeof FidelizacionConfigSchema>;
+
+// ---------- Proveedores / compras ----------
+
+export const CrearProveedorSchema = z.object({
+  nombre: z.string().min(1),
+  telefono: z.string().optional(),
+  email: z.string().email().optional().or(z.literal("")),
+  direccion: z.string().optional(),
+});
+export type CrearProveedorInput = z.infer<typeof CrearProveedorSchema>;
+
+export const CompraItemSchema = z.object({
+  productoId: z.string(),
+  cantidad: z.number().int().positive(),
+  costoUnitario: z.number().nonnegative(),
+});
+export type CompraItemInput = z.infer<typeof CompraItemSchema>;
+
+export const CrearCompraSchema = z.object({
+  proveedorId: z.string(),
+  sucursalId: z.string(),
+  items: z.array(CompraItemSchema).min(1),
+});
+export type CrearCompraInput = z.infer<typeof CrearCompraSchema>;
+
+// ---------- Gastos ----------
+
+export const CrearGastoSchema = z.object({
+  sucursalId: z.string().optional(),
+  categoria: z.string().min(1),
+  descripcion: z.string().optional(),
+  monto: z.number().positive(),
+});
+export type CrearGastoInput = z.infer<typeof CrearGastoSchema>;
+
+// ---------- Shopify ----------
+
+export const GuardarShopifyConfigSchema = z.object({
+  shopDomain: z.string().min(1),
+  clientId: z.string().min(1),
+  clientSecret: z.string().min(1),
+  sucursalEcommerceId: z.string(),
+});
+export type GuardarShopifyConfigInput = z.infer<typeof GuardarShopifyConfigSchema>;
+
+// ---------- Colecciones ----------
+
+export const CrearColeccionSchema = z.object({
+  titulo: z.string().min(1),
+  descripcion: z.string().optional(),
+});
+export type CrearColeccionInput = z.infer<typeof CrearColeccionSchema>;
+
+export const AgregarProductoColeccionSchema = z.object({
+  productoId: z.string(),
+});
+export type AgregarProductoColeccionInput = z.infer<typeof AgregarProductoColeccionSchema>;
+
+// ---------- Variantes ----------
+
+export const CrearVarianteSchema = z.object({
+  opcionValor: z.string().min(1),
+  sku: z.string().min(1),
+  precio: z.number().nonnegative(),
+  codigoBarras: z.string().optional(),
+});
+export type CrearVarianteInput = z.infer<typeof CrearVarianteSchema>;
+
+// ---------- Meta Ads ----------
+
+export const GuardarMetaConfigSchema = z.object({
+  accessToken: z.string().min(1),
+  adAccountId: z.string().min(1),
+  pixelId: z.string().optional(),
+  sucursalEcommerceId: z.string().optional(),
+});
+export type GuardarMetaConfigInput = z.infer<typeof GuardarMetaConfigSchema>;
+
+// ---------- Usuarios y permisos ----------
+
+export const CrearUsuarioSchema = z.object({
+  nombre: z.string().min(2),
+  email: z.string().email(),
+  password: z.string().min(8),
+  rol: RolUsuario,
+  // Si se omite, se usan los permisos por defecto de PERMISOS_POR_ROL[rol].
+  permisos: z.array(z.enum(PERMISOS)).optional(),
+});
+export type CrearUsuarioInput = z.infer<typeof CrearUsuarioSchema>;
+
+export const ActualizarUsuarioSchema = z.object({
+  nombre: z.string().min(2).optional(),
+  password: z.string().min(8).optional(),
+  rol: RolUsuario.optional(),
+  permisos: z.array(z.enum(PERMISOS)).optional(),
+  activo: z.boolean().optional(),
+});
+export type ActualizarUsuarioInput = z.infer<typeof ActualizarUsuarioSchema>;
+
+// ---------- Plantilla del recibo ----------
+
+export const GuardarPlantillaReciboSchema = z.object({
+  logoUrl: z.string().nullable().optional(),
+  nombreNegocio: z.string().nullable().optional(),
+  direccion: z.string().nullable().optional(),
+  telefono: z.string().nullable().optional(),
+  email: z.string().nullable().optional(),
+  redesSociales: z.string().nullable().optional(),
+  mensajeAgradecimiento: z.string().nullable().optional(),
+  politicasCambios: z.string().nullable().optional(),
+  piePagina: z.string().nullable().optional(),
+  mostrarQr: z.boolean().optional(),
+  qrContenido: z.string().nullable().optional(),
+  imagenPromocionalUrl: z.string().nullable().optional(),
+  cuponDescuento: z.string().nullable().optional(),
+  promociones: z.string().nullable().optional(),
+});
+export type GuardarPlantillaReciboInput = z.infer<typeof GuardarPlantillaReciboSchema>;
 
 // ---------- WebSocket events ----------
 
@@ -92,5 +415,15 @@ export interface VentaCreadaEvent {
   ventaId: string;
   sucursalId: string;
   total: number;
+  fecha: string;
+}
+
+export interface PedidoShopifyEvent {
+  id: string;
+  ordenId: string;
+  nombre: string;
+  clienteNombre: string | null;
+  total: number;
+  productos: { nombre: string; cantidad: number }[];
   fecha: string;
 }

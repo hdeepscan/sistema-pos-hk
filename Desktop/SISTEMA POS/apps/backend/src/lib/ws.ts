@@ -1,7 +1,7 @@
 import type { Server as HttpServer } from "node:http";
 import { Server as SocketIOServer } from "socket.io";
 import jwt from "jsonwebtoken";
-import type { InventarioActualizadoEvent, VentaCreadaEvent } from "@sistema-pos/shared";
+import type { InventarioActualizadoEvent, VentaCreadaEvent, PedidoShopifyEvent } from "@sistema-pos/shared";
 import type { JwtPayload } from "./jwt.js";
 
 let io: SocketIOServer | undefined;
@@ -41,4 +41,8 @@ export function emitInventarioActualizado(empresaId: string, payload: Inventario
 
 export function emitVentaCreada(empresaId: string, payload: VentaCreadaEvent) {
   io?.to(empresaRoom(empresaId)).emit("venta:creada", payload);
+}
+
+export function emitPedidoShopify(empresaId: string, payload: PedidoShopifyEvent) {
+  io?.to(empresaRoom(empresaId)).emit("shopify:pedido-nuevo", payload);
 }

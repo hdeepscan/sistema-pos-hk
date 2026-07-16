@@ -9,7 +9,7 @@ export interface Sucursal {
 interface SesionState {
   apiBaseUrl: string;
   token: string | null;
-  usuario: { id: string; nombre: string; email: string; rol: string } | null;
+  usuario: { id: string; nombre: string; email: string; rol: string; permisos: string[] } | null;
   empresa: { id: string; nombre: string } | null;
   sucursales: Sucursal[];
   sucursalActivaId: string | null;
@@ -41,3 +41,7 @@ export const useSesionStore = create<SesionState>((set) => ({
   logout: () =>
     set({ token: null, usuario: null, empresa: null, sucursales: [], sucursalActivaId: null }),
 }));
+
+export function usePermiso(permiso: string): boolean {
+  return useSesionStore((s) => s.usuario?.permisos.includes(permiso) ?? false);
+}

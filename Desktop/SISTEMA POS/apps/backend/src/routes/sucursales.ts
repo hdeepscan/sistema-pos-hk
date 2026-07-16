@@ -14,6 +14,9 @@ export async function sucursalesRoutes(app: FastifyInstance) {
   });
 
   app.post("/sucursales", async (request, reply) => {
+    if (!request.user.permisos.includes("sucursales.administrar")) {
+      return reply.code(403).send({ error: "No tienes permiso para administrar sucursales" });
+    }
     const { empresaId } = request.user;
     const parsed = CrearSucursalSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -26,6 +29,9 @@ export async function sucursalesRoutes(app: FastifyInstance) {
   });
 
   app.delete("/sucursales/:id", async (request, reply) => {
+    if (!request.user.permisos.includes("sucursales.administrar")) {
+      return reply.code(403).send({ error: "No tienes permiso para administrar sucursales" });
+    }
     const { empresaId } = request.user;
     const { id } = request.params as { id: string };
     const sucursal = await prisma.sucursal.findFirst({ where: { id, empresaId } });

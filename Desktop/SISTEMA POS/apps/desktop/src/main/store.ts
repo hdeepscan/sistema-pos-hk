@@ -11,6 +11,12 @@ const DEFAULTS: AppConfig = {
   empresaId: null,
   sucursalId: null,
   printerName: null,
+  sonidoActivado: true,
+  sonidoVolumen: 0.6,
+  backupCarpeta: null,
+  backupAutomatico: false,
+  backupFrecuenciaHoras: 24,
+  ultimoBackupAutomatico: null,
 };
 
 function configPath() {

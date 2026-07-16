@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api } from "../lib/api";
 import { useSesionStore } from "../lib/store";
+import logo from "../assets/logo.png";
 
 export default function Login() {
   const [modo, setModo] = useState<"login" | "registro">("login");
@@ -68,7 +69,10 @@ export default function Login() {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h2>Sistema POS</h2>
+        <div className="auth-brand">
+          <img src={logo} alt="Sistema POS HK" style={{ height: 72 }} />
+        </div>
+        <p className="auth-tagline">Ventas, inventario y sucursales en un solo lugar</p>
 
         <div className="grid-form" style={{ marginBottom: 16 }}>
           <label>

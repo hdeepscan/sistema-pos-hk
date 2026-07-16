@@ -10,7 +10,9 @@ datasource db {
 enum RolUsuario {
   ADMIN
   GERENTE
+  SUPERVISOR
   CAJERO
+  BODEGA
 }
 
 enum TipoSucursal {
@@ -30,6 +32,14 @@ enum MetodoPago {
   EFECTIVO
   TARJETA
   TRANSFERENCIA
+  CREDITO
+  OTRO
+}
+
+enum CanalVenta {
+  POS
+  SHOPIFY
+  WHATSAPP
   OTRO
 }
 
@@ -40,10 +50,33 @@ model Empresa {
   activo         Boolean  @default(true)
   fechaRegistro  DateTime @default(now())
 
+  // Dias tras la venta a credito en que se considera vencido, si el saldo
+  // sigue pendiente. Se aplica como snapshot en Venta.fechaVencimientoCredito
+  // al momento de la venta (cambiarlo aqui no afecta creditos ya generados).
+  diasVencimientoCredito Int @default(20)
+
+  // Fidelizacion: cuantos pesos gastados equivalen a 1 punto al comprar, y
+  // cuanto vale 1 punto (en pesos) al canjearlo. Null = programa desactivado.
+  pesosPorPunto Decimal? @db.Decimal(12, 2)
+  valorPunto    Decimal? @db.Decimal(12, 2)
+
   usuarios       Usuario[]
   sucursales     Sucursal[]
   productos      Producto[]
   ventas         Venta[]
+  clientes       Cliente[]
+  proveedores    Proveedor[]
+  gastos         Gasto[]
+  compras        Compra[]
+  colecciones    Coleccion[]
+  shopifyConfig  ShopifyConfig?
+  metaConfig     MetaConfig?
+  gastoPauta     GastoPauta[]
+  auditoria      RegistroAuditoria[]
+  plantillaRecibo PlantillaRecibo?
+  pedidosShopify  PedidoShopifyNotificacion[]
+  turnosCaja      TurnoCaja[]
+  devolucionesVenta DevolucionVenta[]
 
   @@map("empresas")
 }
@@ -56,11 +89,22 @@ model Usuario {
   email        String     @unique
   passwordHash String
   rol          RolUsuario @default(CAJERO)
+  // Permisos resueltos (defaults del rol + personalizaciones). Se evalua en
+  // cada request autenticado, asi que un cambio de rol/permisos o de "activo"
+  // aplica de inmediato sin esperar a que el usuario vuelva a iniciar sesion.
+  permisos     String[]   @default([])
   activo       Boolean    @default(true)
   creadoEn     DateTime   @default(now())
 
   ventas          Venta[]
   movimientos     MovimientoInventario[]
+  gastos          Gasto[]
+  compras         Compra[]
+  abonos          Abono[]
+  auditoria       RegistroAuditoria[]
+  turnosApertura  TurnoCaja[] @relation("TurnoCajaApertura")
+  turnosCierre    TurnoCaja[] @relation("TurnoCajaCierre")
+  devolucionesVenta DevolucionVenta[]
 
   @@index([empresaId])
   @@map("usuarios")
@@ -76,10 +120,18 @@ model Sucursal {
   activo     Boolean       @default(true)
   creadoEn   DateTime      @default(now())
 
+  // Solo se llena para la sucursal vinculada a Shopify: el id de la ubicacion
+  // (location) de Shopify cuyo inventario refleja esta sucursal.
+  shopifyLocationId String?
+
   inventario         InventarioSucursal[]
   movimientos        MovimientoInventario[]     @relation("MovimientoSucursalOrigen")
   movimientosDestino MovimientoInventario[]     @relation("MovimientoSucursalDestino")
   ventas             Venta[]
+  gastos             Gasto[]
+  compras            Compra[]
+  productosDisponibles ProductoSucursal[]
+  turnosCaja         TurnoCaja[]
 
   @@index([empresaId])
   @@map("sucursales")
@@ -98,12 +150,27 @@ model Producto {
   activo        Boolean  @default(true)
   creadoEn      DateTime @default(now())
 
+  shopifyProductId String?
+  shopifyVariantId String?
+  shopifyInventoryItemId String?
+  varianteTitulo   String? // ej. "S / Negro", para agrupar variantes del mismo producto Shopify
+  imagenUrl        String?
+
+  proveedorId   String?
+  proveedor     Proveedor? @relation(fields: [proveedorId], references: [id])
+
   inventario    InventarioSucursal[]
   movimientos   MovimientoInventario[]
   ventaItems    VentaItem[]
+  compraItems   CompraItem[]
+  colecciones   ProductoColeccion[]
+  // Sin filas = disponible en todas las sucursales (default). Con filas,
+  // queda restringido solo a las sucursales listadas.
+  sucursalesDisponibles ProductoSucursal[]
 
   @@unique([empresaId, sku])
   @@index([empresaId, codigoBarras])
+  @@index([empresaId, shopifyProductId])
   @@map("productos")
 }
 
@@ -150,15 +217,37 @@ model Venta {
   sucursal      Sucursal    @relation(fields: [sucursalId], references: [id])
   usuarioId     String
   usuario       Usuario     @relation(fields: [usuarioId], references: [id])
+  clienteId     String?
+  cliente       Cliente?    @relation(fields: [clienteId], references: [id])
   consecutivo   Int
   total         Decimal     @db.Decimal(12, 2)
   metodoPago    MetodoPago
   fecha         DateTime    @default(now())
 
+  // Solo para metodoPago = EFECTIVO: lo que entrego el cliente y el cambio calculado.
+  dineroRecibido Decimal?   @db.Decimal(12, 2)
+  cambio         Decimal?   @db.Decimal(12, 2)
+
+  // Solo para metodoPago = CREDITO: snapshot de Empresa.diasVencimientoCredito
+  // al momento de la venta, para que cambios futuros en la config no muevan
+  // vencimientos ya generados.
+  fechaVencimientoCredito DateTime?
+
+  // Canal por el que entro la venta (POS fisico, Shopify, etc).
+  canal CanalVenta @default(POS)
+
+  // Descuento manual aplicado en el POS (monto en pesos ya calculado) y
+  // puntos del programa de fidelizacion involucrados en esta venta.
+  descuento       Decimal? @db.Decimal(12, 2)
+  puntosGanados   Int      @default(0)
+  puntosRedimidos Int      @default(0)
+
   items         VentaItem[]
+  devoluciones  DevolucionVenta[]
 
   @@unique([empresaId, consecutivo])
   @@index([empresaId, sucursalId])
+  @@index([clienteId])
   @@map("ventas")
 }
 
@@ -170,7 +259,338 @@ model VentaItem {
   producto        Producto @relation(fields: [productoId], references: [id])
   cantidad        Int
   precioUnitario  Decimal  @db.Decimal(12, 2)
+  // Cuanto de este item se devolvio. Se lleva aparte (en vez de restarle a
+  // "cantidad") para conservar intacto el historial de lo que se vendio
+  // originalmente. Lo que sigue en poder del cliente = cantidad - cantidadDevuelta.
+  cantidadDevuelta Int     @default(0)
 
   @@index([ventaId])
   @@map("venta_items")
+}
+
+model Cliente {
+  id          String   @id @default(uuid())
+  empresaId   String
+  empresa     Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nombre      String
+  telefono    String?
+  email       String?
+  direccion   String?
+  cedula      String?
+  ciudad      String?
+  puntos      Int      @default(0)
+  activo      Boolean  @default(true)
+  creadoEn    DateTime @default(now())
+
+  ventas      Venta[]
+  abonos      Abono[]
+  movimientosPuntos MovimientoPuntos[]
+
+  @@index([empresaId])
+  @@map("clientes")
+}
+
+// Pago que un cliente hace para abonar a su deuda (ventas con metodoPago = CREDITO).
+model Abono {
+  id          String     @id @default(uuid())
+  clienteId   String
+  cliente     Cliente    @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  monto       Decimal    @db.Decimal(12, 2)
+  metodoPago  MetodoPago @default(EFECTIVO)
+  usuarioId   String
+  usuario     Usuario    @relation(fields: [usuarioId], references: [id])
+  fecha       DateTime   @default(now())
+
+  @@index([clienteId])
+  @@map("abonos")
+}
+
+model Proveedor {
+  id          String   @id @default(uuid())
+  empresaId   String
+  empresa     Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nombre      String
+  telefono    String?
+  email       String?
+  direccion   String?
+  activo      Boolean  @default(true)
+  creadoEn    DateTime @default(now())
+
+  compras     Compra[]
+  productos   Producto[]
+
+  @@index([empresaId])
+  @@map("proveedores")
+}
+
+// Compra a un proveedor. Al registrarla se suma automaticamente el inventario
+// de la sucursal destino (equivalente a un MovimientoInventario tipo ENTRADA).
+model Compra {
+  id           String       @id @default(uuid())
+  empresaId    String
+  empresa      Empresa      @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  proveedorId  String
+  proveedor    Proveedor    @relation(fields: [proveedorId], references: [id])
+  sucursalId   String
+  sucursal     Sucursal     @relation(fields: [sucursalId], references: [id])
+  usuarioId    String
+  usuario      Usuario      @relation(fields: [usuarioId], references: [id])
+  total        Decimal      @db.Decimal(12, 2)
+  fecha        DateTime     @default(now())
+
+  items        CompraItem[]
+
+  @@index([empresaId, sucursalId])
+  @@index([proveedorId])
+  @@map("compras")
+}
+
+model CompraItem {
+  id             String   @id @default(uuid())
+  compraId       String
+  compra         Compra   @relation(fields: [compraId], references: [id], onDelete: Cascade)
+  productoId     String
+  producto       Producto @relation(fields: [productoId], references: [id])
+  cantidad       Int
+  costoUnitario  Decimal  @db.Decimal(12, 2)
+
+  @@index([compraId])
+  @@map("compra_items")
+}
+
+model Gasto {
+  id          String    @id @default(uuid())
+  empresaId   String
+  empresa     Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  sucursalId  String?
+  sucursal    Sucursal? @relation(fields: [sucursalId], references: [id])
+  categoria   String
+  descripcion String?
+  monto       Decimal   @db.Decimal(12, 2)
+  usuarioId   String
+  usuario     Usuario   @relation(fields: [usuarioId], references: [id])
+  fecha       DateTime  @default(now())
+
+  @@index([empresaId, fecha])
+  @@map("gastos")
+}
+
+// Credenciales y estado de sincronizacion de la integracion con Shopify
+// (flujo client_credentials, vigente desde 2026). Una por empresa.
+model ShopifyConfig {
+  id                  String    @id @default(uuid())
+  empresaId           String    @unique
+  empresa             Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  shopDomain          String
+  clientId            String
+  clientSecret        String
+  sucursalEcommerceId String
+  accessToken         String?
+  tokenExpiraEn       DateTime?
+  ultimaSincronizacion DateTime?
+  ultimaAlertaOrdenes DateTime?
+  creadoEn            DateTime  @default(now())
+
+  @@map("shopify_config")
+}
+
+// Credenciales de la integracion con Meta Ads (Marketing API + Conversions
+// API). Una por empresa.
+model MetaConfig {
+  id                   String    @id @default(uuid())
+  empresaId            String    @unique
+  empresa              Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  accessToken          String
+  adAccountId          String
+  pixelId              String?
+  sucursalEcommerceId  String?
+  ultimaSincronizacion DateTime?
+  creadoEn             DateTime  @default(now())
+
+  @@map("meta_config")
+}
+
+// Cache diario de gasto en pauta por campaña, traido de Meta Ads, para
+// comparar contra las ventas en Reportes.
+model GastoPauta {
+  id          String   @id @default(uuid())
+  empresaId   String
+  empresa     Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  campaniaId  String
+  campania    String
+  fecha       DateTime
+  gasto       Decimal  @db.Decimal(12, 2)
+  impresiones Int      @default(0)
+  clics       Int      @default(0)
+  creadoEn    DateTime @default(now())
+
+  @@unique([empresaId, campaniaId, fecha])
+  @@index([empresaId, fecha])
+  @@map("gasto_pauta")
+}
+
+model Coleccion {
+  id                  String    @id @default(uuid())
+  empresaId           String
+  empresa             Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  titulo              String
+  descripcion         String?
+  imagenUrl           String?
+  shopifyCollectionId String?
+  creadoEn            DateTime  @default(now())
+
+  productos           ProductoColeccion[]
+
+  @@index([empresaId])
+  @@index([empresaId, shopifyCollectionId])
+  @@map("colecciones")
+}
+
+model ProductoColeccion {
+  id           String    @id @default(uuid())
+  productoId   String
+  producto     Producto  @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  coleccionId  String
+  coleccion    Coleccion @relation(fields: [coleccionId], references: [id], onDelete: Cascade)
+
+  @@unique([productoId, coleccionId])
+  @@index([coleccionId])
+  @@map("producto_colecciones")
+}
+
+// Sucursales en las que un producto (variante) esta disponible para venta.
+// Ausencia de filas para un producto = disponible en todas las sucursales.
+model ProductoSucursal {
+  id         String   @id @default(uuid())
+  productoId String
+  producto   Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  sucursalId String
+  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
+
+  @@unique([productoId, sucursalId])
+  @@index([sucursalId])
+  @@map("producto_sucursales")
+}
+
+// Historial de acciones relevantes (ventas, usuarios, productos, creditos,
+// gastos) para auditoria: quien hizo que y cuando.
+model RegistroAuditoria {
+  id         String   @id @default(uuid())
+  empresaId  String
+  empresa    Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  usuarioId  String?
+  usuario    Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  accion     String
+  entidad    String
+  entidadId  String?
+  detalle    String?
+  fecha      DateTime @default(now())
+
+  @@index([empresaId, fecha])
+  @@map("registro_auditoria")
+}
+
+// Plantilla configurable del recibo impreso. Una por empresa; los campos
+// obligatorios de una venta (items, totales, fecha, factura) NUNCA salen de
+// aqui, se arman siempre en printer.ts independientemente de esta plantilla.
+model PlantillaRecibo {
+  id                    String   @id @default(uuid())
+  empresaId             String   @unique
+  empresa               Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  logoUrl               String?
+  nombreNegocio         String?
+  direccion             String?
+  telefono              String?
+  email                 String?
+  redesSociales         String?
+  mensajeAgradecimiento String?
+  politicasCambios      String?
+  piePagina             String?
+  mostrarQr             Boolean  @default(false)
+  qrContenido           String?
+  imagenPromocionalUrl  String?
+  cuponDescuento        String?
+  promociones           String?
+  actualizadoEn         DateTime @updatedAt
+
+  @@map("plantilla_recibo")
+}
+
+// Turnos de caja: apertura con monto inicial y cierre con arqueo (conteo
+// fisico vs esperado) por sucursal.
+model TurnoCaja {
+  id                String    @id @default(uuid())
+  empresaId         String
+  empresa           Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  sucursalId        String
+  sucursal          Sucursal  @relation(fields: [sucursalId], references: [id])
+  usuarioAperturaId String
+  usuarioApertura   Usuario   @relation("TurnoCajaApertura", fields: [usuarioAperturaId], references: [id])
+  usuarioCierreId   String?
+  usuarioCierre     Usuario?  @relation("TurnoCajaCierre", fields: [usuarioCierreId], references: [id])
+  montoInicial      Decimal   @db.Decimal(12, 2)
+  fechaApertura     DateTime  @default(now())
+  fechaCierre       DateTime?
+  ventasEfectivo    Decimal?  @db.Decimal(12, 2)
+  totalEsperado     Decimal?  @db.Decimal(12, 2)
+  montoContado      Decimal?  @db.Decimal(12, 2)
+  diferencia        Decimal?  @db.Decimal(12, 2)
+
+  @@index([empresaId, sucursalId, fechaApertura])
+  @@map("turnos_caja")
+}
+
+// Devolucion parcial de una venta: guarda que items/cantidades se
+// devolvieron para conservar el historial completo de la transaccion.
+model DevolucionVenta {
+  id            String   @id @default(uuid())
+  empresaId     String
+  empresa       Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  ventaId       String
+  venta         Venta    @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  usuarioId     String
+  usuario       Usuario  @relation(fields: [usuarioId], references: [id])
+  detalle       String // JSON: [{ productoId, nombre, cantidad, precioUnitario }]
+  montoDevuelto Decimal  @db.Decimal(12, 2)
+  motivo        String?
+  fecha         DateTime @default(now())
+
+  @@index([empresaId, fecha])
+  @@index([ventaId])
+  @@map("devoluciones_venta")
+}
+
+// Historial de puntos de fidelizacion por cliente.
+model MovimientoPuntos {
+  id        String   @id @default(uuid())
+  clienteId String
+  cliente   Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  ventaId   String?
+  tipo      String // ACUMULACION | REDENCION
+  puntos    Int
+  fecha     DateTime @default(now())
+
+  @@index([clienteId])
+  @@map("movimientos_puntos")
+}
+
+// Pedidos de Shopify detectados por el poller, guardados para el centro de
+// notificaciones (historial) ademas de la alerta en vivo por websocket.
+model PedidoShopifyNotificacion {
+  id            String    @id @default(uuid())
+  empresaId     String
+  empresa       Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  ordenId       String
+  numeroOrden   String
+  clienteNombre String?
+  total         Decimal   @db.Decimal(12, 2)
+  productos     String // JSON: [{ nombre, cantidad }]
+  fechaPedido   DateTime
+  atendido      Boolean   @default(false)
+  fechaAtendido DateTime?
+  creadoEn      DateTime  @default(now())
+
+  @@unique([empresaId, ordenId])
+  @@index([empresaId, creadoEn])
+  @@map("pedidos_shopify_notificacion")
 }

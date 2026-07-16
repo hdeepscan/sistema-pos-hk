@@ -1,0 +1,575 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { api } from "../lib/api";
+import { useSesionStore, usePermiso } from "../lib/store";
+import { useVentaCreada } from "../lib/socket";
+import { BotonesExportar } from "../lib/BotonesExportar";
+import type { ColumnaExport } from "../lib/export";
+
+interface VentaItem {
+  id: string;
+  productoId: string;
+  cantidad: number;
+  cantidadDevuelta: number;
+  precioUnitario: string | number;
+  producto: { nombre: string; sku: string; imagenUrl: string | null; costo: string | number };
+}
+
+interface Venta {
+  id: string;
+  consecutivo: number;
+  total: string | number;
+  metodoPago: string;
+  canal: string;
+  fecha: string;
+  sucursalId: string;
+  descuento: string | number | null;
+  items: VentaItem[];
+  cliente: { nombre: string } | null;
+  usuario: { id: string; nombre: string } | null;
+}
+
+interface Cliente {
+  id: string;
+  nombre: string;
+}
+
+const ESTADOS_CREDITO: Record<string, string> = {
+  VIGENTE: "Vigente",
+  PROXIMO_A_VENCER: "Proximo a vencer",
+  VENCIDO: "Vencido",
+  PAGADO: "Pagada",
+};
+
+const ETIQUETAS_CANAL: Record<string, string> = {
+  PUNTO_DE_VENTA: "Punto de venta",
+  SHOPIFY: "Shopify",
+  WHATSAPP: "WhatsApp",
+  OTRO: "Otro",
+};
+
+const badgeCanal: Record<string, string> = {
+  PUNTO_DE_VENTA: "neutral",
+  SHOPIFY: "success",
+  WHATSAPP: "warning",
+  OTRO: "neutral",
+};
+
+const badgePago: Record<string, string> = {
+  EFECTIVO: "success",
+  TARJETA: "neutral",
+  TRANSFERENCIA: "neutral",
+  CREDITO: "warning",
+  OTRO: "neutral",
+};
+
+function resumenItems(items: VentaItem[]): string {
+  const nombres = items.map((i) => `${i.cantidad}x ${i.producto.nombre}`);
+  if (nombres.length <= 2) return nombres.join(", ");
+  return `${nombres.slice(0, 2).join(", ")} y ${nombres.length - 2} mas`;
+}
+
+function columnasExportVentas(
+  sucursales: { id: string; nombre: string }[],
+  estadoDe: (venta: Venta) => string
+): ColumnaExport<Venta>[] {
+  return [
+    { encabezado: "Numero de factura", clave: "consecutivo", formato: (v) => `#${v}` },
+    { encabezado: "Fecha", clave: "fecha", formato: (v) => new Date(v).toLocaleString("es-CO") },
+    { encabezado: "Sucursal", clave: "sucursalId", formato: (v) => sucursales.find((s) => s.id === v)?.nombre ?? "" },
+    { encabezado: "Cliente", clave: "cliente", formato: (v) => v?.nombre ?? "" },
+    { encabezado: "Cajero", clave: "usuario", formato: (v) => v?.nombre ?? "" },
+    { encabezado: "Productos", clave: "items", formato: (_v, fila) => resumenItems(fila.items) },
+    {
+      encabezado: "Cantidad",
+      clave: "items",
+      formato: (_v, fila) => String(fila.items.reduce((acc, i) => acc + i.cantidad, 0)),
+    },
+    { encabezado: "Total", clave: "total", formato: (v) => String(v) },
+    { encabezado: "Metodo de pago", clave: "metodoPago" },
+    { encabezado: "Canal de venta", clave: "canal", formato: (v) => ETIQUETAS_CANAL[v] ?? v },
+    { encabezado: "Estado", clave: "id", formato: (_v, fila) => estadoDe(fila) },
+    {
+      encabezado: "Ganancia",
+      clave: "total",
+      formato: (v, fila) => {
+        const costoTotal = fila.items.reduce((acc, i) => acc + i.cantidad * Number(i.producto.costo), 0);
+        return String(Number(v) - costoTotal);
+      },
+    },
+  ];
+}
+
+export default function Ventas() {
+  const { sucursales, sucursalActivaId } = useSesionStore();
+  const [ventas, setVentas] = useState<Venta[]>([]);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [estadoPorVenta, setEstadoPorVenta] = useState<Map<string, string>>(new Map());
+  const [filtroSucursal, setFiltroSucursal] = useState<string>(sucursalActivaId ?? "");
+  const [desde, setDesde] = useState("");
+  const [hasta, setHasta] = useState("");
+  const [montoMin, setMontoMin] = useState("");
+  const [montoMax, setMontoMax] = useState("");
+  const [filtroClienteId, setFiltroClienteId] = useState("");
+  const [filtroUsuarioId, setFiltroUsuarioId] = useState("");
+  const [filtroMetodoPago, setFiltroMetodoPago] = useState("");
+  const [filtroCanal, setFiltroCanal] = useState("");
+  const [filtroEstado, setFiltroEstado] = useState("");
+  const [cargando, setCargando] = useState(true);
+  const [seleccionada, setSeleccionada] = useState<Venta | null>(null);
+
+  const cargar = useCallback(async () => {
+    setCargando(true);
+    const { data } = await api.get<Venta[]>("/ventas", {
+      params: {
+        sucursalId: filtroSucursal || undefined,
+        desde: desde || undefined,
+        hasta: hasta || undefined,
+        montoMin: montoMin || undefined,
+        montoMax: montoMax || undefined,
+        clienteId: filtroClienteId || undefined,
+        usuarioId: filtroUsuarioId || undefined,
+        metodoPago: filtroMetodoPago || undefined,
+        canal: filtroCanal || undefined,
+        limit: 2000,
+      },
+    });
+    setVentas(data);
+    setCargando(false);
+  }, [filtroSucursal, desde, hasta, montoMin, montoMax, filtroClienteId, filtroUsuarioId, filtroMetodoPago, filtroCanal]);
+
+  useEffect(() => {
+    cargar();
+  }, [cargar]);
+
+  useEffect(() => {
+    api.get<Cliente[]>("/clientes").then(({ data }) => setClientes(data));
+  }, []);
+
+  useEffect(() => {
+    Promise.all([
+      api.get("/creditos", { params: { estado: undefined } }).catch(() => ({ data: [] })),
+      api.get("/creditos", { params: { estado: "PAGADO" } }).catch(() => ({ data: [] })),
+    ]).then(([activos, pagados]) => {
+      const mapa = new Map<string, string>();
+      for (const c of [...activos.data, ...pagados.data]) mapa.set(c.ventaId, c.estado);
+      setEstadoPorVenta(mapa);
+    });
+  }, [ventas]);
+
+  useVentaCreada(useCallback(() => cargar(), [cargar]));
+
+  const cajeros = useMemo(() => {
+    const mapa = new Map<string, string>();
+    for (const v of ventas) if (v.usuario) mapa.set(v.usuario.id, v.usuario.nombre);
+    return [...mapa.entries()].map(([id, nombre]) => ({ id, nombre }));
+  }, [ventas]);
+
+  function estadoDe(venta: Venta): string {
+    if (venta.metodoPago !== "CREDITO") return "Pagada";
+    const estado = estadoPorVenta.get(venta.id);
+    return estado ? ESTADOS_CREDITO[estado] ?? estado : "Vigente";
+  }
+
+  const ventasFiltradas = filtroEstado ? ventas.filter((v) => estadoDe(v) === filtroEstado) : ventas;
+  const totalListado = ventasFiltradas.reduce((acc, v) => acc + Number(v.total), 0);
+
+  function limpiarFiltros() {
+    setFiltroSucursal("");
+    setDesde("");
+    setHasta("");
+    setMontoMin("");
+    setMontoMax("");
+    setFiltroClienteId("");
+    setFiltroUsuarioId("");
+    setFiltroMetodoPago("");
+    setFiltroCanal("");
+    setFiltroEstado("");
+  }
+
+  return (
+    <div>
+      <div className="page-header">
+        <div>
+          <h2>Ventas</h2>
+          <p>Historial de ventas registradas, en vivo</p>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "flex-end" }}>
+          <label>
+            Sucursal
+            <select value={filtroSucursal} onChange={(e) => setFiltroSucursal(e.target.value)}>
+              <option value="">Todas</option>
+              {sucursales.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nombre}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Desde
+            <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} />
+          </label>
+          <label>
+            Hasta
+            <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} />
+          </label>
+          <label>
+            Monto minimo
+            <input type="number" placeholder="0" value={montoMin} onChange={(e) => setMontoMin(e.target.value)} style={{ width: 100 }} />
+          </label>
+          <label>
+            Monto maximo
+            <input type="number" placeholder="Sin limite" value={montoMax} onChange={(e) => setMontoMax(e.target.value)} style={{ width: 110 }} />
+          </label>
+          <label>
+            Cliente
+            <select value={filtroClienteId} onChange={(e) => setFiltroClienteId(e.target.value)}>
+              <option value="">Todos</option>
+              {clientes.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nombre}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Cajero
+            <select value={filtroUsuarioId} onChange={(e) => setFiltroUsuarioId(e.target.value)}>
+              <option value="">Todos</option>
+              {cajeros.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nombre}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Metodo de pago
+            <select value={filtroMetodoPago} onChange={(e) => setFiltroMetodoPago(e.target.value)}>
+              <option value="">Todos</option>
+              <option value="EFECTIVO">Efectivo</option>
+              <option value="TARJETA">Tarjeta</option>
+              <option value="TRANSFERENCIA">Transferencia</option>
+              <option value="CREDITO">Credito</option>
+              <option value="OTRO">Otro</option>
+            </select>
+          </label>
+          <label>
+            Canal de venta
+            <select value={filtroCanal} onChange={(e) => setFiltroCanal(e.target.value)}>
+              <option value="">Todos</option>
+              <option value="PUNTO_DE_VENTA">Punto de venta</option>
+              <option value="SHOPIFY">Shopify</option>
+              <option value="WHATSAPP">WhatsApp</option>
+              <option value="OTRO">Otro</option>
+            </select>
+          </label>
+          <label>
+            Estado
+            <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
+              <option value="">Todos</option>
+              <option value="Pagada">Pagada</option>
+              <option value="Vigente">Vigente</option>
+              <option value="Proximo a vencer">Proximo a vencer</option>
+              <option value="Vencido">Vencido</option>
+            </select>
+          </label>
+          <button className="secondary" type="button" onClick={limpiarFiltros}>
+            Limpiar filtros
+          </button>
+        </div>
+      </div>
+
+      <div className="toolbar" style={{ marginBottom: 16 }}>
+        <BotonesExportar
+          nombreArchivo="ventas"
+          titulo="Historial de ventas"
+          columnas={columnasExportVentas(sucursales, estadoDe)}
+          filas={ventasFiltradas}
+        />
+      </div>
+
+      <div className="stat-grid">
+        <div className="stat-card">
+          <div className="label">Ventas en el listado</div>
+          <div className="value">{ventasFiltradas.length}</div>
+        </div>
+        <div className="stat-card">
+          <div className="label">Total</div>
+          <div className="value positive">${totalListado.toLocaleString("es-CO")}</div>
+        </div>
+      </div>
+
+      <div className="card">
+        {cargando ? (
+          <p className="empty-state">Cargando...</p>
+        ) : ventasFiltradas.length === 0 ? (
+          <p className="empty-state">No hay ventas que coincidan con estos filtros</p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>No.</th>
+                <th>Fecha</th>
+                <th>Canal</th>
+                <th>Sucursal</th>
+                <th>Productos</th>
+                <th>Pago</th>
+                <th>Total</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {ventasFiltradas.map((v) => (
+                <tr key={v.id} className="list-item" style={{ cursor: "pointer" }} onClick={() => setSeleccionada(v)}>
+                  <td>#{v.consecutivo}</td>
+                  <td>{new Date(v.fecha).toLocaleString("es-CO")}</td>
+                  <td>
+                    <span className={`badge ${badgeCanal[v.canal] ?? "neutral"}`}>{ETIQUETAS_CANAL[v.canal] ?? v.canal}</span>
+                  </td>
+                  <td>{sucursales.find((s) => s.id === v.sucursalId)?.nombre ?? "-"}</td>
+                  <td style={{ maxWidth: 280 }}>{resumenItems(v.items)}</td>
+                  <td>
+                    <span className={`badge ${badgePago[v.metodoPago] ?? "neutral"}`}>{v.metodoPago}</span>
+                  </td>
+                  <td>${Number(v.total).toLocaleString("es-CO")}</td>
+                  <td>
+                    <button className="secondary" type="button" onClick={(e) => { e.stopPropagation(); setSeleccionada(v); }}>
+                      Ver detalle
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {seleccionada && (
+        <DetalleVenta
+          venta={seleccionada}
+          sucursalNombre={sucursales.find((s) => s.id === seleccionada.sucursalId)?.nombre ?? "-"}
+          onClose={() => setSeleccionada(null)}
+          onEliminada={() => {
+            setSeleccionada(null);
+            cargar();
+          }}
+          onDevuelta={() => {
+            setSeleccionada(null);
+            cargar();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function DetalleVenta({
+  venta,
+  sucursalNombre,
+  onClose,
+  onEliminada,
+  onDevuelta,
+}: {
+  venta: Venta;
+  sucursalNombre: string;
+  onClose: () => void;
+  onEliminada: () => void;
+  onDevuelta: () => void;
+}) {
+  const puedeDevolver = usePermiso("devoluciones.realizar");
+  const [confirmando, setConfirmando] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
+  const [modoDevolucion, setModoDevolucion] = useState(false);
+  const [devolver, setDevolver] = useState<Record<string, number>>({});
+  const [motivo, setMotivo] = useState("");
+  const [procesandoDev, setProcesandoDev] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function eliminar() {
+    setEliminando(true);
+    setError(null);
+    try {
+      await api.delete(`/ventas/${venta.id}`);
+      onEliminada();
+    } catch (err: any) {
+      setError(err?.response?.data?.error ?? "No se pudo eliminar la venta");
+      setEliminando(false);
+    }
+  }
+
+  // Se indexa por productoId porque es lo que identifica al item en el backend.
+  const itemsADevolver = Object.entries(devolver).filter(([, c]) => c > 0);
+  const totalDevolucion = itemsADevolver.reduce((acc, [productoId, cant]) => {
+    const item = venta.items.find((i) => i.productoId === productoId);
+    return acc + (item ? cant * Number(item.precioUnitario) : 0);
+  }, 0);
+
+  async function registrarDevolucion() {
+    if (itemsADevolver.length === 0) return;
+    setProcesandoDev(true);
+    setError(null);
+    try {
+      await api.post(`/ventas/${venta.id}/devoluciones`, {
+        items: itemsADevolver.map(([productoId, cantidad]) => ({ productoId, cantidad })),
+        motivo: motivo || undefined,
+      });
+      onDevuelta();
+    } catch (err: any) {
+      setError(err?.response?.data?.error ?? "No se pudo registrar la devolucion");
+      setProcesandoDev(false);
+    }
+  }
+
+  const hayDevoluciones = venta.items.some((i) => i.cantidadDevuelta > 0);
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="card" style={{ width: 480 }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: 4 }}>
+          <h3 style={{ margin: 0 }}>Venta #{venta.consecutivo}</h3>
+          <button className="secondary" type="button" onClick={onClose}>
+            Cerrar
+          </button>
+        </div>
+        <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "0 0 12px" }}>
+          {new Date(venta.fecha).toLocaleString("es-CO")} · {sucursalNombre}
+          {venta.usuario && <> · Cajero: {venta.usuario.nombre}</>}
+          {" · "}
+          <span className={`badge ${badgeCanal[venta.canal] ?? "neutral"}`}>{ETIQUETAS_CANAL[venta.canal] ?? venta.canal}</span>
+        </p>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th>Cant.</th>
+              <th>Subtotal</th>
+              {modoDevolucion && <th>Devolver</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {venta.items.map((i) => {
+              const disponibles = i.cantidad - i.cantidadDevuelta;
+              return (
+                <tr key={i.id}>
+                  <td>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      {i.producto.imagenUrl ? (
+                        <img src={i.producto.imagenUrl} alt="" style={{ width: 28, height: 28, borderRadius: 6, objectFit: "cover" }} />
+                      ) : (
+                        <div style={{ width: 28, height: 28, borderRadius: 6, background: "#f3f4f6" }} />
+                      )}
+                      <div>
+                        <div>{i.producto.nombre}</div>
+                        <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{i.producto.sku}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    {i.cantidad}
+                    {i.cantidadDevuelta > 0 && (
+                      <div style={{ fontSize: 11, color: "var(--danger)" }}>{i.cantidadDevuelta} devuelto(s)</div>
+                    )}
+                  </td>
+                  <td>${(i.cantidad * Number(i.precioUnitario)).toLocaleString("es-CO")}</td>
+                  {modoDevolucion && (
+                    <td>
+                      {disponibles > 0 ? (
+                        <input
+                          type="number"
+                          min={0}
+                          max={disponibles}
+                          value={devolver[i.productoId] ?? 0}
+                          onChange={(e) =>
+                            setDevolver((prev) => ({
+                              ...prev,
+                              [i.productoId]: Math.max(0, Math.min(disponibles, Number(e.target.value) || 0)),
+                            }))
+                          }
+                          style={{ width: 60 }}
+                        />
+                      ) : (
+                        <span style={{ fontSize: 11, color: "var(--text-muted)" }}>Todo devuelto</span>
+                      )}
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 14, paddingTop: 10, borderTop: "1px solid var(--border)" }}>
+          <div>
+            <span className={`badge ${badgePago[venta.metodoPago] ?? "neutral"}`}>{venta.metodoPago}</span>
+            {venta.cliente && <span style={{ marginLeft: 8, fontSize: 13 }}>Cliente: {venta.cliente.nombre}</span>}
+            {hayDevoluciones && <span className="badge danger" style={{ marginLeft: 8 }}>Con devoluciones</span>}
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 700 }}>${Number(venta.total).toLocaleString("es-CO")}</div>
+        </div>
+
+        {error && <p className="error-text" style={{ marginTop: 10 }}>{error}</p>}
+
+        {modoDevolucion && (
+          <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
+            <input
+              placeholder="Motivo de la devolucion (opcional)"
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              style={{ width: "100%", marginBottom: 8 }}
+            />
+            {totalDevolucion > 0 && (
+              <p style={{ fontSize: 13, marginBottom: 8 }}>
+                Se devolveran <strong>${totalDevolucion.toLocaleString("es-CO")}</strong> y el inventario volvera al stock.
+              </p>
+            )}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button type="button" disabled={itemsADevolver.length === 0 || procesandoDev} onClick={registrarDevolucion}>
+                {procesandoDev ? "Registrando..." : "Confirmar devolucion"}
+              </button>
+              <button className="secondary" type="button" onClick={() => { setModoDevolucion(false); setDevolver({}); }}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!modoDevolucion && (
+          <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
+            {!confirmando ? (
+              <div className="toolbar">
+                {puedeDevolver && (
+                  <button className="secondary" type="button" onClick={() => setModoDevolucion(true)}>
+                    Devolucion parcial
+                  </button>
+                )}
+                <button className="danger" type="button" onClick={() => setConfirmando(true)}>
+                  Eliminar venta
+                </button>
+              </div>
+            ) : (
+              <div>
+                <p style={{ fontSize: 13, marginBottom: 8 }}>
+                  ¿Seguro? Esto anula la venta completa y restaura todo el inventario. Para devolver solo algunos productos, usa
+                  "Devolucion parcial".
+                </p>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button className="danger" type="button" disabled={eliminando} onClick={eliminar}>
+                    {eliminando ? "Eliminando..." : "Si, eliminar"}
+                  </button>
+                  <button className="secondary" type="button" onClick={() => setConfirmando(false)}>
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

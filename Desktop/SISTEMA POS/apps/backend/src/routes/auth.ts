@@ -1,7 +1,12 @@
 import type { FastifyInstance } from "fastify";
-import { LoginSchema, RegistroEmpresaSchema } from "@sistema-pos/shared";
+import { LoginSchema, RegistroEmpresaSchema, PERMISOS_POR_ROL } from "@sistema-pos/shared";
 import { prisma } from "../lib/prisma.js";
 import { hashPassword, verifyPassword } from "../lib/password.js";
+import { registrarAuditoria } from "../lib/auditoria.js";
+
+function permisosDe(usuario: { rol: keyof typeof PERMISOS_POR_ROL; permisos: string[] }) {
+  return usuario.permisos.length > 0 ? usuario.permisos : PERMISOS_POR_ROL[usuario.rol];
+}
 
 export async function authRoutes(app: FastifyInstance) {
   app.post("/auth/registro-empresa", async (request, reply) => {
@@ -39,7 +44,13 @@ export async function authRoutes(app: FastifyInstance) {
     const token = app.jwt.sign({ usuarioId: usuario.id, empresaId: empresa.id, rol: usuario.rol });
     return reply.code(201).send({
       token,
-      usuario: { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rol: usuario.rol },
+      usuario: {
+        id: usuario.id,
+        nombre: usuario.nombre,
+        email: usuario.email,
+        rol: usuario.rol,
+        permisos: permisosDe(usuario),
+      },
       empresa: { id: empresa.id, nombre: empresa.nombre },
     });
   });
@@ -66,9 +77,24 @@ export async function authRoutes(app: FastifyInstance) {
       orderBy: { nombre: "asc" },
     });
 
+    registrarAuditoria({
+      empresaId: usuario.empresaId,
+      usuarioId: usuario.id,
+      accion: "INICIO_SESION",
+      entidad: "Usuario",
+      entidadId: usuario.id,
+      detalle: usuario.email,
+    });
+
     return reply.send({
       token,
-      usuario: { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rol: usuario.rol },
+      usuario: {
+        id: usuario.id,
+        nombre: usuario.nombre,
+        email: usuario.email,
+        rol: usuario.rol,
+        permisos: permisosDe(usuario),
+      },
       empresa: { id: usuario.empresa.id, nombre: usuario.empresa.nombre },
       sucursales,
     });
@@ -76,6 +102,19 @@ export async function authRoutes(app: FastifyInstance) {
 
   app.get("/auth/me", { preHandler: [app.authenticate] }, async (request) => {
     return { user: request.user };
+  });
+
+  // Registra el cierre de sesion en la auditoria (lo llama el desktop antes
+  // de borrar el token local).
+  app.post("/auth/logout", { preHandler: [app.authenticate] }, async (request) => {
+    registrarAuditoria({
+      empresaId: request.user.empresaId,
+      usuarioId: request.user.usuarioId,
+      accion: "CIERRE_SESION",
+      entidad: "Usuario",
+      entidadId: request.user.usuarioId,
+    });
+    return { ok: true };
   });
 
   // Usado por el desktop para restaurar la sesion al reabrir la app con un token guardado.
@@ -91,7 +130,13 @@ export async function authRoutes(app: FastifyInstance) {
     });
 
     return {
-      usuario: { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rol: usuario.rol },
+      usuario: {
+        id: usuario.id,
+        nombre: usuario.nombre,
+        email: usuario.email,
+        rol: usuario.rol,
+        permisos: permisosDe(usuario),
+      },
       empresa: { id: empresa.id, nombre: empresa.nombre },
       sucursales,
     };

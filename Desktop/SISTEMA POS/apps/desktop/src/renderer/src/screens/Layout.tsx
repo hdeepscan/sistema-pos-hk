@@ -1,10 +1,105 @@
 import type { PropsWithChildren } from "react";
-import { NavLink } from "react-router-dom";
-import { useSesionStore } from "../lib/store";
+import { useCallback, useEffect, useState } from "react";
+import { NavLink, useNavigate } from "react-router-dom";
+import { useSesionStore, usePermiso } from "../lib/store";
+import { usePedidoShopify } from "../lib/socket";
+import { api } from "../lib/api";
+import { reproducir } from "../lib/sonidos";
+import type { PedidoShopifyEvent } from "@sistema-pos/shared";
+import logo from "../assets/logo.png";
+
+const INTERVALO_CREDITOS_MS = 5 * 60 * 1000;
 
 export default function Layout({ children }: PropsWithChildren) {
   const { empresa, sucursales, sucursalActivaId, usuario, logout } = useSesionStore();
+  const puedeVerCreditos = usePermiso("creditos.administrar");
+  const puedeAdministrarUsuarios = usePermiso("usuarios.administrar");
+  const puedeVerVentas = usePermiso("ventas.ver");
+  const puedeAdministrarProductos = usePermiso("productos.administrar");
+  const puedeAdministrarInventario = usePermiso("inventario.administrar");
+  const puedeAdministrarClientes = usePermiso("clientes.administrar");
+  const puedeAdministrarGastos = usePermiso("gastos.administrar");
+  const puedeVerReportes = usePermiso("reportes.ver");
+  const puedeAdministrarConfiguracion = usePermiso("configuracion.administrar");
   const sucursalActiva = sucursales.find((s) => s.id === sucursalActivaId);
+  const [alertas, setAlertas] = useState<(PedidoShopifyEvent & { toastId: string })[]>([]);
+  const [creditosVencidos, setCreditosVencidos] = useState(0);
+  const [alertaCreditosOculta, setAlertaCreditosOculta] = useState(false);
+  const [pedidosPendientes, setPedidosPendientes] = useState(0);
+  const [shopDomain, setShopDomain] = useState<string | null>(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    api
+      .get("/shopify/config")
+      .then(({ data }) => setShopDomain(data.conectado ? data.shopDomain : null))
+      .catch(() => setShopDomain(null));
+  }, []);
+
+  const cargarPendientesShopify = useCallback(() => {
+    api
+      .get<{ pendientes: number }>("/pedidos-shopify/resumen")
+      .then(({ data }) => setPedidosPendientes(data.pendientes))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    cargarPendientesShopify();
+    const timer = setInterval(cargarPendientesShopify, INTERVALO_CREDITOS_MS);
+    return () => clearInterval(timer);
+  }, [cargarPendientesShopify]);
+
+  usePedidoShopify(
+    useCallback(
+      (evt: PedidoShopifyEvent) => {
+        void reproducir("pedido_shopify");
+        setAlertas((prev) => [...prev, { ...evt, toastId: `${evt.ordenId}-${Date.now()}` }]);
+        cargarPendientesShopify();
+      },
+      [cargarPendientesShopify]
+    )
+  );
+
+  useEffect(() => {
+    if (!puedeVerCreditos) return;
+    let activo = true;
+    const cargar = () => {
+      api
+        .get<{ vencidos: number }>("/creditos/resumen")
+        .then(({ data }) => {
+          if (!activo) return;
+          setCreditosVencidos((anterior) => {
+            if (data.vencidos > anterior) void reproducir("credito_vencido");
+            return data.vencidos;
+          });
+        })
+        .catch(() => {});
+    };
+    cargar();
+    const timer = setInterval(cargar, INTERVALO_CREDITOS_MS);
+    return () => {
+      activo = false;
+      clearInterval(timer);
+    };
+  }, [puedeVerCreditos]);
+
+  function cerrarAlerta(toastId: string) {
+    setAlertas((prev) => prev.filter((a) => a.toastId !== toastId));
+  }
+
+  function verPedido(ordenId: string) {
+    if (shopDomain) window.pos.abrirEnlaceExterno(`https://${shopDomain}/admin/orders/${ordenId}`);
+  }
+
+  async function prepararPedido(alerta: PedidoShopifyEvent & { toastId: string }) {
+    try {
+      await api.patch(`/pedidos-shopify/${alerta.id}/atender`);
+    } catch {
+      // si ya se marco atendido desde otro lado, igual cerramos la alerta
+    }
+    cerrarAlerta(alerta.toastId);
+    cargarPendientesShopify();
+  }
 
   async function cerrarSesion() {
     await window.pos.setConfig({ token: null, empresaId: null, sucursalId: null });
@@ -14,19 +109,118 @@ export default function Layout({ children }: PropsWithChildren) {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div style={{ fontWeight: 700, marginBottom: 12 }}>{empresa?.nombre}</div>
-        <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 20 }}>
+        <div className="sidebar-brand">
+          <img src={logo} alt="Sistema POS HK" style={{ height: 40, background: "#fff", borderRadius: 8, padding: 4 }} />
+        </div>
+        <div className="sidebar-context">
+          <strong>{empresa?.nombre}</strong>
           {sucursalActiva?.nombre} · {usuario?.nombre}
         </div>
+
+        <div className="sidebar-section-label">Operacion</div>
         <NavLink to="/pos">Punto de venta</NavLink>
-        <NavLink to="/inventario">Inventario</NavLink>
+        {puedeVerVentas && <NavLink to="/ventas">Ventas</NavLink>}
+        <NavLink to="/caja">Caja</NavLink>
+        <NavLink to="/notificaciones">
+          Notificaciones{pedidosPendientes > 0 && <span className="badge warning" style={{ marginLeft: 6 }}>{pedidosPendientes}</span>}
+        </NavLink>
+
+        <div className="sidebar-section-label">Catalogo</div>
+        {puedeAdministrarProductos && (
+          <>
+            <NavLink to="/productos">Productos</NavLink>
+            <NavLink to="/colecciones">Colecciones</NavLink>
+          </>
+        )}
+        {puedeAdministrarInventario && <NavLink to="/inventario">Inventario</NavLink>}
+
+        <div className="sidebar-section-label">Negocio</div>
+        {puedeAdministrarClientes && <NavLink to="/clientes">Clientes</NavLink>}
+        {puedeVerCreditos && (
+          <NavLink to="/creditos">
+            Creditos{creditosVencidos > 0 && <span className="badge danger" style={{ marginLeft: 6 }}>{creditosVencidos}</span>}
+          </NavLink>
+        )}
+        <NavLink to="/proveedores">Proveedores</NavLink>
+        {puedeAdministrarGastos && <NavLink to="/gastos">Gastos</NavLink>}
+        {puedeVerReportes && <NavLink to="/reportes">Reportes</NavLink>}
+
+        <div className="sidebar-section-label">Sistema</div>
+        {puedeAdministrarUsuarios && <NavLink to="/usuarios">Usuarios</NavLink>}
+        {(puedeAdministrarUsuarios || puedeAdministrarConfiguracion) && <NavLink to="/auditoria">Auditoria</NavLink>}
         <NavLink to="/configuracion">Configuracion</NavLink>
+        {puedeAdministrarConfiguracion && <NavLink to="/plantilla-recibo">Plantilla del recibo</NavLink>}
+        {puedeAdministrarConfiguracion && <NavLink to="/backups">Copias de seguridad</NavLink>}
+        <NavLink to="/shopify">Shopify</NavLink>
+        <NavLink to="/meta-ads">Meta Ads</NavLink>
+
         <div style={{ flex: 1 }} />
-        <button className="secondary" onClick={cerrarSesion} type="button">
+        <button className="secondary" onClick={cerrarSesion} type="button" style={{ marginTop: 12 }}>
           Cerrar sesion
         </button>
       </aside>
-      <main className="main-content">{children}</main>
+      <main className="main-content">
+        {creditosVencidos > 0 && !alertaCreditosOculta && (
+          <div className="card pedido-alerta" style={{ marginBottom: 16, borderLeftColor: "var(--danger)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+              <div>
+                <div style={{ fontWeight: 700, marginBottom: 2 }}>
+                  ⚠ Tienes {creditosVencidos} credito{creditosVencidos > 1 ? "s" : ""} vencido{creditosVencidos > 1 ? "s" : ""}
+                </div>
+                <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Revisalos para gestionar el cobro cuanto antes.</div>
+              </div>
+              <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                <button type="button" onClick={() => navigate("/creditos")}>
+                  Ver creditos
+                </button>
+                <button className="secondary" type="button" onClick={() => setAlertaCreditosOculta(true)}>
+                  Ocultar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {children}
+      </main>
+
+      {alertas.length > 0 && (
+        <div style={{ position: "fixed", top: 16, right: 16, display: "flex", flexDirection: "column", gap: 8, zIndex: 100, width: 340 }}>
+          {alertas.map((a) => (
+            <div key={a.toastId} className="card pedido-alerta">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
+                <div>
+                  <div style={{ fontWeight: 700, marginBottom: 2 }}>🎉 ¡Nuevo pedido en Shopify!</div>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>
+                    Pedido {a.nombre} · ${a.total.toLocaleString("es-CO")}
+                  </div>
+                  {a.clienteNombre && <div style={{ fontSize: 12.5 }}>Cliente: {a.clienteNombre}</div>}
+                  {a.productos.length > 0 && (
+                    <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
+                      {a.productos.map((p) => `${p.cantidad}x ${p.nombre}`).join(", ")}
+                    </div>
+                  )}
+                  <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+                    {new Date(a.fecha).toLocaleTimeString("es-CO")}
+                  </div>
+                </div>
+                <button className="secondary" style={{ padding: "2px 8px" }} onClick={() => cerrarAlerta(a.toastId)} type="button">
+                  ✕
+                </button>
+              </div>
+              <div className="toolbar" style={{ marginTop: 8 }}>
+                {shopDomain && (
+                  <button className="secondary" type="button" onClick={() => verPedido(a.ordenId)}>
+                    Ver pedido
+                  </button>
+                )}
+                <button type="button" onClick={() => prepararPedido(a)}>
+                  Preparar pedido
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

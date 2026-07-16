@@ -1,8 +1,9 @@
-# Sistema POS
+# SISTEMA POS HK
 
 Sistema de punto de venta multi-sucursal, multi-tenant, con app de escritorio
-para Windows (Electron) e integracion futura con Shopify. Ver el plan completo
-de la Fase 1 en `PLAN_FASE_1.md`.
+para Windows (Electron), modulos de clientes/cobranza, proveedores/compras,
+gastos, reportes, e integracion con Shopify. Ver el plan de la Fase 1 en
+`PLAN_FASE_1.md`.
 
 ## Estructura
 
