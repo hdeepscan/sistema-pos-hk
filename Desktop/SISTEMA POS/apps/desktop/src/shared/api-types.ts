@@ -15,6 +15,16 @@ export interface AppConfig {
   backupAutomatico: boolean;
   backupFrecuenciaHoras: number;
   ultimoBackupAutomatico: string | null;
+  // Calibracion de etiquetas: cada rollo/impresora corre distinto, asi que el
+  // tamaño real y el desplazamiento se ajustan desde Configuracion.
+  etiquetaAnchoMm: number;
+  etiquetaAltoMm: number;
+  etiquetaOffsetYMm: number;
+  etiquetaOffsetXMm: number;
+  // Espacio en blanco entre una etiqueta y la siguiente (el troquel). El alto
+  // de pagina real = alto + separacion; si no coincide, las etiquetas se van
+  // corriendo una tras otra.
+  etiquetaSeparacionMm: number;
 }
 
 export interface EstadoActualizacion {
@@ -35,6 +45,8 @@ export interface ReciboData {
   metodoPago: string;
   dineroRecibido?: number;
   cambio?: number;
+  // IVA contenido en el total (los precios incluyen IVA).
+  impuesto?: number;
   // Descuentos y fidelizacion (V3).
   subtotal?: number;
   descuento?: number;
@@ -70,10 +82,17 @@ export interface ColaAddArgs {
 export interface EtiquetaData {
   svgCodigoBarras: string;
   nombre: string;
+  variante?: string; // ej. "Color: Rojo · Talla: M"
   sku: string;
   precio: number;
   copias: number;
 }
+
+// Tamaño/disposicion del papel al imprimir etiquetas:
+// - rollo2: rollo termico de etiquetas 50x25mm, 2 columnas (2 al ancho)
+// - rollo1: rollo termico de etiquetas 50x25mm, 1 columna (media hoja)
+// - carta: hoja tamaño carta (impresora normal), varias etiquetas por hoja
+export type EtiquetaFormato = "rollo2" | "rollo1" | "carta";
 
 export interface ReporteCajaData {
   empresaNombre: string;
@@ -107,7 +126,7 @@ export interface PosApi {
   queuePendientes: () => Promise<unknown[]>;
   listPrinters: () => Promise<string[]>;
   printRecibo: (data: ReciboData, deviceName: string | null) => Promise<void>;
-  printEtiquetas: (etiquetas: EtiquetaData[], deviceName: string | null) => Promise<void>;
+  printEtiquetas: (etiquetas: EtiquetaData[], deviceName: string | null, formato?: EtiquetaFormato) => Promise<void>;
   printReporteCaja: (data: ReporteCajaData, deviceName: string | null) => Promise<void>;
 
   getVersion: () => Promise<string>;

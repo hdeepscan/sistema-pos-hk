@@ -1,8 +1,27 @@
+import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import type { Prisma } from "@prisma/client";
-import { CrearProductoSchema, CrearVarianteSchema, EdicionMasivaProductosSchema } from "@sistema-pos/shared";
+import {
+  CrearProductoSchema,
+  CrearProductoCompletoSchema,
+  CrearVarianteSchema,
+  EdicionMasivaProductosSchema,
+} from "@sistema-pos/shared";
 import { prisma } from "../lib/prisma.js";
-import { empujarProductoAShopify, subirImagenAShopify, crearVarianteEnShopify } from "../lib/shopify.js";
+import {
+  empujarProductoAShopify,
+  subirImagenAShopify,
+  crearVarianteEnShopify,
+  crearProductoConVariantesEnShopify,
+  crearProductoEnShopify,
+  fijarInventarioEnShopify,
+  asegurarUbicacionEcommerce,
+  eliminarProductoEnShopify,
+  eliminarVarianteEnShopify,
+  subirImagenGaleria,
+  eliminarImagenEnShopify,
+  obtenerOpcionesShopifyProducto,
+} from "../lib/shopify.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
 import { mensajeDeValidacion } from "../lib/errores.js";
 
@@ -23,6 +42,18 @@ async function sincronizarDisponibilidad(
 
 export async function productosRoutes(app: FastifyInstance) {
   app.addHook("preHandler", app.authenticate);
+
+  // Categorias ya usadas por la empresa, para sugerirlas al crear/editar.
+  app.get("/productos/categorias", async (request) => {
+    const { empresaId } = request.user;
+    const filas = await prisma.producto.findMany({
+      where: { empresaId, categoria: { not: null } },
+      distinct: ["categoria"],
+      select: { categoria: true },
+      orderBy: { categoria: "asc" },
+    });
+    return filas.map((f) => f.categoria).filter((c): c is string => !!c && c.trim().length > 0);
+  });
 
   app.get("/productos", async (request) => {
     const { empresaId } = request.user;
@@ -96,12 +127,21 @@ export async function productosRoutes(app: FastifyInstance) {
     });
     if (!producto) return reply.code(404).send({ error: "Producto no encontrado" });
 
-    const variantes = producto.shopifyProductId
-      ? await prisma.producto.findMany({
-          where: { empresaId, shopifyProductId: producto.shopifyProductId, id: { not: producto.id } },
-          orderBy: { varianteTitulo: "asc" },
-        })
-      : [];
+    // Las variantes son las otras filas del mismo producto: comparten el
+    // producto de Shopify o, si es local, el mismo grupoVariantes.
+    const variantes =
+      producto.shopifyProductId || producto.grupoVariantes
+        ? await prisma.producto.findMany({
+            where: {
+              empresaId,
+              id: { not: producto.id },
+              ...(producto.shopifyProductId
+                ? { shopifyProductId: producto.shopifyProductId }
+                : { grupoVariantes: producto.grupoVariantes }),
+            },
+            orderBy: { varianteTitulo: "asc" },
+          })
+        : [];
 
     const { sucursalesDisponibles, ...resto } = producto;
     return {
@@ -109,6 +149,48 @@ export async function productosRoutes(app: FastifyInstance) {
       colecciones: producto.colecciones.map((pc) => pc.coleccion),
       sucursalIds: sucursalesDisponibles.map((d) => d.sucursalId),
       variantes,
+    };
+  });
+
+  // Stock por sucursal de un producto y todas sus variantes, para editarlo
+  // desde la pantalla de producto.
+  app.get("/productos/:id/inventario", async (request, reply) => {
+    const { empresaId } = request.user;
+    const { id } = request.params as { id: string };
+    const producto = await prisma.producto.findFirst({ where: { id, empresaId } });
+    if (!producto) return reply.code(404).send({ error: "Producto no encontrado" });
+
+    const unidades = await prisma.producto.findMany({
+      where: {
+        empresaId,
+        ...(producto.shopifyProductId
+          ? { shopifyProductId: producto.shopifyProductId }
+          : producto.grupoVariantes
+            ? { grupoVariantes: producto.grupoVariantes }
+            : { id }),
+      },
+      include: { inventario: true },
+      orderBy: { varianteTitulo: "asc" },
+    });
+    const sucursales = await prisma.sucursal.findMany({
+      where: { empresaId, activo: true },
+      select: { id: true, nombre: true },
+      orderBy: { nombre: "asc" },
+    });
+
+    return {
+      sucursales,
+      unidades: unidades.map((u) => ({
+        id: u.id,
+        sku: u.sku,
+        nombre: u.nombre,
+        varianteTitulo: u.varianteTitulo,
+        grupoOpciones: u.grupoOpciones,
+        stock: sucursales.map((s) => ({
+          sucursalId: s.id,
+          cantidad: u.inventario.find((i) => i.sucursalId === s.id)?.cantidad ?? 0,
+        })),
+      })),
     };
   });
 
@@ -168,6 +250,615 @@ export async function productosRoutes(app: FastifyInstance) {
     return reply.code(201).send(productoFinal);
   });
 
+  // Creacion "inteligente": crea un producto y, si trae combinaciones de
+  // variantes (ej. Color x Talla), crea una fila por combinacion agrupada por
+  // grupoVariantes, con su propio SKU/codigo/precio/stock/imagen. Las imagenes
+  // llegan como data URL y se guardan tal cual (el POS/frontend las renderiza);
+  // si Shopify esta conectado, el empuje se hace best-effort despues.
+  app.post("/productos/completo", async (request, reply) => {
+    const { empresaId } = request.user;
+    if (!request.user.permisos.includes("productos.administrar")) {
+      return reply.code(403).send({ error: "No tienes permiso para administrar productos" });
+    }
+    const parsed = CrearProductoCompletoSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
+
+    const {
+      variantes,
+      imagenesDataUrl,
+      nombresOpciones,
+      publicarEnShopify = true,
+      stockInicial,
+      sucursalStockId,
+      sucursalIds,
+      ...base
+    } = parsed.data;
+
+    const tieneVariantes = !!variantes && variantes.length > 0;
+    const imagenPrincipal = imagenesDataUrl?.[0];
+
+    // Verificar SKUs unicos: entre las variantes y contra la base de datos.
+    const skus = tieneVariantes ? variantes!.map((v) => v.sku) : [base.sku];
+    const repetido = skus.find((s, i) => skus.indexOf(s) !== i);
+    if (repetido) return reply.code(400).send({ error: `El SKU "${repetido}" esta repetido entre las variantes` });
+    const yaExisten = await prisma.producto.findMany({
+      where: { empresaId, sku: { in: skus } },
+      select: { sku: true },
+    });
+    if (yaExisten.length > 0) {
+      return reply.code(409).send({ error: `Ya existe un producto con el SKU "${yaExisten[0].sku}"` });
+    }
+
+    const grupo = tieneVariantes ? randomUUID() : null;
+
+    const creados = await prisma.$transaction(async (tx) => {
+      const sucursales = await tx.sucursal.findMany({ where: { empresaId, activo: true }, select: { id: true } });
+      // Sucursal donde entra el stock inicial (por defecto, la primera activa).
+      const sucStock = sucursalStockId ?? sucursales[0]?.id;
+
+      const filas: { id: string; sku: string; stock: number }[] = [];
+
+      async function crearFila(datos: {
+        sku: string;
+        codigoBarras?: string | null;
+        precio: number;
+        varianteTitulo?: string | null;
+        imagenUrl?: string | null;
+        stock: number;
+      }) {
+        const producto = await tx.producto.create({
+          data: {
+            empresaId,
+            nombre: base.nombre,
+            categoria: base.categoria,
+            marca: base.marca,
+            descripcion: base.descripcion,
+            impuestoPorcentaje: base.impuestoPorcentaje,
+            costo: base.costo,
+            activo: base.activo,
+            proveedorId: base.proveedorId,
+            grupoVariantes: grupo,
+            grupoOpciones: tieneVariantes && nombresOpciones && nombresOpciones.length > 0 ? nombresOpciones.join("|") : null,
+            sku: datos.sku,
+            codigoBarras: datos.codigoBarras,
+            precio: datos.precio,
+            varianteTitulo: datos.varianteTitulo,
+            imagenUrl: datos.imagenUrl,
+          },
+        });
+        if (sucursales.length > 0) {
+          await tx.inventarioSucursal.createMany({
+            data: sucursales.map((s) => ({
+              productoId: producto.id,
+              sucursalId: s.id,
+              cantidad: s.id === sucStock ? datos.stock : 0,
+            })),
+          });
+          if (datos.stock > 0 && sucStock) {
+            await tx.movimientoInventario.create({
+              data: {
+                productoId: producto.id,
+                sucursalId: sucStock,
+                tipo: "ENTRADA",
+                cantidad: datos.stock,
+                motivo: "Stock inicial",
+                usuarioId: request.user.usuarioId,
+              },
+            });
+          }
+        }
+        filas.push({ id: producto.id, sku: producto.sku, stock: datos.stock });
+      }
+
+      if (tieneVariantes) {
+        for (const v of variantes!) {
+          await crearFila({
+            sku: v.sku,
+            codigoBarras: v.codigoBarras,
+            precio: v.precio ?? base.precio,
+            varianteTitulo: v.titulo,
+            imagenUrl: v.imagenDataUrl ?? imagenPrincipal,
+            stock: v.stockInicial ?? 0,
+          });
+        }
+      } else {
+        await crearFila({
+          sku: base.sku,
+          codigoBarras: base.codigoBarras,
+          precio: base.precio,
+          imagenUrl: imagenPrincipal,
+          stock: stockInicial ?? 0,
+        });
+      }
+
+      // Disponibilidad por sucursal (compartida por todas las filas del grupo).
+      if (sucursalIds && sucursalIds.length > 0) {
+        await sincronizarDisponibilidad(tx, empresaId, filas.map((f) => f.id), sucursalIds);
+      }
+
+      return filas;
+    });
+
+    registrarAuditoria({
+      empresaId,
+      usuarioId: request.user.usuarioId,
+      accion: "CREAR_PRODUCTO",
+      entidad: "Producto",
+      entidadId: creados[0]?.id,
+      detalle: tieneVariantes ? `${base.nombre} (${creados.length} variantes)` : base.nombre,
+    });
+
+    // Empuje a Shopify best-effort (no bloquea la creacion local si falla).
+    // Se captura el error para informarlo al frontend y permitir reintentar.
+    const config = await prisma.shopifyConfig.findUnique({ where: { empresaId } });
+    let shopifySync: { intentado: boolean; ok: boolean; error?: string } = { intentado: false, ok: false };
+    if (config) {
+      shopifySync = { intentado: true, ok: false };
+      try {
+        const rows = await prisma.producto.findMany({ where: { id: { in: creados.map((f) => f.id) } } });
+        const locationId = await asegurarUbicacionEcommerce(empresaId, config.sucursalEcommerceId);
+
+        async function subirImagenFila(shopifyProductId: string, row: (typeof rows)[number]) {
+          if (!row.imagenUrl?.startsWith("data:")) return;
+          try {
+            const base64 = row.imagenUrl.replace(/^data:image\/\w+;base64,/, "");
+            const variantIds = row.shopifyVariantId && tieneVariantes ? [row.shopifyVariantId] : undefined;
+            const imagenUrl = await subirImagenAShopify(empresaId, shopifyProductId, base64, variantIds);
+            await prisma.producto.update({ where: { id: row.id }, data: { imagenUrl } });
+          } catch (errImg) {
+            request.log.error(errImg);
+          }
+        }
+
+        // Empuja a Shopify el inventario de la sucursal ecommerce para esa fila.
+        async function empujarInventarioFila(row: (typeof rows)[number]) {
+          if (!row.shopifyInventoryItemId || !locationId) return;
+          const inv = await prisma.inventarioSucursal.findUnique({
+            where: { productoId_sucursalId: { productoId: row.id, sucursalId: config!.sucursalEcommerceId } },
+          });
+          await fijarInventarioEnShopify(empresaId, row.shopifyInventoryItemId, locationId, inv?.cantidad ?? 0);
+        }
+
+        if (tieneVariantes) {
+          const res = await crearProductoConVariantesEnShopify(
+            empresaId,
+            { nombre: base.nombre, categoria: base.categoria },
+            nombresOpciones ?? [],
+            variantes!.map((v) => ({
+              titulo: v.titulo,
+              sku: v.sku,
+              precio: v.precio ?? base.precio,
+              codigoBarras: v.codigoBarras,
+            })),
+            publicarEnShopify
+          );
+          const porSku = new Map(res.variantes.map((v) => [v.sku, v]));
+          for (const row of rows) {
+            const v = porSku.get(row.sku);
+            const actualizado = await prisma.producto.update({
+              where: { id: row.id },
+              data: {
+                shopifyProductId: res.shopifyProductId,
+                shopifyVariantId: v?.shopifyVariantId ?? null,
+                shopifyInventoryItemId: v?.shopifyInventoryItemId ?? null,
+              },
+            });
+            await subirImagenFila(res.shopifyProductId, actualizado);
+            await empujarInventarioFila(actualizado);
+          }
+        } else {
+          const row = rows[0];
+          if (row) {
+            const ids = await crearProductoEnShopify(row, publicarEnShopify);
+            const actualizado = await prisma.producto.update({
+              where: { id: row.id },
+              data: {
+                shopifyProductId: ids.shopifyProductId,
+                shopifyVariantId: ids.shopifyVariantId,
+                shopifyInventoryItemId: ids.shopifyInventoryItemId,
+              },
+            });
+            await subirImagenFila(actualizado.shopifyProductId!, actualizado);
+            await empujarInventarioFila(actualizado);
+          }
+        }
+        shopifySync.ok = true;
+      } catch (err) {
+        request.log.error(err);
+        shopifySync.error = err instanceof Error ? err.message : "Error sincronizando con Shopify";
+      }
+    }
+
+    return reply
+      .code(201)
+      .send({ creados: creados.length, grupoVariantes: grupo, productoIds: creados.map((f) => f.id), shopifySync });
+  });
+
+  // Elimina un producto y todas sus variantes (del POS y de Shopify). Si el
+  // producto tiene ventas asociadas no se puede borrar sin perder el historial,
+  // asi que en ese caso se archiva (activo=false) pero igual se quita de Shopify.
+  app.delete("/productos/:id", async (request, reply) => {
+    const { empresaId } = request.user;
+    if (!request.user.permisos.includes("productos.administrar")) {
+      return reply.code(403).send({ error: "No tienes permiso para administrar productos" });
+    }
+    const { id } = request.params as { id: string };
+    const producto = await prisma.producto.findFirst({ where: { id, empresaId } });
+    if (!producto) return reply.code(404).send({ error: "Producto no encontrado" });
+
+    // Todas las filas del mismo producto (sus variantes).
+    const grupo = await prisma.producto.findMany({
+      where: {
+        empresaId,
+        ...(producto.shopifyProductId
+          ? { shopifyProductId: producto.shopifyProductId }
+          : producto.grupoVariantes
+            ? { grupoVariantes: producto.grupoVariantes }
+            : { id }),
+      },
+      select: { id: true, shopifyProductId: true, nombre: true },
+    });
+    const ids = grupo.map((g) => g.id);
+    const shopifyProductIds = [...new Set(grupo.map((g) => g.shopifyProductId).filter((s): s is string => !!s))];
+
+    // 1) Eliminar de Shopify (si aplica). El error se informa pero no impide el
+    //    borrado local.
+    let shopifyError: string | undefined;
+    for (const spid of shopifyProductIds) {
+      try {
+        await eliminarProductoEnShopify(empresaId, spid);
+      } catch (err) {
+        request.log.error(err);
+        shopifyError = err instanceof Error ? err.message : "Error eliminando en Shopify";
+      }
+    }
+
+    // 2) Borrado local. Si hay ventas asociadas, se archiva en vez de borrar.
+    const conVentas = await prisma.ventaItem.count({ where: { productoId: { in: ids } } });
+    let archivado = false;
+    if (conVentas > 0) {
+      await prisma.producto.updateMany({ where: { id: { in: ids } }, data: { activo: false } });
+      archivado = true;
+    } else {
+      await prisma.$transaction([
+        prisma.movimientoInventario.deleteMany({ where: { productoId: { in: ids } } }),
+        prisma.producto.deleteMany({ where: { id: { in: ids }, empresaId } }),
+      ]);
+    }
+
+    registrarAuditoria({
+      empresaId,
+      usuarioId: request.user.usuarioId,
+      accion: archivado ? "ARCHIVAR_PRODUCTO" : "ELIMINAR_PRODUCTO",
+      entidad: "Producto",
+      entidadId: id,
+      detalle: `${producto.nombre}${ids.length > 1 ? ` (${ids.length} variantes)` : ""}`,
+    });
+
+    return {
+      ok: true,
+      archivado,
+      variantesEliminadas: ids.length,
+      shopifyError,
+      mensaje: archivado
+        ? "El producto tenia ventas asociadas: se archivo (ya no aparece) y se elimino de Shopify."
+        : "Producto eliminado del POS y de Shopify.",
+    };
+  });
+
+  // Reintenta la sincronizacion con Shopify de un producto (y sus variantes):
+  // si aun no existe alla lo crea, y en todo caso empuja el inventario de la
+  // sucursal ecommerce. Sirve cuando la sync fallo al crear el producto.
+  app.post("/productos/:id/sincronizar-shopify", async (request, reply) => {
+    const { empresaId } = request.user;
+    if (!request.user.permisos.includes("productos.administrar")) {
+      return reply.code(403).send({ error: "No tienes permiso para administrar productos" });
+    }
+    const { id } = request.params as { id: string };
+    const producto = await prisma.producto.findFirst({ where: { id, empresaId } });
+    if (!producto) return reply.code(404).send({ error: "Producto no encontrado" });
+
+    const config = await prisma.shopifyConfig.findUnique({ where: { empresaId } });
+    if (!config) return reply.code(400).send({ error: "Conecta Shopify primero (Configuracion → Shopify)" });
+
+    // Filas del grupo (variantes).
+    const rows = await prisma.producto.findMany({
+      where: {
+        empresaId,
+        ...(producto.shopifyProductId
+          ? { shopifyProductId: producto.shopifyProductId }
+          : producto.grupoVariantes
+            ? { grupoVariantes: producto.grupoVariantes }
+            : { id }),
+      },
+      orderBy: { varianteTitulo: "asc" },
+    });
+    const tieneVariantes = rows.length > 1 || rows.some((r) => r.varianteTitulo);
+
+    try {
+      const locationId = await asegurarUbicacionEcommerce(empresaId, config.sucursalEcommerceId);
+
+      async function empujarInventario(row: (typeof rows)[number]) {
+        if (!row.shopifyInventoryItemId || !locationId) return;
+        const inv = await prisma.inventarioSucursal.findUnique({
+          where: { productoId_sucursalId: { productoId: row.id, sucursalId: config!.sucursalEcommerceId } },
+        });
+        await fijarInventarioEnShopify(empresaId, row.shopifyInventoryItemId, locationId, inv?.cantidad ?? 0);
+      }
+
+      async function subirImagen(shopifyProductId: string, row: (typeof rows)[number]) {
+        if (!row.imagenUrl?.startsWith("data:")) return;
+        const base64 = row.imagenUrl.replace(/^data:image\/\w+;base64,/, "");
+        const variantIds = row.shopifyVariantId && tieneVariantes ? [row.shopifyVariantId] : undefined;
+        const imagenUrl = await subirImagenAShopify(empresaId, shopifyProductId, base64, variantIds);
+        await prisma.producto.update({ where: { id: row.id }, data: { imagenUrl } });
+      }
+
+      const yaVinculado = rows.some((r) => r.shopifyProductId);
+      if (!yaVinculado) {
+        if (tieneVariantes) {
+          const nombresOpciones = rows[0].grupoOpciones ? rows[0].grupoOpciones.split("|") : [];
+          const res = await crearProductoConVariantesEnShopify(
+            empresaId,
+            { nombre: rows[0].nombre, categoria: rows[0].categoria },
+            nombresOpciones,
+            rows.map((r) => ({
+              titulo: r.varianteTitulo ?? r.sku,
+              sku: r.sku,
+              precio: Number(r.precio),
+              codigoBarras: r.codigoBarras,
+            }))
+          );
+          const porSku = new Map(res.variantes.map((v) => [v.sku, v]));
+          for (const row of rows) {
+            const v = porSku.get(row.sku);
+            const act = await prisma.producto.update({
+              where: { id: row.id },
+              data: {
+                shopifyProductId: res.shopifyProductId,
+                shopifyVariantId: v?.shopifyVariantId ?? null,
+                shopifyInventoryItemId: v?.shopifyInventoryItemId ?? null,
+              },
+            });
+            await subirImagen(res.shopifyProductId, act).catch((e) => request.log.error(e));
+            await empujarInventario(act);
+          }
+        } else {
+          const ids = await crearProductoEnShopify(rows[0]);
+          const act = await prisma.producto.update({
+            where: { id: rows[0].id },
+            data: {
+              shopifyProductId: ids.shopifyProductId,
+              shopifyVariantId: ids.shopifyVariantId,
+              shopifyInventoryItemId: ids.shopifyInventoryItemId,
+            },
+          });
+          await subirImagen(act.shopifyProductId!, act).catch((e) => request.log.error(e));
+          await empujarInventario(act);
+        }
+      } else {
+        // Ya existe en Shopify: solo re-empujar inventario.
+        for (const row of rows) await empujarInventario(row);
+      }
+
+      return { ok: true, mensaje: "Sincronizado con Shopify correctamente." };
+    } catch (err) {
+      request.log.error(err);
+      return reply.code(502).send({ error: err instanceof Error ? err.message : "No se pudo sincronizar con Shopify" });
+    }
+  });
+
+  // Elimina UNA variante de un producto (una fila), del POS y de Shopify.
+  app.delete("/productos/:id/variante", async (request, reply) => {
+    const { empresaId } = request.user;
+    if (!request.user.permisos.includes("productos.administrar")) {
+      return reply.code(403).send({ error: "No tienes permiso para administrar productos" });
+    }
+    const { id } = request.params as { id: string };
+    const variante = await prisma.producto.findFirst({ where: { id, empresaId } });
+    if (!variante) return reply.code(404).send({ error: "Variante no encontrada" });
+
+    // ¿Cuantas filas tiene el grupo? Si es la unica, es borrar el producto entero.
+    const hermanos = await prisma.producto.count({
+      where: {
+        empresaId,
+        ...(variante.shopifyProductId
+          ? { shopifyProductId: variante.shopifyProductId }
+          : variante.grupoVariantes
+            ? { grupoVariantes: variante.grupoVariantes }
+            : { id }),
+      },
+    });
+    if (hermanos <= 1) {
+      return reply.code(400).send({ error: "Es la unica variante: usa 'Eliminar producto' para borrar el producto completo." });
+    }
+
+    const conVentas = await prisma.ventaItem.count({ where: { productoId: id } });
+    if (conVentas > 0) {
+      return reply.code(409).send({ error: "Esta variante tiene ventas asociadas y no se puede eliminar sin perder el historial." });
+    }
+
+    // Eliminar la variante en Shopify (si aplica).
+    let shopifyError: string | undefined;
+    if (variante.shopifyProductId && variante.shopifyVariantId) {
+      try {
+        await eliminarVarianteEnShopify(empresaId, variante.shopifyProductId, variante.shopifyVariantId);
+      } catch (err) {
+        request.log.error(err);
+        shopifyError = err instanceof Error ? err.message : "Error eliminando la variante en Shopify";
+      }
+    }
+
+    await prisma.$transaction([
+      prisma.movimientoInventario.deleteMany({ where: { productoId: id } }),
+      prisma.producto.delete({ where: { id } }),
+    ]);
+
+    registrarAuditoria({
+      empresaId,
+      usuarioId: request.user.usuarioId,
+      accion: "ELIMINAR_VARIANTE",
+      entidad: "Producto",
+      entidadId: id,
+      detalle: `${variante.nombre} - ${variante.varianteTitulo ?? variante.sku}`,
+    });
+
+    return { ok: true, shopifyError, mensaje: "Variante eliminada del POS y de Shopify." };
+  });
+
+  // Opciones del producto en Shopify (Color, Talla...), con sus valores
+  // actuales, para que el formulario de "agregar variante" pida un valor por
+  // cada opcion y no falle con "You need to add option values".
+  app.get("/productos/:id/opciones-shopify", async (request, reply) => {
+    const { empresaId } = request.user;
+    const { id } = request.params as { id: string };
+    const producto = await prisma.producto.findFirst({ where: { id, empresaId } });
+    if (!producto) return reply.code(404).send({ error: "Producto no encontrado" });
+    if (!producto.shopifyProductId) return { opciones: [] };
+    try {
+      const opciones = await obtenerOpcionesShopifyProducto(empresaId, producto.shopifyProductId);
+      return { opciones };
+    } catch (err) {
+      request.log.error(err);
+      return { opciones: [] };
+    }
+  });
+
+  // ---------- Galeria de imagenes del producto ----------
+  function grupoClaveDe(p: { shopifyProductId: string | null; grupoVariantes: string | null; id: string }): string {
+    return p.shopifyProductId ?? p.grupoVariantes ?? p.id;
+  }
+
+  app.get("/productos/:id/imagenes", async (request, reply) => {
+    const { empresaId } = request.user;
+    const { id } = request.params as { id: string };
+    const producto = await prisma.producto.findFirst({ where: { id, empresaId } });
+    if (!producto) return reply.code(404).send({ error: "Producto no encontrado" });
+    return prisma.productoImagen.findMany({
+      where: { empresaId, grupoClave: grupoClaveDe(producto) },
+      orderBy: [{ esPrincipal: "desc" }, { orden: "asc" }, { creadoEn: "asc" }],
+    });
+  });
+
+  app.post("/productos/:id/imagenes", async (request, reply) => {
+    const { empresaId } = request.user;
+    if (!request.user.permisos.includes("productos.administrar")) {
+      return reply.code(403).send({ error: "No tienes permiso para administrar productos" });
+    }
+    const { id } = request.params as { id: string };
+    const { imagenesDataUrl } = request.body as { imagenesDataUrl?: string[] };
+    if (!imagenesDataUrl || imagenesDataUrl.length === 0) return reply.code(400).send({ error: "No hay imagenes" });
+
+    const producto = await prisma.producto.findFirst({ where: { id, empresaId } });
+    if (!producto) return reply.code(404).send({ error: "Producto no encontrado" });
+    const grupoClave = grupoClaveDe(producto);
+
+    const config = await prisma.shopifyConfig.findUnique({ where: { empresaId } });
+    const existentes = await prisma.productoImagen.count({ where: { empresaId, grupoClave } });
+
+    let ordenBase = existentes;
+    const creadas = [];
+    for (const dataUrl of imagenesDataUrl) {
+      let url = dataUrl;
+      let shopifyImageId: string | null = null;
+      // Subir a Shopify si el producto esta vinculado.
+      if (config && producto.shopifyProductId && dataUrl.startsWith("data:")) {
+        try {
+          const base64 = dataUrl.replace(/^data:image\/\w+;base64,/, "");
+          const r = await subirImagenGaleria(empresaId, producto.shopifyProductId, base64);
+          url = r.url;
+          shopifyImageId = r.shopifyImageId;
+        } catch (err) {
+          request.log.error(err);
+        }
+      }
+      const esPrincipal = existentes === 0 && ordenBase === 0;
+      const img = await prisma.productoImagen.create({
+        data: { empresaId, grupoClave, url, shopifyImageId, orden: ordenBase, esPrincipal },
+      });
+      if (esPrincipal) {
+        await prisma.producto.update({ where: { id: producto.id }, data: { imagenUrl: url } });
+      }
+      creadas.push(img);
+      ordenBase++;
+    }
+    return reply.code(201).send(creadas);
+  });
+
+  app.patch("/productos/:id/imagenes/:imgId/principal", async (request, reply) => {
+    const { empresaId } = request.user;
+    if (!request.user.permisos.includes("productos.administrar")) {
+      return reply.code(403).send({ error: "No tienes permiso para administrar productos" });
+    }
+    const { id, imgId } = request.params as { id: string; imgId: string };
+    const producto = await prisma.producto.findFirst({ where: { id, empresaId } });
+    if (!producto) return reply.code(404).send({ error: "Producto no encontrado" });
+    const grupoClave = grupoClaveDe(producto);
+    const img = await prisma.productoImagen.findFirst({ where: { id: imgId, empresaId, grupoClave } });
+    if (!img) return reply.code(404).send({ error: "Imagen no encontrada" });
+
+    await prisma.$transaction([
+      prisma.productoImagen.updateMany({ where: { empresaId, grupoClave }, data: { esPrincipal: false } }),
+      prisma.productoImagen.update({ where: { id: imgId }, data: { esPrincipal: true } }),
+    ]);
+    // La imagen principal se refleja en todas las filas del grupo.
+    await prisma.producto.updateMany({
+      where: {
+        empresaId,
+        ...(producto.shopifyProductId
+          ? { shopifyProductId: producto.shopifyProductId }
+          : producto.grupoVariantes
+            ? { grupoVariantes: producto.grupoVariantes }
+            : { id }),
+      },
+      data: { imagenUrl: img.url },
+    });
+    return { ok: true };
+  });
+
+  app.delete("/productos/:id/imagenes/:imgId", async (request, reply) => {
+    const { empresaId } = request.user;
+    if (!request.user.permisos.includes("productos.administrar")) {
+      return reply.code(403).send({ error: "No tienes permiso para administrar productos" });
+    }
+    const { id, imgId } = request.params as { id: string; imgId: string };
+    const producto = await prisma.producto.findFirst({ where: { id, empresaId } });
+    if (!producto) return reply.code(404).send({ error: "Producto no encontrado" });
+    const img = await prisma.productoImagen.findFirst({ where: { id: imgId, empresaId } });
+    if (!img) return reply.code(404).send({ error: "Imagen no encontrada" });
+
+    if (producto.shopifyProductId && img.shopifyImageId) {
+      try {
+        await eliminarImagenEnShopify(empresaId, producto.shopifyProductId, img.shopifyImageId);
+      } catch (err) {
+        request.log.error(err);
+      }
+    }
+    await prisma.productoImagen.delete({ where: { id: imgId } });
+    // Si era principal, promover la siguiente.
+    if (img.esPrincipal) {
+      const otra = await prisma.productoImagen.findFirst({
+        where: { empresaId, grupoClave: img.grupoClave },
+        orderBy: [{ orden: "asc" }, { creadoEn: "asc" }],
+      });
+      if (otra) {
+        await prisma.productoImagen.update({ where: { id: otra.id }, data: { esPrincipal: true } });
+        await prisma.producto.updateMany({
+          where: {
+            empresaId,
+            ...(producto.shopifyProductId
+              ? { shopifyProductId: producto.shopifyProductId }
+              : producto.grupoVariantes
+                ? { grupoVariantes: producto.grupoVariantes }
+                : { id }),
+          },
+          data: { imagenUrl: otra.url },
+        });
+      }
+    }
+    return reply.code(204).send();
+  });
+
   // Edicion masiva: aplica los mismos cambios (categoria/proveedor/activo) a
   // varios productos a la vez, desde la seleccion multiple en Inventario.
   app.patch("/productos/bulk", async (request, reply) => {
@@ -212,6 +903,12 @@ export async function productosRoutes(app: FastifyInstance) {
     if (!producto) return reply.code(404).send({ error: "Producto no encontrado" });
 
     const { sucursalIds, ...datosProducto } = parsed.data;
+    if (datosProducto.sku && datosProducto.sku !== producto.sku) {
+      const choca = await prisma.producto.findUnique({
+        where: { empresaId_sku: { empresaId, sku: datosProducto.sku } },
+      });
+      if (choca) return reply.code(409).send({ error: "Ya existe otro producto con ese SKU" });
+    }
     let actualizado = await prisma.producto.update({ where: { id }, data: datosProducto });
 
     if (sucursalIds !== undefined) {
@@ -264,8 +961,11 @@ export async function productosRoutes(app: FastifyInstance) {
     if (!producto) return reply.code(404).send({ error: "Producto no encontrado" });
 
     const config = await prisma.shopifyConfig.findUnique({ where: { empresaId } });
+    // Sin Shopify: guardamos la imagen localmente (data URL) para que el
+    // catalogo la muestre igual. Con Shopify: la subimos y usamos su URL.
     if (!config) {
-      return reply.code(400).send({ error: "Conecta Shopify primero para poder subir imagenes" });
+      const actualizado = await prisma.producto.update({ where: { id }, data: { imagenUrl: dataUrl } });
+      return actualizado;
     }
 
     let shopifyProductId = producto.shopifyProductId;
@@ -323,6 +1023,11 @@ export async function productosRoutes(app: FastifyInstance) {
     } catch (err) {
       request.log.error(err);
       const mensaje = err instanceof Error ? err.message : "";
+      if (mensaje.includes("already exists")) {
+        return reply.code(409).send({
+          error: `Esa combinacion (${parsed.data.opcionValor}) ya existe en este producto. Elige una talla/color diferente.`,
+        });
+      }
       if (mensaje.includes("linked to a metafield")) {
         return reply.code(502).send({
           error:
@@ -345,6 +1050,8 @@ export async function productosRoutes(app: FastifyInstance) {
           costo: producto.costo,
           codigoBarras: parsed.data.codigoBarras,
           varianteTitulo: parsed.data.opcionValor,
+          grupoOpciones: producto.grupoOpciones,
+          grupoVariantes: producto.grupoVariantes,
           shopifyProductId: producto.shopifyProductId,
           shopifyVariantId: ids.shopifyVariantId,
           shopifyInventoryItemId: ids.shopifyInventoryItemId,

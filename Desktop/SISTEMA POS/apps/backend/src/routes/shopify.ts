@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { GuardarShopifyConfigSchema } from "@sistema-pos/shared";
 import { prisma } from "../lib/prisma.js";
-import { normalizarDominio, sincronizarProductos } from "../lib/shopify.js";
+import { normalizarDominio, validarDominioShopify, sincronizarProductos } from "../lib/shopify.js";
 import { mensajeDeValidacion } from "../lib/errores.js";
 
 function enmascarar(secreto: string) {
@@ -36,6 +36,8 @@ export async function shopifyRoutes(app: FastifyInstance) {
     if (!sucursal) return reply.code(404).send({ error: "Sucursal no encontrada" });
 
     const shopDomain = normalizarDominio(parsed.data.shopDomain);
+    const problemaDominio = validarDominioShopify(shopDomain);
+    if (problemaDominio) return reply.code(400).send({ error: problemaDominio });
 
     const config = await prisma.shopifyConfig.upsert({
       where: { empresaId },

@@ -54,10 +54,14 @@ async function crearVentaDesdeShopify(empresaId: string, sucursalEcommerceId: st
       },
     });
     for (const item of itemsMapeados) {
+      const invActual = await tx.inventarioSucursal.findUnique({
+        where: { productoId_sucursalId: { productoId: item.productoId, sucursalId: sucursalEcommerceId } },
+      });
+      const nuevaCantidad = Math.max(0, (invActual?.cantidad ?? 0) - item.cantidad);
       await tx.inventarioSucursal.upsert({
         where: { productoId_sucursalId: { productoId: item.productoId, sucursalId: sucursalEcommerceId } },
-        update: { cantidad: { decrement: item.cantidad } },
-        create: { productoId: item.productoId, sucursalId: sucursalEcommerceId, cantidad: -item.cantidad },
+        update: { cantidad: nuevaCantidad },
+        create: { productoId: item.productoId, sucursalId: sucursalEcommerceId, cantidad: nuevaCantidad },
       });
       await tx.movimientoInventario.create({
         data: {

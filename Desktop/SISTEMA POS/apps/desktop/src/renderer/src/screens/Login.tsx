@@ -3,6 +3,55 @@ import { api } from "../lib/api";
 import { useSesionStore } from "../lib/store";
 import logo from "../assets/logo.png";
 import { mensajeError } from "../lib/errores";
+import { IconoOjo, IconoOjoTachado } from "../lib/iconos";
+
+// Campo de contraseña con boton de ojo para ver/ocultar.
+function CampoPassword({
+  value,
+  onChange,
+  placeholder,
+  minLength,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  minLength?: number;
+}) {
+  const [ver, setVer] = useState(false);
+  return (
+    <div style={{ position: "relative" }}>
+      <input
+        placeholder={placeholder}
+        type={ver ? "text" : "password"}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        required
+        minLength={minLength}
+        style={{ width: "100%", paddingRight: 40 }}
+      />
+      <button
+        type="button"
+        onClick={() => setVer((v) => !v)}
+        title={ver ? "Ocultar contrasena" : "Ver contrasena"}
+        style={{
+          position: "absolute",
+          right: 6,
+          top: "50%",
+          transform: "translateY(-50%)",
+          background: "none",
+          border: "none",
+          boxShadow: "none",
+          padding: 6,
+          color: "var(--text-muted)",
+          cursor: "pointer",
+          display: "inline-flex",
+        }}
+      >
+        {ver ? <IconoOjoTachado size={18} /> : <IconoOjo size={18} />}
+      </button>
+    </div>
+  );
+}
 
 export default function Login() {
   const [modo, setModo] = useState<"login" | "registro">("login");
@@ -106,13 +155,7 @@ export default function Login() {
         {modo === "login" ? (
           <form className="grid-form" onSubmit={handleLogin}>
             <input placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-            <input
-              placeholder="Contrasena"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+            <CampoPassword placeholder="Contrasena" value={password} onChange={setPassword} />
             {error && <span className="error-text">{error}</span>}
             <button type="submit" disabled={cargando}>
               {cargando ? "Ingresando..." : "Ingresar"}
@@ -133,12 +176,10 @@ export default function Login() {
               required
             />
             <input placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-            <input
+            <CampoPassword
               placeholder="Contrasena (min. 8 caracteres)"
-              type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
+              onChange={setPassword}
               minLength={8}
             />
             {error && <span className="error-text">{error}</span>}

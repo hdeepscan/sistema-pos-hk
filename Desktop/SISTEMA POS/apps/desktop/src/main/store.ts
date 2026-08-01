@@ -17,6 +17,10 @@ const DEFAULTS: AppConfig = {
   backupAutomatico: false,
   backupFrecuenciaHoras: 24,
   ultimoBackupAutomatico: null,
+  etiquetaAnchoMm: 50,
+  etiquetaAltoMm: 25,
+  etiquetaOffsetYMm: 0,
+  etiquetaOffsetXMm: 0,
 };
 
 function configPath() {

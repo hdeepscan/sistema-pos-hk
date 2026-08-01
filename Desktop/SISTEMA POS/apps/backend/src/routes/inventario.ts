@@ -6,11 +6,17 @@ import { ajustarInventarioEnShopifySiCorresponde } from "../lib/shopify.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
 import { mensajeDeValidacion } from "../lib/errores.js";
 
+// El stock nunca queda en negativo: si el delta lo llevaria por debajo de 0,
+// se deja en 0.
 async function ajustarStock(productoId: string, sucursalId: string, delta: number) {
+  const actual = await prisma.inventarioSucursal.findUnique({
+    where: { productoId_sucursalId: { productoId, sucursalId } },
+  });
+  const nueva = Math.max(0, (actual?.cantidad ?? 0) + delta);
   const inv = await prisma.inventarioSucursal.upsert({
     where: { productoId_sucursalId: { productoId, sucursalId } },
-    update: { cantidad: { increment: delta } },
-    create: { productoId, sucursalId, cantidad: Math.max(delta, 0) },
+    update: { cantidad: nueva },
+    create: { productoId, sucursalId, cantidad: nueva },
   });
   return inv;
 }

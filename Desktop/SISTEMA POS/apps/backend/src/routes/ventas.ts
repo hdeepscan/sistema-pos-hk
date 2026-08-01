@@ -112,9 +112,14 @@ export async function ventasRoutes(app: FastifyInstance) {
     if (!parsed.success) {
       return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
     }
-    const { clienteUuid, sucursalId, contactoCliente, metodoPago, items, dineroRecibido, descuento, puntosARedimir } =
+    const { clienteUuid, sucursalId, contactoCliente, metodoPago, cuentaBancariaId, items, dineroRecibido, descuento, puntosARedimir, observaciones } =
       parsed.data;
     let { clienteId } = parsed.data;
+
+    // Items del inventario vs items de "venta libre" (sin producto): estos
+    // ultimos no validan ni descuentan stock.
+    const itemsProducto = items.filter((i): i is typeof i & { productoId: string } => !!i.productoId);
+    const hayVentaLibre = items.some((i) => !i.productoId);
 
     if (metodoPago === "CREDITO" && !clienteId) {
       return reply.code(400).send({ error: "Una venta a credito requiere seleccionar un cliente" });
@@ -138,15 +143,26 @@ export async function ventasRoutes(app: FastifyInstance) {
       clienteId = await encontrarOCrearCliente(empresaId, contactoCliente);
     }
 
-    const productoIds = items.map((i) => i.productoId);
+    // Si el pago no es en efectivo ni a credito, se puede indicar a que cuenta
+    // bancaria entro (para cuadrar la caja por cuenta).
+    if (cuentaBancariaId) {
+      const cuenta = await prisma.cuentaBancaria.findFirst({ where: { id: cuentaBancariaId, empresaId } });
+      if (!cuenta) return reply.code(404).send({ error: "Cuenta bancaria no encontrada" });
+    }
+
+    const productoIds = itemsProducto.map((i) => i.productoId);
     const [inventarios, productosDb] = await Promise.all([
       prisma.inventarioSucursal.findMany({ where: { sucursalId, productoId: { in: productoIds } } }),
-      prisma.producto.findMany({ where: { id: { in: productoIds }, empresaId }, select: { id: true, nombre: true } }),
+      prisma.producto.findMany({
+        where: { id: { in: productoIds }, empresaId },
+        select: { id: true, nombre: true, impuestoPorcentaje: true },
+      }),
     ]);
     const stockPorProducto = new Map(inventarios.map((i) => [i.productoId, i.cantidad]));
+    const impuestoPorProducto = new Map(productosDb.map((p) => [p.id, Number(p.impuestoPorcentaje)]));
     const nombrePorProducto = new Map(productosDb.map((p) => [p.id, p.nombre]));
     const puedeVenderSinStock = request.user.permisos.includes("ventas.sin_stock");
-    for (const item of items) {
+    for (const item of itemsProducto) {
       const disponible = stockPorProducto.get(item.productoId) ?? 0;
       if (disponible < item.cantidad && !puedeVenderSinStock) {
         const nombre = nombrePorProducto.get(item.productoId) ?? item.productoId;
@@ -190,6 +206,19 @@ export async function ventasRoutes(app: FastifyInstance) {
 
     const total = Math.max(0, Math.round((subtotal - montoDescuento - valorPuntosRedimidos) * 100) / 100);
 
+    // IVA contenido en el total (los precios incluyen IVA). Se calcula por
+    // producto y se escala proporcionalmente si hubo descuentos/puntos.
+    let impuestoBruto = 0;
+    for (const item of itemsProducto) {
+      const iva = impuestoPorProducto.get(item.productoId) ?? 0;
+      if (iva > 0) {
+        const lineaBruta = item.cantidad * item.precioUnitario;
+        impuestoBruto += (lineaBruta * iva) / (100 + iva);
+      }
+    }
+    const factorDescuento = subtotal > 0 ? total / subtotal : 1;
+    const impuestoTotal = Math.round(impuestoBruto * factorDescuento * 100) / 100;
+
     if (metodoPago === "EFECTIVO" && dineroRecibido !== undefined && dineroRecibido < total) {
       return reply.code(400).send({ error: "El dinero recibido es menor al total de la venta" });
     }
@@ -222,16 +251,21 @@ export async function ventasRoutes(app: FastifyInstance) {
           clienteId,
           consecutivo,
           total,
+          impuestoTotal: impuestoTotal > 0 ? impuestoTotal : undefined,
           metodoPago,
+          cuentaBancariaId: cuentaBancariaId ?? undefined,
           dineroRecibido,
           cambio,
           fechaVencimientoCredito,
           descuento: montoDescuento + valorPuntosRedimidos > 0 ? montoDescuento + valorPuntosRedimidos : undefined,
           puntosGanados,
           puntosRedimidos: puntosARedimir ?? 0,
+          ventaLibre: hayVentaLibre,
+          observaciones,
           items: {
             create: items.map((i) => ({
-              productoId: i.productoId,
+              productoId: i.productoId ?? null,
+              descripcionLibre: i.productoId ? null : (i.descripcionLibre ?? "Venta libre"),
               cantidad: i.cantidad,
               precioUnitario: i.precioUnitario,
             })),
@@ -240,11 +274,18 @@ export async function ventasRoutes(app: FastifyInstance) {
         include: { items: true },
       });
 
-      for (const item of items) {
+      // Solo los items de inventario mueven stock; los de venta libre no.
+      for (const item of itemsProducto) {
+        // El stock nunca baja de 0: si se vende sin existencias (permiso
+        // ventas.sin_stock) el inventario queda en 0, no en negativo.
+        const invActual = await tx.inventarioSucursal.findUnique({
+          where: { productoId_sucursalId: { productoId: item.productoId, sucursalId } },
+        });
+        const nuevaCantidad = Math.max(0, (invActual?.cantidad ?? 0) - item.cantidad);
         await tx.inventarioSucursal.upsert({
           where: { productoId_sucursalId: { productoId: item.productoId, sucursalId } },
-          update: { cantidad: { decrement: item.cantidad } },
-          create: { productoId: item.productoId, sucursalId, cantidad: -item.cantidad },
+          update: { cantidad: nuevaCantidad },
+          create: { productoId: item.productoId, sucursalId, cantidad: nuevaCantidad },
         });
         await tx.movimientoInventario.create({
           data: {
@@ -292,9 +333,9 @@ export async function ventasRoutes(app: FastifyInstance) {
       accion: "CREAR_VENTA",
       entidad: "Venta",
       entidadId: venta.id,
-      detalle: `Venta #${venta.consecutivo} por $${total} (${metodoPago})`,
+      detalle: `Venta #${venta.consecutivo} por $${total} (${metodoPago})${hayVentaLibre ? " · venta libre" : ""}`,
     });
-    for (const item of items) {
+    for (const item of itemsProducto) {
       const [inv, producto] = await Promise.all([
         prisma.inventarioSucursal.findUnique({
           where: { productoId_sucursalId: { productoId: item.productoId, sucursalId } },
@@ -351,20 +392,21 @@ export async function ventasRoutes(app: FastifyInstance) {
     const detalle: { productoId: string; nombre: string; cantidad: number; precioUnitario: number }[] = [];
     for (const item of parsed.data.items) {
       const ventaItem = venta.items.find((vi) => vi.productoId === item.productoId);
-      if (!ventaItem) {
+      if (!ventaItem || !ventaItem.productoId) {
         return reply.code(400).send({ error: "El producto no pertenece a esta venta" });
       }
+      const nombreItem = ventaItem.producto?.nombre ?? ventaItem.descripcionLibre ?? "Producto";
       // Se valida contra lo que queda por devolver, no contra lo vendido:
       // asi dos devoluciones parciales no pueden sumar mas que la venta.
       const pendiente = ventaItem.cantidad - ventaItem.cantidadDevuelta;
       if (item.cantidad > pendiente) {
         return reply.code(400).send({
-          error: `Solo quedan ${pendiente} unidad(es) por devolver de ${ventaItem.producto.nombre}`,
+          error: `Solo quedan ${pendiente} unidad(es) por devolver de ${nombreItem}`,
         });
       }
       detalle.push({
         productoId: item.productoId,
-        nombre: ventaItem.producto.nombre,
+        nombre: nombreItem,
         cantidad: item.cantidad,
         precioUnitario: Number(ventaItem.precioUnitario),
       });
@@ -458,8 +500,13 @@ export async function ventasRoutes(app: FastifyInstance) {
     });
     if (!venta) return reply.code(404).send({ error: "Venta no encontrada" });
 
+    // Los items de venta libre no tienen producto: no devuelven stock.
+    const itemsConProducto = venta.items.filter(
+      (i): i is typeof i & { productoId: string } => !!i.productoId
+    );
+
     await prisma.$transaction(async (tx) => {
-      for (const item of venta.items) {
+      for (const item of itemsConProducto) {
         await tx.inventarioSucursal.update({
           where: { productoId_sucursalId: { productoId: item.productoId, sucursalId: venta.sucursalId } },
           data: { cantidad: { increment: item.cantidad } },
@@ -487,7 +534,7 @@ export async function ventasRoutes(app: FastifyInstance) {
       detalle: `Venta #${venta.consecutivo} por $${venta.total}`,
     });
 
-    for (const item of venta.items) {
+    for (const item of itemsConProducto) {
       const [inv, producto] = await Promise.all([
         prisma.inventarioSucursal.findUnique({
           where: { productoId_sucursalId: { productoId: item.productoId, sucursalId: venta.sucursalId } },

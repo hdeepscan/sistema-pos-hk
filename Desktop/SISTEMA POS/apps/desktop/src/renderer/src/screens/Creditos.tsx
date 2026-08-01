@@ -4,6 +4,7 @@ import { useSesionStore } from "../lib/store";
 import { BotonesExportar } from "../lib/BotonesExportar";
 import type { ColumnaExport } from "../lib/export";
 import { mensajeError } from "../lib/errores";
+import CreditosManuales from "./CreditosManuales";
 
 interface Credito {
   ventaId: string;
@@ -51,6 +52,25 @@ const COLUMNAS_CREDITOS: ColumnaExport<Credito>[] = [
 ];
 
 export default function Creditos() {
+  const [modo, setModo] = useState<"ventas" | "manuales">("ventas");
+  return (
+    <div>
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button type="button" className={modo === "ventas" ? "" : "secondary"} onClick={() => setModo("ventas")}>
+            Creditos de ventas
+          </button>
+          <button type="button" className={modo === "manuales" ? "" : "secondary"} onClick={() => setModo("manuales")}>
+            Creditos manuales
+          </button>
+        </div>
+      </div>
+      {modo === "ventas" ? <CreditosVentas /> : <CreditosManuales />}
+    </div>
+  );
+}
+
+function CreditosVentas() {
   const { sucursales } = useSesionStore();
   const [tab, setTab] = useState<Credito["estado"] | undefined>(undefined);
   const [creditos, setCreditos] = useState<Credito[]>([]);

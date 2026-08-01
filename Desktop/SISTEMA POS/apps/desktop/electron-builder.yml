@@ -30,5 +30,8 @@ nsis:
 # o "Buscar actualizaciones" en la app no encontrara nada.
 publish:
   provider: github
-  owner: TU-USUARIO-GITHUB
+  owner: hdeepscan
   repo: sistema-pos-hk
+  # La release queda publicada de una (no como borrador), para que las tiendas
+  # la vean apenas se sube.
+  releaseType: release

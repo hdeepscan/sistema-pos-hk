@@ -55,6 +55,10 @@ model Empresa {
   // al momento de la venta (cambiarlo aqui no afecta creditos ya generados).
   diasVencimientoCredito Int @default(20)
 
+  // Dias de antelacion con que se avisa que una cuota de un credito manual
+  // esta por vencer (para el centro de notificaciones).
+  diasAvisoCuota Int @default(3)
+
   // Fidelizacion: cuantos pesos gastados equivalen a 1 punto al comprar, y
   // cuanto vale 1 punto (en pesos) al canjearlo. Null = programa desactivado.
   pesosPorPunto Decimal? @db.Decimal(12, 2)
@@ -73,10 +77,13 @@ model Empresa {
   metaConfig     MetaConfig?
   gastoPauta     GastoPauta[]
   auditoria      RegistroAuditoria[]
-  plantillaRecibo PlantillaRecibo?
+  plantillasRecibo PlantillaRecibo[]
   pedidosShopify  PedidoShopifyNotificacion[]
   turnosCaja      TurnoCaja[]
   devolucionesVenta DevolucionVenta[]
+  creditosManuales CreditoManual[]
+  cuentasBancarias CuentaBancaria[]
+  eventosCalendario EventoCalendario[]
 
   @@map("empresas")
 }
@@ -105,6 +112,8 @@ model Usuario {
   turnosApertura  TurnoCaja[] @relation("TurnoCajaApertura")
   turnosCierre    TurnoCaja[] @relation("TurnoCajaCierre")
   devolucionesVenta DevolucionVenta[]
+  pagosCreditoManual PagoCreditoManual[]
+  eventosResponsable EventoCalendario[] @relation("EventoResponsable")
 
   @@index([empresaId])
   @@map("usuarios")
@@ -144,6 +153,9 @@ model Producto {
   sku           String
   nombre        String
   categoria     String?
+  marca         String?
+  descripcion   String?
+  impuestoPorcentaje Decimal @db.Decimal(5, 2) @default(0)
   precio        Decimal  @db.Decimal(12, 2)
   costo         Decimal  @db.Decimal(12, 2) @default(0)
   codigoBarras  String?
@@ -155,6 +167,14 @@ model Producto {
   shopifyInventoryItemId String?
   varianteTitulo   String? // ej. "S / Negro", para agrupar variantes del mismo producto Shopify
   imagenUrl        String?
+  // Agrupa variantes creadas localmente (sin Shopify) que pertenecen al mismo
+  // producto padre. Para las de Shopify se sigue usando shopifyProductId.
+  grupoVariantes   String?
+  // Nombres de las opciones de variante (ej. "Color|Talla"), en el mismo orden
+  // que los valores en varianteTitulo, para mostrar "Color: Rojo / Talla: M".
+  grupoOpciones    String?
+  // Cantidad minima antes de generar un recordatorio de reposicion (0 = sin aviso).
+  stockMinimo      Int      @default(0)
 
   proveedorId   String?
   proveedor     Proveedor? @relation(fields: [proveedorId], references: [id])
@@ -221,7 +241,14 @@ model Venta {
   cliente       Cliente?    @relation(fields: [clienteId], references: [id])
   consecutivo   Int
   total         Decimal     @db.Decimal(12, 2)
+  // IVA contenido en el total (los precios incluyen IVA). Se calcula segun el
+  // impuesto de cada producto.
+  impuestoTotal Decimal?    @db.Decimal(12, 2)
   metodoPago    MetodoPago
+  // Cuenta bancaria que recibio el pago (tarjeta/transferencia/QR). Permite
+  // cuadrar la caja por cuenta automaticamente.
+  cuentaBancariaId String?
+  cuentaBancaria   CuentaBancaria? @relation(fields: [cuentaBancariaId], references: [id])
   fecha         DateTime    @default(now())
 
   // Solo para metodoPago = EFECTIVO: lo que entrego el cliente y el cambio calculado.
@@ -235,6 +262,11 @@ model Venta {
 
   // Canal por el que entro la venta (POS fisico, Shopify, etc).
   canal CanalVenta @default(POS)
+
+  // Venta libre: concepto suelto sin producto del inventario (no descuenta
+  // stock). Se marca para diferenciarla en el historial y los reportes.
+  ventaLibre    Boolean  @default(false)
+  observaciones String?
 
   // Descuento manual aplicado en el POS (monto en pesos ya calculado) y
   // puntos del programa de fidelizacion involucrados en esta venta.
@@ -255,8 +287,11 @@ model VentaItem {
   id              String   @id @default(uuid())
   ventaId         String
   venta           Venta    @relation(fields: [ventaId], references: [id], onDelete: Cascade)
-  productoId      String
-  producto        Producto @relation(fields: [productoId], references: [id])
+  // productoId es null en una "venta libre" (concepto suelto, sin producto del
+  // inventario). En ese caso el texto va en descripcionLibre.
+  productoId      String?
+  producto        Producto? @relation(fields: [productoId], references: [id])
+  descripcionLibre String?
   cantidad        Int
   precioUnitario  Decimal  @db.Decimal(12, 2)
   // Cuanto de este item se devolvio. Se lleva aparte (en vez de restarle a
@@ -285,6 +320,7 @@ model Cliente {
   ventas      Venta[]
   abonos      Abono[]
   movimientosPuntos MovimientoPuntos[]
+  creditosManuales CreditoManual[]
 
   @@index([empresaId])
   @@map("clientes")
@@ -495,8 +531,12 @@ model RegistroAuditoria {
 // aqui, se arman siempre en printer.ts independientemente de esta plantilla.
 model PlantillaRecibo {
   id                    String   @id @default(uuid())
-  empresaId             String   @unique
+  empresaId             String
   empresa               Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  // Varias plantillas por empresa; la marcada como predeterminada es la que
+  // usa el POS al imprimir.
+  nombre                String   @default("Plantilla principal")
+  esPredeterminada      Boolean  @default(false)
   logoUrl               String?
   nombreNegocio         String?
   direccion             String?
@@ -513,6 +553,7 @@ model PlantillaRecibo {
   promociones           String?
   actualizadoEn         DateTime @updatedAt
 
+  @@index([empresaId])
   @@map("plantilla_recibo")
 }
 
@@ -535,9 +576,79 @@ model TurnoCaja {
   totalEsperado     Decimal?  @db.Decimal(12, 2)
   montoContado      Decimal?  @db.Decimal(12, 2)
   diferencia        Decimal?  @db.Decimal(12, 2)
+  // Saldo inicial capturado por cuenta bancaria al abrir el turno:
+  // [{ cuentaId, nombre, saldo }]. Y el desglose calculado al cerrar.
+  saldosIniciales   Json?
+  desgloseCierre    Json?
 
   @@index([empresaId, sucursalId, fechaApertura])
   @@map("turnos_caja")
+}
+
+model CuentaBancaria {
+  id           String   @id @default(uuid())
+  empresaId    String
+  empresa      Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nombre       String
+  banco        String?
+  numeroCuenta String?
+  tipoCuenta   String? // Ahorros, Corriente, Billetera (Nequi/Daviplata), Caja menor, etc.
+  saldoInicial Decimal  @db.Decimal(14, 2) @default(0)
+  activa       Boolean  @default(true)
+  creadoEn     DateTime @default(now())
+
+  ventas       Venta[]
+
+  @@index([empresaId])
+  @@map("cuentas_bancarias")
+}
+
+// Galeria de imagenes de un producto (varias por producto). Se agrupan por
+// grupoClave = shopifyProductId | grupoVariantes | id del producto, para que
+// todas las variantes del mismo producto compartan la galeria.
+model ProductoImagen {
+  id             String   @id @default(uuid())
+  empresaId      String
+  grupoClave     String
+  url            String   @db.Text
+  shopifyImageId String?
+  orden          Int      @default(0)
+  esPrincipal    Boolean  @default(false)
+  creadoEn       DateTime @default(now())
+
+  @@index([empresaId, grupoClave])
+  @@map("producto_imagenes")
+}
+
+enum PrioridadEvento {
+  BAJA
+  MEDIA
+  ALTA
+}
+
+enum EstadoEvento {
+  PENDIENTE
+  EN_PROCESO
+  COMPLETADO
+}
+
+model EventoCalendario {
+  id            String          @id @default(uuid())
+  empresaId     String
+  empresa       Empresa         @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  titulo        String
+  descripcion   String?
+  fecha         DateTime // fecha (y hora si aplica) del evento
+  hora          String? // "14:30" opcional, para mostrar
+  prioridad     PrioridadEvento @default(MEDIA)
+  estado        EstadoEvento    @default(PENDIENTE)
+  tipo          String          @default("TAREA") // TAREA, RECORDATORIO, EVENTO, REUNION, SEGUIMIENTO
+  responsableId String?
+  responsable   Usuario?        @relation("EventoResponsable", fields: [responsableId], references: [id])
+  creadoEn      DateTime        @default(now())
+
+  @@index([empresaId, fecha])
+  @@map("eventos_calendario")
 }
 
 // Devolucion parcial de una venta: guarda que items/cantidades se
@@ -593,4 +704,66 @@ model PedidoShopifyNotificacion {
   @@unique([empresaId, ordenId])
   @@index([empresaId, creadoEn])
   @@map("pedidos_shopify_notificacion")
+}
+
+enum FrecuenciaPago {
+  DIARIA
+  SEMANAL
+  QUINCENAL
+  MENSUAL
+}
+
+// Credito/prestamo creado manualmente (sin una venta detras). Se paga en
+// cuotas segun un cronograma generado al crearlo.
+model CreditoManual {
+  id            String   @id @default(uuid())
+  empresaId     String
+  empresa       Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  numero        Int // consecutivo por empresa, para referirse al credito
+  clienteId     String
+  cliente       Cliente  @relation(fields: [clienteId], references: [id])
+  valorTotal    Decimal  @db.Decimal(12, 2)
+  fechaInicio   DateTime
+  numeroCuotas  Int
+  frecuencia    FrecuenciaPago
+  observaciones String?
+  activo        Boolean  @default(true)
+  creadoEn      DateTime @default(now())
+
+  cuotas        CuotaCredito[]
+
+  @@unique([empresaId, numero])
+  @@index([empresaId])
+  @@index([clienteId])
+  @@map("creditos_manuales")
+}
+
+// Cada cuota del cronograma de un credito manual.
+model CuotaCredito {
+  id             String   @id @default(uuid())
+  creditoId      String
+  credito        CreditoManual @relation(fields: [creditoId], references: [id], onDelete: Cascade)
+  numero         Int // 1, 2, 3...
+  fechaVencimiento DateTime
+  valor          Decimal  @db.Decimal(12, 2)
+  pagado         Decimal  @db.Decimal(12, 2) @default(0)
+
+  pagos          PagoCreditoManual[]
+
+  @@index([creditoId])
+  @@map("cuotas_credito")
+}
+
+// Abono a un credito manual, aplicado a una cuota especifica.
+model PagoCreditoManual {
+  id         String   @id @default(uuid())
+  cuotaId    String
+  cuota      CuotaCredito @relation(fields: [cuotaId], references: [id], onDelete: Cascade)
+  monto      Decimal  @db.Decimal(12, 2)
+  fecha      DateTime @default(now())
+  usuarioId  String
+  usuario    Usuario  @relation(fields: [usuarioId], references: [id])
+
+  @@index([cuotaId])
+  @@map("pagos_credito_manual")
 }

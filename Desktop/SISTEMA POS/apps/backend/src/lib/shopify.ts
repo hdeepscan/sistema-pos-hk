@@ -3,11 +3,55 @@ import { prisma } from "./prisma.js";
 const API_VERSION = "2024-10";
 
 export function normalizarDominio(input: string): string {
-  let d = input.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/$/, "");
-  if (!d.includes(".myshopify.com") && !d.includes(".")) {
+  let d = input.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  if (!d.includes(".")) {
     d = `${d}.myshopify.com`;
   }
   return d;
+}
+
+// El endpoint de token (client_credentials) SOLO existe en el dominio interno
+// *.myshopify.com. Si se usa el dominio publico personalizado (ej. valcris.co),
+// Shopify redirige a admin.shopify.com, que esta detras de Cloudflare y
+// responde con una pagina de desafio en HTML en vez de un token. No se puede
+// deducir el dominio .myshopify.com a partir del personalizado, asi que se
+// rechaza de entrada con una explicacion en vez de fallar despues.
+export function validarDominioShopify(dominio: string): string | null {
+  if (dominio.endsWith(".myshopify.com")) return null;
+  return (
+    `"${dominio}" es tu dominio publico, y con ese Shopify no entrega el token. ` +
+    `Usa el dominio interno que termina en .myshopify.com (ejemplo: mi-tienda.myshopify.com). ` +
+    `Lo encuentras en el admin de Shopify, en Configuracion > Dominios, marcado como "dominio de Shopify".`
+  );
+}
+
+// Las respuestas de error de Shopify a veces son paginas HTML enteras (por
+// ejemplo el desafio de Cloudflare). Volcarlas tal cual en pantalla no le
+// dice nada al usuario, asi que se traducen a un mensaje corto.
+function resumirErrorShopify(status: number, cuerpo: string): string {
+  const esHtml = /^\s*<(!doctype|html)/i.test(cuerpo);
+
+  if (esHtml) {
+    if (/cf_chl|cloudflare|verifying your connection/i.test(cuerpo)) {
+      return (
+        `Shopify no entrego el token (${status}): la peticion termino en una pagina de verificacion de Cloudflare. ` +
+        `Casi siempre es porque el dominio configurado no es el de tipo .myshopify.com. ` +
+        `Revisalo en la configuracion de Shopify del sistema.`
+      );
+    }
+    return `Shopify respondio con una pagina web en vez de un token (${status}). Revisa que el dominio de la tienda sea correcto.`;
+  }
+
+  try {
+    const json = JSON.parse(cuerpo);
+    const detalle = json.error_description || json.error || json.errors;
+    if (detalle) return `Shopify rechazo la conexion (${status}): ${typeof detalle === "string" ? detalle : JSON.stringify(detalle)}`;
+  } catch {
+    // no era JSON; se usa el texto crudo recortado
+  }
+
+  const corto = cuerpo.replace(/\s+/g, " ").trim().slice(0, 200);
+  return `No se pudo obtener el token de Shopify (${status})${corto ? `: ${corto}` : ""}`;
 }
 
 // Obtiene un access token vigente para la empresa, renovandolo automaticamente
@@ -34,7 +78,7 @@ export async function obtenerAccessToken(empresaId: string): Promise<{ token: st
 
   if (!res.ok) {
     const texto = await res.text();
-    throw new Error(`No se pudo obtener el token de Shopify (${res.status}): ${texto}`);
+    throw new Error(resumirErrorShopify(res.status, texto));
   }
 
   const data = (await res.json()) as { access_token: string; expires_in: number };
@@ -70,7 +114,7 @@ export async function obtenerProductosShopify(empresaId: string): Promise<Shopif
   const { token, shopDomain } = await obtenerAccessToken(empresaId);
   const productos: ShopifyProduct[] = [];
   let url: string | null =
-    `https://${shopDomain}/admin/api/${API_VERSION}/products.json?limit=250`;
+    `https://${shopDomain}/admin/api/${API_VERSION}/products.json?limit=250&status=any`;
 
   while (url) {
     const res: Response = await fetch(url, { headers: { "X-Shopify-Access-Token": token } });
@@ -113,7 +157,7 @@ export async function obtenerUbicaciones(empresaId: string): Promise<ShopifyLoca
 
 // La primera vez que se sincroniza, vincula la sucursal ecommerce a la
 // primera ubicacion (location) de Shopify, para poder ajustar inventario ahi.
-async function asegurarUbicacionEcommerce(empresaId: string, sucursalEcommerceId: string) {
+async function asegurarUbicacionEcommerceInterno(empresaId: string, sucursalEcommerceId: string) {
   const sucursal = await prisma.sucursal.findUnique({ where: { id: sucursalEcommerceId } });
   if (sucursal?.shopifyLocationId) return;
 
@@ -143,17 +187,14 @@ export async function sincronizarProductos(empresaId: string): Promise<Resultado
 
   for (const producto of productosShopify) {
     for (const variante of producto.variants) {
-      if (!variante.sku) {
-        variantesOmitidas += 1;
-        continue;
-      }
+      const sku = variante.sku || `SHOP${producto.id}V${variante.id}`;
       const nombre =
         variante.title && variante.title !== "Default Title"
           ? `${producto.title} - ${variante.title}`
           : producto.title;
 
       const existente = await prisma.producto.findUnique({
-        where: { empresaId_sku: { empresaId, sku: variante.sku } },
+        where: { empresaId_sku: { empresaId, sku } },
       });
 
       const datos = {
@@ -169,7 +210,7 @@ export async function sincronizarProductos(empresaId: string): Promise<Resultado
 
       const productoDb = existente
         ? await prisma.producto.update({ where: { id: existente.id }, data: datos })
-        : await prisma.producto.create({ data: { empresaId, sku: variante.sku, costo: 0, ...datos } });
+        : await prisma.producto.create({ data: { empresaId, sku, costo: 0, ...datos } });
 
       if (existente) productosActualizados += 1;
       else productosCreados += 1;
@@ -209,7 +250,8 @@ interface ProductoLocal {
 // Crea el producto en Shopify (con una sola variante = el SKU local) y
 // devuelve los ids de Shopify para guardarlos en el producto local.
 export async function crearProductoEnShopify(
-  producto: ProductoLocal
+  producto: ProductoLocal,
+  publicar = true
 ): Promise<{ shopifyProductId: string; shopifyVariantId: string; shopifyInventoryItemId: string }> {
   const { token, shopDomain } = await obtenerAccessToken(producto.empresaId);
 
@@ -220,7 +262,7 @@ export async function crearProductoEnShopify(
       product: {
         title: producto.nombre,
         product_type: producto.categoria || undefined,
-        status: "active",
+        status: publicar ? "active" : "draft",
         variants: [
           {
             sku: producto.sku,
@@ -241,6 +283,63 @@ export async function crearProductoEnShopify(
     shopifyProductId: String(data.product.id),
     shopifyVariantId: String(variante.id),
     shopifyInventoryItemId: String(variante.inventory_item_id),
+  };
+}
+
+// Crea UN producto en Shopify con TODAS sus variantes en una sola llamada, con
+// las opciones (Color, Talla, ...) nombradas. Devuelve el id del producto y el
+// mapeo de cada SKU a sus ids de variante/inventario.
+export async function crearProductoConVariantesEnShopify(
+  empresaId: string,
+  base: { nombre: string; categoria?: string | null },
+  nombresOpciones: string[],
+  variantes: { titulo: string; sku: string; precio: number; codigoBarras?: string | null }[],
+  publicar = true
+): Promise<{ shopifyProductId: string; variantes: { sku: string; shopifyVariantId: string; shopifyInventoryItemId: string }[] }> {
+  const { token, shopDomain } = await obtenerAccessToken(empresaId);
+
+  const variantsBody = variantes.map((v) => {
+    const partes = v.titulo.split("/").map((p) => p.trim()).filter(Boolean);
+    const opciones: Record<string, string> = {};
+    partes.slice(0, 3).forEach((valor, i) => {
+      opciones[`option${i + 1}`] = valor;
+    });
+    return {
+      ...opciones,
+      sku: v.sku,
+      price: String(v.precio),
+      barcode: v.codigoBarras || undefined,
+      inventory_management: "shopify",
+    };
+  });
+
+  const options =
+    nombresOpciones.length > 0 ? nombresOpciones.slice(0, 3).map((name) => ({ name })) : undefined;
+
+  const res = await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/products.json`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": token },
+    body: JSON.stringify({
+      product: {
+        title: base.nombre,
+        product_type: base.categoria || undefined,
+        status: publicar ? "active" : "draft",
+        options,
+        variants: variantsBody,
+      },
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`No se pudo crear el producto con variantes en Shopify (${res.status}): ${await res.text()}`);
+  }
+  const data = (await res.json()) as { product: ShopifyProduct };
+  return {
+    shopifyProductId: String(data.product.id),
+    variantes: data.product.variants.map((v) => ({
+      sku: v.sku ?? "",
+      shopifyVariantId: String(v.id),
+      shopifyInventoryItemId: String(v.inventory_item_id),
+    })),
   };
 }
 
@@ -274,12 +373,20 @@ export async function actualizarProductoEnShopify(producto: ProductoLocal): Prom
 
 // Sube una imagen (base64, sin el prefijo data:...;base64,) y la asocia al
 // producto en Shopify. Devuelve la URL publica (CDN) resultante.
-export async function subirImagenAShopify(empresaId: string, shopifyProductId: string, base64: string): Promise<string> {
+export async function subirImagenAShopify(
+  empresaId: string,
+  shopifyProductId: string,
+  base64: string,
+  variantIds?: string[]
+): Promise<string> {
   const { token, shopDomain } = await obtenerAccessToken(empresaId);
+  const image: Record<string, unknown> = { attachment: base64 };
+  // Si se pasan variantes, la imagen queda asociada a esas variantes puntuales.
+  if (variantIds && variantIds.length > 0) image.variant_ids = variantIds.map((v) => Number(v));
   const res = await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/products/${shopifyProductId}/images.json`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": token },
-    body: JSON.stringify({ image: { attachment: base64 } }),
+    body: JSON.stringify({ image }),
   });
   if (!res.ok) {
     throw new Error(`No se pudo subir la imagen a Shopify (${res.status}): ${await res.text()}`);
@@ -308,6 +415,126 @@ export async function ajustarInventarioEnShopify(
   });
   if (!res.ok) {
     throw new Error(`No se pudo ajustar el inventario en Shopify (${res.status}): ${await res.text()}`);
+  }
+}
+
+// Fija el inventario disponible (cantidad absoluta) de un item en una ubicacion.
+// Si el item no esta conectado a la ubicacion, lo conecta y reintenta.
+export async function fijarInventarioEnShopify(
+  empresaId: string,
+  inventoryItemId: string,
+  locationId: string,
+  cantidad: number
+): Promise<void> {
+  const { token, shopDomain } = await obtenerAccessToken(empresaId);
+  const set = () =>
+    fetch(`https://${shopDomain}/admin/api/${API_VERSION}/inventory_levels/set.json`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": token },
+      body: JSON.stringify({
+        location_id: Number(locationId),
+        inventory_item_id: Number(inventoryItemId),
+        available: cantidad,
+      }),
+    });
+
+  let res = await set();
+  if (!res.ok) {
+    // Conectar el item a la ubicacion y reintentar (error tipico si el item
+    // aun no esta "stocked" en esa location).
+    await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/inventory_levels/connect.json`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": token },
+      body: JSON.stringify({ location_id: Number(locationId), inventory_item_id: Number(inventoryItemId) }),
+    });
+    res = await set();
+  }
+  if (!res.ok) {
+    throw new Error(`No se pudo fijar el inventario en Shopify (${res.status}): ${await res.text()}`);
+  }
+}
+
+// Vincula la sucursal ecommerce a una ubicacion de Shopify si aun no lo esta, y
+// devuelve el locationId. Se usa para poder empujar inventario.
+export async function asegurarUbicacionEcommerce(empresaId: string, sucursalEcommerceId: string): Promise<string | null> {
+  await asegurarUbicacionEcommerceInterno(empresaId, sucursalEcommerceId);
+  const sucursal = await prisma.sucursal.findUnique({ where: { id: sucursalEcommerceId } });
+  return sucursal?.shopifyLocationId ?? null;
+}
+
+// Devuelve las opciones de un producto de Shopify (ej. [{name:"Color",
+// values:["Rojo","Azul"]}, {name:"Talla", values:["S","M"]}]).
+export async function obtenerOpcionesShopifyProducto(
+  empresaId: string,
+  shopifyProductId: string
+): Promise<{ name: string; values: string[] }[]> {
+  const { token, shopDomain } = await obtenerAccessToken(empresaId);
+  const res = await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/products/${shopifyProductId}.json`, {
+    headers: { "X-Shopify-Access-Token": token },
+  });
+  if (!res.ok) throw new Error(`No se pudieron leer las opciones del producto (${res.status})`);
+  const data = (await res.json()) as { product: { options: { name: string; values: string[] }[] } };
+  return (data.product.options ?? []).map((o) => ({ name: o.name, values: o.values ?? [] }));
+}
+
+// Elimina una sola variante de un producto en Shopify. 404 = exito.
+export async function eliminarVarianteEnShopify(
+  empresaId: string,
+  shopifyProductId: string,
+  shopifyVariantId: string
+): Promise<void> {
+  const { token, shopDomain } = await obtenerAccessToken(empresaId);
+  const res = await fetch(
+    `https://${shopDomain}/admin/api/${API_VERSION}/products/${shopifyProductId}/variants/${shopifyVariantId}.json`,
+    { method: "DELETE", headers: { "X-Shopify-Access-Token": token } }
+  );
+  if (!res.ok && res.status !== 404) {
+    throw new Error(`No se pudo eliminar la variante en Shopify (${res.status}): ${await res.text()}`);
+  }
+}
+
+// Sube una imagen a Shopify y devuelve su id y URL (para la galeria).
+export async function subirImagenGaleria(
+  empresaId: string,
+  shopifyProductId: string,
+  base64: string
+): Promise<{ shopifyImageId: string; url: string }> {
+  const { token, shopDomain } = await obtenerAccessToken(empresaId);
+  const res = await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/products/${shopifyProductId}/images.json`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": token },
+    body: JSON.stringify({ image: { attachment: base64 } }),
+  });
+  if (!res.ok) throw new Error(`No se pudo subir la imagen a Shopify (${res.status}): ${await res.text()}`);
+  const data = (await res.json()) as { image: { id: number; src: string } };
+  return { shopifyImageId: String(data.image.id), url: data.image.src };
+}
+
+export async function eliminarImagenEnShopify(
+  empresaId: string,
+  shopifyProductId: string,
+  shopifyImageId: string
+): Promise<void> {
+  const { token, shopDomain } = await obtenerAccessToken(empresaId);
+  const res = await fetch(
+    `https://${shopDomain}/admin/api/${API_VERSION}/products/${shopifyProductId}/images/${shopifyImageId}.json`,
+    { method: "DELETE", headers: { "X-Shopify-Access-Token": token } }
+  );
+  if (!res.ok && res.status !== 404) {
+    throw new Error(`No se pudo eliminar la imagen en Shopify (${res.status}): ${await res.text()}`);
+  }
+}
+
+// Elimina un producto de Shopify (con todas sus variantes). Un 404 se considera
+// exito (ya no existe alla).
+export async function eliminarProductoEnShopify(empresaId: string, shopifyProductId: string): Promise<void> {
+  const { token, shopDomain } = await obtenerAccessToken(empresaId);
+  const res = await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/products/${shopifyProductId}.json`, {
+    method: "DELETE",
+    headers: { "X-Shopify-Access-Token": token },
+  });
+  if (!res.ok && res.status !== 404) {
+    throw new Error(`No se pudo eliminar el producto en Shopify (${res.status}): ${await res.text()}`);
   }
 }
 
@@ -519,6 +746,41 @@ export async function crearVarianteEnShopify(
   partes.slice(0, 3).forEach((valor, i) => {
     opciones[`option${i + 1}`] = valor;
   });
+
+  // Shopify (API 2024+) exige que el valor de opcion ya exista en la lista de
+  // opciones del producto antes de crear la variante; si no, responde 422
+  // "You need to add option values for Color". Por eso primero leemos las
+  // opciones del producto y agregamos los valores nuevos que falten.
+  try {
+    const prodRes = await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/products/${shopifyProductId}.json`, {
+      headers: { "X-Shopify-Access-Token": token },
+    });
+    if (prodRes.ok) {
+      const prod = (await prodRes.json()).product as {
+        id: number;
+        options: { id: number; name: string; position: number; values: string[] }[];
+      };
+      let hayNuevos = false;
+      const opcionesActualizadas = prod.options.map((opt, i) => {
+        const valor = partes[i];
+        if (valor && !opt.values.includes(valor)) {
+          hayNuevos = true;
+          return { id: opt.id, name: opt.name, values: [...opt.values, valor] };
+        }
+        return { id: opt.id, name: opt.name, values: opt.values };
+      });
+      if (hayNuevos) {
+        await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/products/${shopifyProductId}.json`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": token },
+          body: JSON.stringify({ product: { id: Number(shopifyProductId), options: opcionesActualizadas } }),
+        });
+      }
+    }
+  } catch {
+    // Si falla la lectura/actualizacion de opciones, se intenta crear igual; el
+    // error real se reportara abajo.
+  }
 
   const res = await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/products/${shopifyProductId}/variants.json`, {
     method: "POST",

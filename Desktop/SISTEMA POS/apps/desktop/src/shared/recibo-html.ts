@@ -52,6 +52,7 @@ export function construirReciboHtml(data: ReciboData): string {
         ${data.subtotal !== undefined && (data.descuento || data.valorPuntosRedimidos) ? `<div>Subtotal: $${data.subtotal.toFixed(2)}</div>` : ""}
         ${data.descuento ? `<div>Descuento: -$${data.descuento.toFixed(2)}</div>` : ""}
         ${data.valorPuntosRedimidos ? `<div>Puntos canjeados (${data.puntosRedimidos ?? 0}): -$${data.valorPuntosRedimidos.toFixed(2)}</div>` : ""}
+        ${data.impuesto ? `<div>Base gravable: $${(data.total - data.impuesto).toFixed(2)}</div><div>IVA incluido: $${data.impuesto.toFixed(2)}</div>` : ""}
         <div class="total">TOTAL: $${data.total.toFixed(2)}</div>
         <div>Pago: ${escapeHtml(data.metodoPago)}</div>
         ${data.dineroRecibido !== undefined ? `<div>Recibido: $${data.dineroRecibido.toFixed(2)}</div>` : ""}

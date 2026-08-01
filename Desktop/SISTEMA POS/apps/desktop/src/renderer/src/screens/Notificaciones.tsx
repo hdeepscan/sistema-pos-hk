@@ -14,8 +14,31 @@ interface Pedido {
   fechaAtendido: string | null;
 }
 
+interface AlertaCuota {
+  creditoId: string;
+  numeroCredito: number;
+  clienteNombre: string;
+  numeroCuota: number;
+  valorPendiente: number;
+  fechaVencimiento: string;
+  diasRetraso: number;
+  tipo: "VENCIDA" | "HOY" | "PROXIMA";
+}
+
+const badgeAlerta: Record<AlertaCuota["tipo"], string> = {
+  VENCIDA: "danger",
+  HOY: "warning",
+  PROXIMA: "neutral",
+};
+const etiquetaAlerta: Record<AlertaCuota["tipo"], string> = {
+  VENCIDA: "En mora",
+  HOY: "Vence hoy",
+  PROXIMA: "Proxima a vencer",
+};
+
 export default function Notificaciones() {
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
+  const [alertas, setAlertas] = useState<AlertaCuota[]>([]);
   const [filtro, setFiltro] = useState<"todos" | "pendientes" | "atendidos">("pendientes");
   const [shopDomain, setShopDomain] = useState<string | null>(null);
   const [cargando, setCargando] = useState(true);
@@ -51,6 +74,13 @@ export default function Notificaciones() {
       .catch(() => setShopDomain(null));
   }, []);
 
+  useEffect(() => {
+    api
+      .get<AlertaCuota[]>("/creditos-manuales/alertas")
+      .then(({ data }) => setAlertas(data))
+      .catch(() => setAlertas([]));
+  }, []);
+
   async function atender(id: string) {
     await api.patch(`/pedidos-shopify/${id}/atender`);
     cargar();
@@ -66,9 +96,45 @@ export default function Notificaciones() {
       <div className="page-header">
         <div>
           <h2>Centro de notificaciones</h2>
-          <p>Historial de pedidos recibidos desde Shopify</p>
+          <p>Alertas de cobro de creditos y pedidos recibidos desde Shopify</p>
         </div>
       </div>
+
+      {alertas.length > 0 && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <h4 style={{ marginTop: 0 }}>
+            Alertas de cobro <span className="badge danger" style={{ marginLeft: 6 }}>{alertas.length}</span>
+          </h4>
+          <table>
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>Credito</th>
+                <th>Cuota</th>
+                <th>Valor pendiente</th>
+                <th>Vence</th>
+                <th>Atraso</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {alertas.map((a) => (
+                <tr key={`${a.creditoId}-${a.numeroCuota}`}>
+                  <td>{a.clienteNombre}</td>
+                  <td>#{a.numeroCredito}</td>
+                  <td>Cuota {a.numeroCuota}</td>
+                  <td>${Math.round(a.valorPendiente).toLocaleString("es-CO")}</td>
+                  <td>{new Date(a.fechaVencimiento).toLocaleDateString("es-CO")}</td>
+                  <td>{a.diasRetraso > 0 ? `${a.diasRetraso} dias` : "-"}</td>
+                  <td>
+                    <span className={`badge ${badgeAlerta[a.tipo]}`}>{etiquetaAlerta[a.tipo]}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ display: "flex", gap: 8 }}>

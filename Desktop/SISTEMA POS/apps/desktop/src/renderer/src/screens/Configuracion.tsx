@@ -5,6 +5,7 @@ import { useHardwareStore } from "../lib/hardwareStore";
 import { reproducir } from "../lib/sonidos";
 import type { EstadoActualizacion } from "../../../shared/api-types";
 import { mensajeError } from "../lib/errores";
+import { generarSvgCodigoBarras } from "../lib/barcode";
 
 function tiempoRelativo(fecha: Date): string {
   const segundos = Math.floor((Date.now() - fecha.getTime()) / 1000);
@@ -34,6 +35,12 @@ export default function Configuracion() {
   const [valorPunto, setValorPunto] = useState("");
   const [guardandoPuntos, setGuardandoPuntos] = useState(false);
   const [mensajePuntos, setMensajePuntos] = useState<string | null>(null);
+  // Calibracion de etiquetas (mm).
+  const [etqAncho, setEtqAncho] = useState("50");
+  const [etqAlto, setEtqAlto] = useState("25");
+  const [etqOffsetX, setEtqOffsetX] = useState("0");
+  const [etqOffsetY, setEtqOffsetY] = useState("0");
+  const [mensajeEtq, setMensajeEtq] = useState<string | null>(null);
 
   useEffect(() => {
     window.pos.listPrinters().then((lista) => {
@@ -44,6 +51,10 @@ export default function Configuracion() {
       setImpresoraSeleccionada(c.printerName ?? "");
       setSonidoActivado(c.sonidoActivado);
       setSonidoVolumen(c.sonidoVolumen);
+      setEtqAncho(String(c.etiquetaAnchoMm ?? 50));
+      setEtqAlto(String(c.etiquetaAltoMm ?? 25));
+      setEtqOffsetX(String(c.etiquetaOffsetXMm ?? 0));
+      setEtqOffsetY(String(c.etiquetaOffsetYMm ?? 0));
     });
     window.pos.getVersion().then(setVersion);
     api
@@ -119,6 +130,33 @@ export default function Configuracion() {
     await window.pos.setConfig({ printerName: nombre || null });
   }
 
+  async function guardarCalibracion(e: React.FormEvent) {
+    e.preventDefault();
+    await window.pos.setConfig({
+      etiquetaAnchoMm: Number(etqAncho) || 50,
+      etiquetaAltoMm: Number(etqAlto) || 25,
+      etiquetaOffsetXMm: Number(etqOffsetX) || 0,
+      etiquetaOffsetYMm: Number(etqOffsetY) || 0,
+    });
+    setMensajeEtq("Guardado. Imprime una etiqueta de prueba para verificar.");
+  }
+
+  // Imprime una etiqueta de ejemplo para calibrar sin gastar producto real.
+  async function imprimirPrueba() {
+    setMensajeEtq(null);
+    try {
+      const svg = generarSvgCodigoBarras("2001234567890");
+      await window.pos.printEtiquetas(
+        [{ svgCodigoBarras: svg, nombre: "PRUEBA DE ETIQUETA", variante: "Talla: M · Color: Azul", sku: "PRUEBA-001", precio: 85000, copias: 1 }],
+        impresoraSeleccionada || null,
+        "rollo1"
+      );
+      setMensajeEtq("Etiqueta de prueba enviada. Si sale corrida, ajusta el desplazamiento y repite.");
+    } catch {
+      setMensajeEtq("No se pudo imprimir. Revisa que la impresora este configurada.");
+    }
+  }
+
   async function crearSucursal(e: React.FormEvent) {
     e.preventDefault();
     setGuardando(true);
@@ -156,6 +194,41 @@ export default function Configuracion() {
           El lector es un dispositivo tipo teclado: no existe forma de confirmar que esta
           "conectado" sin que escanee algo, por eso el estado se basa en actividad reciente.
         </p>
+      </div>
+
+      <div className="card">
+        <h3>Calibracion de etiquetas</h3>
+        <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 4 }}>
+          Si la etiqueta sale corrida o partida entre dos, ajusta aqui. Mide tu etiqueta con una regla y usa el
+          desplazamiento para centrarla (valores negativos suben o mueven a la izquierda).
+        </p>
+        <form className="grid-form" onSubmit={guardarCalibracion} style={{ marginTop: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <label>
+              Ancho de la etiqueta (mm)
+              <input type="number" step="0.5" value={etqAncho} onChange={(e) => setEtqAncho(e.target.value)} />
+            </label>
+            <label>
+              Alto de la etiqueta (mm)
+              <input type="number" step="0.5" value={etqAlto} onChange={(e) => setEtqAlto(e.target.value)} />
+            </label>
+            <label>
+              Desplazar horizontal (mm)
+              <input type="number" step="0.5" value={etqOffsetX} onChange={(e) => setEtqOffsetX(e.target.value)} />
+            </label>
+            <label>
+              Desplazar vertical (mm)
+              <input type="number" step="0.5" value={etqOffsetY} onChange={(e) => setEtqOffsetY(e.target.value)} />
+            </label>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button type="submit">Guardar calibracion</button>
+            <button type="button" className="secondary" onClick={imprimirPrueba}>
+              Imprimir etiqueta de prueba
+            </button>
+          </div>
+          {mensajeEtq && <span className="badge success" style={{ whiteSpace: "normal" }}>{mensajeEtq}</span>}
+        </form>
       </div>
 
       <div className="card">

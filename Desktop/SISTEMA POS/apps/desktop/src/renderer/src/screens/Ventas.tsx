@@ -8,11 +8,18 @@ import { mensajeError } from "../lib/errores";
 
 interface VentaItem {
   id: string;
-  productoId: string;
+  // null en items de "venta libre" (concepto suelto sin producto).
+  productoId: string | null;
+  descripcionLibre?: string | null;
   cantidad: number;
   cantidadDevuelta: number;
   precioUnitario: string | number;
-  producto: { nombre: string; sku: string; imagenUrl: string | null; costo: string | number };
+  producto: { nombre: string; sku: string; imagenUrl: string | null; costo: string | number } | null;
+}
+
+// Nombre a mostrar de un item: el producto, o la descripcion si es venta libre.
+function nombreItem(i: VentaItem): string {
+  return i.producto?.nombre ?? i.descripcionLibre ?? "Venta libre";
 }
 
 interface Venta {
@@ -24,6 +31,8 @@ interface Venta {
   fecha: string;
   sucursalId: string;
   descuento: string | number | null;
+  ventaLibre?: boolean;
+  observaciones?: string | null;
   items: VentaItem[];
   cliente: { nombre: string } | null;
   usuario: { id: string; nombre: string } | null;
@@ -64,7 +73,7 @@ const badgePago: Record<string, string> = {
 };
 
 function resumenItems(items: VentaItem[]): string {
-  const nombres = items.map((i) => `${i.cantidad}x ${i.producto.nombre}`);
+  const nombres = items.map((i) => `${i.cantidad}x ${nombreItem(i)}`);
   if (nombres.length <= 2) return nombres.join(", ");
   return `${nombres.slice(0, 2).join(", ")} y ${nombres.length - 2} mas`;
 }
@@ -330,6 +339,11 @@ export default function Ventas() {
                   <td>{new Date(v.fecha).toLocaleString("es-CO")}</td>
                   <td>
                     <span className={`badge ${badgeCanal[v.canal] ?? "neutral"}`}>{ETIQUETAS_CANAL[v.canal] ?? v.canal}</span>
+                    {v.ventaLibre && (
+                      <span className="badge warning" style={{ marginLeft: 4 }}>
+                        Libre
+                      </span>
+                    )}
                   </td>
                   <td>{sucursales.find((s) => s.id === v.sucursalId)?.nombre ?? "-"}</td>
                   <td style={{ maxWidth: 280 }}>{resumenItems(v.items)}</td>
@@ -459,14 +473,16 @@ function DetalleVenta({
                 <tr key={i.id}>
                   <td>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      {i.producto.imagenUrl ? (
+                      {i.producto?.imagenUrl ? (
                         <img src={i.producto.imagenUrl} alt="" style={{ width: 28, height: 28, borderRadius: 6, objectFit: "cover" }} />
                       ) : (
                         <div style={{ width: 28, height: 28, borderRadius: 6, background: "#f3f4f6" }} />
                       )}
                       <div>
-                        <div>{i.producto.nombre}</div>
-                        <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{i.producto.sku}</div>
+                        <div>{nombreItem(i)}</div>
+                        <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                          {i.producto ? i.producto.sku : "Venta libre"}
+                        </div>
                       </div>
                     </div>
                   </td>

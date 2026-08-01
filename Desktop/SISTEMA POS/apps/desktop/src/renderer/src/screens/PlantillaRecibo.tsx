@@ -8,6 +8,9 @@ import type { ReciboData } from "../../../shared/api-types";
 import { mensajeError } from "../lib/errores";
 
 interface PlantillaForm {
+  id: string | null;
+  nombre: string;
+  esPredeterminada: boolean;
   logoUrl: string | null;
   nombreNegocio: string;
   direccion: string;
@@ -24,22 +27,69 @@ interface PlantillaForm {
   promociones: string;
 }
 
-const VACIA: PlantillaForm = {
-  logoUrl: null,
-  nombreNegocio: "",
-  direccion: "",
-  telefono: "",
-  email: "",
-  redesSociales: "",
-  mensajeAgradecimiento: "",
-  politicasCambios: "",
-  piePagina: "",
-  mostrarQr: false,
-  qrContenido: "",
-  imagenPromocionalUrl: null,
-  cuponDescuento: "",
-  promociones: "",
-};
+interface PlantillaApi {
+  id: string;
+  nombre: string;
+  esPredeterminada: boolean;
+  logoUrl: string | null;
+  nombreNegocio: string | null;
+  direccion: string | null;
+  telefono: string | null;
+  email: string | null;
+  redesSociales: string | null;
+  mensajeAgradecimiento: string | null;
+  politicasCambios: string | null;
+  piePagina: string | null;
+  mostrarQr: boolean;
+  qrContenido: string | null;
+  imagenPromocionalUrl: string | null;
+  cuponDescuento: string | null;
+  promociones: string | null;
+}
+
+function nuevaVacia(nombre: string): PlantillaForm {
+  return {
+    id: null,
+    nombre,
+    esPredeterminada: false,
+    logoUrl: null,
+    nombreNegocio: "",
+    direccion: "",
+    telefono: "",
+    email: "",
+    redesSociales: "",
+    mensajeAgradecimiento: "",
+    politicasCambios: "",
+    piePagina: "",
+    mostrarQr: false,
+    qrContenido: "",
+    imagenPromocionalUrl: null,
+    cuponDescuento: "",
+    promociones: "",
+  };
+}
+
+function desdeApi(p: PlantillaApi): PlantillaForm {
+  return {
+    id: p.id,
+    nombre: p.nombre,
+    esPredeterminada: p.esPredeterminada,
+    logoUrl: p.logoUrl ?? null,
+    nombreNegocio: p.nombreNegocio ?? "",
+    direccion: p.direccion ?? "",
+    telefono: p.telefono ?? "",
+    email: p.email ?? "",
+    redesSociales: p.redesSociales ?? "",
+    mensajeAgradecimiento: p.mensajeAgradecimiento ?? "",
+    politicasCambios: p.politicasCambios ?? "",
+    piePagina: p.piePagina ?? "",
+    mostrarQr: p.mostrarQr ?? false,
+    qrContenido: p.qrContenido ?? "",
+    imagenPromocionalUrl: p.imagenPromocionalUrl ?? null,
+    cuponDescuento: p.cuponDescuento ?? "",
+    promociones: p.promociones ?? "",
+  };
+}
 
 const DATOS_EJEMPLO: Omit<ReciboData, "plantilla"> = {
   empresaNombre: "Mi Negocio",
@@ -59,39 +109,34 @@ const DATOS_EJEMPLO: Omit<ReciboData, "plantilla"> = {
 
 export default function PlantillaRecibo() {
   const { empresa } = useSesionStore();
-  const [form, setForm] = useState<PlantillaForm>(VACIA);
+  const [lista, setLista] = useState<PlantillaApi[]>([]);
+  const [form, setForm] = useState<PlantillaForm>(nuevaVacia("Recibo estandar"));
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
 
+  async function cargarLista(seleccionarId?: string) {
+    const { data } = await api.get<PlantillaApi[]>("/plantillas-recibo");
+    setLista(data);
+    if (data.length > 0) {
+      const elegir = seleccionarId
+        ? data.find((p) => p.id === seleccionarId)
+        : data.find((p) => p.esPredeterminada) ?? data[0];
+      if (elegir) setForm(desdeApi(elegir));
+    } else {
+      setForm(nuevaVacia("Recibo estandar"));
+    }
+  }
+
   useEffect(() => {
-    api
-      .get("/plantilla-recibo")
-      .then(({ data }) => {
-        setForm({
-          logoUrl: data.logoUrl ?? null,
-          nombreNegocio: data.nombreNegocio ?? "",
-          direccion: data.direccion ?? "",
-          telefono: data.telefono ?? "",
-          email: data.email ?? "",
-          redesSociales: data.redesSociales ?? "",
-          mensajeAgradecimiento: data.mensajeAgradecimiento ?? "",
-          politicasCambios: data.politicasCambios ?? "",
-          piePagina: data.piePagina ?? "",
-          mostrarQr: data.mostrarQr ?? false,
-          qrContenido: data.qrContenido ?? "",
-          imagenPromocionalUrl: data.imagenPromocionalUrl ?? null,
-          cuponDescuento: data.cuponDescuento ?? "",
-          promociones: data.promociones ?? "",
-        });
-      })
-      .catch((err) => {
+    cargarLista()
+      .catch((err: any) => {
         setErrorCarga(
           err?.response?.status === 404
             ? "Esta funcion no existe todavia en el servidor. Actualiza el servidor a la ultima version."
-            : "No se pudo cargar la plantilla del recibo"
+            : "No se pudieron cargar las plantillas del recibo"
         );
       })
       .finally(() => setCargando(false));
@@ -117,12 +162,50 @@ export default function PlantillaRecibo() {
     actualizar(campo, dataUrl);
   }
 
+  function seleccionar(p: PlantillaApi) {
+    setMensaje(null);
+    setForm(desdeApi(p));
+  }
+
+  function nuevaPlantilla() {
+    setMensaje(null);
+    setForm(nuevaVacia(`Recibo ${lista.length + 1}`));
+  }
+
   async function guardar() {
+    if (!form.nombre.trim()) {
+      setMensaje("Ponle un nombre a la plantilla");
+      return;
+    }
     setGuardando(true);
     setMensaje(null);
+    const cuerpo = {
+      nombre: form.nombre.trim(),
+      logoUrl: form.logoUrl,
+      nombreNegocio: form.nombreNegocio,
+      direccion: form.direccion,
+      telefono: form.telefono,
+      email: form.email,
+      redesSociales: form.redesSociales,
+      mensajeAgradecimiento: form.mensajeAgradecimiento,
+      politicasCambios: form.politicasCambios,
+      piePagina: form.piePagina,
+      mostrarQr: form.mostrarQr,
+      qrContenido: form.qrContenido,
+      imagenPromocionalUrl: form.imagenPromocionalUrl,
+      cuponDescuento: form.cuponDescuento,
+      promociones: form.promociones,
+    };
     try {
-      await api.put("/plantilla-recibo", form);
-      setMensaje("Plantilla guardada");
+      if (form.id) {
+        await api.put(`/plantillas-recibo/${form.id}`, cuerpo);
+        await cargarLista(form.id);
+        setMensaje("Plantilla guardada");
+      } else {
+        const { data } = await api.post<PlantillaApi>("/plantillas-recibo", cuerpo);
+        await cargarLista(data.id);
+        setMensaje("Plantilla creada");
+      }
     } catch (err: any) {
       setMensaje(mensajeError(err, "No se pudo guardar la plantilla"));
     } finally {
@@ -130,13 +213,36 @@ export default function PlantillaRecibo() {
     }
   }
 
-  async function restaurar() {
-    if (!confirm("¿Restaurar la plantilla por defecto? Se perderan los cambios personalizados.")) return;
+  async function hacerPredeterminada() {
+    if (!form.id) {
+      setMensaje("Guarda la plantilla antes de marcarla como predeterminada");
+      return;
+    }
     setGuardando(true);
     try {
-      await api.delete("/plantilla-recibo");
-      setForm(VACIA);
-      setMensaje("Plantilla restaurada por defecto");
+      await api.patch(`/plantillas-recibo/${form.id}/predeterminada`);
+      await cargarLista(form.id);
+      setMensaje("Ahora es la plantilla predeterminada del punto de venta");
+    } catch (err: any) {
+      setMensaje(mensajeError(err, "No se pudo cambiar la predeterminada"));
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  async function eliminar() {
+    if (!form.id) {
+      setForm(lista.length > 0 ? desdeApi(lista.find((p) => p.esPredeterminada) ?? lista[0]) : nuevaVacia("Recibo estandar"));
+      return;
+    }
+    if (!confirm(`¿Eliminar la plantilla "${form.nombre}"?`)) return;
+    setGuardando(true);
+    try {
+      await api.delete(`/plantillas-recibo/${form.id}`);
+      await cargarLista();
+      setMensaje("Plantilla eliminada");
+    } catch (err: any) {
+      setMensaje(mensajeError(err, "No se pudo eliminar la plantilla"));
     } finally {
       setGuardando(false);
     }
@@ -168,14 +274,59 @@ export default function PlantillaRecibo() {
     <div>
       <div className="page-header">
         <div>
-          <h2>Plantilla del recibo</h2>
-          <p>Personaliza lo que se imprime en cada venta. Lo obligatorio (productos, totales, factura) siempre se muestra.</p>
+          <h2>Plantillas del recibo</h2>
+          <p>
+            Crea varias plantillas y elige cual usa el punto de venta. Lo obligatorio (productos, cantidades, impuestos,
+            total, fecha y numero de factura) siempre se imprime.
+          </p>
+        </div>
+        <button type="button" onClick={nuevaPlantilla}>
+          + Nueva plantilla
+        </button>
+      </div>
+
+      {/* Selector de plantillas */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {lista.length === 0 && <span className="empty-state" style={{ margin: 0 }}>Aun no tienes plantillas guardadas.</span>}
+          {lista.map((p) => {
+            const activa = form.id === p.id;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                className={activa ? "" : "secondary"}
+                onClick={() => seleccionar(p)}
+                style={{ display: "flex", alignItems: "center", gap: 6 }}
+              >
+                {p.nombre}
+                {p.esPredeterminada && (
+                  <span className="badge success" style={{ marginLeft: 2 }}>
+                    Predeterminada
+                  </span>
+                )}
+              </button>
+            );
+          })}
+          {!form.id && (
+            <button type="button" style={{ pointerEvents: "none" }}>
+              {form.nombre || "Nueva plantilla"} <span className="badge warning">Sin guardar</span>
+            </button>
+          )}
         </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 16, alignItems: "start" }}>
         <div className="card">
           <div className="grid-form">
+            <label>
+              Nombre de la plantilla
+              <input
+                placeholder="Ej. Recibo estandar, Promocional, Minimalista"
+                value={form.nombre}
+                onChange={(e) => actualizar("nombre", e.target.value)}
+              />
+            </label>
             <div style={{ display: "flex", gap: 16 }}>
               <label style={{ flex: 1 }}>
                 Logo
@@ -275,12 +426,17 @@ export default function PlantillaRecibo() {
             </label>
 
             {mensaje && <p className="badge success" style={{ width: "fit-content" }}>{mensaje}</p>}
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button type="button" onClick={guardar} disabled={guardando}>
-                {guardando ? "Guardando..." : "Guardar plantilla"}
+                {guardando ? "Guardando..." : form.id ? "Guardar cambios" : "Crear plantilla"}
               </button>
-              <button type="button" className="secondary" onClick={restaurar} disabled={guardando}>
-                Restaurar por defecto
+              {form.id && !form.esPredeterminada && (
+                <button type="button" className="secondary" onClick={hacerPredeterminada} disabled={guardando}>
+                  Usar como predeterminada
+                </button>
+              )}
+              <button type="button" className="secondary" onClick={eliminar} disabled={guardando}>
+                {form.id ? "Eliminar" : "Descartar"}
               </button>
             </div>
           </div>

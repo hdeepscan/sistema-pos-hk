@@ -26,6 +26,20 @@ interface TurnoCerrado {
   sucursal: { nombre: string };
 }
 
+interface CuentaBancaria {
+  id: string;
+  nombre: string;
+  saldoInicial: string | number;
+}
+
+const ETIQUETA_METODO: Record<string, string> = {
+  EFECTIVO: "Efectivo",
+  TARJETA: "Tarjetas",
+  TRANSFERENCIA: "Transferencias / QR",
+  CREDITO: "Creditos",
+  OTRO: "Otros",
+};
+
 export default function Caja() {
   const { sucursales, sucursalActivaId, empresa } = useSesionStore();
   const [sucursalId, setSucursalId] = useState(sucursalActivaId ?? sucursales[0]?.id ?? "");
@@ -35,6 +49,10 @@ export default function Caja() {
   const [montoContado, setMontoContado] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
+  const [cuentas, setCuentas] = useState<CuentaBancaria[]>([]);
+  const [saldosApertura, setSaldosApertura] = useState<Record<string, string>>({});
+  const [saldosCierre, setSaldosCierre] = useState<Record<string, string>>({});
+  const [ultimoCierre, setUltimoCierre] = useState<any | null>(null);
 
   const cargar = useCallback(async () => {
     const [{ data: actual }, { data: hist }] = await Promise.all([
@@ -49,11 +67,27 @@ export default function Caja() {
     cargar();
   }, [cargar]);
 
+  useEffect(() => {
+    api
+      .get<CuentaBancaria[]>("/cuentas-bancarias", { params: { soloActivas: true } })
+      .then(({ data }) => {
+        setCuentas(data);
+        const ini: Record<string, string> = {};
+        for (const c of data) ini[c.id] = String(c.saldoInicial);
+        setSaldosApertura(ini);
+      })
+      .catch(() => setCuentas([]));
+  }, []);
+
   async function abrir() {
     setProcesando(true);
     setError(null);
     try {
-      await api.post("/caja/abrir", { sucursalId, montoInicial: Number(montoInicial) || 0 });
+      await api.post("/caja/abrir", {
+        sucursalId,
+        montoInicial: Number(montoInicial) || 0,
+        saldosIniciales: cuentas.map((c) => ({ cuentaId: c.id, saldo: Number(saldosApertura[c.id] || 0) })),
+      });
       setMontoInicial("");
       await cargar();
     } catch (err: any) {
@@ -67,8 +101,14 @@ export default function Caja() {
     setProcesando(true);
     setError(null);
     try {
-      const { data } = await api.post("/caja/cerrar", { sucursalId, montoContado: Number(montoContado) || 0 });
+      const { data } = await api.post("/caja/cerrar", {
+        sucursalId,
+        montoContado: Number(montoContado) || 0,
+        saldosFinales: cuentas.map((c) => ({ cuentaId: c.id, saldo: Number(saldosCierre[c.id] || 0) })),
+      });
       setMontoContado("");
+      setSaldosCierre({});
+      setUltimoCierre(data);
       await cargar();
       await imprimirCierre(data);
     } catch (err: any) {
@@ -135,9 +175,25 @@ export default function Caja() {
           </p>
           <div className="grid-form" style={{ marginTop: 12 }}>
             <label>
-              Dinero contado fisicamente al cerrar
+              Efectivo contado fisicamente al cerrar
               <input type="number" min={0} value={montoContado} onChange={(e) => setMontoContado(e.target.value)} />
             </label>
+            {cuentas.length > 0 && (
+              <div>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-muted)" }}>Saldo final de cada cuenta</span>
+                {cuentas.map((c) => (
+                  <label key={c.id} style={{ marginTop: 6 }}>
+                    {c.nombre}
+                    <input
+                      type="number"
+                      value={saldosCierre[c.id] ?? ""}
+                      placeholder="Saldo al cerrar"
+                      onChange={(e) => setSaldosCierre((p) => ({ ...p, [c.id]: e.target.value }))}
+                    />
+                  </label>
+                ))}
+              </div>
+            )}
             <button className="danger" type="button" onClick={cerrar} disabled={procesando}>
               {procesando ? "Cerrando..." : "Cerrar caja e imprimir arqueo"}
             </button>
@@ -151,10 +207,86 @@ export default function Caja() {
               Monto inicial en efectivo
               <input type="number" min={0} value={montoInicial} onChange={(e) => setMontoInicial(e.target.value)} />
             </label>
+            {cuentas.length > 0 && (
+              <div>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-muted)" }}>Saldo inicial de cada cuenta</span>
+                {cuentas.map((c) => (
+                  <label key={c.id} style={{ marginTop: 6 }}>
+                    {c.nombre}
+                    <input
+                      type="number"
+                      value={saldosApertura[c.id] ?? ""}
+                      onChange={(e) => setSaldosApertura((p) => ({ ...p, [c.id]: e.target.value }))}
+                    />
+                  </label>
+                ))}
+              </div>
+            )}
             <button type="button" onClick={abrir} disabled={procesando}>
               {procesando ? "Abriendo..." : "Abrir caja"}
             </button>
           </div>
+        </div>
+      )}
+
+      {ultimoCierre?.desgloseCierre && (
+        <div className="card" style={{ maxWidth: 520, marginBottom: 16 }}>
+          <h4 style={{ marginTop: 0 }}>Resumen del ultimo cierre</h4>
+          <table>
+            <tbody>
+              {Object.entries(ultimoCierre.desgloseCierre.porMetodo ?? {}).map(([metodo, v]: any) => (
+                <tr key={metodo}>
+                  <td>{ETIQUETA_METODO[metodo] ?? metodo}</td>
+                  <td style={{ textAlign: "right" }}>${Number(v.total).toLocaleString("es-CO")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {(ultimoCierre.desgloseCierre.recibidoPorCuenta ?? []).length > 0 && (
+            <>
+              <h5 style={{ marginBottom: 6 }}>Recibido por cuenta (segun ventas)</h5>
+              <table>
+                <tbody>
+                  {ultimoCierre.desgloseCierre.recibidoPorCuenta.map((c: any) => (
+                    <tr key={c.cuentaId}>
+                      <td>{c.nombre} <span style={{ color: "var(--text-muted)", fontSize: 11 }}>({c.cantidad})</span></td>
+                      <td style={{ textAlign: "right" }}>${Number(c.total).toLocaleString("es-CO")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+          {(ultimoCierre.desgloseCierre.cuentas ?? []).length > 0 && (
+            <>
+              <h5 style={{ marginBottom: 6 }}>Conciliacion de saldos</h5>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Cuenta</th>
+                    <th style={{ textAlign: "right" }}>Inicial</th>
+                    <th style={{ textAlign: "right" }}>Final</th>
+                    <th style={{ textAlign: "right" }}>Movimiento</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ultimoCierre.desgloseCierre.cuentas.map((c: any) => (
+                    <tr key={c.cuentaId}>
+                      <td>{c.nombre}</td>
+                      <td style={{ textAlign: "right" }}>${Number(c.saldoInicial).toLocaleString("es-CO")}</td>
+                      <td style={{ textAlign: "right" }}>${Number(c.saldoFinal).toLocaleString("es-CO")}</td>
+                      <td style={{ textAlign: "right", color: c.movimiento >= 0 ? "var(--success,#16a34a)" : "var(--danger,#dc2626)" }}>
+                        ${Number(c.movimiento).toLocaleString("es-CO")}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+          <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>
+            Diferencia en efectivo: <strong>${Number(ultimoCierre.diferencia).toLocaleString("es-CO")}</strong>
+          </p>
         </div>
       )}
 

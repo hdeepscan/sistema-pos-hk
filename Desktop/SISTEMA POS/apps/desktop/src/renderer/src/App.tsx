@@ -10,7 +10,6 @@ import Layout from "./screens/Layout";
 import Pos from "./screens/Pos";
 import Ventas from "./screens/Ventas";
 import Productos from "./screens/Productos";
-import Inventario from "./screens/Inventario";
 import Colecciones from "./screens/Colecciones";
 import Clientes from "./screens/Clientes";
 import Creditos from "./screens/Creditos";
@@ -26,6 +25,8 @@ import Caja from "./screens/Caja";
 import Auditoria from "./screens/Auditoria";
 import Shopify from "./screens/Shopify";
 import MetaAds from "./screens/MetaAds";
+import CuentasBancarias from "./screens/CuentasBancarias";
+import Calendario from "./screens/Calendario";
 
 export default function App() {
   const { token, sucursalActivaId, hidratado, setApiBaseUrl, setSesion, setSucursalActiva, setHidratado } =
@@ -83,7 +84,6 @@ export default function App() {
         <Route path="/pos" element={<Pos />} />
         <Route path="/ventas" element={<Ventas />} />
         <Route path="/productos" element={<Productos />} />
-        <Route path="/inventario" element={<Inventario />} />
         <Route path="/colecciones" element={<Colecciones />} />
         <Route path="/clientes" element={<Clientes />} />
         <Route path="/creditos" element={<Creditos />} />
@@ -99,6 +99,8 @@ export default function App() {
         <Route path="/auditoria" element={<Auditoria />} />
         <Route path="/shopify" element={<Shopify />} />
         <Route path="/meta-ads" element={<MetaAds />} />
+        <Route path="/cuentas-bancarias" element={<CuentasBancarias />} />
+        <Route path="/calendario" element={<Calendario />} />
         <Route path="*" element={<Navigate to="/pos" replace />} />
       </Routes>
       </ErrorBoundary>

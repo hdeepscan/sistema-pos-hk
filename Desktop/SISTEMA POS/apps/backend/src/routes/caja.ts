@@ -26,7 +26,7 @@ export async function cajaRoutes(app: FastifyInstance) {
     }
     const parsed = AbrirCajaSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
-    const { sucursalId, montoInicial } = parsed.data;
+    const { sucursalId, montoInicial, saldosIniciales } = parsed.data;
 
     const sucursal = await prisma.sucursal.findFirst({ where: { id: sucursalId, empresaId } });
     if (!sucursal) return reply.code(404).send({ error: "Sucursal no encontrada" });
@@ -36,8 +36,15 @@ export async function cajaRoutes(app: FastifyInstance) {
       return reply.code(409).send({ error: "Ya hay una caja abierta en esta sucursal. Cierrala antes de abrir otra." });
     }
 
+    // Guarda el saldo inicial de cada cuenta bancaria con su nombre (snapshot).
+    const cuentas = await prisma.cuentaBancaria.findMany({ where: { empresaId, activa: true } });
+    const saldosIni = cuentas.map((c) => {
+      const enviado = saldosIniciales?.find((s) => s.cuentaId === c.id);
+      return { cuentaId: c.id, nombre: c.nombre, saldo: enviado ? enviado.saldo : Number(c.saldoInicial) };
+    });
+
     const turno = await prisma.turnoCaja.create({
-      data: { empresaId, sucursalId, usuarioAperturaId: usuarioId, montoInicial },
+      data: { empresaId, sucursalId, usuarioAperturaId: usuarioId, montoInicial, saldosIniciales: saldosIni },
       include: { usuarioApertura: { select: { nombre: true } } },
     });
 
@@ -60,7 +67,7 @@ export async function cajaRoutes(app: FastifyInstance) {
     }
     const parsed = CerrarCajaSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
-    const { sucursalId, montoContado } = parsed.data;
+    const { sucursalId, montoContado, saldosFinales } = parsed.data;
 
     const turno = await prisma.turnoCaja.findFirst({
       where: { empresaId, sucursalId, fechaCierre: null },
@@ -69,19 +76,66 @@ export async function cajaRoutes(app: FastifyInstance) {
     if (!turno) return reply.code(404).send({ error: "No hay una caja abierta en esta sucursal" });
 
     const fechaCierre = new Date();
-    const ventasEfectivoAgg = await prisma.venta.aggregate({
+
+    // Ventas del turno agrupadas por metodo de pago (efectivo, tarjeta,
+    // transferencia, credito, otro).
+    const ventasPorMetodo = await prisma.venta.groupBy({
+      by: ["metodoPago"],
+      where: { empresaId, sucursalId, fecha: { gte: turno.fechaApertura, lte: fechaCierre } },
+      _sum: { total: true },
+      _count: true,
+    });
+    const porMetodo: Record<string, { total: number; cantidad: number }> = {};
+    for (const m of ventasPorMetodo) {
+      porMetodo[m.metodoPago] = { total: Number(m._sum.total ?? 0), cantidad: m._count };
+    }
+
+    // Ventas del turno agrupadas por cuenta bancaria (las que registraron a que
+    // cuenta entro el pago). Da el total recibido por cada cuenta.
+    const ventasPorCuenta = await prisma.venta.groupBy({
+      by: ["cuentaBancariaId"],
       where: {
         empresaId,
         sucursalId,
-        metodoPago: "EFECTIVO",
         fecha: { gte: turno.fechaApertura, lte: fechaCierre },
+        cuentaBancariaId: { not: null },
       },
+      _sum: { total: true },
+      _count: true,
+    });
+    const cuentasEmpresa = await prisma.cuentaBancaria.findMany({ where: { empresaId }, select: { id: true, nombre: true } });
+    const nombreCuenta = new Map(cuentasEmpresa.map((c) => [c.id, c.nombre]));
+    const recibidoPorCuenta = ventasPorCuenta.map((v) => ({
+      cuentaId: v.cuentaBancariaId!,
+      nombre: nombreCuenta.get(v.cuentaBancariaId!) ?? "Cuenta",
+      total: Number(v._sum.total ?? 0),
+      cantidad: v._count,
+    }));
+
+    const ventasEfectivoAgg = await prisma.venta.aggregate({
+      where: { empresaId, sucursalId, metodoPago: "EFECTIVO", fecha: { gte: turno.fechaApertura, lte: fechaCierre } },
       _sum: { total: true },
       _count: true,
     });
     const ventasEfectivo = Number(ventasEfectivoAgg._sum.total ?? 0);
     const totalEsperado = Number(turno.montoInicial) + ventasEfectivo;
     const diferencia = Math.round((montoContado - totalEsperado) * 100) / 100;
+
+    // Conciliacion por cuenta bancaria: saldo inicial (del turno) vs final (contado).
+    const saldosIni = (turno.saldosIniciales as { cuentaId: string; nombre: string; saldo: number }[] | null) ?? [];
+    const cuentas = saldosIni.map((ini) => {
+      const fin = saldosFinales?.find((s) => s.cuentaId === ini.cuentaId);
+      const saldoFinal = fin ? fin.saldo : ini.saldo;
+      return {
+        cuentaId: ini.cuentaId,
+        nombre: ini.nombre,
+        saldoInicial: ini.saldo,
+        saldoFinal,
+        movimiento: Math.round((saldoFinal - ini.saldo) * 100) / 100,
+      };
+    });
+
+    const desgloseCierre = { porMetodo, cuentas, recibidoPorCuenta };
 
     const cerrado = await prisma.turnoCaja.update({
       where: { id: turno.id },
@@ -92,6 +146,7 @@ export async function cajaRoutes(app: FastifyInstance) {
         totalEsperado,
         montoContado,
         diferencia,
+        desgloseCierre,
       },
       include: {
         usuarioApertura: { select: { nombre: true } },

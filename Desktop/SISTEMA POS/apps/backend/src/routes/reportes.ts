@@ -75,8 +75,9 @@ export async function reportesRoutes(app: FastifyInstance) {
 
     const totalVentas = ventas.reduce((acc, v) => acc + Number(v.total), 0);
     const totalGastos = gastos.reduce((acc, g) => acc + Number(g.monto), 0);
+    // Los items de "venta libre" no tienen producto (ni costo asociado).
     const costoVentas = ventas.reduce(
-      (acc, v) => acc + v.items.reduce((a, i) => a + i.cantidad * Number(i.producto.costo), 0),
+      (acc, v) => acc + v.items.reduce((a, i) => a + i.cantidad * Number(i.producto?.costo ?? 0), 0),
       0
     );
     const utilidadBruta = totalVentas - costoVentas - totalGastos;
@@ -89,14 +90,16 @@ export async function reportesRoutes(app: FastifyInstance) {
     const porProducto = new Map<string, { nombre: string; cantidad: number; total: number }>();
     for (const venta of ventas) {
       for (const item of venta.items) {
-        const actual = porProducto.get(item.productoId) ?? {
-          nombre: item.producto.nombre,
+        // Las ventas libres se agrupan bajo su descripcion (no tienen producto).
+        const clave = item.productoId ?? `libre:${item.descripcionLibre ?? "Venta libre"}`;
+        const actual = porProducto.get(clave) ?? {
+          nombre: item.producto?.nombre ?? item.descripcionLibre ?? "Venta libre",
           cantidad: 0,
           total: 0,
         };
         actual.cantidad += item.cantidad;
         actual.total += item.cantidad * Number(item.precioUnitario);
-        porProducto.set(item.productoId, actual);
+        porProducto.set(clave, actual);
       }
     }
     const productosMasVendidos = [...porProducto.entries()]

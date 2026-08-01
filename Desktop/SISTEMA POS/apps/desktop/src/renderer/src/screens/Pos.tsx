@@ -21,7 +21,10 @@ interface Producto {
 }
 
 interface ItemCarrito {
+  // Los items de "venta libre" no tienen producto del inventario: usan un id
+  // local (libre-...) solo para manejarlos en el carrito.
   productoId: string;
+  esLibre?: boolean;
   nombre: string;
   imagenUrl: string | null;
   cantidad: number;
@@ -82,6 +85,15 @@ export default function Pos() {
   const [carrito, setCarrito] = useState<ItemCarrito[]>([]);
   const [metodoPago, setMetodoPago] = useState<MetodoPago>("EFECTIVO");
   const [dineroRecibido, setDineroRecibido] = useState("");
+  const [cuentas, setCuentas] = useState<{ id: string; nombre: string }[]>([]);
+  const [cuentaId, setCuentaId] = useState("");
+  // Venta libre: concepto suelto que no descuenta inventario.
+  const [mostrarVentaLibre, setMostrarVentaLibre] = useState(false);
+  const [libreDescripcion, setLibreDescripcion] = useState("");
+  const [libreValor, setLibreValor] = useState("");
+  const [libreCantidad, setLibreCantidad] = useState("1");
+  const [libreObservaciones, setLibreObservaciones] = useState("");
+  const [observacionesVenta, setObservacionesVenta] = useState("");
   const [clienteId, setClienteId] = useState<string>("");
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [mostrarDatosCliente, setMostrarDatosCliente] = useState(false);
@@ -111,6 +123,10 @@ export default function Pos() {
   useEffect(() => {
     api.get<Cliente[]>("/clientes").then(({ data }) => setClientes(data));
     api.get("/fidelizacion/config").then(({ data }) => setFidelizacion(data));
+    api
+      .get<{ id: string; nombre: string }[]>("/cuentas-bancarias", { params: { soloActivas: true } })
+      .then(({ data }) => setCuentas(data))
+      .catch(() => setCuentas([]));
     api.get("/plantilla-recibo").then(async ({ data }) => {
       const qrDataUrl = data.mostrarQr && data.qrContenido ? await QRCode.toDataURL(data.qrContenido, { width: 180, margin: 1 }) : null;
       setPlantilla({
@@ -130,9 +146,17 @@ export default function Pos() {
     });
   }, []);
 
+  const requiereCuenta = metodoPago !== "EFECTIVO" && metodoPago !== "CREDITO";
+
   useEffect(() => {
     if (metodoPago !== "EFECTIVO") setDineroRecibido("");
-  }, [metodoPago]);
+    // Al elegir un pago no-efectivo/no-credito, sugiere la primera cuenta.
+    if (metodoPago !== "EFECTIVO" && metodoPago !== "CREDITO") {
+      setCuentaId((prev) => prev || cuentas[0]?.id || "");
+    } else {
+      setCuentaId("");
+    }
+  }, [metodoPago, cuentas]);
 
   useInventarioActualizado(
     useCallback((evt) => {
@@ -214,6 +238,36 @@ export default function Pos() {
     );
   }
 
+  // Agrega al carrito un concepto libre (sin producto del inventario).
+  function agregarVentaLibre(e: React.FormEvent) {
+    e.preventDefault();
+    const valor = Number(libreValor);
+    const cantidad = Math.max(1, Number(libreCantidad) || 1);
+    if (!libreDescripcion.trim()) return setError("Escribe la descripcion de la venta libre");
+    if (!(valor > 0)) return setError("Escribe un valor valido");
+    setError(null);
+    setCarrito((prev) => [
+      ...prev,
+      {
+        productoId: `libre-${crypto.randomUUID()}`,
+        esLibre: true,
+        nombre: libreDescripcion.trim(),
+        imagenUrl: null,
+        cantidad,
+        precioUnitario: valor,
+      },
+    ]);
+    if (libreObservaciones.trim()) {
+      setObservacionesVenta((prev) => (prev ? `${prev} · ${libreObservaciones.trim()}` : libreObservaciones.trim()));
+    }
+    void reproducir("producto_agregado");
+    setMostrarVentaLibre(false);
+    setLibreDescripcion("");
+    setLibreValor("");
+    setLibreCantidad("1");
+    setLibreObservaciones("");
+  }
+
   const subtotal = carrito.reduce((acc, i) => acc + i.cantidad * i.precioUnitario, 0);
   const totalUnidades = carrito.reduce((acc, i) => acc + i.cantidad, 0);
 
@@ -254,6 +308,7 @@ export default function Pos() {
     setPuntosARedimir("");
     setClienteId("");
     setDineroRecibido("");
+    setObservacionesVenta("");
   }
 
   async function cobrar() {
@@ -284,9 +339,15 @@ export default function Pos() {
       clienteUuid,
       sucursalId: sucursalActivaId,
       metodoPago,
+      cuentaBancariaId: requiereCuenta && cuentaId ? cuentaId : undefined,
       clienteId: clienteId || undefined,
       contactoCliente,
-      items: carrito.map((i) => ({ productoId: i.productoId, cantidad: i.cantidad, precioUnitario: i.precioUnitario })),
+      items: carrito.map((i) =>
+        i.esLibre
+          ? { descripcionLibre: i.nombre, cantidad: i.cantidad, precioUnitario: i.precioUnitario }
+          : { productoId: i.productoId, cantidad: i.cantidad, precioUnitario: i.precioUnitario }
+      ),
+      observaciones: observacionesVenta || undefined,
       dineroRecibido: metodoPago === "EFECTIVO" && dineroRecibidoNum !== null ? dineroRecibidoNum : undefined,
       descuento: montoDescuento > 0 ? { tipo: descuentoTipo, valor: Number(descuentoValor) } : undefined,
       puntosARedimir: valorPuntos > 0 ? puntosNum : undefined,
@@ -295,10 +356,12 @@ export default function Pos() {
     let consecutivo = 0;
     let sincronizada = true;
     let puntosGanados = 0;
+    let impuestoVenta: number | undefined;
     try {
       const { data } = await api.post("/ventas", payload);
       consecutivo = data.consecutivo;
       puntosGanados = data.puntosGanados ?? 0;
+      impuestoVenta = data.impuestoTotal ? Number(data.impuestoTotal) : undefined;
     } catch (err: any) {
       if (err?.response?.status === 409 || err?.response?.status === 403 || err?.response?.status === 400) {
         void reproducir("error");
@@ -319,9 +382,14 @@ export default function Pos() {
           consecutivo: consecutivo || 0,
           fecha: new Date().toLocaleString("es-CO"),
           cajero: usuario?.nombre ?? "",
-          items: carrito.map((i) => ({ nombre: i.nombre, cantidad: i.cantidad, precioUnitario: i.precioUnitario })),
+          items: carrito.map((i) => ({
+            nombre: i.esLibre ? `Venta Libre: ${i.nombre}` : i.nombre,
+            cantidad: i.cantidad,
+            precioUnitario: i.precioUnitario,
+          })),
           total,
           metodoPago,
+          impuesto: impuestoVenta,
           subtotal: montoDescuento > 0 || valorPuntos > 0 ? subtotal : undefined,
           descuento: montoDescuento > 0 ? montoDescuento : undefined,
           puntosRedimidos: valorPuntos > 0 ? puntosNum : undefined,
@@ -460,9 +528,15 @@ export default function Pos() {
 
           {mensaje && <p style={{ fontSize: 13, color: "var(--text-muted)" }}>{mensaje}</p>}
 
+          <div style={{ display: "flex", justifyContent: "flex-end", margin: "6px 0 10px" }}>
+            <button type="button" className="secondary" onClick={() => setMostrarVentaLibre(true)}>
+              + Venta libre
+            </button>
+          </div>
+
           {carrito.length === 0 ? (
             <div className="empty-state" style={{ padding: "48px 0" }}>
-              El carrito esta vacio — escanea un codigo de barras o busca un producto para empezar
+              El carrito esta vacio — escanea un codigo de barras, busca un producto o usa "+ Venta libre"
             </div>
           ) : (
             <table>
@@ -486,7 +560,14 @@ export default function Pos() {
                           <div style={{ width: 28, height: 28, borderRadius: 6, background: "#f3f4f6" }} />
                         )}
                         <div>
-                          <div>{i.nombre}</div>
+                          <div>
+                            {i.nombre}
+                            {i.esLibre && (
+                              <span className="badge neutral" style={{ marginLeft: 6 }}>
+                                Venta libre
+                              </span>
+                            )}
+                          </div>
                           {i.stockSucursal !== undefined && i.cantidad > i.stockSucursal && (
                             <div style={{ fontSize: 11, color: "var(--warning)" }}>
                               Solo {i.stockSucursal} en stock
@@ -561,6 +642,26 @@ export default function Pos() {
               <option value="OTRO">Otro</option>
             </select>
           </label>
+
+          {requiereCuenta &&
+            (cuentas.length > 0 ? (
+              <label style={{ marginTop: 10 }}>
+                Cuenta que recibe el pago
+                <select value={cuentaId} onChange={(e) => setCuentaId(e.target.value)} style={{ width: "100%" }}>
+                  <option value="">Sin especificar</option>
+                  {cuentas.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.nombre}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <p style={{ marginTop: 8, fontSize: 12, color: "var(--text-muted)" }}>
+                Crea cuentas en <strong>"Cuentas bancarias"</strong> para registrar a que cuenta (Nequi, Bancolombia…)
+                entra este pago y cuadrar la caja automaticamente.
+              </p>
+            ))}
 
           {puedeDescuentos && (
             <div style={{ marginTop: 10 }}>
@@ -679,6 +780,57 @@ export default function Pos() {
       </div>
 
       {ventaExitosa && <VentaExitosaModal resultado={ventaExitosa} onCerrar={nuevaVenta} />}
+
+      {/* Venta libre: concepto sin producto del inventario (no descuenta stock) */}
+      {mostrarVentaLibre && (
+        <div className="modal-backdrop">
+          <div className="card" style={{ width: 460, maxWidth: "94vw" }}>
+            <h4 style={{ marginTop: 0, marginBottom: 4 }}>Venta libre</h4>
+            <p style={{ marginTop: 0, fontSize: 12.5, color: "var(--text-muted)" }}>
+              Para cobrar algo que no esta en el inventario (un servicio, un arreglo, un domicilio...). No descuenta stock.
+            </p>
+            <form className="grid-form" onSubmit={agregarVentaLibre}>
+              <label>
+                Descripcion o concepto
+                <input
+                  value={libreDescripcion}
+                  onChange={(e) => setLibreDescripcion(e.target.value)}
+                  placeholder="Ej. Arreglo de prenda, domicilio..."
+                  required
+                  autoFocus
+                />
+              </label>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <label>
+                  Valor
+                  <input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={libreValor}
+                    onChange={(e) => setLibreValor(e.target.value)}
+                    required
+                  />
+                </label>
+                <label>
+                  Cantidad
+                  <input type="number" min={1} value={libreCantidad} onChange={(e) => setLibreCantidad(e.target.value)} />
+                </label>
+              </div>
+              <label>
+                Observaciones (opcional)
+                <textarea rows={2} value={libreObservaciones} onChange={(e) => setLibreObservaciones(e.target.value)} />
+              </label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button type="submit">Agregar al carrito</button>
+                <button type="button" className="secondary" onClick={() => setMostrarVentaLibre(false)}>
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

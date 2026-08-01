@@ -90,6 +90,10 @@ export default function Shopify() {
               onChange={(e) => setShopDomain(e.target.value)}
               required
             />
+            <span style={{ fontWeight: 400, fontSize: 11.5, color: "var(--text-muted)" }}>
+              Debe terminar en <strong>.myshopify.com</strong> — NO uses tu dominio publico (ej. mitienda.com).
+              Lo encuentras en Shopify: Configuracion → Dominios.
+            </span>
           </label>
           <label>
             Client ID

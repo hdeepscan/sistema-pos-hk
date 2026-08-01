@@ -146,15 +146,59 @@ export const CrearProductoSchema = z.object({
   sku: z.string().min(1),
   nombre: z.string().min(1),
   categoria: z.string().optional(),
+  marca: z.string().nullable().optional(),
+  descripcion: z.string().nullable().optional(),
+  impuestoPorcentaje: z.number().min(0).max(100).optional(),
   precio: z.number().nonnegative(),
   costo: z.number().nonnegative().default(0),
   codigoBarras: z.string().optional(),
   activo: z.boolean().optional(),
   proveedorId: z.string().nullable().optional(),
+  // Stock minimo para el recordatorio de reposicion (0 = sin aviso).
+  stockMinimo: z.number().int().nonnegative().optional(),
   // undefined u [] = disponible en todas las sucursales.
   sucursalIds: z.array(z.string()).optional(),
 });
 export type CrearProductoInput = z.infer<typeof CrearProductoSchema>;
+
+// Creacion "inteligente": un producto base + combinaciones de variantes
+// generadas desde grupos (ej. Color x Talla). Si no hay variantes, se crea un
+// solo producto. La imagen va como dataUrl (base64) y Shopify/local la hostea.
+export const VarianteCombinadaSchema = z.object({
+  titulo: z.string().min(1), // ej. "Negro / 38"
+  sku: z.string().min(1),
+  codigoBarras: z.string().optional(),
+  precio: z.number().nonnegative().optional(), // si difiere del base
+  stockInicial: z.number().int().nonnegative().optional(),
+  imagenDataUrl: z.string().optional(),
+});
+
+export const CrearProductoCompletoSchema = z.object({
+  sku: z.string().min(1),
+  nombre: z.string().min(1),
+  categoria: z.string().optional(),
+  marca: z.string().optional(),
+  descripcion: z.string().optional(),
+  impuestoPorcentaje: z.number().min(0).max(100).optional(),
+  precio: z.number().nonnegative(),
+  costo: z.number().nonnegative().default(0),
+  codigoBarras: z.string().optional(),
+  activo: z.boolean().optional(),
+  proveedorId: z.string().nullable().optional(),
+  sucursalIds: z.array(z.string()).optional(),
+  stockInicial: z.number().int().nonnegative().optional(), // para el sucursal activo, sin variantes
+  sucursalStockId: z.string().optional(),
+  imagenesDataUrl: z.array(z.string()).optional(), // la primera = principal
+  // Nombres de las opciones en el orden en que aparecen en el titulo de cada
+  // variante (ej. ["Color", "Talla"] para un titulo "Negro / 38"). Se usan para
+  // nombrar las opciones del producto en Shopify.
+  nombresOpciones: z.array(z.string()).optional(),
+  // Si es false, el producto se crea en Shopify como borrador (no visible en la
+  // tienda). Por defecto se publica.
+  publicarEnShopify: z.boolean().optional(),
+  variantes: z.array(VarianteCombinadaSchema).optional(),
+});
+export type CrearProductoCompletoInput = z.infer<typeof CrearProductoCompletoSchema>;
 
 // Edicion masiva: solo los campos incluidos se actualizan, en todos los
 // productos de la lista.
@@ -190,11 +234,18 @@ export type RegistrarMovimientoInput = z.infer<typeof RegistrarMovimientoSchema>
 
 // ---------- Ventas ----------
 
-export const VentaItemSchema = z.object({
-  productoId: z.string(),
-  cantidad: z.number().int().positive(),
-  precioUnitario: z.number().nonnegative(),
-});
+// Un item de venta es un producto del inventario (productoId) o una "venta
+// libre": un concepto suelto con su descripcion, que no descuenta stock.
+export const VentaItemSchema = z
+  .object({
+    productoId: z.string().optional(),
+    descripcionLibre: z.string().optional(),
+    cantidad: z.number().int().positive(),
+    precioUnitario: z.number().nonnegative(),
+  })
+  .refine((i) => !!i.productoId || !!i.descripcionLibre?.trim(), {
+    message: "Cada item debe tener un producto o una descripcion",
+  });
 export type VentaItemInput = z.infer<typeof VentaItemSchema>;
 
 export const ContactoClienteSchema = z.object({
@@ -217,6 +268,8 @@ export const CrearVentaSchema = z.object({
   clienteId: z.string().optional(),
   contactoCliente: ContactoClienteSchema.optional(),
   metodoPago: MetodoPago,
+  // Cuenta bancaria que recibio el pago (para tarjeta/transferencia/QR).
+  cuentaBancariaId: z.string().optional(),
   items: z.array(VentaItemSchema).min(1),
   // Solo aplica (y se guarda) cuando metodoPago = EFECTIVO.
   dineroRecibido: z.number().nonnegative().optional(),
@@ -224,6 +277,8 @@ export const CrearVentaSchema = z.object({
   descuento: DescuentoVentaSchema.optional(),
   // Requiere cliente seleccionado y programa de fidelizacion configurado.
   puntosARedimir: z.number().int().positive().optional(),
+  // Nota libre de la venta (se guarda y sale en el historial).
+  observaciones: z.string().optional(),
 });
 export type CrearVentaInput = z.infer<typeof CrearVentaSchema>;
 
@@ -264,17 +319,57 @@ export type ActualizarConfigCreditoInput = z.infer<typeof ActualizarConfigCredit
 
 // ---------- Caja ----------
 
+// Saldo de una cuenta bancaria capturado al abrir/cerrar el turno.
+export const SaldoCuentaTurnoSchema = z.object({
+  cuentaId: z.string(),
+  saldo: z.number(),
+});
+
 export const AbrirCajaSchema = z.object({
   sucursalId: z.string(),
   montoInicial: z.number().nonnegative(),
+  saldosIniciales: z.array(SaldoCuentaTurnoSchema).optional(),
 });
 export type AbrirCajaInput = z.infer<typeof AbrirCajaSchema>;
 
 export const CerrarCajaSchema = z.object({
   sucursalId: z.string(),
   montoContado: z.number().nonnegative(),
+  // Saldo final (contado) de cada cuenta bancaria al cerrar el turno.
+  saldosFinales: z.array(SaldoCuentaTurnoSchema).optional(),
 });
 export type CerrarCajaInput = z.infer<typeof CerrarCajaSchema>;
+
+// ---------- Cuentas bancarias ----------
+export const CrearCuentaBancariaSchema = z.object({
+  nombre: z.string().min(1),
+  banco: z.string().optional(),
+  numeroCuenta: z.string().optional(),
+  tipoCuenta: z.string().optional(),
+  saldoInicial: z.number().default(0),
+  activa: z.boolean().optional(),
+});
+export type CrearCuentaBancariaInput = z.infer<typeof CrearCuentaBancariaSchema>;
+
+// ---------- Calendario / Agenda ----------
+export const PrioridadEvento = z.enum(["BAJA", "MEDIA", "ALTA"]);
+export type PrioridadEvento = z.infer<typeof PrioridadEvento>;
+export const EstadoEvento = z.enum(["PENDIENTE", "EN_PROCESO", "COMPLETADO"]);
+export type EstadoEvento = z.infer<typeof EstadoEvento>;
+export const TipoEvento = z.enum(["TAREA", "RECORDATORIO", "EVENTO", "REUNION", "SEGUIMIENTO"]);
+export type TipoEvento = z.infer<typeof TipoEvento>;
+
+export const CrearEventoSchema = z.object({
+  titulo: z.string().min(1),
+  descripcion: z.string().optional(),
+  fecha: z.string(), // ISO date
+  hora: z.string().optional(),
+  prioridad: PrioridadEvento.optional(),
+  estado: EstadoEvento.optional(),
+  tipo: TipoEvento.optional(),
+  responsableId: z.string().nullable().optional(),
+});
+export type CrearEventoInput = z.infer<typeof CrearEventoSchema>;
 
 // ---------- Fidelizacion ----------
 
@@ -386,6 +481,8 @@ export type ActualizarUsuarioInput = z.infer<typeof ActualizarUsuarioSchema>;
 // ---------- Plantilla del recibo ----------
 
 export const GuardarPlantillaReciboSchema = z.object({
+  nombre: z.string().min(1).optional(),
+  esPredeterminada: z.boolean().optional(),
   logoUrl: z.string().nullable().optional(),
   nombreNegocio: z.string().nullable().optional(),
   direccion: z.string().nullable().optional(),
@@ -402,6 +499,33 @@ export const GuardarPlantillaReciboSchema = z.object({
   promociones: z.string().nullable().optional(),
 });
 export type GuardarPlantillaReciboInput = z.infer<typeof GuardarPlantillaReciboSchema>;
+
+// ---------- Creditos manuales ----------
+
+export const FrecuenciaPago = z.enum(["DIARIA", "SEMANAL", "QUINCENAL", "MENSUAL"]);
+export type FrecuenciaPago = z.infer<typeof FrecuenciaPago>;
+
+export const EstadoCuota = z.enum(["PENDIENTE", "PAGADA", "VENCIDA", "PARCIAL"]);
+export type EstadoCuota = z.infer<typeof EstadoCuota>;
+
+export const CrearCreditoManualSchema = z.object({
+  clienteId: z.string().min(1),
+  valorTotal: z.number().positive(),
+  fechaInicio: z.string(), // ISO date: fecha en que se otorga el credito
+  fechaPrimerPago: z.string(), // ISO date: vencimiento de la primera cuota
+  numeroCuotas: z.number().int().positive(),
+  frecuencia: FrecuenciaPago,
+  // Si se envia, se usa como valor de cada cuota (editable); si no, se calcula
+  // valorTotal / numeroCuotas y el residuo se ajusta en la ultima cuota.
+  valorCuota: z.number().positive().optional(),
+  observaciones: z.string().optional(),
+});
+export type CrearCreditoManualInput = z.infer<typeof CrearCreditoManualSchema>;
+
+export const RegistrarPagoCreditoManualSchema = z.object({
+  monto: z.number().positive(),
+});
+export type RegistrarPagoCreditoManualInput = z.infer<typeof RegistrarPagoCreditoManualSchema>;
 
 // ---------- WebSocket events ----------
 

@@ -1,8 +1,10 @@
 import { BrowserWindow } from "electron";
-import type { ReciboData, EtiquetaData, ReporteCajaData } from "../shared/api-types.js";
+import type { ReciboData, EtiquetaData, EtiquetaFormato, ReporteCajaData } from "../shared/api-types.js";
 import { construirReciboHtml } from "../shared/recibo-html.js";
 
-export type { ReciboData, EtiquetaData, ReporteCajaData };
+export type { ReciboData, EtiquetaData, EtiquetaFormato, ReporteCajaData };
+
+type PageSize = "Letter" | { width: number; height: number };
 
 function escapeHtml(value: string): string {
   return value
@@ -21,7 +23,7 @@ export async function listPrinters(): Promise<string[]> {
   }
 }
 
-async function imprimirHtml(html: string, deviceName: string | null): Promise<void> {
+async function imprimirHtml(html: string, deviceName: string | null, pageSize?: PageSize): Promise<void> {
   const win = new BrowserWindow({ show: false });
   try {
     await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
@@ -32,6 +34,7 @@ async function imprimirHtml(html: string, deviceName: string | null): Promise<vo
           printBackground: true,
           deviceName: deviceName ?? undefined,
           margins: { marginType: "none" },
+          ...(pageSize ? { pageSize } : {}),
         },
         (ok, errorType) => {
           if (ok) resolve();
@@ -48,13 +51,62 @@ export async function printRecibo(data: ReciboData, deviceName: string | null): 
   await imprimirHtml(construirReciboHtml(data), deviceName);
 }
 
-function etiquetasHtml(etiquetas: EtiquetaData[]): string {
+// Calibracion de la etiqueta: medidas reales del rollo y desplazamiento fino
+// (cada impresora/rollo corre distinto y hay que centrarlo).
+export interface CalibracionEtiqueta {
+  anchoMm: number;
+  altoMm: number;
+  offsetXMm: number;
+  offsetYMm: number;
+}
+
+const CALIBRACION_DEFECTO: CalibracionEtiqueta = { anchoMm: 50, altoMm: 25, offsetXMm: 0, offsetYMm: 0 };
+
+// Cada formato define el tamaño de pagina (para el driver) y el CSS de la
+// hoja, usando las medidas calibradas.
+function formatoEtiqueta(formato: EtiquetaFormato, cal: CalibracionEtiqueta): { pageSize: PageSize; css: string } {
+  const { anchoMm: a, altoMm: h } = cal;
+  // micrones = mm * 1000 (lo que espera Electron en pageSize).
+  const um = (mm: number) => Math.round(mm * 1000);
+  // El codigo de barras ocupa casi todo el ancho y ~55% del alto.
+  const bcAncho = Math.max(20, a - 3);
+  const bcAlto = Math.max(8, h * 0.52);
+
+  if (formato === "carta") {
+    return {
+      pageSize: "Letter",
+      css: `
+        @page { size: Letter; margin: 8mm; }
+        .hoja { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2mm; }
+        .etiqueta { height: ${h}mm; border: 1px dashed #ccc; }
+        .barcode svg { width: ${bcAncho - 4}mm; height: ${bcAlto}mm; }`,
+    };
+  }
+
+  const columnas = formato === "rollo2" ? 2 : 1;
+  const anchoPagina = a * columnas;
+  return {
+    pageSize: { width: um(anchoPagina), height: um(h) },
+    css: `
+      @page { size: ${anchoPagina}mm ${h}mm; margin: 0; }
+      .hoja { display: grid; grid-template-columns: ${Array(columnas).fill(`${a}mm`).join(" ")}; }
+      .etiqueta { width: ${a}mm; height: ${h}mm; }
+      .barcode svg { width: ${bcAncho}mm; height: ${bcAlto}mm; }`,
+  };
+}
+
+function etiquetasHtml(
+  etiquetas: EtiquetaData[],
+  formato: EtiquetaFormato,
+  cal: CalibracionEtiqueta = CALIBRACION_DEFECTO
+): string {
   const tarjetas = etiquetas
     .flatMap((e) => Array.from({ length: e.copias }, () => e))
     .map(
       (e) => `
       <div class="etiqueta">
         <div class="nombre">${escapeHtml(e.nombre)}</div>
+        ${e.variante ? `<div class="variante">${escapeHtml(e.variante)}</div>` : ""}
         <div class="barcode">${e.svgCodigoBarras}</div>
         <div class="precio">$${e.precio.toLocaleString("es-CO")}</div>
       </div>`
@@ -67,15 +119,21 @@ function etiquetasHtml(etiquetas: EtiquetaData[]): string {
         <meta charset="utf-8" />
         <style>
           body { font-family: sans-serif; margin: 0; }
-          .hoja { display: flex; flex-wrap: wrap; gap: 4mm; padding: 4mm; }
           .etiqueta {
-            width: 38mm; height: 22mm; border: 1px dashed #ccc; padding: 2mm;
+            padding: 0; box-sizing: border-box; overflow: hidden; page-break-inside: avoid;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            box-sizing: border-box; overflow: hidden; page-break-inside: avoid;
+            /* Desplazamiento fino para centrar en la etiqueta fisica. */
+            transform: translate(${cal.offsetXMm}mm, ${cal.offsetYMm}mm);
           }
-          .nombre { font-size: 7px; text-align: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-          .barcode svg { width: 34mm; height: 10mm; }
-          .precio { font-size: 9px; font-weight: bold; }
+          /* El nombre puede ocupar hasta 2 lineas para aprovechar el ancho. */
+          .nombre {
+            font-size: 9px; font-weight: 600; line-height: 1.05; text-align: center; max-width: 100%;
+            overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+          }
+          .variante { font-size: 7.5px; line-height: 1.1; text-align: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+          .barcode { line-height: 0; margin: 0.3mm 0; }
+          .precio { font-size: 13px; font-weight: 800; line-height: 1.1; }
+          ${formatoEtiqueta(formato, cal).css}
         </style>
       </head>
       <body>
@@ -84,8 +142,15 @@ function etiquetasHtml(etiquetas: EtiquetaData[]): string {
     </html>`;
 }
 
-export async function printEtiquetas(etiquetas: EtiquetaData[], deviceName: string | null): Promise<void> {
-  await imprimirHtml(etiquetasHtml(etiquetas), deviceName);
+export async function printEtiquetas(
+  etiquetas: EtiquetaData[],
+  deviceName: string | null,
+  formato: EtiquetaFormato = "rollo2",
+  calibracion?: Partial<CalibracionEtiqueta>
+): Promise<void> {
+  const cal: CalibracionEtiqueta = { ...CALIBRACION_DEFECTO, ...calibracion };
+  const { pageSize } = formatoEtiqueta(formato, cal);
+  await imprimirHtml(etiquetasHtml(etiquetas, formato, cal), deviceName, pageSize);
 }
 
 function reporteCajaHtml(d: ReporteCajaData): string {
