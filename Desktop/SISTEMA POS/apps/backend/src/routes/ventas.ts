@@ -112,7 +112,7 @@ export async function ventasRoutes(app: FastifyInstance) {
     if (!parsed.success) {
       return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
     }
-    const { clienteUuid, sucursalId, contactoCliente, metodoPago, cuentaBancariaId, items, dineroRecibido, descuento, puntosARedimir, observaciones } =
+    const { clienteUuid, sucursalId, contactoCliente, metodoPago, cuentaBancariaId, items, dineroRecibido, descuento, puntosARedimir, observaciones, numeroCuotas, plazoMeses } =
       parsed.data;
     let { clienteId } = parsed.data;
 
@@ -226,8 +226,12 @@ export async function ventasRoutes(app: FastifyInstance) {
 
     let fechaVencimientoCredito: Date | undefined;
     if (metodoPago === "CREDITO") {
-      const dias = empresa?.diasVencimientoCredito ?? 20;
-      fechaVencimientoCredito = new Date(Date.now() + dias * MS_DIA);
+      if (plazoMeses) {
+        fechaVencimientoCredito = new Date(Date.now() + plazoMeses * 30 * MS_DIA);
+      } else {
+        const dias = empresa?.diasVencimientoCredito ?? 20;
+        fechaVencimientoCredito = new Date(Date.now() + dias * MS_DIA);
+      }
     }
 
     // Acumulacion de puntos sobre el total final pagado.
@@ -257,6 +261,7 @@ export async function ventasRoutes(app: FastifyInstance) {
           dineroRecibido,
           cambio,
           fechaVencimientoCredito,
+          numeroCuotasCredito: metodoPago === "CREDITO" ? (numeroCuotas ?? 1) : undefined,
           descuento: montoDescuento + valorPuntosRedimidos > 0 ? montoDescuento + valorPuntosRedimidos : undefined,
           puntosGanados,
           puntosRedimidos: puntosARedimir ?? 0,

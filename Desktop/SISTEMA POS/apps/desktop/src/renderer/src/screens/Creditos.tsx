@@ -5,6 +5,7 @@ import { BotonesExportar } from "../lib/BotonesExportar";
 import type { ColumnaExport } from "../lib/export";
 import { mensajeError } from "../lib/errores";
 import CreditosManuales from "./CreditosManuales";
+import { DetalleCreditoModal } from "../components/DetalleCreditoModal";
 
 interface Credito {
   ventaId: string;
@@ -78,6 +79,7 @@ function CreditosVentas() {
   const [diasVencimiento, setDiasVencimiento] = useState("20");
   const [guardandoConfig, setGuardandoConfig] = useState(false);
   const [mensajeConfig, setMensajeConfig] = useState<string | null>(null);
+  const [creditoDetalle, setCreditoDetalle] = useState<Credito | null>(null);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -190,6 +192,7 @@ function CreditosVentas() {
                 <th>Dias de retraso</th>
                 <th>Pendiente</th>
                 <th>Estado</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -205,15 +208,29 @@ function CreditosVentas() {
                   <td>
                     <span className={`badge ${badgeEstado[c.estado]}`}>{etiquetaEstado[c.estado]}</span>
                   </td>
+                  <td>
+                    <button type="button" className="secondary" style={{ fontSize: 12, padding: "4px 10px" }} onClick={() => setCreditoDetalle(c)}>
+                      Ver info
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
       </div>
-      <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 10 }}>
-        Para registrar abonos de un cliente, ve a la seccion "Clientes".
-      </p>
+      {creditoDetalle && (
+        <DetalleCreditoModal
+          mostrar={!!creditoDetalle}
+          creditoId={creditoDetalle.ventaId}
+          clienteNombre={creditoDetalle.clienteNombre}
+          total={creditoDetalle.total}
+          pendiente={creditoDetalle.pendiente}
+          estado={creditoDetalle.estado}
+          onAbonar={cargar}
+          onCerrar={() => setCreditoDetalle(null)}
+        />
+      )}
     </div>
   );
 }

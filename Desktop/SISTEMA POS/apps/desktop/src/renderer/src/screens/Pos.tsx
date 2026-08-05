@@ -9,6 +9,8 @@ import { reproducir } from "../lib/sonidos";
 import type { MetodoPago } from "@sistema-pos/shared";
 import type { ReciboData } from "../../../shared/api-types";
 import { mensajeError } from "../lib/errores";
+import { ModalCredito } from "../components/ModalCredito";
+import { DetalleCreditoModal } from "../components/DetalleCreditoModal";
 
 interface Producto {
   id: string;
@@ -101,6 +103,9 @@ export default function Pos() {
   const [contactoEmail, setContactoEmail] = useState("");
   const [contactoCelular, setContactoCelular] = useState("");
   const [contactoCedula, setContactoCedula] = useState("");
+  const [mostrarModalCredito, setMostrarModalCredito] = useState(false);
+  const [creditoCuotas, setCreditoCuotas] = useState(1);
+  const [creditoPlazo, setCreditoPlazo] = useState(1);
   const [descuentoTipo, setDescuentoTipo] = useState<"PORCENTAJE" | "VALOR">("PORCENTAJE");
   const [descuentoValor, setDescuentoValor] = useState("");
   const [puntosARedimir, setPuntosARedimir] = useState("");
@@ -311,23 +316,28 @@ export default function Pos() {
     setObservacionesVenta("");
   }
 
-  async function cobrar() {
+  function handleCobrarClick() {
+    if (carrito.length === 0 || !sucursalActivaId) return;
+    if (metodoPago === "CREDITO") {
+      setMostrarModalCredito(true);
+    } else {
+      void cobrar();
+    }
+  }
+
+  async function cobrar(creditoData?: { clienteId: string; cuotas: number; plazo: number; abonoInicial: number }) {
     if (carrito.length === 0 || !sucursalActivaId) return;
     setError(null);
-    if (metodoPago === "CREDITO" && !clienteId) {
-      void reproducir("error");
-      setError("Selecciona el cliente para una venta a credito");
-      return;
-    }
     if (metodoPago === "EFECTIVO" && dineroRecibidoNum !== null && dineroRecibidoNum < total) {
       void reproducir("error");
       setError("El dinero recibido es menor al total de la venta");
       return;
     }
     setProcesando(true);
+    const clienteIdEfectivo = creditoData?.clienteId ?? clienteId;
     const clienteUuid = uuidv4();
     const contactoCliente =
-      metodoPago !== "CREDITO" && !clienteId && (contactoNombre || contactoEmail || contactoCelular || contactoCedula)
+      metodoPago !== "CREDITO" && !clienteIdEfectivo && (contactoNombre || contactoEmail || contactoCelular || contactoCedula)
         ? {
             nombre: contactoNombre || undefined,
             email: contactoEmail || undefined,
@@ -340,7 +350,7 @@ export default function Pos() {
       sucursalId: sucursalActivaId,
       metodoPago,
       cuentaBancariaId: requiereCuenta && cuentaId ? cuentaId : undefined,
-      clienteId: clienteId || undefined,
+      clienteId: clienteIdEfectivo || undefined,
       contactoCliente,
       items: carrito.map((i) =>
         i.esLibre
@@ -351,6 +361,8 @@ export default function Pos() {
       dineroRecibido: metodoPago === "EFECTIVO" && dineroRecibidoNum !== null ? dineroRecibidoNum : undefined,
       descuento: montoDescuento > 0 ? { tipo: descuentoTipo, valor: Number(descuentoValor) } : undefined,
       puntosARedimir: valorPuntos > 0 ? puntosNum : undefined,
+      numeroCuotas: creditoData?.cuotas,
+      plazoMeses: creditoData?.plazo,
     };
 
     let consecutivo = 0;
@@ -362,6 +374,13 @@ export default function Pos() {
       consecutivo = data.consecutivo;
       puntosGanados = data.puntosGanados ?? 0;
       impuestoVenta = data.impuestoTotal ? Number(data.impuestoTotal) : undefined;
+      if (creditoData?.abonoInicial && creditoData.abonoInicial > 0 && data.id) {
+        try {
+          await api.post(`/creditos/${data.id}/abonar`, { monto: creditoData.abonoInicial });
+        } catch {
+          // El credito queda registrado; el abono inicial fallara silenciosamente
+        }
+      }
     } catch (err: any) {
       if (err?.response?.status === 409 || err?.response?.status === 403 || err?.response?.status === 400) {
         void reproducir("error");
@@ -634,7 +653,14 @@ export default function Pos() {
 
           <label style={{ marginTop: 10 }}>
             Metodo de pago
-            <select value={metodoPago} onChange={(e) => setMetodoPago(e.target.value as MetodoPago)} style={{ width: "100%" }}>
+            <select
+              value={metodoPago}
+              onChange={(e) => {
+                const valor = e.target.value as MetodoPago;
+                setMetodoPago(valor);
+              }}
+              style={{ width: "100%" }}
+            >
               <option value="EFECTIVO">Efectivo</option>
               <option value="TARJETA">Tarjeta</option>
               <option value="TRANSFERENCIA">Transferencia</option>
@@ -771,13 +797,26 @@ export default function Pos() {
           <button
             style={{ width: "100%", marginTop: 12 }}
             disabled={carrito.length === 0 || procesando || (cambio !== null && cambio < 0)}
-            onClick={cobrar}
+            onClick={handleCobrarClick}
             type="button"
           >
             {procesando ? "Procesando..." : "Cobrar e imprimir"}
           </button>
         </div>
       </div>
+
+      <ModalCredito
+        mostrar={mostrarModalCredito}
+        clienteId={clienteId}
+        clientes={clientes}
+        total={total}
+        onConfirmar={(data) => {
+          setMostrarModalCredito(false);
+          setClienteId(data.clienteId);
+          void cobrar(data);
+        }}
+        onCerrar={() => setMostrarModalCredito(false)}
+      />
 
       {ventaExitosa && <VentaExitosaModal resultado={ventaExitosa} onCerrar={nuevaVenta} />}
 

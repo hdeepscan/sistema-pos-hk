@@ -146,4 +146,102 @@ export async function creditosRoutes(app: FastifyInstance) {
       valorTotalPendiente: activos.reduce((acc, c) => acc + c.pendiente, 0),
     };
   });
+
+  app.get("/creditos/:ventaId/detalle", async (request, reply) => {
+    const { empresaId } = request.user;
+    const { ventaId } = request.params as { ventaId: string };
+
+    const venta = await prisma.venta.findUnique({
+      where: { id: ventaId },
+      include: { cliente: true, abonos: { orderBy: { fecha: "desc" } } },
+    });
+
+    if (!venta || venta.empresaId !== empresaId) {
+      return reply.code(404).send({ error: "Crédito no encontrado" });
+    }
+
+    const creditos = await calcularCreditos(empresaId);
+    const credito = creditos.find((c) => c.ventaId === ventaId);
+
+    if (!credito) {
+      return reply.code(404).send({ error: "Crédito no encontrado" });
+    }
+
+    return {
+      ...credito,
+      cliente: venta.cliente,
+      abonos: venta.abonos,
+      cuotas: venta.numeroCuotasCredito || 1,
+      plazo: venta.fechaVencimientoCredito ? Math.ceil((venta.fechaVencimientoCredito.getTime() - venta.fecha.getTime()) / (30 * 24 * 60 * 60 * 1000)) : 0,
+    };
+  });
+
+  app.post("/creditos/:ventaId/abonar", async (request, reply) => {
+    const { empresaId, usuarioId } = request.user;
+    const { ventaId } = request.params as { ventaId: string };
+    const { monto } = request.body as { monto: number };
+
+    if (!monto || monto <= 0) {
+      return reply.code(400).send({ error: "Monto debe ser mayor a 0" });
+    }
+
+    const venta = await prisma.venta.findUnique({
+      where: { id: ventaId },
+    });
+
+    if (!venta || venta.empresaId !== empresaId || venta.metodoPago !== "CREDITO") {
+      return reply.code(404).send({ error: "Crédito no encontrado" });
+    }
+
+    const abono = await prisma.abono.create({
+      data: {
+        clienteId: venta.clienteId!,
+        monto,
+        fecha: new Date(),
+        referencia: `Abono a crédito ${venta.consecutivo}`,
+      },
+    });
+
+    registrarAuditoria({
+      empresaId,
+      usuarioId,
+      accion: "CREAR_ABONO",
+      entidad: "Abono",
+      entidadId: abono.id,
+      detalle: `Abono de $${monto} al crédito ${venta.consecutivo}`,
+    });
+
+    return abono;
+  });
+
+  app.get("/creditos/:ventaId/proximos-pagos", async (request, reply) => {
+    const { empresaId } = request.user;
+    const { ventaId } = request.params as { ventaId: string };
+
+    const venta = await prisma.venta.findUnique({
+      where: { id: ventaId },
+      include: { cliente: true },
+    });
+
+    if (!venta || venta.empresaId !== empresaId) {
+      return reply.code(404).send({ error: "Crédito no encontrado" });
+    }
+
+    const cuotas = venta.numeroCuotasCredito || 1;
+    const fechaVencimiento = venta.fechaVencimientoCredito || venta.fecha;
+    const montoTotal = Number(venta.total);
+    const montoPorCuota = Math.round((montoTotal / cuotas) * 100) / 100;
+
+    const proximosPagos = Array.from({ length: cuotas }, (_, i) => {
+      const fecha = new Date(fechaVencimiento);
+      fecha.setMonth(fecha.getMonth() + i);
+      return {
+        cuota: i + 1,
+        fecha,
+        monto: i === cuotas - 1 ? montoTotal - montoPorCuota * i : montoPorCuota,
+      };
+    });
+
+    return proximosPagos;
+  });
 }

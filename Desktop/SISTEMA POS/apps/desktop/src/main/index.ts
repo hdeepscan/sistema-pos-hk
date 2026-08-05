@@ -191,6 +191,25 @@ ipcMain.handle("printer:reporteCaja", (_e, args: { data: ReporteCajaData; device
   printReporteCaja(args.data, args.deviceName)
 );
 
+ipcMain.handle("archivo:guardarRecibo", async (_e, args: { html: string; nombreArchivo: string }) => {
+  return guardarArchivo({
+    contenido: args.html,
+    nombreArchivo: args.nombreArchivo,
+    tipo: "text/html",
+  });
+});
+
+ipcMain.handle("dialogo:mostrar", async (_e, opciones: { tipo: string; titulo: string; mensaje: string; botones: string[] }) => {
+  const { dialog } = await import("electron");
+  const resultado = await dialog.showMessageBox(ventanaPrincipal!, {
+    type: opciones.tipo as any,
+    title: opciones.titulo,
+    message: opciones.mensaje,
+    buttons: opciones.botones,
+  });
+  return resultado.response;
+});
+
 ipcMain.handle("app:version", () => app.getVersion());
 ipcMain.handle("updates:buscar", () => buscarActualizaciones());
 ipcMain.handle("updates:descargar", () => descargarActualizacion());

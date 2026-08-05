@@ -29,6 +29,10 @@ const api: PosApi = {
   elegirArchivo: (filtros) => ipcRenderer.invoke("archivo:elegir", filtros),
 
   abrirEnlaceExterno: (url) => ipcRenderer.invoke("shell:abrir", url),
+
+  guardarReciboEnEscritorio: (html, nombreArchivo) =>
+    ipcRenderer.invoke("archivo:guardarRecibo", { html, nombreArchivo }),
+  mostrarDialogo: (opciones) => ipcRenderer.invoke("dialogo:mostrar", opciones),
 };
 
 contextBridge.exposeInMainWorld("pos", api);

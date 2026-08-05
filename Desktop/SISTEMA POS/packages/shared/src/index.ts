@@ -279,6 +279,9 @@ export const CrearVentaSchema = z.object({
   puntosARedimir: z.number().int().positive().optional(),
   // Nota libre de la venta (se guarda y sale en el historial).
   observaciones: z.string().optional(),
+  // Solo para ventas a credito: numero de cuotas y plazo en meses.
+  numeroCuotas: z.number().int().positive().optional(),
+  plazoMeses: z.number().int().positive().optional(),
 });
 export type CrearVentaInput = z.infer<typeof CrearVentaSchema>;
 

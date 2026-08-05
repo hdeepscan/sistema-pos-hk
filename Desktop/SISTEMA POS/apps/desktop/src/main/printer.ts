@@ -25,23 +25,29 @@ export async function listPrinters(): Promise<string[]> {
 
 async function imprimirHtml(html: string, deviceName: string | null, pageSize?: PageSize): Promise<void> {
   const win = new BrowserWindow({ show: false });
+  const PRINT_TIMEOUT = 30000;
   try {
     await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
-    await new Promise<void>((resolve, reject) => {
-      win.webContents.print(
-        {
-          silent: true,
-          printBackground: true,
-          deviceName: deviceName ?? undefined,
-          margins: { marginType: "none" },
-          ...(pageSize ? { pageSize } : {}),
-        },
-        (ok, errorType) => {
-          if (ok) resolve();
-          else reject(new Error(errorType));
-        }
-      );
-    });
+    await Promise.race([
+      new Promise<void>((resolve, reject) => {
+        win.webContents.print(
+          {
+            silent: true,
+            printBackground: true,
+            deviceName: deviceName ?? undefined,
+            margins: { marginType: "none" },
+            ...(pageSize ? { pageSize } : {}),
+          },
+          (ok, errorType) => {
+            if (ok) resolve();
+            else reject(new Error(errorType || "Error en impresora"));
+          }
+        );
+      }),
+      new Promise<void>((_, reject) =>
+        setTimeout(() => reject(new Error("Tiempo agotado al imprimir")), PRINT_TIMEOUT)
+      ),
+    ]);
   } finally {
     win.destroy();
   }

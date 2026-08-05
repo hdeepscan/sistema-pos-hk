@@ -26,6 +26,7 @@ import { backupRoutes } from "./routes/backup.js";
 import { cajaRoutes } from "./routes/caja.js";
 import { fidelizacionRoutes } from "./routes/fidelizacion.js";
 import { iniciarPollerShopify } from "./lib/poller.js";
+import { iniciarBackupAutomatico } from "./lib/auto-backup.js";
 
 // bodyLimit ampliado para permitir subir imagenes de producto en base64 y
 // restaurar backups (.sql) de varios negocios/años de historial.
@@ -64,3 +65,4 @@ await app.listen({ port, host: "0.0.0.0" });
 
 initWebSocket(app.server);
 iniciarPollerShopify();
+iniciarBackupAutomatico();
