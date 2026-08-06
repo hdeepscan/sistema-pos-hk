@@ -4,6 +4,7 @@ import { reproducir } from "../lib/sonidos";
 import { BotonesExportar } from "../lib/BotonesExportar";
 import type { ColumnaExport } from "../lib/export";
 import { mensajeError } from "../lib/errores";
+import { DetalleCreditoModal } from "../components/DetalleCreditoModal";
 
 interface Cliente {
   id: string;
@@ -14,6 +15,15 @@ interface Cliente {
   cedula: string | null;
   ciudad: string | null;
   saldoPendiente: number;
+}
+
+interface CreditoCliente {
+  ventaId: string;
+  consecutivo: number;
+  total: number;
+  pendiente: number;
+  fechaVencimiento: string;
+  estado: "VIGENTE" | "PROXIMO_A_VENCER" | "VENCIDO" | "PAGADO";
 }
 
 const COLUMNAS_CLIENTES: ColumnaExport<Cliente>[] = [
@@ -31,11 +41,18 @@ export default function Clientes() {
   const [mostrarForm, setMostrarForm] = useState(false);
   const [clienteAbono, setClienteAbono] = useState<Cliente | null>(null);
   const [clienteEditar, setClienteEditar] = useState<Cliente | null>(null);
+  const [clienteCreditos, setClienteCreditos] = useState<{ cliente: Cliente; creditos: CreditoCliente[] } | null>(null);
+  const [creditoDetalle, setCreditoDetalle] = useState<CreditoCliente | null>(null);
 
   const cargar = useCallback(async () => {
     const { data } = await api.get<Cliente[]>("/clientes", { params: busqueda ? { q: busqueda } : undefined });
     setClientes(data);
   }, [busqueda]);
+
+  async function verCreditosCliente(c: Cliente) {
+    const { data } = await api.get<CreditoCliente[]>("/creditos", { params: { clienteId: c.id } });
+    setClienteCreditos({ cliente: c, creditos: data });
+  }
 
   useEffect(() => {
     cargar();
@@ -112,9 +129,14 @@ export default function Clientes() {
                         Editar
                       </button>
                       {c.saldoPendiente > 0 && (
-                        <button className="secondary" onClick={() => setClienteAbono(c)} type="button">
-                          Registrar abono
-                        </button>
+                        <>
+                          <button className="secondary" onClick={() => setClienteAbono(c)} type="button">
+                            Abonar
+                          </button>
+                          <button className="secondary" onClick={() => verCreditosCliente(c)} type="button">
+                            Ver créditos
+                          </button>
+                        </>
                       )}
                     </div>
                   </td>
@@ -131,6 +153,66 @@ export default function Clientes() {
       )}
       {clienteAbono && (
         <RegistrarAbono cliente={clienteAbono} onClose={() => setClienteAbono(null)} onRegistrado={cargar} />
+      )}
+
+      {clienteCreditos && !creditoDetalle && (
+        <div className="modal-backdrop" onClick={() => setClienteCreditos(null)}>
+          <div className="card" style={{ width: 680, maxWidth: "96vw", maxHeight: "85vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h4 style={{ margin: 0 }}>Créditos de {clienteCreditos.cliente.nombre}</h4>
+              <button type="button" className="secondary" onClick={() => setClienteCreditos(null)}>✕</button>
+            </div>
+            {clienteCreditos.creditos.length === 0 ? (
+              <p className="empty-state">Este cliente no tiene créditos activos</p>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>Factura</th>
+                    <th>Total</th>
+                    <th>Pendiente</th>
+                    <th>Vence</th>
+                    <th>Estado</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {clienteCreditos.creditos.map((cr) => (
+                    <tr key={cr.ventaId}>
+                      <td>#{cr.consecutivo}</td>
+                      <td>${cr.total.toLocaleString("es-CO")}</td>
+                      <td><span className="badge danger">${cr.pendiente.toLocaleString("es-CO")}</span></td>
+                      <td>{new Date(cr.fechaVencimiento).toLocaleDateString("es-CO")}</td>
+                      <td>
+                        <span className={`badge ${{ VIGENTE: "success", PROXIMO_A_VENCER: "warning", VENCIDO: "danger", PAGADO: "neutral" }[cr.estado]}`}>
+                          {{ VIGENTE: "Vigente", PROXIMO_A_VENCER: "Próximo a vencer", VENCIDO: "Vencido", PAGADO: "Pagado" }[cr.estado]}
+                        </span>
+                      </td>
+                      <td>
+                        <button type="button" className="secondary" style={{ fontSize: 12 }} onClick={() => setCreditoDetalle(cr)}>
+                          Ver detalles
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
+
+      {creditoDetalle && clienteCreditos && (
+        <DetalleCreditoModal
+          mostrar={!!creditoDetalle}
+          creditoId={creditoDetalle.ventaId}
+          clienteNombre={clienteCreditos.cliente.nombre}
+          total={creditoDetalle.total}
+          pendiente={creditoDetalle.pendiente}
+          estado={creditoDetalle.estado}
+          onAbonar={() => { cargar(); setClienteCreditos(null); setCreditoDetalle(null); }}
+          onCerrar={() => setCreditoDetalle(null)}
+        />
       )}
     </div>
   );

@@ -120,10 +120,11 @@ export async function creditosRoutes(app: FastifyInstance) {
 
   app.get("/creditos", async (request) => {
     const { empresaId } = request.user;
-    const { estado, sucursalId } = request.query as { estado?: EstadoCredito; sucursalId?: string };
+    const { estado, sucursalId, clienteId } = request.query as { estado?: EstadoCredito; sucursalId?: string; clienteId?: string };
 
     let creditos = await calcularCreditos(empresaId);
     if (sucursalId) creditos = creditos.filter((c) => c.sucursalId === sucursalId);
+    if (clienteId) creditos = creditos.filter((c) => c.clienteId === clienteId);
     if (estado) {
       creditos = creditos.filter((c) => c.estado === estado);
     } else {
