@@ -58,7 +58,56 @@ export async function calendarioRoutes(app: FastifyInstance) {
       });
     }
 
-    // 2) Creditos manuales: una alerta por cada cuota pendiente con vencimiento
+    // 2) Creditos de ventas POS: una entrada por cada cuota pendiente en el rango.
+    const ventasCredito = await prisma.venta.findMany({
+      where: { empresaId, metodoPago: "CREDITO" },
+      include: { cliente: { select: { nombre: true } } },
+      orderBy: { fecha: "asc" },
+    });
+    const abonosPorCliente = await prisma.abono.groupBy({
+      by: ["clienteId"],
+      where: { cliente: { empresaId } },
+      _sum: { monto: true },
+    });
+    const poolAbonos = new Map(abonosPorCliente.map((a) => [a.clienteId, Number(a._sum.monto ?? 0)]));
+
+    for (const venta of ventasCredito) {
+      if (!venta.clienteId) continue;
+      const total = Number(venta.total);
+      const disponible = poolAbonos.get(venta.clienteId) ?? 0;
+      const aplicado = Math.min(disponible, total);
+      poolAbonos.set(venta.clienteId, disponible - aplicado);
+      const pendiente = Math.round((total - aplicado) * 100) / 100;
+      if (pendiente <= 0) continue;
+
+      const numCuotas = venta.numeroCuotasCredito || 1;
+      const fechaFin = venta.fechaVencimientoCredito || venta.fecha;
+      const totalMs = fechaFin.getTime() - venta.fecha.getTime();
+      const intervalMs = numCuotas > 1 ? totalMs / numCuotas : totalMs;
+
+      for (let i = 0; i < numCuotas; i++) {
+        const fechaCuota = new Date(venta.fecha.getTime() + (i + 1) * intervalMs);
+        if (fechaCuota < inicio || fechaCuota > fin) continue;
+        const vencida = fechaCuota.getTime() < ahora;
+        const montoCuota = Math.round((total / numCuotas) * 100) / 100;
+        eventos.push({
+          id: `credito-venta-${venta.id}-${i + 1}`,
+          titulo: `Cobro crédito #${venta.consecutivo} - ${venta.cliente?.nombre ?? "Cliente"}`,
+          descripcion: numCuotas > 1 ? `Cuota ${i + 1} de ${numCuotas}: $${montoCuota.toLocaleString("es-CO")}` : `Pendiente: $${pendiente.toLocaleString("es-CO")}`,
+          fecha: fechaCuota.toISOString(),
+          hora: null,
+          prioridad: vencida ? "ALTA" : "MEDIA",
+          estado: "PENDIENTE",
+          tipo: "RECORDATORIO",
+          responsableId: null,
+          responsableNombre: null,
+          origen: "credito",
+          editable: false,
+        });
+      }
+    }
+
+    // 4) Creditos manuales: una alerta por cada cuota pendiente con vencimiento
     //    en el rango.
     const creditos = await prisma.creditoManual.findMany({
       where: { empresaId, activo: true },
@@ -88,7 +137,7 @@ export async function calendarioRoutes(app: FastifyInstance) {
       }
     }
 
-    // 3) Inventario: productos activos con stock minimo configurado cuyo stock
+    // 5) Inventario: productos activos con stock minimo configurado cuyo stock
     //    total esta en o por debajo del minimo (recordatorio de reposicion hoy).
     const productos = await prisma.producto.findMany({
       where: { empresaId, activo: true, stockMinimo: { gt: 0 } },

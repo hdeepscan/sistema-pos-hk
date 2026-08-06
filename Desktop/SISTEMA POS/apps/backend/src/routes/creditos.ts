@@ -196,9 +196,10 @@ export async function creditosRoutes(app: FastifyInstance) {
     const abono = await prisma.abono.create({
       data: {
         clienteId: venta.clienteId!,
+        usuarioId,
         monto,
         fecha: new Date(),
-        referencia: `Abono a crédito ${venta.consecutivo}`,
+        referencia: `Abono a crédito #${venta.consecutivo}`,
       },
     });
 
@@ -227,21 +228,92 @@ export async function creditosRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: "Crédito no encontrado" });
     }
 
-    const cuotas = venta.numeroCuotasCredito || 1;
-    const fechaVencimiento = venta.fechaVencimientoCredito || venta.fecha;
-    const montoTotal = Number(venta.total);
-    const montoPorCuota = Math.round((montoTotal / cuotas) * 100) / 100;
+    return calcularCuotas(venta);
+  });
 
-    const proximosPagos = Array.from({ length: cuotas }, (_, i) => {
-      const fecha = new Date(fechaVencimiento);
-      fecha.setMonth(fecha.getMonth() + i);
-      return {
-        cuota: i + 1,
-        fecha,
-        monto: i === cuotas - 1 ? montoTotal - montoPorCuota * i : montoPorCuota,
-      };
+  // Alertas de cobro para el centro de notificaciones:
+  // cuotas vencidas, que vencen hoy y proximas (dentro de 2 dias).
+  app.get("/creditos/alertas", async (request) => {
+    const { empresaId } = request.user;
+    const ahora = Date.now();
+    const DOS_DIAS = 2 * MS_DIA;
+
+    const ventas = await prisma.venta.findMany({
+      where: { empresaId, metodoPago: "CREDITO" },
+      include: { cliente: { select: { nombre: true } } },
+      orderBy: { fecha: "asc" },
     });
 
-    return proximosPagos;
+    const abonosPorCliente = await prisma.abono.groupBy({
+      by: ["clienteId"],
+      where: { cliente: { empresaId } },
+      _sum: { monto: true },
+    });
+    const poolAbonos = new Map(abonosPorCliente.map((a) => [a.clienteId, Number(a._sum.monto ?? 0)]));
+
+    const alertas: {
+      ventaId: string;
+      consecutivo: number;
+      clienteNombre: string;
+      numeroCuota: number;
+      valorPendiente: number;
+      fechaVencimiento: Date;
+      diasRetraso: number;
+      tipo: "VENCIDA" | "HOY" | "PROXIMA";
+    }[] = [];
+
+    for (const venta of ventas) {
+      if (!venta.clienteId) continue;
+      const total = Number(venta.total);
+      const disponible = poolAbonos.get(venta.clienteId) ?? 0;
+      const aplicado = Math.min(disponible, total);
+      poolAbonos.set(venta.clienteId, disponible - aplicado);
+      const pendiente = Math.round((total - aplicado) * 100) / 100;
+      if (pendiente <= 0) continue;
+
+      const cuotas = calcularCuotas(venta);
+      for (const cuota of cuotas) {
+        const venc = new Date(cuota.fecha).getTime();
+        const esHoy = new Date(venc).toDateString() === new Date(ahora).toDateString();
+        const esPasado = venc < ahora && !esHoy;
+        const esProxima = !esPasado && !esHoy && venc <= ahora + DOS_DIAS;
+        if (!esHoy && !esPasado && !esProxima) continue;
+
+        const diasRetraso = esPasado ? Math.floor((ahora - venc) / MS_DIA) : 0;
+        alertas.push({
+          ventaId: venta.id,
+          consecutivo: venta.consecutivo,
+          clienteNombre: venta.cliente?.nombre ?? "Cliente",
+          numeroCuota: cuota.cuota,
+          valorPendiente: cuota.monto,
+          fechaVencimiento: new Date(cuota.fecha),
+          diasRetraso,
+          tipo: esPasado ? "VENCIDA" : esHoy ? "HOY" : "PROXIMA",
+        });
+      }
+    }
+
+    alertas.sort((a, b) => b.diasRetraso - a.diasRetraso || a.fechaVencimiento.getTime() - b.fechaVencimiento.getTime());
+    return alertas;
   });
+}
+
+// Calcula las fechas y montos de cada cuota de una venta a credito.
+// Las cuotas se distribuyen equitativamente entre la fecha de venta
+// y la fecha de vencimiento final.
+function calcularCuotas(venta: { fecha: Date; fechaVencimientoCredito: Date | null; numeroCuotasCredito: number | null; total: any }) {
+  const numCuotas = venta.numeroCuotasCredito || 1;
+  const fechaFin = venta.fechaVencimientoCredito || venta.fecha;
+  const fechaInicio = venta.fecha;
+  const montoTotal = Number(venta.total);
+  const montoPorCuota = Math.round((montoTotal / numCuotas) * 100) / 100;
+
+  const totalMs = fechaFin.getTime() - fechaInicio.getTime();
+  const intervalMs = numCuotas > 1 ? totalMs / numCuotas : totalMs;
+
+  return Array.from({ length: numCuotas }, (_, i) => ({
+    cuota: i + 1,
+    fecha: new Date(fechaInicio.getTime() + (i + 1) * intervalMs),
+    monto: i === numCuotas - 1 ? Math.round((montoTotal - montoPorCuota * i) * 100) / 100 : montoPorCuota,
+  }));
 }

@@ -25,6 +25,17 @@ interface AlertaCuota {
   tipo: "VENCIDA" | "HOY" | "PROXIMA";
 }
 
+interface AlertaCreditoPOS {
+  ventaId: string;
+  consecutivo: number;
+  clienteNombre: string;
+  numeroCuota: number;
+  valorPendiente: number;
+  fechaVencimiento: string;
+  diasRetraso: number;
+  tipo: "VENCIDA" | "HOY" | "PROXIMA";
+}
+
 const badgeAlerta: Record<AlertaCuota["tipo"], string> = {
   VENCIDA: "danger",
   HOY: "warning",
@@ -39,6 +50,7 @@ const etiquetaAlerta: Record<AlertaCuota["tipo"], string> = {
 export default function Notificaciones() {
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [alertas, setAlertas] = useState<AlertaCuota[]>([]);
+  const [alertasPOS, setAlertasPOS] = useState<AlertaCreditoPOS[]>([]);
   const [filtro, setFiltro] = useState<"todos" | "pendientes" | "atendidos">("pendientes");
   const [shopDomain, setShopDomain] = useState<string | null>(null);
   const [cargando, setCargando] = useState(true);
@@ -75,10 +87,12 @@ export default function Notificaciones() {
   }, []);
 
   useEffect(() => {
-    api
-      .get<AlertaCuota[]>("/creditos-manuales/alertas")
+    api.get<AlertaCuota[]>("/creditos-manuales/alertas")
       .then(({ data }) => setAlertas(data))
       .catch(() => setAlertas([]));
+    api.get<AlertaCreditoPOS[]>("/creditos/alertas")
+      .then(({ data }) => setAlertasPOS(data))
+      .catch(() => setAlertasPOS([]));
   }, []);
 
   async function atender(id: string) {
@@ -100,10 +114,57 @@ export default function Notificaciones() {
         </div>
       </div>
 
+      {alertasPOS.length > 0 && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <h4 style={{ marginTop: 0 }}>
+            Cobros de ventas a crédito{" "}
+            <span className="badge danger" style={{ marginLeft: 6 }}>{alertasPOS.length}</span>
+          </h4>
+          {alertasPOS.some((a) => a.tipo === "HOY") && (
+            <p style={{ fontSize: 13, color: "var(--warning)", fontWeight: 600, margin: "0 0 8px" }}>
+              ¡Hay cobros programados para hoy!
+            </p>
+          )}
+          {alertasPOS.some((a) => a.tipo === "PROXIMA") && (
+            <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "0 0 8px" }}>
+              Recuerda: mañana hay cobros pendientes.
+            </p>
+          )}
+          <table>
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>Factura</th>
+                <th>Cuota</th>
+                <th>Valor</th>
+                <th>Fecha cobro</th>
+                <th>Atraso</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {alertasPOS.map((a) => (
+                <tr key={`${a.ventaId}-${a.numeroCuota}`}>
+                  <td>{a.clienteNombre}</td>
+                  <td>#{a.consecutivo}</td>
+                  <td>Cuota {a.numeroCuota}</td>
+                  <td>${Math.round(a.valorPendiente).toLocaleString("es-CO")}</td>
+                  <td>{new Date(a.fechaVencimiento).toLocaleDateString("es-CO")}</td>
+                  <td>{a.diasRetraso > 0 ? `${a.diasRetraso} dias` : "-"}</td>
+                  <td>
+                    <span className={`badge ${badgeAlerta[a.tipo]}`}>{etiquetaAlerta[a.tipo]}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {alertas.length > 0 && (
         <div className="card" style={{ marginBottom: 16 }}>
           <h4 style={{ marginTop: 0 }}>
-            Alertas de cobro <span className="badge danger" style={{ marginLeft: 6 }}>{alertas.length}</span>
+            Alertas créditos manuales <span className="badge danger" style={{ marginLeft: 6 }}>{alertas.length}</span>
           </h4>
           <table>
             <thead>
