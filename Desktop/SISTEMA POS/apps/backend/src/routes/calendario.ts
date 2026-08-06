@@ -34,6 +34,7 @@ export async function calendarioRoutes(app: FastifyInstance) {
     const fin = hasta ? new Date(hasta) : new Date(Date.now() + 60 * MS_DIA);
 
     const eventos: EventoSalida[] = [];
+    const ahora = Date.now();
 
     // 1) Manuales.
     const manuales = await prisma.eventoCalendario.findMany({
@@ -113,7 +114,6 @@ export async function calendarioRoutes(app: FastifyInstance) {
       where: { empresaId, activo: true },
       include: { cuotas: true, cliente: { select: { nombre: true } } },
     });
-    const ahora = Date.now();
     for (const c of creditos) {
       for (const cuota of c.cuotas) {
         const pendiente = Number(cuota.valor) - Number(cuota.pagado);
