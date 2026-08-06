@@ -92,7 +92,7 @@ export async function shopifyRoutes(app: FastifyInstance) {
 
     try {
       const { crearProductoEnShopify } = await import("../lib/shopify.js");
-      const resultado = await crearProductoEnShopify(empresaId, producto);
+      const resultado = await crearProductoEnShopify(producto);
       return resultado;
     } catch (err) {
       request.log.error(err);
