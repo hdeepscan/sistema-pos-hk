@@ -333,6 +333,14 @@ export default function Pos() {
       setError("El dinero recibido es menor al total de la venta");
       return;
     }
+    // Validar que cada item tenga productoId o descripcionLibre antes de enviar
+    const itemSinId = carrito.find((i) => !i.esLibre && !i.productoId);
+    if (itemSinId) {
+      void reproducir("error");
+      setError(`El producto "${itemSinId.nombre}" no tiene un identificador válido. Quítalo y agrégalo de nuevo.`);
+      return;
+    }
+
     setProcesando(true);
     const clienteIdEfectivo = creditoData?.clienteId ?? clienteId;
     const clienteUuid = uuidv4();

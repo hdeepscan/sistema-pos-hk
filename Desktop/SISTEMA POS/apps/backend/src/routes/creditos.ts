@@ -154,16 +154,25 @@ export async function creditosRoutes(app: FastifyInstance) {
 
     const venta = await prisma.venta.findUnique({
       where: { id: ventaId },
-      include: { cliente: true, abonos: { orderBy: { fecha: "desc" } } },
+      include: { cliente: true },
     });
 
     if (!venta || venta.empresaId !== empresaId) {
       return reply.code(404).send({ error: "Crédito no encontrado" });
     }
 
-    const creditos = await calcularCreditos(empresaId);
-    const credito = creditos.find((c) => c.ventaId === ventaId);
+    const [creditos, abonos] = await Promise.all([
+      calcularCreditos(empresaId),
+      venta.clienteId
+        ? prisma.abono.findMany({
+            where: { clienteId: venta.clienteId },
+            orderBy: { fecha: "desc" },
+            take: 50,
+          })
+        : Promise.resolve([]),
+    ]);
 
+    const credito = creditos.find((c) => c.ventaId === ventaId);
     if (!credito) {
       return reply.code(404).send({ error: "Crédito no encontrado" });
     }
@@ -171,9 +180,11 @@ export async function creditosRoutes(app: FastifyInstance) {
     return {
       ...credito,
       cliente: venta.cliente,
-      abonos: venta.abonos,
+      abonos,
       cuotas: venta.numeroCuotasCredito || 1,
-      plazo: venta.fechaVencimientoCredito ? Math.ceil((venta.fechaVencimientoCredito.getTime() - venta.fecha.getTime()) / (30 * 24 * 60 * 60 * 1000)) : 0,
+      plazo: venta.fechaVencimientoCredito
+        ? Math.ceil((venta.fechaVencimientoCredito.getTime() - venta.fecha.getTime()) / (30 * 24 * 60 * 60 * 1000))
+        : 0,
     };
   });
 
