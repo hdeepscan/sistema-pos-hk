@@ -36,7 +36,7 @@ Write-Host "Listo. Version $ver publicada. Las tiendas se actualizaran solas." -
 # 3) Copia el instalador nuevo a la carpeta "POS - Instalar en tiendas" del escritorio
 #    para que siempre tengas ahi la version mas reciente lista para compartir.
 $carpetaInstaladores = "C:\Users\PC\Desktop\POS - Instalar en tiendas"
-$distDir = Join-Path $raiz "apps\desktop\dist"
+$distDir = Join-Path $raiz "apps\desktop\release"
 
 # Busca el .exe del instalador generado (el que dice "Setup", no el de auto-update)
 $instaladorNuevo = Get-ChildItem $distDir -Filter "*.exe" |
