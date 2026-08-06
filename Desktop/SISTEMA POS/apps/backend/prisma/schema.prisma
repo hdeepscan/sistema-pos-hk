@@ -259,6 +259,7 @@ model Venta {
   // al momento de la venta, para que cambios futuros en la config no muevan
   // vencimientos ya generados.
   fechaVencimientoCredito DateTime?
+  numeroCuotasCredito     Int?
 
   // Canal por el que entro la venta (POS fisico, Shopify, etc).
   canal CanalVenta @default(POS)
@@ -336,6 +337,7 @@ model Abono {
   usuarioId   String
   usuario     Usuario    @relation(fields: [usuarioId], references: [id])
   fecha       DateTime   @default(now())
+  referencia  String?
 
   @@index([clienteId])
   @@map("abonos")

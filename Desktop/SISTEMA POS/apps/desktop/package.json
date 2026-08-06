@@ -1,6 +1,6 @@
 {
   "name": "@sistema-pos/desktop",
-  "version": "0.8.14",
+  "version": "0.8.15",
   "private": true,
   "description": "Sistema POS HK - punto de venta multi-sucursal con integracion Shopify",
   "author": "Sistema POS HK",
