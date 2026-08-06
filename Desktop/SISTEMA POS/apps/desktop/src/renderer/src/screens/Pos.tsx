@@ -556,7 +556,21 @@ export default function Pos() {
           {mensaje && <p style={{ fontSize: 13, color: "var(--text-muted)" }}>{mensaje}</p>}
 
           <div style={{ display: "flex", justifyContent: "flex-end", margin: "6px 0 10px" }}>
-            <button type="button" className="secondary" onClick={() => setMostrarVentaLibre(true)}>
+            <button
+              type="button"
+              onClick={() => setMostrarVentaLibre(true)}
+              style={{
+                background: "#f5a623",
+                color: "#fff",
+                border: "none",
+                borderRadius: 6,
+                padding: "7px 16px",
+                fontWeight: 700,
+                fontSize: 13.5,
+                cursor: "pointer",
+                letterSpacing: 0.2,
+              }}
+            >
               + Venta libre
             </button>
           </div>
@@ -828,13 +842,15 @@ export default function Pos() {
 
       {ventaExitosa && <VentaExitosaModal resultado={ventaExitosa} onCerrar={nuevaVenta} />}
 
-      {/* Venta libre: concepto sin producto del inventario (no descuenta stock) */}
       {mostrarVentaLibre && (
         <div className="modal-backdrop">
           <div className="card" style={{ width: 460, maxWidth: "94vw" }}>
-            <h4 style={{ marginTop: 0, marginBottom: 4 }}>Venta libre</h4>
-            <p style={{ marginTop: 0, fontSize: 12.5, color: "var(--text-muted)" }}>
-              Para cobrar algo que no esta en el inventario (un servicio, un arreglo, un domicilio...). No descuenta stock.
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+              <span style={{ background: "#f5a623", color: "#fff", borderRadius: 5, padding: "3px 10px", fontWeight: 700, fontSize: 13 }}>Venta libre</span>
+              <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Producto express · sin inventario</span>
+            </div>
+            <p style={{ marginTop: 0, marginBottom: 14, fontSize: 12.5, color: "var(--text-muted)" }}>
+              Cobra cualquier producto o servicio que no esta cargado en el sistema. Solo genera el recibo — no mueve stock.
             </p>
             <form className="grid-form" onSubmit={agregarVentaLibre}>
               <label>
