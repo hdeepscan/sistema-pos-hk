@@ -360,11 +360,16 @@ export default function Pos() {
       cuentaBancariaId: requiereCuenta && cuentaId ? cuentaId : undefined,
       clienteId: clienteIdEfectivo || undefined,
       contactoCliente,
-      items: carrito.map((i) =>
-        i.esLibre
-          ? { descripcionLibre: i.nombre, cantidad: i.cantidad, precioUnitario: i.precioUnitario }
-          : { productoId: i.productoId, cantidad: i.cantidad, precioUnitario: i.precioUnitario }
-      ),
+      items: carrito.map((i) => {
+        // Valida que sean realmente items de venta libre o del inventario
+        if (i.esLibre || i.productoId.startsWith("libre-")) {
+          // Venta libre: solo envía descripción
+          return { descripcionLibre: i.nombre, cantidad: i.cantidad, precioUnitario: i.precioUnitario };
+        } else {
+          // Producto del inventario: envía el productoId
+          return { productoId: i.productoId, cantidad: i.cantidad, precioUnitario: i.precioUnitario };
+        }
+      }),
       observaciones: observacionesVenta || undefined,
       dineroRecibido: metodoPago === "EFECTIVO" && dineroRecibidoNum !== null ? dineroRecibidoNum : undefined,
       descuento: montoDescuento > 0 ? { tipo: descuentoTipo, valor: Number(descuentoValor) } : undefined,

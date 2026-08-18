@@ -238,13 +238,13 @@ export type RegistrarMovimientoInput = z.infer<typeof RegistrarMovimientoSchema>
 // libre": un concepto suelto con su descripcion, que no descuenta stock.
 export const VentaItemSchema = z
   .object({
-    productoId: z.string().optional(),
-    descripcionLibre: z.string().optional(),
+    productoId: z.string().optional().or(z.null()),
+    descripcionLibre: z.string().optional().or(z.null()),
     cantidad: z.number().int().positive(),
     precioUnitario: z.number().nonnegative(),
   })
-  .refine((i) => !!i.productoId || !!i.descripcionLibre?.trim(), {
-    message: "Cada item debe tener un producto o una descripcion",
+  .refine((i) => !!(i.productoId && i.productoId.trim()) || !!(i.descripcionLibre && i.descripcionLibre.trim()), {
+    message: "Cada item debe tener un producto o una descripción",
   });
 export type VentaItemInput = z.infer<typeof VentaItemSchema>;
 

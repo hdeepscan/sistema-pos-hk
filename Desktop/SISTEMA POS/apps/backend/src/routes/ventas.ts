@@ -118,8 +118,8 @@ export async function ventasRoutes(app: FastifyInstance) {
 
     // Items del inventario vs items de "venta libre" (sin producto): estos
     // ultimos no validan ni descuentan stock.
-    const itemsProducto = items.filter((i): i is typeof i & { productoId: string } => !!i.productoId);
-    const hayVentaLibre = items.some((i) => !i.productoId);
+    const itemsProducto = items.filter((i): i is typeof i & { productoId: string } => !!(i.productoId && i.productoId.trim() && !i.productoId.startsWith("libre-")));
+    const hayVentaLibre = items.some((i) => !i.productoId || i.productoId.startsWith("libre-"));
 
     if (metodoPago === "CREDITO" && !clienteId) {
       return reply.code(400).send({ error: "Una venta a credito requiere seleccionar un cliente" });
