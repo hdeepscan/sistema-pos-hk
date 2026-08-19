@@ -41,8 +41,36 @@ export const electronAPI = {
 
   async guardarArchivo(options: any) {
     if (!this.isElectron()) {
-      console.warn("guardarArchivo not available in web");
-      return null;
+      // Web: download directly
+      const { nombreSugerido, contenidoBase64 } = options;
+      if (!contenidoBase64 || !nombreSugerido) {
+        console.warn("guardarArchivo: missing contenidoBase64 or nombreSugerido");
+        return { guardado: false, ruta: null };
+      }
+      try {
+        // Convert base64 to blob
+        const binaryString = atob(contenidoBase64);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        const blob = new Blob([bytes]);
+
+        // Create download link
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = nombreSugerido;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        return { guardado: true, ruta: nombreSugerido };
+      } catch (error) {
+        console.error("Error downloading file:", error);
+        return { guardado: false, ruta: null };
+      }
     }
     return await (window as any).pos.guardarArchivo(options);
   },
