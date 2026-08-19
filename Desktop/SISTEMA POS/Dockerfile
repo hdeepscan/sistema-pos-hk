@@ -32,7 +32,9 @@ RUN npm run build:web -w apps/desktop
 
 # Copy frontend build to backend public directory for serving
 RUN mkdir -p apps/backend/dist/public && \
-    cp -r apps/desktop/dist/web/* apps/backend/dist/public/
+    ls -la apps/desktop/dist/web/ && \
+    cp -r apps/desktop/dist/web/. apps/backend/dist/public/ && \
+    ls -la apps/backend/dist/public/
 
 EXPOSE 8080
 

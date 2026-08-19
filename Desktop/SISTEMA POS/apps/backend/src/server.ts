@@ -74,6 +74,12 @@ const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const publicDir = join(__dirname, "public");
 const indexHtmlPath = join(publicDir, "index.html");
 
+// Log para debugging
+console.log("[Static Files] publicDir:", publicDir);
+console.log("[Static Files] indexHtmlPath:", indexHtmlPath);
+console.log("[Static Files] public dir exists:", existsSync(publicDir));
+console.log("[Static Files] index.html exists:", existsSync(indexHtmlPath));
+
 app.get("/:path*", async (request, reply) => {
   const path = (request.params as any).path || "index.html";
 
