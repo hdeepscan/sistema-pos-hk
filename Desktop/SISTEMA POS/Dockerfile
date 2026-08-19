@@ -23,10 +23,17 @@ WORKDIR /app/apps/backend
 RUN npx prisma generate
 WORKDIR /app
 
-# Build TypeScript - fail if errors occur
+# Build TypeScript backend
 RUN npm run build
 
-EXPOSE 4000
+# Build web frontend
+RUN npm run build:web -w apps/desktop
+
+# Copy frontend build to backend public directory for serving
+RUN mkdir -p apps/backend/dist/public && \
+    cp -r apps/desktop/dist/web/* apps/backend/dist/public/
+
+EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \

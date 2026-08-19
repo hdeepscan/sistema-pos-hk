@@ -1,9 +1,10 @@
 import "dotenv/config";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
-import staticPlugin from "@fastify/static";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { registerJwt } from "./lib/jwt.js";
 import { initWebSocket } from "./lib/ws.js";
 import { authRoutes } from "./routes/auth.js";
@@ -42,18 +43,56 @@ await initializeDatabase();
 await app.register(cors, { origin: process.env.CORS_ORIGIN ?? "*" });
 await registerJwt(app);
 
-// Servir frontend web estático
+// Servir frontend web estático (SPA)
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const publicDir = join(__dirname, "..", "public");
-await app.register(staticPlugin, {
-  root: publicDir,
-  prefix: "/",
-});
-app.setNotFoundHandler((request, reply) => {
-  // Si no es una ruta de API, servir index.html para SPA routing
-  if (!request.url.startsWith("/api") && !request.url.startsWith("/health")) {
-    return reply.sendFile("index.html");
+const indexHtmlPath = join(publicDir, "index.html");
+
+// Middleware para servir archivos estáticos y SPA routing
+app.get("/:path(*)", async (request, reply) => {
+  const path = (request.params as any).path || "index.html";
+
+  // No interceptar rutas de API
+  if (path.startsWith("api/") || path === "health") {
+    reply.code(404).send({ error: "Not Found" });
+    return;
   }
+
+  // Intentar servir el archivo solicitado
+  const filePath = join(publicDir, path);
+  if (existsSync(filePath) && !filePath.includes("..")) {
+    try {
+      const content = await readFile(filePath);
+      const ext = path.split(".").pop() || "html";
+      const mimeTypes: Record<string, string> = {
+        html: "text/html",
+        js: "application/javascript",
+        css: "text/css",
+        png: "image/png",
+        jpg: "image/jpeg",
+        svg: "image/svg+xml",
+        json: "application/json",
+      };
+      reply.header("Content-Type", mimeTypes[ext] || "application/octet-stream");
+      reply.send(content);
+      return;
+    } catch (err) {
+      // Si falla, servir index.html (SPA routing)
+    }
+  }
+
+  // Para rutas no encontradas, servir index.html (SPA routing)
+  if (existsSync(indexHtmlPath)) {
+    try {
+      const content = await readFile(indexHtmlPath);
+      reply.header("Content-Type", "text/html");
+      reply.send(content);
+      return;
+    } catch (err) {
+      console.error("Error sirviendo index.html:", err);
+    }
+  }
+
   reply.code(404).send({ error: "Not Found" });
 });
 
