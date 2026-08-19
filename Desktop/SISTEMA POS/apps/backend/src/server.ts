@@ -69,8 +69,9 @@ await app.register(fidelizacionRoutes);
 app.get("/health", async () => ({ ok: true }));
 
 // Servir frontend web estático y SPA routing (DEBE SER LA ÚLTIMA RUTA)
+// Nota: En producción, los archivos están en dist/public/ (mismo directorio que server.js)
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
-const publicDir = join(__dirname, "..", "public");
+const publicDir = join(__dirname, "public");
 const indexHtmlPath = join(publicDir, "index.html");
 
 app.get("/:path*", async (request, reply) => {
