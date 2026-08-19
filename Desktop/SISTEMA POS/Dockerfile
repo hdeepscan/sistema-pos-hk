@@ -28,5 +28,6 @@ EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD node -e "require('http').get('http://localhost:4000/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
 
-# Run migrations and start the backend server
-CMD sh -c "npm run migrate:deploy -w apps/backend && node apps/backend/dist/server.js"
+# Start the backend server
+# Note: Migrations will run automatically on first connection if using Prisma's migration feature
+CMD ["node", "apps/backend/dist/server.js"]

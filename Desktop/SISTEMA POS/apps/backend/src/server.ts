@@ -27,10 +27,14 @@ import { cajaRoutes } from "./routes/caja.js";
 import { fidelizacionRoutes } from "./routes/fidelizacion.js";
 import { iniciarPollerShopify } from "./lib/poller.js";
 import { iniciarBackupAutomatico } from "./lib/auto-backup.js";
+import { initializeDatabase } from "./lib/initialize-db.js";
 
 // bodyLimit ampliado para permitir subir imagenes de producto en base64 y
 // restaurar backups (.sql) de varios negocios/años de historial.
 const app = Fastify({ logger: true, bodyLimit: 200 * 1024 * 1024 });
+
+// Inicializar la base de datos antes de hacer cualquier cosa
+await initializeDatabase();
 
 await app.register(cors, { origin: process.env.CORS_ORIGIN ?? "*" });
 await registerJwt(app);
