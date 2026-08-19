@@ -6,6 +6,7 @@ import { generarSvgCodigoBarras, generarCodigoBarrasEan13 } from "../lib/barcode
 import { BotonesExportar } from "../lib/BotonesExportar";
 import type { ColumnaExport } from "../lib/export";
 import { mensajeError } from "../lib/errores";
+import { electronAPI } from "../lib/electron-api";
 import { NuevoProductoInteligente } from "./NuevoProductoInteligente";
 import type { EtiquetaFormato } from "../../../shared/api-types";
 import {
@@ -966,8 +967,8 @@ function EtiquetaCard({ producto, onActualizado }: { producto: ProductoDetalle; 
         setError("Elige al menos una etiqueta para imprimir.");
         return;
       }
-      const config = await window.pos.getConfig();
-      await window.pos.printEtiquetas(items, config.printerName, formato);
+      const config = await electronAPI.getConfig();
+      await electronAPI.printEtiquetas(items, config.printerName, formato);
       setMensaje(`${totalEtiquetas} etiqueta${totalEtiquetas === 1 ? "" : "s"} enviada${totalEtiquetas === 1 ? "" : "s"} a la impresora`);
     } catch {
       setError("No se pudo imprimir. Revisa que haya una impresora configurada en Configuracion.");

@@ -147,7 +147,7 @@ export default function Configuracion() {
     setMensajeEtq(null);
     try {
       const svg = generarSvgCodigoBarras("2001234567890");
-      await window.pos.printEtiquetas(
+      await electronAPI.printEtiquetas(
         [{ svgCodigoBarras: svg, nombre: "PRUEBA DE ETIQUETA", variante: "Talla: M · Color: Azul", sku: "PRUEBA-001", precio: 85000, copias: 1 }],
         impresoraSeleccionada || null,
         "rollo1"

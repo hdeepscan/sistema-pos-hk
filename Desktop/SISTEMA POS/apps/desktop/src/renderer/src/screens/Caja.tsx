@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { useSesionStore } from "../lib/store";
 import { mensajeError } from "../lib/errores";
+import { electronAPI } from "../lib/electron-api";
 
 interface TurnoAbierto {
   id: string;
@@ -119,9 +120,9 @@ export default function Caja() {
   }
 
   async function imprimirCierre(t: TurnoCerrado) {
-    const config = await window.pos.getConfig();
+    const config = await electronAPI.getConfig();
     try {
-      await window.pos.printReporteCaja(
+      await electronAPI.printReporteCaja(
         {
           empresaNombre: empresa?.nombre ?? "",
           sucursalNombre: t.sucursal?.nombre ?? sucursales.find((s) => s.id === sucursalId)?.nombre ?? "",
