@@ -67,11 +67,17 @@ export async function shopifyRoutes(app: FastifyInstance) {
     if (!config) return reply.code(400).send({ error: "Configura Shopify antes de sincronizar" });
 
     try {
+      request.log.info(`[shopify-sync] Iniciando sincronización para empresa ${empresaId} en dominio ${config.shopDomain}`);
       const resultado = await sincronizarProductos(empresaId);
+      request.log.info(`[shopify-sync] Completado: ${resultado.productosCreados} creados, ${resultado.productosActualizados} actualizados`);
       return resultado;
     } catch (err) {
-      request.log.error(err);
-      return reply.code(502).send({ error: err instanceof Error ? err.message : "Error sincronizando con Shopify" });
+      const mensaje = err instanceof Error ? err.message : "Error desconocido sincronizando con Shopify";
+      request.log.error(`[shopify-sync] Error: ${mensaje}`);
+      return reply.code(502).send({
+        error: mensaje,
+        detalles: process.env.NODE_ENV === "development" ? String(err) : undefined
+      });
     }
   });
 

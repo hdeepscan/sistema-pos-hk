@@ -55,15 +55,23 @@ export default function Shopify() {
     setError(null);
     setMensaje(null);
     try {
+      console.log("[shopify] Iniciando sincronización...");
       const { data } = await api.post("/shopify/sync");
-      setMensaje(
-        `Sincronizado: ${data.productosCreados} productos nuevos, ${data.productosActualizados} actualizados` +
-          (data.variantesOmitidas ? `, ${data.variantesOmitidas} variantes sin SKU omitidas` : "")
-      );
-      const { data: cfg } = await api.get<ShopifyConfigResp>("/shopify/config");
-      setConfig(cfg);
+      console.log("[shopify] Resultado:", data);
+      if (data.error) {
+        setError(`Error de Shopify: ${data.error}`);
+      } else {
+        setMensaje(
+          `Sincronizado: ${data.productosCreados} productos nuevos, ${data.productosActualizados} actualizados` +
+            (data.variantesOmitidas ? `, ${data.variantesOmitidas} variantes sin SKU omitidas` : "")
+        );
+        const { data: cfg } = await api.get<ShopifyConfigResp>("/shopify/config");
+        setConfig(cfg);
+      }
     } catch (err: any) {
-      setError(mensajeError(err, "No se pudo sincronizar con Shopify"));
+      console.error("[shopify] Error de sincronización:", err);
+      const mensajeError_respuesta = err.response?.data?.error || err.message;
+      setError(`Error: ${mensajeError_respuesta || "No se pudo sincronizar con Shopify"}`);
     } finally {
       setSincronizando(false);
     }
