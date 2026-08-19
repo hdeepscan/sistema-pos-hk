@@ -7,6 +7,7 @@
     "packages/*"
   ],
   "scripts": {
+    "build": "npm run build -w apps/backend",
     "backend:dev": "npm run dev -w apps/backend",
     "desktop:dev": "npm run dev -w apps/desktop",
     "backend:migrate": "npm run migrate -w apps/backend"
