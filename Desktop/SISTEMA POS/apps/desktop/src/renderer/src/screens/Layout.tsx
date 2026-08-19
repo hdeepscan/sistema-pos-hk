@@ -7,6 +7,7 @@ import { api } from "../lib/api";
 import { reproducir } from "../lib/sonidos";
 import type { PedidoShopifyEvent } from "@sistema-pos/shared";
 import logo from "../assets/logo.png";
+import { electronAPI } from "../lib/electron-api";
 
 const INTERVALO_CREDITOS_MS = 5 * 60 * 1000;
 
@@ -98,14 +99,14 @@ export default function Layout({ children }: PropsWithChildren) {
   }, [puedeVerCreditos]);
 
   // Aviso global de actualizacion (se muestra en cualquier pantalla).
-  useEffect(() => window.pos.onEstadoActualizacion((e) => setUpdate(e)), []);
+  useEffect(() => electronAPI.onEstadoActualizacion((e) => setUpdate(e)), []);
 
   function cerrarAlerta(toastId: string) {
     setAlertas((prev) => prev.filter((a) => a.toastId !== toastId));
   }
 
   function verPedido(ordenId: string) {
-    if (shopDomain) window.pos.abrirEnlaceExterno(`https://${shopDomain}/admin/orders/${ordenId}`);
+    if (shopDomain) electronAPI.abrirEnlaceExterno(`https://${shopDomain}/admin/orders/${ordenId}`);
   }
 
   async function prepararPedido(alerta: PedidoShopifyEvent & { toastId: string }) {
@@ -119,7 +120,7 @@ export default function Layout({ children }: PropsWithChildren) {
   }
 
   async function cerrarSesion() {
-    await window.pos.setConfig({ token: null, empresaId: null, sucursalId: null });
+    await electronAPI.setConfig({ token: null, empresaId: null, sucursalId: null });
     logout();
   }
 
@@ -205,12 +206,12 @@ export default function Layout({ children }: PropsWithChildren) {
               </div>
               <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                 {update.estado === "disponible" && (
-                  <button type="button" onClick={() => window.pos.descargarActualizacion()}>
+                  <button type="button" onClick={() => electronAPI.descargarActualizacion()}>
                     Descargar
                   </button>
                 )}
                 {update.estado === "listo-para-instalar" && (
-                  <button type="button" onClick={() => window.pos.instalarActualizacion()}>
+                  <button type="button" onClick={() => electronAPI.instalarActualizacion()}>
                     Instalar y reiniciar
                   </button>
                 )}

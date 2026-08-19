@@ -6,6 +6,7 @@ import { reproducir } from "../lib/sonidos";
 import type { EstadoActualizacion } from "../../../shared/api-types";
 import { mensajeError } from "../lib/errores";
 import { generarSvgCodigoBarras } from "../lib/barcode";
+import { electronAPI } from "../lib/electron-api";
 
 function tiempoRelativo(fecha: Date): string {
   const segundos = Math.floor((Date.now() - fecha.getTime()) / 1000);
@@ -43,11 +44,11 @@ export default function Configuracion() {
   const [mensajeEtq, setMensajeEtq] = useState<string | null>(null);
 
   useEffect(() => {
-    window.pos.listPrinters().then((lista) => {
+    electronAPI.listPrinters().then((lista) => {
       setImpresoras(lista);
       setImpresorasCargadas(true);
     });
-    window.pos.getConfig().then((c) => {
+    electronAPI.getConfig().then((c) => {
       setImpresoraSeleccionada(c.printerName ?? "");
       setSonidoActivado(c.sonidoActivado);
       setSonidoVolumen(c.sonidoVolumen);
@@ -56,7 +57,7 @@ export default function Configuracion() {
       setEtqOffsetX(String(c.etiquetaOffsetXMm ?? 0));
       setEtqOffsetY(String(c.etiquetaOffsetYMm ?? 0));
     });
-    window.pos.getVersion().then(setVersion);
+    electronAPI.getVersion().then(setVersion);
     api
       .get("/fidelizacion/config")
       .then(({ data }) => {
@@ -66,7 +67,7 @@ export default function Configuracion() {
         setValorPunto(data.valorPunto != null ? String(data.valorPunto) : "");
       })
       .catch(() => {});
-    return window.pos.onEstadoActualizacion((estado) => {
+    return electronAPI.onEstadoActualizacion((estado) => {
       setEstadoUpdate(estado);
       if (estado.estado !== "buscando" && estado.estado !== "descargando") setBuscandoUpdate(false);
     });
@@ -93,7 +94,7 @@ export default function Configuracion() {
     setBuscandoUpdate(true);
     setEstadoUpdate({ estado: "buscando" });
     try {
-      await window.pos.buscarActualizaciones();
+      await electronAPI.buscarActualizaciones();
     } catch (err: any) {
       setEstadoUpdate({ estado: "error", mensaje: err?.message ?? "No se pudo buscar actualizaciones" });
       setBuscandoUpdate(false);
