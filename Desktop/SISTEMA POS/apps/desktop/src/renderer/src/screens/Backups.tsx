@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { bufferABase64, base64ABuffer } from "../lib/base64";
 import { mensajeError } from "../lib/errores";
+import { electronAPI } from "../lib/electron-api";
 
 function formatoTamano(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -26,7 +27,7 @@ export default function Backups() {
       .get("/backup/info")
       .then(({ data }) => setUltimoBackup(data.ultimoBackup))
       .catch(() => {});
-    window.pos.getConfig().then((c) => {
+    electronAPI.getConfig().then((c) => {
       setBackupAutomatico(c.backupAutomatico);
       setBackupCarpeta(c.backupCarpeta);
       setBackupFrecuenciaHoras(c.backupFrecuenciaHoras);
@@ -41,7 +42,7 @@ export default function Backups() {
       const { data } = await api.get("/backup/generar", { responseType: "arraybuffer" });
       const contenidoBase64 = bufferABase64(data as ArrayBuffer);
       const fecha = new Date().toISOString().slice(0, 10);
-      const resultado = await window.pos.guardarArchivo({
+      const resultado = await electronAPI.guardarArchivo({
         nombreSugerido: `backup-sistema-pos-${fecha}.sql`,
         contenidoBase64,
       });
@@ -59,7 +60,7 @@ export default function Backups() {
   }
 
   async function restaurarBackup() {
-    const archivo = await window.pos.elegirArchivo([{ name: "Respaldo SQL", extensions: ["sql"] }]);
+    const archivo = await electronAPI.elegirArchivo([{ name: "Respaldo SQL", extensions: ["sql"] }]);
     if (!archivo) return;
     const confirmacion = prompt(
       'Esto REEMPLAZA todos los datos actuales por los del respaldo. Esta accion no se puede deshacer.\n\nEscribe RESTAURAR para confirmar:'
@@ -81,10 +82,10 @@ export default function Backups() {
   }
 
   async function elegirCarpetaBackup() {
-    const carpeta = await window.pos.elegirCarpeta();
+    const carpeta = await electronAPI.elegirCarpeta();
     if (!carpeta) return;
     setBackupCarpeta(carpeta);
-    await window.pos.setConfig({ backupCarpeta: carpeta });
+    await electronAPI.setConfig({ backupCarpeta: carpeta });
   }
 
   async function cambiarAutomatico(activo: boolean) {
@@ -93,12 +94,12 @@ export default function Backups() {
       return;
     }
     setBackupAutomatico(activo);
-    await window.pos.setConfig({ backupAutomatico: activo });
+    await electronAPI.setConfig({ backupAutomatico: activo });
   }
 
   async function cambiarFrecuencia(horas: number) {
     setBackupFrecuenciaHoras(horas);
-    await window.pos.setConfig({ backupFrecuenciaHoras: horas });
+    await electronAPI.setConfig({ backupFrecuenciaHoras: horas });
   }
 
   return (
