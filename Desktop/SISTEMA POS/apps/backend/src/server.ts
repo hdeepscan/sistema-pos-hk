@@ -2,7 +2,6 @@ import "dotenv/config";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { registerJwt } from "./lib/jwt.js";
@@ -69,9 +68,8 @@ await app.register(fidelizacionRoutes);
 app.get("/health", async () => ({ ok: true }));
 
 // Servir frontend web estático y SPA routing (DEBE SER LA ÚLTIMA RUTA)
-// Nota: En producción, los archivos están en dist/public/ (mismo directorio que server.js)
-const __dirname = fileURLToPath(new URL(".", import.meta.url));
-const publicDir = join(__dirname, "public");
+// Nota: En producción, los archivos están en dist/public/ dentro del workspace
+const publicDir = join(process.cwd(), "apps/backend/dist/public");
 const indexHtmlPath = join(publicDir, "index.html");
 
 // Log para debugging
