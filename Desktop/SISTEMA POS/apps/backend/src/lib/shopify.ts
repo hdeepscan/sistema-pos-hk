@@ -61,18 +61,25 @@ export async function obtenerAccessToken(empresaId: string): Promise<{ token: st
   const config = await prisma.shopifyConfig.findUnique({ where: { empresaId } });
   if (!config) throw new Error("Shopify no esta configurado para esta empresa");
 
+  // Si ya tenemos un access token válido, usarlo
   const margenSeguridadMs = 5 * 60 * 1000;
   if (config.accessToken && config.tokenExpiraEn && config.tokenExpiraEn.getTime() - margenSeguridadMs > Date.now()) {
     return { token: config.accessToken, shopDomain: config.shopDomain };
+  }
+
+  // El clientSecret ahora se interpreta como Refresh Token
+  // Usar el flujo de OAuth2 con refresh_token para obtener un nuevo access_token
+  if (!config.clientSecret) {
+    throw new Error("Falta el Refresh Token de Shopify. Guarda de nuevo las credenciales.");
   }
 
   const res = await fetch(`https://${config.shopDomain}/admin/oauth/access_token`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      grant_type: "client_credentials",
+      grant_type: "refresh_token",
+      refresh_token: config.clientSecret, // Reutilizamos clientSecret como refreshToken
       client_id: config.clientId,
-      client_secret: config.clientSecret,
     }),
   });
 
@@ -81,12 +88,17 @@ export async function obtenerAccessToken(empresaId: string): Promise<{ token: st
     throw new Error(resumirErrorShopify(res.status, texto));
   }
 
-  const data = (await res.json()) as { access_token: string; expires_in: number };
-  const tokenExpiraEn = new Date(Date.now() + data.expires_in * 1000);
+  const data = (await res.json()) as { access_token: string; expires_in: number; refresh_token?: string };
+  const tokenExpiraEn = new Date(Date.now() + (data.expires_in ?? 3600) * 1000);
 
+  // Actualizar access token y refresh token si fue renovado
   await prisma.shopifyConfig.update({
     where: { empresaId },
-    data: { accessToken: data.access_token, tokenExpiraEn },
+    data: {
+      accessToken: data.access_token,
+      tokenExpiraEn,
+      ...(data.refresh_token && { clientSecret: data.refresh_token }), // Actualizar refresh token si cambió
+    },
   });
 
   return { token: data.access_token, shopDomain: config.shopDomain };
