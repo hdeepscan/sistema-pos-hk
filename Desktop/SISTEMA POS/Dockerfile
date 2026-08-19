@@ -17,6 +17,8 @@ RUN npm install
 COPY . .
 
 # Generate Prisma client BEFORE building (required for TypeScript compilation)
+# Remove cached Prisma types to ensure clean generation
+RUN rm -rf /app/node_modules/.prisma /app/apps/backend/node_modules/.prisma
 WORKDIR /app/apps/backend
 RUN npx prisma generate
 WORKDIR /app
