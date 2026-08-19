@@ -1,23 +1,28 @@
 /**
  * Wrapper para window.pos que funciona tanto en Electron como en web
  */
+import { construirReciboHtml } from "../../../shared/recibo-html";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 export const electronAPI = {
   isElectron: (): boolean => {
     return typeof window !== "undefined" && !!(window as any).pos;
   },
 
-  async getConfig() {
+  getConfig() {
     if (this.isElectron()) {
-      return await (window as any).pos.getConfig();
+      return Promise.resolve().then(() => (window as any).pos.getConfig());
     }
     // Web: read from localStorage
-    try {
-      const stored = localStorage.getItem("pos_config");
-      return stored ? JSON.parse(stored) : {};
-    } catch {
-      return {};
-    }
+    return Promise.resolve().then(() => {
+      try {
+        const stored = localStorage.getItem("pos_config");
+        return stored ? JSON.parse(stored) : {};
+      } catch {
+        return {};
+      }
+    });
   },
 
   async setConfig(config: any) {
@@ -71,6 +76,67 @@ export const electronAPI = {
       return;
     }
     return await (window as any).pos.printRecibo(data);
+  },
+
+  async generarReciboPDF(data: any) {
+    if (!this.isElectron()) {
+      // Web: generate and download PDF
+      try {
+        const html = construirReciboHtml(data);
+        const doc = new jsPDF({
+          orientation: "portrait",
+          unit: "mm",
+          format: "a4",
+        });
+
+        // Create temporary container for HTML rendering
+        const container = document.createElement("div");
+        container.innerHTML = html;
+        container.style.position = "absolute";
+        container.style.left = "-9999px";
+        container.style.width = "80mm";
+        document.body.appendChild(container);
+
+        try {
+          const canvas = await html2canvas(container, {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: "#ffffff",
+          });
+
+          const imgData = canvas.toDataURL("image/png");
+          const pageWidth = doc.internal.pageSize.getWidth();
+          const pageHeight = doc.internal.pageSize.getHeight();
+          const canvasWidth = canvas.width;
+          const canvasHeight = canvas.height;
+          const ratio = canvasWidth / canvasHeight;
+
+          let height = pageHeight;
+          let width = height * ratio;
+
+          if (width > pageWidth) {
+            width = pageWidth;
+            height = width / ratio;
+          }
+
+          const x = (pageWidth - width) / 2;
+          doc.addImage(imgData, "PNG", x, 10, width, height);
+
+          // Trigger download
+          const fecha = new Date().toISOString().slice(0, 10);
+          const hora = new Date().toTimeString().slice(0, 5);
+          doc.save(`recibo-${data.consecutivo}-${fecha}-${hora}.pdf`);
+        } finally {
+          document.body.removeChild(container);
+        }
+      } catch (error) {
+        console.error("Error generating PDF:", error);
+        throw error;
+      }
+    } else {
+      // Electron: use native print
+      return await (window as any).pos.printRecibo(data);
+    }
   },
 
   async printReporteCaja(data: any) {
