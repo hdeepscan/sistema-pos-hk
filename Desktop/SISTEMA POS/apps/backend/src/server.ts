@@ -43,17 +43,41 @@ await initializeDatabase();
 await app.register(cors, { origin: process.env.CORS_ORIGIN ?? "*" });
 await registerJwt(app);
 
-// Servir frontend web estático (SPA)
+await app.register(authRoutes);
+await app.register(sucursalesRoutes);
+await app.register(productosRoutes);
+await app.register(inventarioRoutes);
+await app.register(ventasRoutes);
+await app.register(clientesRoutes);
+await app.register(proveedoresRoutes);
+await app.register(gastosRoutes);
+await app.register(reportesRoutes);
+await app.register(shopifyRoutes);
+await app.register(coleccionesRoutes);
+await app.register(metaRoutes);
+await app.register(creditosRoutes);
+await app.register(creditosManualesRoutes);
+await app.register(cuentasBancariasRoutes);
+await app.register(calendarioRoutes);
+await app.register(usuariosRoutes);
+await app.register(plantillaReciboRoutes);
+await app.register(pedidosShopifyRoutes);
+await app.register(backupRoutes);
+await app.register(cajaRoutes);
+await app.register(fidelizacionRoutes);
+
+app.get("/health", async () => ({ ok: true }));
+
+// Servir frontend web estático y SPA routing (DEBE SER LA ÚLTIMA RUTA)
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const publicDir = join(__dirname, "..", "public");
 const indexHtmlPath = join(publicDir, "index.html");
 
-// Middleware para servir archivos estáticos y SPA routing
-app.get("/:path(*)", async (request, reply) => {
+app.get("/:path*", async (request, reply) => {
   const path = (request.params as any).path || "index.html";
 
-  // No interceptar rutas de API
-  if (path.startsWith("api/") || path === "health") {
+  // No interceptar rutas de salud
+  if (path === "health") {
     reply.code(404).send({ error: "Not Found" });
     return;
   }
@@ -70,6 +94,7 @@ app.get("/:path(*)", async (request, reply) => {
         css: "text/css",
         png: "image/png",
         jpg: "image/jpeg",
+        gif: "image/gif",
         svg: "image/svg+xml",
         json: "application/json",
       };
@@ -95,31 +120,6 @@ app.get("/:path(*)", async (request, reply) => {
 
   reply.code(404).send({ error: "Not Found" });
 });
-
-await app.register(authRoutes);
-await app.register(sucursalesRoutes);
-await app.register(productosRoutes);
-await app.register(inventarioRoutes);
-await app.register(ventasRoutes);
-await app.register(clientesRoutes);
-await app.register(proveedoresRoutes);
-await app.register(gastosRoutes);
-await app.register(reportesRoutes);
-await app.register(shopifyRoutes);
-await app.register(coleccionesRoutes);
-await app.register(metaRoutes);
-await app.register(creditosRoutes);
-await app.register(creditosManualesRoutes);
-await app.register(cuentasBancariasRoutes);
-await app.register(calendarioRoutes);
-await app.register(usuariosRoutes);
-await app.register(plantillaReciboRoutes);
-await app.register(pedidosShopifyRoutes);
-await app.register(backupRoutes);
-await app.register(cajaRoutes);
-await app.register(fidelizacionRoutes);
-
-app.get("/health", async () => ({ ok: true }));
 
 const port = Number(process.env.PORT ?? 4000);
 await app.listen({ port, host: "0.0.0.0" });
