@@ -365,13 +365,17 @@ export async function actualizarProductoEnShopify(producto: ProductoLocal): Prom
   if (!producto.shopifyProductId || !producto.shopifyVariantId) return;
   const { token, shopDomain } = await obtenerAccessToken(producto.empresaId);
 
-  // Solo actualiza el tipo de producto, NO el nombre (title). El nombre viene
-  // desde Shopify (es la fuente de verdad) y se sincroniza hacia acá.
+  // Actualiza el producto en Shopify con los valores del Sistema POS
+  // Incluye el nombre (title) para que los cambios locales se reflejen en Shopify
   await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/products/${producto.shopifyProductId}.json`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": token },
     body: JSON.stringify({
-      product: { id: Number(producto.shopifyProductId), product_type: producto.categoria || undefined },
+      product: {
+        id: Number(producto.shopifyProductId),
+        title: producto.nombre,
+        product_type: producto.categoria || undefined,
+      },
     }),
   });
 
@@ -381,6 +385,7 @@ export async function actualizarProductoEnShopify(producto: ProductoLocal): Prom
     body: JSON.stringify({
       variant: {
         id: Number(producto.shopifyVariantId),
+        title: producto.nombre,
         sku: producto.sku,
         price: String(producto.precio),
         barcode: producto.codigoBarras || undefined,
