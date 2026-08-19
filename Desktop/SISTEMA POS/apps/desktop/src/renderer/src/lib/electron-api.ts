@@ -77,16 +77,48 @@ export const electronAPI = {
 
   async elegirArchivo(filters: any) {
     if (!this.isElectron()) {
-      console.warn("elegirArchivo not available in web");
-      return null;
+      // Web: trigger file picker
+      return new Promise((resolve) => {
+        const input = document.createElement("input");
+        input.type = "file";
+        if (filters && filters.length > 0) {
+          input.accept = filters.map((f: any) => `.${f.extensions?.[0] || "*"}`).join(",");
+        }
+        input.onchange = async () => {
+          const file = input.files?.[0];
+          if (!file) {
+            resolve(null);
+            return;
+          }
+          try {
+            const buffer = await file.arrayBuffer();
+            const bytes = new Uint8Array(buffer);
+            let base64 = "";
+            for (let i = 0; i < bytes.length; i++) {
+              base64 += String.fromCharCode(bytes[i]);
+            }
+            const contenidoBase64 = btoa(base64);
+            resolve({
+              nombre: file.name,
+              ruta: file.name,
+              contenidoBase64,
+            });
+          } catch (error) {
+            console.error("Error reading file:", error);
+            resolve(null);
+          }
+        };
+        input.click();
+      });
     }
     return await (window as any).pos.elegirArchivo(filters);
   },
 
   async elegirCarpeta() {
     if (!this.isElectron()) {
-      console.warn("elegirCarpeta not available in web");
-      return null;
+      // Web: folder selection not supported, return a virtual path
+      console.warn("elegirCarpeta not available in web - using virtual path");
+      return "downloads";
     }
     return await (window as any).pos.elegirCarpeta();
   },
