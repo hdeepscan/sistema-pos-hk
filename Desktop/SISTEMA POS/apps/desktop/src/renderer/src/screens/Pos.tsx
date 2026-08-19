@@ -408,29 +408,32 @@ export default function Pos() {
 
     const config = await electronAPI.getConfig();
     try {
-      await electronAPI.generarReciboPDF({
-        empresaNombre: empresa?.nombre ?? "",
-        sucursalNombre: sucursalActiva?.nombre ?? "",
-        consecutivo: consecutivo || 0,
-        fecha: new Date().toLocaleString("es-CO"),
-        cajero: usuario?.nombre ?? "",
-        items: carrito.map((i) => ({
-          nombre: i.esLibre ? `Venta Libre: ${i.nombre}` : i.nombre,
-          cantidad: i.cantidad,
-          precioUnitario: i.precioUnitario,
-        })),
-        total,
-        metodoPago,
-        impuesto: impuestoVenta,
-        subtotal: montoDescuento > 0 || valorPuntos > 0 ? subtotal : undefined,
-        descuento: montoDescuento > 0 ? montoDescuento : undefined,
-        puntosRedimidos: valorPuntos > 0 ? puntosNum : undefined,
-        valorPuntosRedimidos: valorPuntos > 0 ? valorPuntos : undefined,
-        puntosGanados: puntosGanados > 0 ? puntosGanados : undefined,
-        dineroRecibido: metodoPago === "EFECTIVO" && dineroRecibidoNum !== null ? dineroRecibidoNum : undefined,
-        cambio: metodoPago === "EFECTIVO" && cambio !== null ? cambio : undefined,
-        plantilla: plantilla ?? undefined,
-      });
+      await electronAPI.generarReciboPDF(
+        {
+          empresaNombre: empresa?.nombre ?? "",
+          sucursalNombre: sucursalActiva?.nombre ?? "",
+          consecutivo: consecutivo || 0,
+          fecha: new Date().toLocaleString("es-CO"),
+          cajero: usuario?.nombre ?? "",
+          items: carrito.map((i) => ({
+            nombre: i.esLibre ? `Venta Libre: ${i.nombre}` : i.nombre,
+            cantidad: i.cantidad,
+            precioUnitario: i.precioUnitario,
+          })),
+          total,
+          metodoPago,
+          impuesto: impuestoVenta,
+          subtotal: montoDescuento > 0 || valorPuntos > 0 ? subtotal : undefined,
+          descuento: montoDescuento > 0 ? montoDescuento : undefined,
+          puntosRedimidos: valorPuntos > 0 ? puntosNum : undefined,
+          valorPuntosRedimidos: valorPuntos > 0 ? valorPuntos : undefined,
+          puntosGanados: puntosGanados > 0 ? puntosGanados : undefined,
+          dineroRecibido: metodoPago === "EFECTIVO" && dineroRecibidoNum !== null ? dineroRecibidoNum : undefined,
+          cambio: metodoPago === "EFECTIVO" && cambio !== null ? cambio : undefined,
+          plantilla: plantilla ?? undefined,
+        },
+        config.printerName
+      );
     } catch {
       // Sin impresora/en web, la venta igual queda registrada/encolada
     }

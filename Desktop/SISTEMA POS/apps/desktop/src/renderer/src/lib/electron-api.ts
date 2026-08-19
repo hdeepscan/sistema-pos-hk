@@ -78,7 +78,7 @@ export const electronAPI = {
     return await (window as any).pos.printRecibo(data);
   },
 
-  async generarReciboPDF(data: any) {
+  async generarReciboPDF(data: any, printerName?: string | null) {
     if (!this.isElectron()) {
       // Web: generate and download PDF
       try {
@@ -135,7 +135,7 @@ export const electronAPI = {
       }
     } else {
       // Electron: use native print
-      return await (window as any).pos.printRecibo(data);
+      return await (window as any).pos.printRecibo(data, printerName);
     }
   },
 
