@@ -35,7 +35,7 @@ RUN ls -la apps/backend/dist/public/index.html || echo "WARNING: index.html not 
 
 EXPOSE 8080
 
-# Health check
+# Health check - Force rebuild: 2026-08-19
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD node -e "require('http').get('http://localhost:4000/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
 
