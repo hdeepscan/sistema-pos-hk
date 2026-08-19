@@ -72,7 +72,9 @@ export default function Backups() {
     setError(null);
     try {
       const bytes = base64ABuffer(archivo.contenidoBase64);
-      await api.post("/backup/restaurar", bytes, { headers: { "Content-Type": "application/sql" } });
+      // En web, axios maneja mejor Blob que Uint8Array
+      const blob = new Blob([bytes], { type: "application/sql" });
+      await api.post("/backup/restaurar", blob, { headers: { "Content-Type": "application/sql" } });
       setMensaje("Respaldo restaurado. Cierra sesion y vuelve a entrar para ver los datos restaurados.");
     } catch (err: any) {
       setError(mensajeError(err, "No se pudo restaurar el respaldo"));

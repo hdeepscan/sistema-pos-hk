@@ -81,23 +81,43 @@ export const electronAPI = {
       return new Promise((resolve) => {
         const input = document.createElement("input");
         input.type = "file";
+        input.multiple = false;
+
+        // Build accept string from filters
         if (filters && filters.length > 0) {
-          input.accept = filters.map((f: any) => `.${f.extensions?.[0] || "*"}`).join(",");
+          const accepts: string[] = [];
+          for (const filter of filters) {
+            if (filter.extensions && Array.isArray(filter.extensions)) {
+              for (const ext of filter.extensions) {
+                accepts.push(`.${ext}`);
+              }
+            }
+          }
+          if (accepts.length > 0) {
+            input.accept = accepts.join(",");
+          }
         }
+
         input.onchange = async () => {
           const file = input.files?.[0];
           if (!file) {
             resolve(null);
             return;
           }
+
           try {
             const buffer = await file.arrayBuffer();
             const bytes = new Uint8Array(buffer);
+
+            // Convert bytes to base64 efficiently
             let base64 = "";
-            for (let i = 0; i < bytes.length; i++) {
-              base64 += String.fromCharCode(bytes[i]);
+            const chunkSize = 65536; // Process in chunks to avoid stack overflow
+            for (let i = 0; i < bytes.length; i += chunkSize) {
+              const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+              base64 += String.fromCharCode.apply(null, Array.from(chunk));
             }
             const contenidoBase64 = btoa(base64);
+
             resolve({
               nombre: file.name,
               ruta: file.name,
@@ -108,6 +128,12 @@ export const electronAPI = {
             resolve(null);
           }
         };
+
+        input.onerror = () => {
+          console.error("File picker error");
+          resolve(null);
+        };
+
         input.click();
       });
     }
