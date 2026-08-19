@@ -3,7 +3,7 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { registerJwt } from "./lib/jwt.js";
 import { initWebSocket } from "./lib/ws.js";
@@ -91,8 +91,10 @@ const indexHtmlPath = join(publicDir, "index.html");
 app.log.info(`[INIT] Directorio estático configurado en: ${publicDir}`);
 app.log.info(`[INIT] ¿Existe index.html allí?: ${existsSync(indexHtmlPath)}`);
 
-app.get("/:path*", async (request, reply) => {
-  const path = (request.params as any).path || "index.html";
+app.get("/*", async (request, reply) => {
+  // Captura la ruta completa incluyendo subcarpetas (ej: assets/index.js)
+  const pathParam = (request.params as any)["*"];
+  const path = pathParam && pathParam !== "" ? pathParam : "index.html";
 
   // Ignorar check de salud
   if (path === "health") {
@@ -104,12 +106,13 @@ app.get("/:path*", async (request, reply) => {
 
   // Prevenir Directory Traversal (seguridad)
   if (filePath.includes("..")) {
-      reply.code(403).send({ error: "Forbidden" });
-      return;
+    reply.code(403).send({ error: "Forbidden" });
+    return;
   }
 
-  // 1. Intentar servir archivo estático (.js, .css, .png, etc)
-  if (existsSync(filePath)) {
+  // 1. Intentar servir archivo estático (.js, .css, .png, etc.)
+  // Verificamos que exista Y que sea un archivo (no una carpeta)
+  if (existsSync(filePath) && statSync(filePath).isFile()) {
     try {
       const content = await readFile(filePath);
       const ext = path.split(".").pop() || "html";
@@ -122,6 +125,9 @@ app.get("/:path*", async (request, reply) => {
         gif: "image/gif",
         svg: "image/svg+xml",
         json: "application/json",
+        woff: "font/woff",
+        woff2: "font/woff2",
+        ttf: "font/ttf",
       };
       reply.header("Content-Type", mimeTypes[ext] || "application/octet-stream");
       reply.send(content);
@@ -131,7 +137,7 @@ app.get("/:path*", async (request, reply) => {
     }
   }
 
-  // 2. Si no encuentra el archivo (y es ruta de SPA), devolver index.html
+  // 2. Si el archivo no existe (y es una ruta de navegación de la SPA), devolver index.html
   if (existsSync(indexHtmlPath)) {
     try {
       const content = await readFile(indexHtmlPath);
