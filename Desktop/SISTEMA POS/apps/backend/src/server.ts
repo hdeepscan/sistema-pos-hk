@@ -1,8 +1,9 @@
 import "dotenv/config";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
-import { join } from "node:path";
-import { existsSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { existsSync, appendFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { registerJwt } from "./lib/jwt.js";
 import { initWebSocket } from "./lib/ws.js";
@@ -68,18 +69,32 @@ await app.register(fidelizacionRoutes);
 app.get("/health", async () => ({ ok: true }));
 
 // Servir frontend web estático y SPA routing (DEBE SER LA ÚLTIMA RUTA)
-// Nota: En producción, los archivos están en dist/public/ dentro del workspace
-const publicDir = join(process.cwd(), "apps/backend/dist/public");
+// El servidor puede ejecutarse de dos formas:
+// 1. Con node: apps/backend/dist/server.js → public está en: apps/backend/dist/public
+// 2. Con tsx: apps/backend/src/server.ts → public está en: apps/backend/dist/public (siempre en dist/)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const isDev = __dirname.includes("src/");
+
+let publicDir = join(__dirname, "public");
+if (isDev) {
+  // En desarrollo (ejecutando con tsx desde src/), la carpeta public está en dist/
+  publicDir = join(__dirname, "..", "dist", "public");
+}
+
 const indexHtmlPath = join(publicDir, "index.html");
 
-// Log para debugging
-console.log("[Static Files] publicDir:", publicDir);
-console.log("[Static Files] indexHtmlPath:", indexHtmlPath);
-console.log("[Static Files] public dir exists:", existsSync(publicDir));
-console.log("[Static Files] index.html exists:", existsSync(indexHtmlPath));
+appendFileSync("C:\\tmp\\pos-debug.log", `[INIT] isDev: ${isDev}, __dirname: ${__dirname}, publicDir: ${publicDir}, exists: ${existsSync(publicDir)}\n`);
 
 app.get("/:path*", async (request, reply) => {
   const path = (request.params as any).path || "index.html";
+  const logMsg = `[STATIC] Request path: "${path}", publicDir: "${publicDir}"`;
+  try {
+    appendFileSync("C:\\tmp\\pos-debug.log", logMsg + "\n");
+  } catch (e) {
+    // Ignore file write errors
+  }
+  app.log.info(logMsg);
 
   // No interceptar rutas de salud
   if (path === "health") {
@@ -89,6 +104,8 @@ app.get("/:path*", async (request, reply) => {
 
   // Intentar servir el archivo solicitado
   const filePath = join(publicDir, path);
+  app.log.info(`[STATIC] filePath: "${filePath}", exists: ${existsSync(filePath)}`);
+
   if (existsSync(filePath) && !filePath.includes("..")) {
     try {
       const content = await readFile(filePath);
@@ -103,26 +120,30 @@ app.get("/:path*", async (request, reply) => {
         svg: "image/svg+xml",
         json: "application/json",
       };
+      app.log.info(`[STATIC] Serving ${path}`);
       reply.header("Content-Type", mimeTypes[ext] || "application/octet-stream");
       reply.send(content);
       return;
     } catch (err) {
-      // Si falla, servir index.html (SPA routing)
+      app.log.error(`[STATIC] Error reading ${filePath}: ${err}`);
     }
   }
 
   // Para rutas no encontradas, servir index.html (SPA routing)
+  app.log.info(`[STATIC] Attempting to serve index.html, exists: ${existsSync(indexHtmlPath)}`);
   if (existsSync(indexHtmlPath)) {
     try {
       const content = await readFile(indexHtmlPath);
+      app.log.info(`[STATIC] Serving index.html`);
       reply.header("Content-Type", "text/html");
       reply.send(content);
       return;
     } catch (err) {
-      console.error("Error sirviendo index.html:", err);
+      app.log.error(`[STATIC] Error sirviendo index.html: ${err}`);
     }
   }
 
+  app.log.error(`[STATIC] 404: File not found and index.html missing`);
   reply.code(404).send({ error: "Not Found" });
 });
 
