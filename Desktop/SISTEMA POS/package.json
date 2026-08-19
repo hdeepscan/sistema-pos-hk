@@ -7,7 +7,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build -w apps/backend",
+    "build": "npm run build -w apps/backend && npm run build:web -w apps/desktop",
     "backend:dev": "npm run dev -w apps/backend",
     "desktop:dev": "npm run dev -w apps/desktop",
     "backend:migrate": "npm run migrate -w apps/backend"
