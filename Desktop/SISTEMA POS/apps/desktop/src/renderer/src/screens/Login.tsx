@@ -4,6 +4,7 @@ import { useSesionStore } from "../lib/store";
 import logo from "../assets/logo.png";
 import { mensajeError } from "../lib/errores";
 import { IconoOjo, IconoOjoTachado } from "../lib/iconos";
+import { electronAPI } from "../lib/electron-api";
 
 // Campo de contraseña con boton de ojo para ver/ocultar.
 function CampoPassword({
@@ -80,7 +81,12 @@ export default function Login() {
       empresa: data.empresa,
       sucursales: data.sucursales ?? [],
     });
-    await window.pos.setConfig({ token: data.token, empresaId: data.empresa.id });
+
+    // Save config (Electron or web)
+    await electronAPI.setConfig({
+      token: data.token,
+      empresaId: data.empresa.id
+    });
   }
 
   async function handleLogin(e: React.FormEvent) {

@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useSesionStore } from "./lib/store";
 import { connectSocket } from "./lib/socket";
 import { api } from "./lib/api";
+import { electronAPI } from "./lib/electron-api";
 import { ErrorBoundary } from "./lib/ErrorBoundary";
 import Login from "./screens/Login";
 import SeleccionSucursal from "./screens/SeleccionSucursal";
@@ -36,22 +37,38 @@ export default function App() {
   const location = useLocation();
 
   useEffect(() => {
-    window.pos.getConfig().then(async (config) => {
-      setApiBaseUrl(config.apiBaseUrl);
-      if (config.token) {
+    const initConfig = async () => {
+      let apiBaseUrl = "/"; // Default to current origin for web
+      let token = null;
+      let sucursalId = null;
+
+      try {
+        const config = await electronAPI.getConfig();
+        apiBaseUrl = config.apiBaseUrl || "/";
+        token = config.token;
+        sucursalId = config.sucursalId;
+      } catch (err) {
+        console.error("Error getting config:", err);
+      }
+
+      setApiBaseUrl(apiBaseUrl);
+
+      if (token) {
         try {
           const { data } = await api.get("/auth/sesion", {
-            baseURL: config.apiBaseUrl,
-            headers: { Authorization: `Bearer ${config.token}` },
+            baseURL: apiBaseUrl,
+            headers: { Authorization: `Bearer ${token}` },
           });
-          setSesion({ token: config.token, ...data });
-          if (config.sucursalId) setSucursalActiva(config.sucursalId);
+          setSesion({ token, ...data });
+          if (sucursalId) setSucursalActiva(sucursalId);
         } catch {
-          await window.pos.setConfig({ token: null, empresaId: null, sucursalId: null });
+          await electronAPI.setConfig({ token: null, empresaId: null, sucursalId: null });
         }
       }
       setHidratado();
-    });
+    };
+
+    initConfig();
   }, []);
 
   useEffect(() => {

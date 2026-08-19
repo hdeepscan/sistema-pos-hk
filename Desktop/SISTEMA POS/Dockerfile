@@ -8,10 +8,11 @@ RUN apt-get update && apt-get install -y postgresql-client && rm -rf /var/lib/ap
 # Copy package files for dependency installation
 COPY package*.json ./
 COPY apps/backend/package*.json ./apps/backend/
+COPY apps/desktop/package*.json ./apps/desktop/
 COPY packages/shared/package*.json ./packages/shared/
 
-# Install all dependencies
-RUN npm install
+# Install ALL dependencies (including devDependencies needed for build)
+RUN npm install --include=dev
 
 # Copy application source code
 COPY . .
