@@ -197,8 +197,22 @@ export async function sincronizarProductos(empresaId: string): Promise<Resultado
         where: { empresaId_sku: { empresaId, sku } },
       });
 
-      const datos = {
+      // Shopify es la fuente de verdad: si el producto no existe, se crea con
+      // datos de Shopify. Si ya existe, se actualiza TODO EXCEPTO el nombre
+      // (que viene del Sistema POS, para mantener consistencia).
+      const datosCreacion = {
         nombre,
+        categoria: producto.product_type || undefined,
+        precio: Number(variante.price),
+        codigoBarras: variante.barcode || undefined,
+        shopifyProductId: String(producto.id),
+        shopifyVariantId: String(variante.id),
+        shopifyInventoryItemId: String(variante.inventory_item_id),
+        imagenUrl: producto.image?.src || undefined,
+      };
+
+      const datosActualizacion = {
+        // NO actualizamos el nombre: viene del Sistema POS
         categoria: producto.product_type || undefined,
         precio: Number(variante.price),
         codigoBarras: variante.barcode || undefined,
@@ -209,8 +223,8 @@ export async function sincronizarProductos(empresaId: string): Promise<Resultado
       };
 
       const productoDb = existente
-        ? await prisma.producto.update({ where: { id: existente.id }, data: datos })
-        : await prisma.producto.create({ data: { empresaId, sku, costo: 0, ...datos } });
+        ? await prisma.producto.update({ where: { id: existente.id }, data: datosActualizacion })
+        : await prisma.producto.create({ data: { empresaId, sku, costo: 0, ...datosCreacion } });
 
       if (existente) productosActualizados += 1;
       else productosCreados += 1;
@@ -343,17 +357,21 @@ export async function crearProductoConVariantesEnShopify(
   };
 }
 
-// Actualiza titulo/tipo del producto y precio/sku/codigo de barras de la
-// variante en Shopify. Requiere que el producto ya tenga ids de Shopify.
+// Actualiza tipo del producto y precio/sku/codigo de barras de la variante
+// en Shopify. NO actualiza el nombre (title) porque Shopify es la fuente de
+// verdad: el nombre debe venir desde Shopify, no ir hacia allá.
+// Requiere que el producto ya tenga ids de Shopify.
 export async function actualizarProductoEnShopify(producto: ProductoLocal): Promise<void> {
   if (!producto.shopifyProductId || !producto.shopifyVariantId) return;
   const { token, shopDomain } = await obtenerAccessToken(producto.empresaId);
 
+  // Solo actualiza el tipo de producto, NO el nombre (title). El nombre viene
+  // desde Shopify (es la fuente de verdad) y se sincroniza hacia acá.
   await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/products/${producto.shopifyProductId}.json`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": token },
     body: JSON.stringify({
-      product: { id: Number(producto.shopifyProductId), title: producto.nombre, product_type: producto.categoria || undefined },
+      product: { id: Number(producto.shopifyProductId), product_type: producto.categoria || undefined },
     }),
   });
 
@@ -756,7 +774,7 @@ export async function crearVarianteEnShopify(
       headers: { "X-Shopify-Access-Token": token },
     });
     if (prodRes.ok) {
-      const prod = (await prodRes.json()).product as {
+      const prod = ((await prodRes.json()) as any).product as {
         id: number;
         options: { id: number; name: string; position: number; values: string[] }[];
       };

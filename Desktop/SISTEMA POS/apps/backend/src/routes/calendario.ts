@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import type { Prisma } from '@prisma/client';
 import { CrearEventoSchema } from "@sistema-pos/shared";
 import { prisma } from "../lib/prisma.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
@@ -188,7 +189,7 @@ export async function calendarioRoutes(app: FastifyInstance) {
     const { fecha, responsableId, ...resto } = parsed.data;
 
     const evento = await prisma.eventoCalendario.create({
-      data: { empresaId, fecha: new Date(fecha), responsableId: responsableId || null, ...resto },
+      data: { empresaId, fecha: new Date(fecha), responsableId: responsableId || null, ...resto } as Prisma.EventoCalendarioUncheckedCreateInput,
     });
     registrarAuditoria({
       empresaId,

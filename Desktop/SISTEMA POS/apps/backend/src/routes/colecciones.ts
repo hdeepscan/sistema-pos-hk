@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import type { Prisma } from '@prisma/client';
 import { CrearColeccionSchema, AgregarProductoColeccionSchema } from "@sistema-pos/shared";
 import { prisma } from "../lib/prisma.js";
 import { mensajeDeValidacion } from "../lib/errores.js";
@@ -45,7 +46,7 @@ export async function coleccionesRoutes(app: FastifyInstance) {
     }
 
     const coleccion = await prisma.coleccion.create({
-      data: { empresaId, ...parsed.data, shopifyCollectionId },
+      data: { empresaId, ...parsed.data, shopifyCollectionId } as Prisma.ColeccionUncheckedCreateInput,
     });
     return reply.code(201).send(coleccion);
   });

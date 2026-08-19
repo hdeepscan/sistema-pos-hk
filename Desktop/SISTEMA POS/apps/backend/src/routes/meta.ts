@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import type { Prisma } from '@prisma/client';
 import { GuardarMetaConfigSchema } from "@sistema-pos/shared";
 import { prisma } from "../lib/prisma.js";
 import { sincronizarGastoPauta } from "../lib/meta.js";
@@ -33,7 +34,7 @@ export async function metaRoutes(app: FastifyInstance) {
     const config = await prisma.metaConfig.upsert({
       where: { empresaId },
       update: parsed.data,
-      create: { empresaId, ...parsed.data },
+      create: { empresaId, ...parsed.data } as Prisma.MetaConfigUncheckedCreateInput,
     });
     return reply.code(201).send({ conectado: true, adAccountId: config.adAccountId });
   });

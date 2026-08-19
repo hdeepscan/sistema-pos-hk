@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { CrearClienteSchema, RegistrarAbonoSchema } from "@sistema-pos/shared";
 import { prisma } from "../lib/prisma.js";
 import { mensajeDeValidacion } from "../lib/errores.js";
+import type { Prisma } from "@prisma/client";
 
 async function calcularSaldo(clienteId: string) {
   const [deuda, abonado] = await Promise.all([
@@ -57,7 +58,7 @@ export async function clientesRoutes(app: FastifyInstance) {
 
     const { email, ...resto } = parsed.data;
     const cliente = await prisma.cliente.create({
-      data: { empresaId, ...resto, email: email || undefined },
+      data: { empresaId, ...resto, email: email || undefined } as Prisma.ClienteUncheckedCreateInput,
     });
     return reply.code(201).send({ ...cliente, saldoPendiente: 0 });
   });

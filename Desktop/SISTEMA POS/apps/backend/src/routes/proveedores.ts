@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import type { Prisma } from '@prisma/client';
 import { CrearProveedorSchema, CrearCompraSchema } from "@sistema-pos/shared";
 import { prisma } from "../lib/prisma.js";
 import { emitInventarioActualizado } from "../lib/ws.js";
@@ -28,7 +29,7 @@ export async function proveedoresRoutes(app: FastifyInstance) {
 
     const { email, ...resto } = parsed.data;
     const proveedor = await prisma.proveedor.create({
-      data: { empresaId, ...resto, email: email || undefined },
+      data: { empresaId, ...resto, email: email || undefined } as Prisma.ProveedorUncheckedCreateInput,
     });
     return reply.code(201).send(proveedor);
   });

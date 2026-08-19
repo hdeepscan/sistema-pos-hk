@@ -213,7 +213,7 @@ export async function productosRoutes(app: FastifyInstance) {
     }
 
     const producto = await prisma.$transaction(async (tx) => {
-      const producto = await tx.producto.create({ data: { empresaId, ...datosProducto } });
+      const producto = await tx.producto.create({ data: { empresaId, ...datosProducto } as Prisma.ProductoUncheckedCreateInput });
       const sucursales = await tx.sucursal.findMany({ where: { empresaId, activo: true } });
       if (sucursales.length > 0) {
         await tx.inventarioSucursal.createMany({
@@ -1019,7 +1019,7 @@ export async function productosRoutes(app: FastifyInstance) {
 
     let ids: { shopifyVariantId: string; shopifyInventoryItemId: string };
     try {
-      ids = await crearVarianteEnShopify(empresaId, producto.shopifyProductId, parsed.data);
+      ids = await crearVarianteEnShopify(empresaId, producto.shopifyProductId, parsed.data as any);
     } catch (err) {
       request.log.error(err);
       const mensaje = err instanceof Error ? err.message : "";

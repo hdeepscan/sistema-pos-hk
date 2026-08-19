@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { CrearSucursalSchema } from "@sistema-pos/shared";
 import { prisma } from "../lib/prisma.js";
 import { mensajeDeValidacion } from "../lib/errores.js";
+import type { Prisma } from "@prisma/client";
 
 export async function sucursalesRoutes(app: FastifyInstance) {
   app.addHook("preHandler", app.authenticate);
@@ -24,7 +25,7 @@ export async function sucursalesRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
     }
     const sucursal = await prisma.sucursal.create({
-      data: { empresaId, ...parsed.data },
+      data: { empresaId, ...parsed.data } as Prisma.SucursalUncheckedCreateInput,
     });
     return reply.code(201).send(sucursal);
   });

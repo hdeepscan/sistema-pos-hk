@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import type { Prisma } from '@prisma/client';
 import { CrearGastoSchema } from "@sistema-pos/shared";
 import { prisma } from "../lib/prisma.js";
 import { mensajeDeValidacion } from "../lib/errores.js";
@@ -40,7 +41,7 @@ export async function gastosRoutes(app: FastifyInstance) {
     if (!parsed.success) return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
 
     const gasto = await prisma.gasto.create({
-      data: { empresaId, usuarioId, ...parsed.data },
+      data: { empresaId, usuarioId, ...parsed.data } as Prisma.GastoUncheckedCreateInput,
     });
     return reply.code(201).send(gasto);
   });

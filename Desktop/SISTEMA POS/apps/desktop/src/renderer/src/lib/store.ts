@@ -35,7 +35,15 @@ export const useSesionStore = create<SesionState>((set) => ({
   sucursalActivaId: null,
   hidratado: false,
   setApiBaseUrl: (apiBaseUrl) => set({ apiBaseUrl }),
-  setSesion: ({ token, usuario, empresa, sucursales }) => set({ token, usuario, empresa, sucursales }),
+  setSesion: ({ token, usuario, empresa, sucursales }) =>
+    set({
+      token,
+      usuario,
+      empresa,
+      sucursales,
+      // Auto-seta la primera sucursal como activa si hay sucursales
+      sucursalActivaId: sucursales.length > 0 ? sucursales[0].id : null
+    }),
   setSucursalActiva: (sucursalActivaId) => set({ sucursalActivaId }),
   setHidratado: () => set({ hidratado: true }),
   logout: () =>

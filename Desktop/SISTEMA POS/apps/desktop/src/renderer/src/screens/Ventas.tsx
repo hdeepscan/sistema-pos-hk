@@ -129,26 +129,42 @@ export default function Ventas() {
 
   const cargar = useCallback(async () => {
     setCargando(true);
-    const { data } = await api.get<Venta[]>("/ventas", {
-      params: {
-        sucursalId: filtroSucursal || undefined,
-        desde: desde || undefined,
-        hasta: hasta || undefined,
-        montoMin: montoMin || undefined,
-        montoMax: montoMax || undefined,
-        clienteId: filtroClienteId || undefined,
-        usuarioId: filtroUsuarioId || undefined,
-        metodoPago: filtroMetodoPago || undefined,
-        canal: filtroCanal || undefined,
-        limit: 2000,
-      },
-    });
-    setVentas(data);
-    setCargando(false);
-  }, [filtroSucursal, desde, hasta, montoMin, montoMax, filtroClienteId, filtroUsuarioId, filtroMetodoPago, filtroCanal]);
+    try {
+      // Si no hay filtro de sucursal pero hay sucursal activa, usa esa
+      const sucursalParaFiltro = filtroSucursal || sucursalActivaId || undefined;
+
+      const { data } = await api.get<Venta[]>("/ventas", {
+        params: {
+          sucursalId: sucursalParaFiltro,
+          desde: desde || undefined,
+          hasta: hasta || undefined,
+          montoMin: montoMin || undefined,
+          montoMax: montoMax || undefined,
+          clienteId: filtroClienteId || undefined,
+          usuarioId: filtroUsuarioId || undefined,
+          metodoPago: filtroMetodoPago || undefined,
+          canal: filtroCanal || undefined,
+          limit: 2000,
+        },
+      });
+      setVentas(data);
+    } catch (err) {
+      console.error("Error al cargar ventas:", err);
+    } finally {
+      setCargando(false);
+    }
+  }, [filtroSucursal, sucursalActivaId, desde, hasta, montoMin, montoMax, filtroClienteId, filtroUsuarioId, filtroMetodoPago, filtroCanal]);
 
   useEffect(() => {
     cargar();
+  }, [cargar]);
+
+  // Auto-refresh cada 10 segundos como fallback si el WebSocket no funciona
+  useEffect(() => {
+    const intervalo = setInterval(() => {
+      cargar();
+    }, 10000);
+    return () => clearInterval(intervalo);
   }, [cargar]);
 
   useEffect(() => {
@@ -166,7 +182,11 @@ export default function Ventas() {
     });
   }, [ventas]);
 
-  useVentaCreada(useCallback(() => cargar(), [cargar]));
+  // Escucha cuando se crea una venta y recarga inmediatamente
+  useVentaCreada(useCallback(() => {
+    console.log("Venta creada detectada, recargando...");
+    cargar();
+  }, [cargar]));
 
   const cajeros = useMemo(() => {
     const mapa = new Map<string, string>();

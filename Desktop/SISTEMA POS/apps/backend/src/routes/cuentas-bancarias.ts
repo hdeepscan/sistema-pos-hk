@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import type { Prisma } from '@prisma/client';
 import { CrearCuentaBancariaSchema } from "@sistema-pos/shared";
 import { prisma } from "../lib/prisma.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
@@ -24,7 +25,7 @@ export async function cuentasBancariasRoutes(app: FastifyInstance) {
     const parsed = CrearCuentaBancariaSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
 
-    const cuenta = await prisma.cuentaBancaria.create({ data: { empresaId, ...parsed.data } });
+    const cuenta = await prisma.cuentaBancaria.create({ data: { empresaId, ...parsed.data } as Prisma.CuentaBancariaUncheckedCreateInput });
     registrarAuditoria({
       empresaId,
       usuarioId: request.user.usuarioId,
