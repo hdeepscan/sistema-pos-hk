@@ -1,8 +1,9 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 
-const rendererOutDir = fileURLToPath(new URL("./dist/web", import.meta.url));
+// Compilar directamente a ../backend/dist/public para evitar copia manual
+const rendererOutDir = resolve(__dirname, "../backend/dist/public");
 
 export default defineConfig({
   plugins: [react()],

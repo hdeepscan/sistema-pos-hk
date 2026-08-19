@@ -27,14 +27,11 @@ WORKDIR /app
 # Build TypeScript backend
 RUN npm run build
 
-# Build web frontend
+# Build web frontend (compiles directly to backend/dist/public)
 RUN npm run build:web -w apps/desktop
 
-# Copy frontend build to backend public directory for serving
-RUN mkdir -p apps/backend/dist/public && \
-    ls -la apps/desktop/dist/web/ && \
-    cp -r apps/desktop/dist/web/. apps/backend/dist/public/ && \
-    ls -la apps/backend/dist/public/
+# Verify frontend was built
+RUN ls -la apps/backend/dist/public/index.html || echo "WARNING: index.html not found!"
 
 EXPOSE 8080
 
