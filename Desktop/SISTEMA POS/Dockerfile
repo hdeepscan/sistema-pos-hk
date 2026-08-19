@@ -1,5 +1,9 @@
 ﻿FROM node:20
+
 WORKDIR /app
+
+# Install PostgreSQL client tools (pg_dump, psql) for backup/restore functionality
+RUN apt-get update && apt-get install -y postgresql-client && rm -rf /var/lib/apt/lists/*
 
 # Copy package files for dependency installation
 COPY package*.json ./
@@ -12,13 +16,17 @@ RUN npm install
 # Copy application source code
 COPY . .
 
-# Build TypeScript (ignore errors and generate JS anyway)
-RUN npm run build || true
+# Generate Prisma client BEFORE building (required for TypeScript compilation)
+RUN npm run prisma:generate -w apps/backend
 
-# Install Prisma client and generate types
-RUN npm run prisma:generate -w apps/backend || true
+# Build TypeScript - fail if errors occur
+RUN npm run build
 
 EXPOSE 4000
 
-# Use node directly to run the compiled backend
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:4000/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
+
+# Run the backend server
 CMD ["node", "apps/backend/dist/server.js"]

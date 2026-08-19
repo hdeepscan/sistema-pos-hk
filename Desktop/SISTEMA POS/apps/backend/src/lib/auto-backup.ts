@@ -2,11 +2,28 @@ import { spawn } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { execSync } from "node:child_process";
 
 const PG_DUMP = process.env.PG_DUMP_PATH || "pg_dump";
 const BACKUP_INTERVAL = 12 * 60 * 60 * 1000; // 12 horas
+let pg_dump_disponible = false;
+
+// Verificar disponibilidad de pg_dump al iniciar
+function verificarPgDumpDisponible(): boolean {
+  try {
+    execSync("which pg_dump", { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 async function generarBackupAutomatico(): Promise<void> {
+  // Si pg_dump no está disponible, saltar silenciosamente
+  if (!pg_dump_disponible) {
+    return;
+  }
+
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
     console.log("[AutoBackup] DATABASE_URL no configurada, saltando backup");
@@ -48,17 +65,23 @@ async function generarBackupAutomatico(): Promise<void> {
 
       proceso.on("close", (code) => {
         if (code !== 0) {
-          reject(new Error(`pg_dump fallo con codigo ${code}: ${stderr}`));
+          reject(new Error(`pg_dump fallo con codigo ${code}`));
         } else {
           resolve(stdout);
         }
       });
+
+      // Timeout: si tarda más de 5 minutos, matar el proceso
+      setTimeout(() => {
+        proceso.kill();
+        reject(new Error("pg_dump timeout (>5min)"));
+      }, 5 * 60 * 1000);
     });
 
     await writeFile(archivo, contenido);
     console.log(`[AutoBackup] ✅ Backup completado: ${archivo}`);
   } catch (err) {
-    console.error(`[AutoBackup] ❌ Error al generar backup:`, err);
+    console.error(`[AutoBackup] ❌ Error al generar backup:`, (err as Error).message);
   }
 }
 
@@ -68,16 +91,24 @@ export function iniciarBackupAutomatico(): void {
     return;
   }
 
-  console.log("[AutoBackup] Inicializando backups automáticos cada 12 horas");
-  console.log("[AutoBackup] Nota: pg_dump debe estar en el PATH del sistema para que funcionen los backups");
+  pg_dump_disponible = verificarPgDumpDisponible();
+
+  if (!pg_dump_disponible) {
+    console.warn("[AutoBackup] ⚠️  pg_dump no disponible. Backups automáticos deshabilitados.");
+    console.warn("[AutoBackup] Los backups manuales via API seguirán disponibles.");
+    console.warn("[AutoBackup] En producción (Railway), usar los backups automáticos del servicio PostgreSQL.");
+    return;
+  }
+
+  console.log("[AutoBackup] ✅ pg_dump disponible. Inicializando backups automáticos cada 12 horas");
 
   generarBackupAutomatico().catch((err) => {
-    console.warn("[AutoBackup] No se puede generar backups (pg_dump no disponible). El sistema seguirá funcionando.", err.message);
+    console.error("[AutoBackup] Error en primer backup:", (err as Error).message);
   });
 
   setInterval(() => {
-    generarBackupAutomatico().catch(() => {
-      // Silenciar errores en intentos posteriores
+    generarBackupAutomatico().catch((err) => {
+      console.error("[AutoBackup] Error en backup programado:", (err as Error).message);
     });
   }, BACKUP_INTERVAL);
 }
