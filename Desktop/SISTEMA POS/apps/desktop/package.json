@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
+    "build:web": "vite build --config vite.config.web.ts",
     "dist": "electron-vite build && electron-builder --win"
   },
   "dependencies": {

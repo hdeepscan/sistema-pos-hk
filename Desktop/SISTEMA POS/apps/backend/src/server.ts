@@ -1,6 +1,9 @@
 import "dotenv/config";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import staticPlugin from "@fastify/static";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { registerJwt } from "./lib/jwt.js";
 import { initWebSocket } from "./lib/ws.js";
 import { authRoutes } from "./routes/auth.js";
@@ -38,6 +41,21 @@ await initializeDatabase();
 
 await app.register(cors, { origin: process.env.CORS_ORIGIN ?? "*" });
 await registerJwt(app);
+
+// Servir frontend web estático
+const __dirname = fileURLToPath(new URL(".", import.meta.url));
+const publicDir = join(__dirname, "..", "public");
+await app.register(staticPlugin, {
+  root: publicDir,
+  prefix: "/",
+});
+app.setNotFoundHandler((request, reply) => {
+  // Si no es una ruta de API, servir index.html para SPA routing
+  if (!request.url.startsWith("/api") && !request.url.startsWith("/health")) {
+    return reply.sendFile("index.html");
+  }
+  reply.code(404).send({ error: "Not Found" });
+});
 
 await app.register(authRoutes);
 await app.register(sucursalesRoutes);
