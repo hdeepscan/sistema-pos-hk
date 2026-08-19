@@ -3,7 +3,7 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { existsSync, appendFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { registerJwt } from "./lib/jwt.js";
 import { initWebSocket } from "./lib/ws.js";
@@ -69,44 +69,47 @@ await app.register(fidelizacionRoutes);
 app.get("/health", async () => ({ ok: true }));
 
 // Servir frontend web estático y SPA routing (DEBE SER LA ÚLTIMA RUTA)
-// El servidor puede ejecutarse de dos formas:
-// 1. Con node: apps/backend/dist/server.js → public está en: apps/backend/dist/public
-// 2. Con tsx: apps/backend/src/server.ts → public está en: apps/backend/dist/public (siempre en dist/)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const isDev = __dirname.includes("src/");
 
-let publicDir = join(__dirname, "public");
-if (isDev) {
-  // En desarrollo (ejecutando con tsx desde src/), la carpeta public está en dist/
+// Búsqueda inteligente de la carpeta pública (A prueba de fallos)
+let publicDir = join(__dirname, "public"); // 1. Asume que corre desde dist/ (Producción Docker)
+
+if (!existsSync(publicDir)) {
+  // 2. Si no existe, asume que corre desde src/ (Desarrollo local)
   publicDir = join(__dirname, "..", "dist", "public");
+}
+
+if (!existsSync(publicDir)) {
+  // 3. Fallback absoluto de rescate para Docker (Toma la raíz del contenedor)
+  publicDir = join(process.cwd(), "apps", "backend", "dist", "public");
 }
 
 const indexHtmlPath = join(publicDir, "index.html");
 
-appendFileSync("C:\\tmp\\pos-debug.log", `[INIT] isDev: ${isDev}, __dirname: ${__dirname}, publicDir: ${publicDir}, exists: ${existsSync(publicDir)}\n`);
+// Log seguro para la consola de Railway (no en disco C:\)
+app.log.info(`[INIT] Directorio estático configurado en: ${publicDir}`);
+app.log.info(`[INIT] ¿Existe index.html allí?: ${existsSync(indexHtmlPath)}`);
 
 app.get("/:path*", async (request, reply) => {
   const path = (request.params as any).path || "index.html";
-  const logMsg = `[STATIC] Request path: "${path}", publicDir: "${publicDir}"`;
-  try {
-    appendFileSync("C:\\tmp\\pos-debug.log", logMsg + "\n");
-  } catch (e) {
-    // Ignore file write errors
-  }
-  app.log.info(logMsg);
 
-  // No interceptar rutas de salud
+  // Ignorar check de salud
   if (path === "health") {
     reply.code(404).send({ error: "Not Found" });
     return;
   }
 
-  // Intentar servir el archivo solicitado
   const filePath = join(publicDir, path);
-  app.log.info(`[STATIC] filePath: "${filePath}", exists: ${existsSync(filePath)}`);
 
-  if (existsSync(filePath) && !filePath.includes("..")) {
+  // Prevenir Directory Traversal (seguridad)
+  if (filePath.includes("..")) {
+      reply.code(403).send({ error: "Forbidden" });
+      return;
+  }
+
+  // 1. Intentar servir archivo estático (.js, .css, .png, etc)
+  if (existsSync(filePath)) {
     try {
       const content = await readFile(filePath);
       const ext = path.split(".").pop() || "html";
@@ -120,7 +123,6 @@ app.get("/:path*", async (request, reply) => {
         svg: "image/svg+xml",
         json: "application/json",
       };
-      app.log.info(`[STATIC] Serving ${path}`);
       reply.header("Content-Type", mimeTypes[ext] || "application/octet-stream");
       reply.send(content);
       return;
@@ -129,12 +131,10 @@ app.get("/:path*", async (request, reply) => {
     }
   }
 
-  // Para rutas no encontradas, servir index.html (SPA routing)
-  app.log.info(`[STATIC] Attempting to serve index.html, exists: ${existsSync(indexHtmlPath)}`);
+  // 2. Si no encuentra el archivo (y es ruta de SPA), devolver index.html
   if (existsSync(indexHtmlPath)) {
     try {
       const content = await readFile(indexHtmlPath);
-      app.log.info(`[STATIC] Serving index.html`);
       reply.header("Content-Type", "text/html");
       reply.send(content);
       return;
@@ -143,7 +143,7 @@ app.get("/:path*", async (request, reply) => {
     }
   }
 
-  app.log.error(`[STATIC] 404: File not found and index.html missing`);
+  app.log.error(`[STATIC] 404: File not found en ${filePath} y index.html tampoco existe.`);
   reply.code(404).send({ error: "Not Found" });
 });
 
