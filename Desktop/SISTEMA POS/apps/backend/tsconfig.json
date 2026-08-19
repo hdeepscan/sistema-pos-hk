@@ -8,10 +8,12 @@
     "noImplicitAny": false,
     "noImplicitThis": false,
     "strictNullChecks": false,
+    "noEmitOnError": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    "forceConsistentCasingInFileNames": false
+    "forceConsistentCasingInFileNames": false,
+    "lib": ["ES2022"]
   },
   "include": ["src"]
 }
