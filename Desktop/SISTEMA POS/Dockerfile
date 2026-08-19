@@ -17,7 +17,9 @@ RUN npm install
 COPY . .
 
 # Generate Prisma client BEFORE building (required for TypeScript compilation)
-RUN npm run prisma:generate -w apps/backend
+WORKDIR /app/apps/backend
+RUN npx prisma generate
+WORKDIR /app
 
 # Build TypeScript - fail if errors occur
 RUN npm run build
