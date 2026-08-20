@@ -294,7 +294,7 @@ export default function Configuracion() {
         <button
           type="button"
           onClick={async () => {
-            await window.pos.setConfig({ descuentosClave });
+            await electronAPI.setConfig({ descuentosClave });
             setMensajeEtq("Clave guardada correctamente");
             setTimeout(() => setMensajeEtq(null), 3000);
           }}
