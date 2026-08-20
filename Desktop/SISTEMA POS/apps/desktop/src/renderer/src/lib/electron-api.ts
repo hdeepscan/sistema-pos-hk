@@ -250,7 +250,7 @@ export const electronAPI = {
   },
 
   // Generar y descargar PDF de etiquetas en web
-  private descargarEtiquetasPDF(items: any, formato: string) {
+  descargarEtiquetasPDF(items: any, formato: string) {
     try {
       // Generar HTML simple con las etiquetas
       const html = this.generarHTMLEtiquetas(items);
@@ -279,7 +279,7 @@ export const electronAPI = {
   },
 
   // Generar HTML para etiquetas (versión simplificada para web)
-  private generarHTMLEtiquetas(items: any): string {
+  generarHTMLEtiquetas(items: any): string {
     const etiquetasHTML = items
       .flatMap((item: any, idx: number) =>
         Array.from({ length: item.copias || 1 }).map(() => `
