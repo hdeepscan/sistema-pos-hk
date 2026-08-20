@@ -181,4 +181,43 @@ export async function cajaRoutes(app: FastifyInstance) {
       take: Math.min(Number(limit) || 50, 200),
     });
   });
+
+  // Eliminar un cierre de caja (solo si tiene permiso de administrador)
+  app.delete("/caja/:id", async (request, reply) => {
+    const { empresaId, usuarioId } = request.user;
+    if (!request.user.permisos.includes("caja.administrar")) {
+      return reply.code(403).send({ error: "No tienes permiso para eliminar cierres de caja" });
+    }
+    const { id } = request.params as { id: string };
+
+    // Verificar que el cierre existe y pertenece a la empresa
+    const cierre = await prisma.turnoCaja.findFirst({
+      where: { id, empresaId },
+      include: { sucursal: { select: { nombre: true } } },
+    });
+
+    if (!cierre) {
+      return reply.code(404).send({ error: "Cierre de caja no encontrado" });
+    }
+
+    if (!cierre.fechaCierre) {
+      return reply.code(400).send({ error: "No puedes eliminar un cierre que no está cerrado" });
+    }
+
+    // Eliminar el cierre
+    await prisma.turnoCaja.delete({
+      where: { id },
+    });
+
+    registrarAuditoria({
+      empresaId,
+      usuarioId,
+      accion: "ELIMINAR_CIERRE_CAJA",
+      entidad: "TurnoCaja",
+      entidadId: id,
+      detalle: `Eliminado cierre de ${cierre.sucursal.nombre}`,
+    });
+
+    return reply.code(200).send({ mensaje: "Cierre de caja eliminado correctamente" });
+  });
 }

@@ -54,6 +54,24 @@ export default function Caja() {
   const [saldosApertura, setSaldosApertura] = useState<Record<string, string>>({});
   const [saldosCierre, setSaldosCierre] = useState<Record<string, string>>({});
   const [ultimoCierre, setUltimoCierre] = useState<any | null>(null);
+  const [eliminando, setEliminando] = useState<string | null>(null);
+
+  async function eliminarCierre(id: string) {
+    if (!window.confirm("¿Estás seguro que quieres eliminar este cierre de caja? Esta acción no se puede deshacer.")) {
+      return;
+    }
+
+    setEliminando(id);
+    try {
+      await api.delete(`/caja/${id}`);
+      setHistorial((prev) => prev.filter((h) => h.id !== id));
+      setError(null);
+    } catch (err: any) {
+      setError(mensajeError(err, "No se pudo eliminar el cierre"));
+    } finally {
+      setEliminando(null);
+    }
+  }
 
   const cargar = useCallback(async () => {
     const [{ data: actual }, { data: hist }] = await Promise.all([
@@ -307,6 +325,7 @@ export default function Caja() {
                 <th>Esperado</th>
                 <th>Contado</th>
                 <th>Diferencia</th>
+                <th style={{ textAlign: "center" }}>Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -325,6 +344,17 @@ export default function Caja() {
                       <span className={`badge ${dif === 0 ? "success" : dif > 0 ? "neutral" : "danger"}`}>
                         {dif === 0 ? "Exacto" : dif > 0 ? `+$${dif.toLocaleString("es-CO")}` : `-$${Math.abs(dif).toLocaleString("es-CO")}`}
                       </span>
+                    </td>
+                    <td style={{ textAlign: "center" }}>
+                      <button
+                        type="button"
+                        className="danger"
+                        style={{ padding: "4px 8px", fontSize: "12px" }}
+                        onClick={() => eliminarCierre(t.id)}
+                        disabled={eliminando === t.id}
+                      >
+                        {eliminando === t.id ? "Eliminando..." : "Eliminar"}
+                      </button>
                     </td>
                   </tr>
                 );
