@@ -20,11 +20,30 @@ export default function Gastos() {
   const { sucursales } = useSesionStore();
   const [gastos, setGastos] = useState<Gasto[]>([]);
   const [mostrarForm, setMostrarForm] = useState(false);
+  const [eliminando, setEliminando] = useState<string | null>(null);
+  const [mensajeError, setMensajeError] = useState<string | null>(null);
 
   const cargar = useCallback(async () => {
     const { data } = await api.get<Gasto[]>("/gastos");
     setGastos(data);
   }, []);
+
+  async function eliminarGasto(id: string) {
+    if (!window.confirm("¿Estás seguro que quieres eliminar este gasto? Esta acción no se puede deshacer.")) {
+      return;
+    }
+
+    setEliminando(id);
+    setMensajeError(null);
+    try {
+      await api.delete(`/gastos/${id}`);
+      setGastos((prev) => prev.filter((g) => g.id !== id));
+    } catch (err: any) {
+      setMensajeError(mensajeError(err, "No se pudo eliminar el gasto"));
+    } finally {
+      setEliminando(null);
+    }
+  }
 
   useEffect(() => {
     cargar();
@@ -66,6 +85,12 @@ export default function Gastos() {
         </div>
       </div>
 
+      {mensajeError && (
+        <div className="card" style={{ borderLeft: "4px solid var(--error)" }}>
+          <p style={{ color: "var(--error)", margin: 0 }}>{mensajeError}</p>
+        </div>
+      )}
+
       <div className="card">
         {gastos.length === 0 ? (
           <p className="empty-state">No hay gastos registrados</p>
@@ -78,6 +103,7 @@ export default function Gastos() {
                 <th>Descripcion</th>
                 <th>Sucursal</th>
                 <th>Monto</th>
+                <th style={{ textAlign: "center" }}>Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -90,6 +116,17 @@ export default function Gastos() {
                   <td>{g.descripcion ?? "-"}</td>
                   <td>{sucursales.find((s) => s.id === g.sucursalId)?.nombre ?? "-"}</td>
                   <td>${Number(g.monto).toLocaleString("es-CO")}</td>
+                  <td style={{ textAlign: "center" }}>
+                    <button
+                      type="button"
+                      className="danger"
+                      style={{ padding: "4px 8px", fontSize: "12px" }}
+                      onClick={() => eliminarGasto(g.id)}
+                      disabled={eliminando === g.id}
+                    >
+                      {eliminando === g.id ? "Eliminando..." : "Eliminar"}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

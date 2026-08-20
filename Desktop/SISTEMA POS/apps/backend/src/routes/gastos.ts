@@ -45,4 +45,29 @@ export async function gastosRoutes(app: FastifyInstance) {
     });
     return reply.code(201).send(gasto);
   });
+
+  // Eliminar un gasto
+  app.delete("/gastos/:id", async (request, reply) => {
+    if (!request.user.permisos.includes("gastos.administrar")) {
+      return reply.code(403).send({ error: "No tienes permiso para eliminar gastos" });
+    }
+    const { empresaId } = request.user;
+    const { id } = request.params as { id: string };
+
+    // Verificar que el gasto existe y pertenece a la empresa del usuario
+    const gasto = await prisma.gasto.findFirst({
+      where: { id, empresaId },
+    });
+
+    if (!gasto) {
+      return reply.code(404).send({ error: "Gasto no encontrado" });
+    }
+
+    // Eliminar el gasto
+    await prisma.gasto.delete({
+      where: { id },
+    });
+
+    return reply.code(200).send({ mensaje: "Gasto eliminado correctamente" });
+  });
 }
