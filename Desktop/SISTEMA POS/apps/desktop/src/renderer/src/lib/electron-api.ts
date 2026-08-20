@@ -243,10 +243,71 @@ export const electronAPI = {
 
   async printODescargarEtiquetas(items: any, printer: string, formato: string) {
     if (!this.isElectron()) {
-      console.warn("printODescargarEtiquetas not available in web");
-      return { imprimio: false, mensaje: "No disponible en web" };
+      // En web: generar PDF/HTML para descargar
+      return this.descargarEtiquetasPDF(items, formato);
     }
     return await (window as any).pos.printODescargarEtiquetas(items, printer, formato);
+  },
+
+  // Generar y descargar PDF de etiquetas en web
+  private descargarEtiquetasPDF(items: any, formato: string) {
+    try {
+      // Generar HTML simple con las etiquetas
+      const html = this.generarHTMLEtiquetas(items);
+
+      // Crear blob y descargar
+      const blob = new Blob([html], { type: "text/html" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `etiquetas-${new Date().toISOString().split("T")[0]}.html`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      return {
+        imprimio: false,
+        mensaje: `Descargado HTML de ${items.length} etiqueta${items.length === 1 ? "" : "s"}. Abre el archivo y usa Ctrl+P para imprimir.`,
+      };
+    } catch (err) {
+      return {
+        imprimio: false,
+        mensaje: "Error al generar etiquetas. Intenta desde Electron.",
+      };
+    }
+  },
+
+  // Generar HTML para etiquetas (versión simplificada para web)
+  private generarHTMLEtiquetas(items: any): string {
+    const etiquetasHTML = items
+      .flatMap((item: any, idx: number) =>
+        Array.from({ length: item.copias || 1 }).map(() => `
+          <div style="width: 50mm; height: 25mm; border: 1px solid #ccc; padding: 2mm; page-break-inside: avoid; display: inline-block; margin: 2mm; box-sizing: border-box; font-family: sans-serif; text-align: center;">
+            <div style="font-size: 8px; font-weight: bold; max-width: 100%; overflow: hidden; text-overflow: ellipsis;">${item.nombre || ""}</div>
+            ${item.svgCodigoBarras ? `<div style="margin: 1mm 0;">${item.svgCodigoBarras}</div>` : ""}
+            <div style="font-size: 10px; font-weight: bold;">$${(item.precio || 0).toLocaleString("es-CO")}</div>
+          </div>
+        `)
+      )
+      .join("");
+
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Etiquetas - Códigos de Barras</title>
+          <style>
+            body { margin: 0; padding: 4mm; font-family: Arial, sans-serif; }
+            @media print { body { margin: 0; padding: 0; } }
+          </style>
+        </head>
+        <body>
+          ${etiquetasHTML}
+        </body>
+      </html>
+    `;
   },
 
   async queueAdd(item: any) {

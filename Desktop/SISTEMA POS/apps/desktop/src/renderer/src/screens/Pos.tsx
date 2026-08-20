@@ -110,6 +110,9 @@ export default function Pos() {
   const [descuentoTipo, setDescuentoTipo] = useState<"PORCENTAJE" | "VALOR">("PORCENTAJE");
   const [descuentoValor, setDescuentoValor] = useState("");
   const [puntosARedimir, setPuntosARedimir] = useState("");
+  const [mostrarModalClaveDescuento, setMostrarModalClaveDescuento] = useState(false);
+  const [claveDescuentoIngresada, setClaveDescuentoIngresada] = useState("");
+  const [esAdministrador, setEsAdministrador] = useState(false);
   const [fidelizacion, setFidelizacion] = useState<{ pesosPorPunto: number | null; valorPunto: number | null }>({
     pesosPorPunto: null,
     valorPunto: null,
