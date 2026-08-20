@@ -62,6 +62,78 @@ export async function shopifyRoutes(app: FastifyInstance) {
     return reply.code(201).send({ conectado: true, shopDomain: config.shopDomain });
   });
 
+  // Guardar Access Token y validar contra Shopify
+  app.put("/shopify/config/access-token", async (request, reply) => {
+    const { empresaId } = request.user;
+    const { accessToken } = request.body as { accessToken?: string };
+
+    if (!accessToken?.trim()) {
+      return reply.code(400).send({
+        ok: false,
+        message: "Access token es obligatorio"
+      });
+    }
+
+    try {
+      // Obtener config actual
+      const config = await prisma.shopifyConfig.findUnique({
+        where: { empresaId }
+      });
+
+      if (!config) {
+        return reply.code(400).send({
+          ok: false,
+          message: "Configura primero el dominio y credenciales"
+        });
+      }
+
+      // Validar token con una query simple
+      const { ShopifyGraphQLClient } = await import("../lib/shopify-graphql.js");
+      const client = new ShopifyGraphQLClient(config.shopDomain, accessToken);
+
+      const response = await client.query({
+        query: `
+          query {
+            shop {
+              id
+              name
+            }
+          }
+        `,
+      });
+
+      if (!response.shop) {
+        throw new Error("Token inválido o sin permisos");
+      }
+
+      // Guardar token
+      await prisma.shopifyConfig.update({
+        where: { empresaId },
+        data: {
+          accessToken,
+          tokenExpiraEn: null, // Token estático, no expira
+        },
+      });
+
+      request.log.info(`[shopify-token] ✅ Token guardado para ${response.shop.name}`);
+
+      return reply.code(200).send({
+        ok: true,
+        message: `Token guardado correctamente. Tienda: ${response.shop.name}`,
+        shopName: response.shop.name,
+      });
+    } catch (error) {
+      const mensaje = error instanceof Error ? error.message : "Error desconocido";
+      request.log.error(`[shopify-token] Error: ${mensaje}`);
+
+      return reply.code(400).send({
+        ok: false,
+        message: "El access token es inválido o no tiene permisos suficientes",
+        details: mensaje,
+      });
+    }
+  });
+
   app.post("/shopify/sync", async (request, reply) => {
     const { empresaId } = request.user;
     const config = await prisma.shopifyConfig.findUnique({ where: { empresaId } });

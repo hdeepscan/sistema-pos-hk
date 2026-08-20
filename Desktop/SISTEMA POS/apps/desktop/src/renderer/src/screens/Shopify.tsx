@@ -59,7 +59,9 @@ export default function Shopify() {
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [sucursalEcommerceId, setSucursalEcommerceId] = useState("");
+  const [accessToken, setAccessToken] = useState("");
   const [guardando, setGuardando] = useState(false);
+  const [guardandoToken, setGuardandoToken] = useState(false);
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -121,18 +123,36 @@ export default function Shopify() {
     setMensaje(null);
     try {
       await api.post("/shopify/config", { shopDomain, clientId, clientSecret, sucursalEcommerceId });
-      setMensaje("✅ Configuracion guardada. Ya puedes importar tus productos.");
+      setMensaje("✅ Credenciales guardadas. Ahora pega el Access Token.");
       const { data } = await api.get<ShopifyConfigResp>("/shopify/config");
       setConfig(data);
       setClientSecret("");
+    } catch (err: any) {
+      setError(mensajeError(err, "No se pudo guardar la configuracion"));
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  async function guardarAccessToken(e: React.FormEvent) {
+    e.preventDefault();
+    setGuardandoToken(true);
+    setError(null);
+    setMensaje(null);
+    try {
+      const res = await api.put("/shopify/config/access-token", { accessToken });
+      setMensaje(`✅ ${res.data.message}`);
+      const { data } = await api.get<ShopifyConfigResp>("/shopify/config");
+      setConfig(data);
+      setAccessToken("");
       setTimeout(() => {
         setMostrarAsistente(true);
         setPasoActual(1);
       }, 500);
     } catch (err: any) {
-      setError(mensajeError(err, "No se pudo guardar la configuracion"));
+      setError(mensajeError(err, "Error validando token"));
     } finally {
-      setGuardando(false);
+      setGuardandoToken(false);
     }
   }
 
@@ -336,12 +356,36 @@ export default function Shopify() {
                 </button>
               )}
             </div>
-            {config?.ultimaSincronizacion && (
-              <p style={{ fontSize: 12, color: "var(--text-muted)", margin: 0 }}>
-                Ultima sincronizacion: {new Date(config.ultimaSincronizacion).toLocaleString("es-CO")}
-              </p>
-            )}
           </form>
+
+          {/* CAMPO: ACCESS TOKEN */}
+          {config?.conectado && (
+            <form className="grid-form" onSubmit={guardarAccessToken} style={{ marginTop: 24, paddingTop: 24, borderTop: "1px solid var(--border)" }}>
+              <h4 style={{ marginTop: 0 }}>📌 Access Token (Admin API)</h4>
+              <p style={{ fontSize: 13, color: "var(--text-muted)" }}>
+                Copia tu Admin API access token desde Shopify Dev Dashboard:<br />
+                Tu app → Configuration → Admin API access tokens → Create token
+              </p>
+              <label>
+                Access Token
+                <input
+                  type="password"
+                  value={accessToken}
+                  onChange={(e) => setAccessToken(e.target.value)}
+                  placeholder="Pega el token aquí"
+                  required
+                />
+                <span style={{ fontWeight: 400, fontSize: 11.5, color: "var(--text-muted)" }}>
+                  El token se valida automáticamente con Shopify
+                </span>
+              </label>
+              {error && <span className="error-text">{error}</span>}
+              {mensaje && <span className="badge success" style={{ width: "fit-content" }}>{mensaje}</span>}
+              <button type="submit" disabled={guardandoToken} className="secondary">
+                {guardandoToken ? "Validando..." : "🔑 Validar y guardar token"}
+              </button>
+            </form>
+          )}
         </div>
       )}
 
