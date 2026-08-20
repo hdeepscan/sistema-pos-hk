@@ -157,9 +157,13 @@ export async function ventasRoutes(app: FastifyInstance) {
     });
 
     // 2. Obtener abonos en el rango de fechas (dinero real recibido)
+    // Los abonos solo se cuentan si el cliente del abono coincide con los filtros
     const abonos = await prisma.abono.findMany({
       where: {
-        cliente: { empresaId },
+        cliente: {
+          empresaId,
+          ...(clienteId ? { id: clienteId } : {}),
+        },
         ...(desde || hasta
           ? {
               fecha: {
