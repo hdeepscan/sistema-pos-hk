@@ -250,30 +250,89 @@ export const electronAPI = {
   },
 
   // Generar y descargar PDF de etiquetas en web
-  descargarEtiquetasPDF(items: any, formato: string) {
+  async descargarEtiquetasPDF(items: any, formato: string) {
     try {
-      // Generar HTML simple con las etiquetas
+      // Generar HTML con las etiquetas
       const html = this.generarHTMLEtiquetas(items);
 
-      // Crear blob y descargar
-      const blob = new Blob([html], { type: "text/html" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `etiquetas-${new Date().toISOString().split("T")[0]}.html`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      // Crear contenedor temporal
+      const container = document.createElement("div");
+      container.innerHTML = html;
+      container.style.position = "absolute";
+      container.style.left = "-9999px";
+      container.style.width = "210mm"; // Ancho A4
+      container.style.padding = "10mm";
+      document.body.appendChild(container);
 
-      return {
-        imprimio: false,
-        mensaje: `Descargado HTML de ${items.length} etiqueta${items.length === 1 ? "" : "s"}. Abre el archivo y usa Ctrl+P para imprimir.`,
-      };
+      try {
+        // Renderizar HTML a canvas
+        const canvas = await html2canvas(container, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: "#ffffff",
+        });
+
+        // Crear PDF con orientación vertical
+        const doc = new jsPDF({
+          orientation: "portrait",
+          unit: "mm",
+          format: "a4",
+        });
+
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const canvasWidth = canvas.width;
+        const canvasHeight = canvas.height;
+        const ratio = canvasWidth / canvasHeight;
+
+        let height = pageHeight;
+        let width = height * ratio;
+
+        if (width > pageWidth) {
+          width = pageWidth;
+          height = width / ratio;
+        }
+
+        const imgData = canvas.toDataURL("image/png");
+        const x = (pageWidth - width) / 2;
+
+        // Primer página
+        doc.addImage(imgData, "PNG", x, 10, width, height);
+
+        // Si el contenido es muy largo, añadir más páginas
+        let remainingHeight = canvasHeight - (pageHeight - 20) / ratio;
+        let pageNumber = 1;
+        while (remainingHeight > 0) {
+          doc.addPage("a4");
+          pageNumber++;
+          doc.addImage(
+            imgData,
+            "PNG",
+            x,
+            10 - ((pageNumber - 1) * (pageHeight - 20)) / ratio,
+            width,
+            height
+          );
+          remainingHeight -= (pageHeight - 20) / ratio;
+        }
+
+        // Descargar PDF
+        const fecha = new Date().toISOString().slice(0, 10);
+        const hora = new Date().toTimeString().slice(0, 5);
+        doc.save(`etiquetas-${fecha}-${hora}.pdf`);
+
+        return {
+          imprimio: false,
+          mensaje: `PDF descargado: ${items.length} etiqueta${items.length === 1 ? "" : "s"}`,
+        };
+      } finally {
+        document.body.removeChild(container);
+      }
     } catch (err) {
+      console.error("Error generando PDF de etiquetas:", err);
       return {
         imprimio: false,
-        mensaje: "Error al generar etiquetas. Intenta desde Electron.",
+        mensaje: "Error al generar PDF de etiquetas. Intenta desde Electron.",
       };
     }
   },
