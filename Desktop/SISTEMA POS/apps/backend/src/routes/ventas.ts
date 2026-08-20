@@ -101,6 +101,117 @@ export async function ventasRoutes(app: FastifyInstance) {
     });
   });
 
+  // Endpoint para obtener los totales de ventas separados en Real (dinero recibido) y Cartera (créditos pendientes)
+  app.get("/ventas/totales-resumen", async (request, reply) => {
+    const { empresaId } = request.user;
+    if (!request.user.permisos.includes("ventas.ver")) {
+      return reply.code(403).send({ error: "No tienes permiso para ver las ventas" });
+    }
+
+    const { sucursalId, desde, hasta, montoMin, montoMax, clienteId, usuarioId, metodoPago, canal } =
+      request.query as {
+        sucursalId?: string;
+        desde?: string;
+        hasta?: string;
+        montoMin?: string;
+        montoMax?: string;
+        clienteId?: string;
+        usuarioId?: string;
+        metodoPago?: string;
+        canal?: string;
+      };
+
+    // Construir el filtro base (mismo que en GET /ventas)
+    const filtroBase = {
+      empresaId,
+      ...(sucursalId ? { sucursalId } : {}),
+      ...(clienteId ? { clienteId } : {}),
+      ...(usuarioId ? { usuarioId } : {}),
+      ...(metodoPago ? { metodoPago: metodoPago as MetodoPago } : {}),
+      ...(canal ? { canal: canal as CanalVenta } : {}),
+      ...(desde || hasta
+        ? {
+            fecha: {
+              ...(desde ? { gte: new Date(desde) } : {}),
+              ...(hasta ? { lte: new Date(`${hasta}T23:59:59.999`) } : {}),
+            },
+          }
+        : {}),
+      ...(montoMin || montoMax
+        ? {
+            total: {
+              ...(montoMin ? { gte: Number(montoMin) } : {}),
+              ...(montoMax ? { lte: Number(montoMax) } : {}),
+            },
+          }
+        : {}),
+    };
+
+    // 1. Obtener ventas no-crédito (EFECTIVO, TARJETA, TRANSFERENCIA, OTRO) en el rango
+    const ventasNoCredito = await prisma.venta.findMany({
+      where: {
+        ...filtroBase,
+        metodoPago: { not: "CREDITO" },
+      },
+      select: { total: true },
+    });
+
+    // 2. Obtener abonos en el rango de fechas (dinero real recibido)
+    const abonos = await prisma.abono.findMany({
+      where: {
+        cliente: { empresaId },
+        ...(desde || hasta
+          ? {
+              fecha: {
+                ...(desde ? { gte: new Date(desde) } : {}),
+                ...(hasta ? { lte: new Date(`${hasta}T23:59:59.999`) } : {}),
+              },
+            }
+          : {}),
+      },
+      select: { monto: true },
+    });
+
+    // 3. Obtener ventas a crédito para calcular cartera pendiente
+    const ventasCredito = await prisma.venta.findMany({
+      where: {
+        ...filtroBase,
+        metodoPago: "CREDITO",
+      },
+      include: { cliente: { select: { id: true } } },
+      orderBy: { fecha: "asc" },
+    });
+
+    // 4. Obtener todos los abonos del cliente para calcular pendientes correctamente
+    // (necesitamos TODOS los abonos para aplicar FIFO, no solo los del rango)
+    const abonosPorClienteTodos = await prisma.abono.groupBy({
+      by: ["clienteId"],
+      where: { cliente: { empresaId } },
+      _sum: { monto: true },
+    });
+
+    // Calcular los totales
+    const totalReal = ventasNoCredito.reduce((acc, v) => acc + Number(v.total), 0) + abonos.reduce((acc, a) => acc + Number(a.monto), 0);
+
+    // Para cartera: aplicar abonos FIFO a créditos (como en creditos.ts)
+    const poolAbonos = new Map(abonosPorClienteTodos.map((a) => [a.clienteId, Number(a._sum.monto ?? 0)]));
+    let totalCartera = 0;
+
+    for (const venta of ventasCredito) {
+      const total = Number(venta.total);
+      const disponible = poolAbonos.get(venta.cliente?.id) ?? 0;
+      const aplicado = Math.min(disponible, total);
+      poolAbonos.set(venta.cliente?.id, disponible - aplicado);
+      const pendiente = Math.round((total - aplicado) * 100) / 100;
+      totalCartera += pendiente;
+    }
+
+    return {
+      totalReal: Math.round(totalReal * 100) / 100,
+      totalCartera: Math.round(totalCartera * 100) / 100,
+    };
+  });
+
   // Idempotente por clienteUuid: si el POS reintenta una venta ya sincronizada
   // (por ejemplo tras recuperar conexion), devuelve la venta existente.
   app.post("/ventas", async (request, reply) => {

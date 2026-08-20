@@ -126,6 +126,8 @@ export default function Ventas() {
   const [filtroEstado, setFiltroEstado] = useState("");
   const [cargando, setCargando] = useState(true);
   const [seleccionada, setSeleccionada] = useState<Venta | null>(null);
+  const [totalReal, setTotalReal] = useState(0);
+  const [totalCartera, setTotalCartera] = useState(0);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -133,21 +135,30 @@ export default function Ventas() {
       // Si no hay filtro de sucursal pero hay sucursal activa, usa esa
       const sucursalParaFiltro = filtroSucursal || sucursalActivaId || undefined;
 
-      const { data } = await api.get<Venta[]>("/ventas", {
-        params: {
-          sucursalId: sucursalParaFiltro,
-          desde: desde || undefined,
-          hasta: hasta || undefined,
-          montoMin: montoMin || undefined,
-          montoMax: montoMax || undefined,
-          clienteId: filtroClienteId || undefined,
-          usuarioId: filtroUsuarioId || undefined,
-          metodoPago: filtroMetodoPago || undefined,
-          canal: filtroCanal || undefined,
-          limit: 2000,
-        },
-      });
-      setVentas(data);
+      const params = {
+        sucursalId: sucursalParaFiltro,
+        desde: desde || undefined,
+        hasta: hasta || undefined,
+        montoMin: montoMin || undefined,
+        montoMax: montoMax || undefined,
+        clienteId: filtroClienteId || undefined,
+        usuarioId: filtroUsuarioId || undefined,
+        metodoPago: filtroMetodoPago || undefined,
+        canal: filtroCanal || undefined,
+        limit: 2000,
+      };
+
+      // Cargar ventas y totales en paralelo
+      const [ventasRes, totalesRes] = await Promise.all([
+        api.get<Venta[]>("/ventas", { params }),
+        api.get<{ totalReal: number; totalCartera: number }>("/ventas/totales-resumen", { params }).catch(() => ({
+          data: { totalReal: 0, totalCartera: 0 },
+        })),
+      ]);
+
+      setVentas(ventasRes.data);
+      setTotalReal(totalesRes.data.totalReal);
+      setTotalCartera(totalesRes.data.totalCartera);
     } catch (err) {
       console.error("Error al cargar ventas:", err);
     } finally {
@@ -328,8 +339,12 @@ export default function Ventas() {
           <div className="value">{ventasFiltradas.length}</div>
         </div>
         <div className="stat-card">
-          <div className="label">Total</div>
-          <div className="value positive">${totalListado.toLocaleString("es-CO")}</div>
+          <div className="label">Total Real</div>
+          <div className="value positive">${totalReal.toLocaleString("es-CO")}</div>
+        </div>
+        <div className="stat-card">
+          <div className="label">Total Cartera</div>
+          <div className="value warning">${totalCartera.toLocaleString("es-CO")}</div>
         </div>
       </div>
 
