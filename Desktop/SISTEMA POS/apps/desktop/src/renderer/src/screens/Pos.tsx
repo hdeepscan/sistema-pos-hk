@@ -942,7 +942,7 @@ export default function Pos() {
         <div className="modal-backdrop" onClick={() => setMostrarModalClaveDescuento(false)}>
           <div className="card" style={{ width: 340 }} onClick={(e) => e.stopPropagation()}>
             <h3 style={{ marginTop: 0 }}>Autorización requerida</h3>
-            <p>Este usuario necesita ingresa la clave de autorización para aplicar descuentos.</p>
+            <p>Este usuario necesita ingresar la clave de autorización para aplicar descuentos.</p>
             <input
               type="password"
               placeholder="Ingresa la clave"
