@@ -157,12 +157,33 @@ export async function ventasRoutes(app: FastifyInstance) {
     });
 
     // 2. Obtener abonos en el rango de fechas (dinero real recibido)
-    // Los abonos solo se cuentan si el cliente del abono coincide con los filtros
-    const abonos = await prisma.abono.findMany({
+    // Los abonos solo se cuentan si:
+    // - El cliente del abono coincide con los filtros
+    // - El cliente tiene ventas de crédito en el período (si hay filtro de ventas)
+    const abonosValidos = await prisma.abono.findMany({
       where: {
         cliente: {
           empresaId,
           ...(clienteId ? { id: clienteId } : {}),
+          // Si hay filtro de ventas (desde/hasta/rango), solo contar abonos de clientes con ventas de crédito
+          ...(desde || hasta || montoMin || montoMax
+            ? {
+                ventas: {
+                  some: {
+                    empresaId,
+                    metodoPago: "CREDITO",
+                    ...(desde || hasta
+                      ? {
+                          fecha: {
+                            ...(desde ? { gte: new Date(desde) } : {}),
+                            ...(hasta ? { lte: new Date(`${hasta}T23:59:59.999`) } : {}),
+                          },
+                        }
+                      : {}),
+                  },
+                },
+              }
+            : {}),
         },
         ...(desde || hasta
           ? {
@@ -175,6 +196,8 @@ export async function ventasRoutes(app: FastifyInstance) {
       },
       select: { monto: true },
     });
+
+    const abonos = abonosValidos;
 
     // 3. Obtener ventas a crédito para calcular cartera pendiente
     const ventasCredito = await prisma.venta.findMany({
