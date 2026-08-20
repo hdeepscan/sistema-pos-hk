@@ -344,24 +344,53 @@ export const electronAPI = {
         Array.from({ length: item.copias || 1 }).map(() => `
           <div style="
             width: 60mm;
-            height: 35mm;
+            height: 40mm;
             border: 2px dashed #333;
-            padding: 3mm;
+            padding: 2.5mm;
             page-break-inside: avoid;
             box-sizing: border-box;
             font-family: Arial, sans-serif;
             text-align: center;
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            justify-content: space-between;
             align-items: center;
-            gap: 2mm;
           ">
-            <div style="font-size: 9px; font-weight: bold; width: 100%; max-width: 100%; overflow: hidden; text-overflow: ellipsis; line-height: 1.2;">
+            <div style="
+              font-size: 8px;
+              font-weight: bold;
+              width: 100%;
+              line-height: 1.1;
+              max-height: 10mm;
+              overflow: hidden;
+            ">
               ${item.nombre || ""}
             </div>
-            ${item.svgCodigoBarras ? `<div style="flex-grow: 1; display: flex; align-items: center; justify-content: center;">${item.svgCodigoBarras}</div>` : ""}
-            <div style="font-size: 11px; font-weight: bold; margin-top: 2mm;">
+            ${item.variante ? `<div style="
+              font-size: 7px;
+              color: #555;
+              width: 100%;
+              line-height: 1;
+              max-height: 5mm;
+              overflow: hidden;
+            ">
+              ${item.variante}
+            </div>` : ""}
+            ${item.svgCodigoBarras ? `<div style="
+              flex-grow: 1;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              width: 100%;
+              margin: 1mm 0;
+            ">
+              ${item.svgCodigoBarras}
+            </div>` : ""}
+            <div style="
+              font-size: 10px;
+              font-weight: bold;
+              color: #000;
+            ">
               $${(item.precio || 0).toLocaleString("es-CO")}
             </div>
           </div>
