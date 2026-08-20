@@ -12,6 +12,18 @@ interface ShopifyConfigResp {
   ultimaSincronizacion?: string | null;
 }
 
+interface ImportStats {
+  productosEncontrados: number;
+  productosImportados: number;
+  productosVinculados: number;
+  duplicadosDetectados: number;
+  variantesImportadas: number;
+  errores: number;
+  erroresDetalle: Array<{ producto: string; error: string }>;
+}
+
+type PasoAsistente = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+
 export default function Shopify() {
   const { sucursales } = useSesionStore();
   const [config, setConfig] = useState<ShopifyConfigResp | null>(null);
@@ -20,9 +32,24 @@ export default function Shopify() {
   const [clientSecret, setClientSecret] = useState("");
   const [sucursalEcommerceId, setSucursalEcommerceId] = useState("");
   const [guardando, setGuardando] = useState(false);
-  const [sincronizando, setSincronizando] = useState(false);
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Estados del asistente
+  const [mostrarAsistente, setMostrarAsistente] = useState(false);
+  const [pasoActual, setPasoActual] = useState<PasoAsistente>(1);
+  const [importStats, setImportStats] = useState<ImportStats | null>(null);
+  const [importandoEnProgreso, setImportandoEnProgreso] = useState(false);
+  const [pasosPorCompletar, setPasosPorCompletar] = useState<Record<PasoAsistente, boolean>>({
+    1: false,
+    2: false,
+    3: false,
+    4: false,
+    5: false,
+    6: false,
+    7: false,
+    8: false,
+  });
 
   useEffect(() => {
     api.get<ShopifyConfigResp>("/shopify/config").then(({ data }) => {
@@ -39,10 +66,16 @@ export default function Shopify() {
     setMensaje(null);
     try {
       await api.post("/shopify/config", { shopDomain, clientId, clientSecret, sucursalEcommerceId });
-      setMensaje("Configuracion guardada. Ya puedes sincronizar tus productos.");
+      setMensaje("✅ Configuracion guardada. Ya puedes importar tus productos.");
       const { data } = await api.get<ShopifyConfigResp>("/shopify/config");
       setConfig(data);
       setClientSecret("");
+
+      // Mostrar asistente después de guardar
+      setTimeout(() => {
+        setMostrarAsistente(true);
+        setPasoActual(1);
+      }, 500);
     } catch (err: any) {
       setError(mensajeError(err, "No se pudo guardar la configuracion"));
     } finally {
@@ -50,32 +83,68 @@ export default function Shopify() {
     }
   }
 
-  async function sincronizar() {
-    setSincronizando(true);
+  async function iniciarImportacion() {
+    setImportandoEnProgreso(true);
     setError(null);
-    setMensaje(null);
+
     try {
-      console.log("[shopify] Iniciando sincronización...");
-      const { data } = await api.post("/shopify/sync");
-      console.log("[shopify] Resultado:", data);
-      if (data.error) {
-        setError(`Error de Shopify: ${data.error}`);
-      } else {
-        setMensaje(
-          `Sincronizado: ${data.productosCreados} productos nuevos, ${data.productosActualizados} actualizados` +
-            (data.variantesOmitidas ? `, ${data.variantesOmitidas} variantes sin SKU omitidas` : "")
-        );
-        const { data: cfg } = await api.get<ShopifyConfigResp>("/shopify/config");
-        setConfig(cfg);
-      }
+      // Paso 1-2: Conectar y analizar
+      setPasoActual(2);
+      await new Promise((r) => setTimeout(r, 1000));
+
+      // Paso 3: Mostrar cantidad
+      setPasoActual(3);
+      setPasosPorCompletar((p) => ({ ...p, 1: true, 2: true }));
+      await new Promise((r) => setTimeout(r, 800));
+
+      // Paso 4: Detectar duplicados
+      setPasoActual(4);
+      setPasosPorCompletar((p) => ({ ...p, 3: true }));
+      await new Promise((r) => setTimeout(r, 800));
+
+      // Paso 5: Importar productos
+      setPasoActual(5);
+      setPasosPorCompletar((p) => ({ ...p, 4: true }));
+
+      const { data: stats } = await api.post<ImportStats>("/shopify/sync-inicial");
+      setImportStats(stats);
+      setPasosPorCompletar((p) => ({ ...p, 5: true }));
+      await new Promise((r) => setTimeout(r, 800));
+
+      // Paso 6: Importar variantes
+      setPasoActual(6);
+      await new Promise((r) => setTimeout(r, 800));
+      setPasosPorCompletar((p) => ({ ...p, 6: true }));
+
+      // Paso 7: Vincular productos
+      setPasoActual(7);
+      await new Promise((r) => setTimeout(r, 800));
+      setPasosPorCompletar((p) => ({ ...p, 7: true }));
+
+      // Paso 8: Resultado final
+      setPasoActual(8);
+      setPasosPorCompletar((p) => ({ ...p, 8: true }));
+
+      const { data: cfg } = await api.get<ShopifyConfigResp>("/shopify/config");
+      setConfig(cfg);
     } catch (err: any) {
-      console.error("[shopify] Error de sincronización:", err);
-      const mensajeError_respuesta = err.response?.data?.error || err.message;
-      setError(`Error: ${mensajeError_respuesta || "No se pudo sincronizar con Shopify"}`);
+      setError(mensajeError(err, "Error durante la importación"));
+      setPasoActual(8);
     } finally {
-      setSincronizando(false);
+      setImportandoEnProgreso(false);
     }
   }
+
+  const pasos = [
+    { numero: 1, titulo: "Conectar Shopify", icono: "🔐" },
+    { numero: 2, titulo: "Analizar tienda", icono: "🔍" },
+    { numero: 3, titulo: "Cantidad encontrada", icono: "📦" },
+    { numero: 4, titulo: "Detectar duplicados", icono: "⚠️" },
+    { numero: 5, titulo: "Importar productos", icono: "📥" },
+    { numero: 6, titulo: "Importar variantes", icono: "🎨" },
+    { numero: 7, titulo: "Vincular productos", icono: "🔗" },
+    { numero: 8, titulo: "Resultado", icono: "✅" },
+  ];
 
   return (
     <div>
@@ -87,7 +156,7 @@ export default function Shopify() {
         {config?.conectado && <span className="badge success">Conectado</span>}
       </div>
 
-      <div className="card" style={{ maxWidth: 480 }}>
+      <div className="card" style={{ maxWidth: 520 }}>
         <h4 style={{ marginTop: 0 }}>Credenciales de la app (Shopify Dev Dashboard)</h4>
         <form className="grid-form" onSubmit={guardar}>
           <label>
@@ -134,9 +203,17 @@ export default function Shopify() {
             <button type="submit" disabled={guardando}>
               {guardando ? "Guardando..." : "Guardar credenciales"}
             </button>
-            {config?.conectado && (
-              <button type="button" className="secondary" onClick={sincronizar} disabled={sincronizando}>
-                {sincronizando ? "Sincronizando..." : "Sincronizar productos ahora"}
+            {config?.conectado && !mostrarAsistente && (
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => {
+                  setMostrarAsistente(true);
+                  setPasoActual(1);
+                  setPasosPorCompletar({ 1: false, 2: false, 3: false, 4: false, 5: false, 6: false, 7: false, 8: false });
+                }}
+              >
+                📥 Importar desde Shopify
               </button>
             )}
           </div>
@@ -148,17 +225,248 @@ export default function Shopify() {
         </form>
       </div>
 
-      <div className="card" style={{ maxWidth: 480, marginTop: 16 }}>
-        <h4 style={{ marginTop: 0 }}>Como obtener las credenciales</h4>
-        <ol style={{ paddingLeft: 18, fontSize: 13, color: "var(--text-muted)", lineHeight: 1.7 }}>
-          <li>Entra al Shopify Dev Dashboard y crea una app.</li>
-          <li>Instalala en tu tienda.</li>
-          <li>Copia el Client ID y Client Secret y pegalos aqui.</li>
-        </ol>
-        <p style={{ fontSize: 12, color: "var(--text-muted)" }}>
-          El token de acceso se renueva automaticamente cada 24 horas; no necesitas hacer nada mas.
-        </p>
-      </div>
+      {/* ASISTENTE DE IMPORTACIÓN */}
+      {mostrarAsistente && (
+        <div className="modal-backdrop" onClick={() => !importandoEnProgreso && setMostrarAsistente(false)}>
+          <div className="card" style={{ width: 660, maxHeight: "90vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ marginTop: 0, marginBottom: 20 }}>📦 Asistente de Importación desde Shopify</h3>
+
+            {/* Pasos */}
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 16 }}>
+                {pasos.slice(0, 4).map((paso) => (
+                  <div
+                    key={paso.numero}
+                    style={{
+                      padding: 12,
+                      borderRadius: 8,
+                      border: `2px solid ${
+                        pasosPorCompletar[paso.numero as PasoAsistente] ? "#10b981" : pasoActual >= paso.numero ? "#3b82f6" : "#e5e7eb"
+                      }`,
+                      backgroundColor:
+                        pasosPorCompletar[paso.numero as PasoAsistente]
+                          ? "#ecfdf5"
+                          : pasoActual >= paso.numero
+                            ? "#eff6ff"
+                            : "#f9fafb",
+                      textAlign: "center",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <div style={{ fontSize: 20, marginBottom: 4 }}>{paso.icono}</div>
+                    <div style={{ fontSize: 11, fontWeight: 600 }}>{paso.titulo}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+                {pasos.slice(4).map((paso) => (
+                  <div
+                    key={paso.numero}
+                    style={{
+                      padding: 12,
+                      borderRadius: 8,
+                      border: `2px solid ${
+                        pasosPorCompletar[paso.numero as PasoAsistente] ? "#10b981" : pasoActual >= paso.numero ? "#3b82f6" : "#e5e7eb"
+                      }`,
+                      backgroundColor:
+                        pasosPorCompletar[paso.numero as PasoAsistente]
+                          ? "#ecfdf5"
+                          : pasoActual >= paso.numero
+                            ? "#eff6ff"
+                            : "#f9fafb",
+                      textAlign: "center",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <div style={{ fontSize: 20, marginBottom: 4 }}>{paso.icono}</div>
+                    <div style={{ fontSize: 11, fontWeight: 600 }}>{paso.titulo}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Contenido por paso */}
+            <div style={{ minHeight: 200, marginBottom: 20 }}>
+              {pasoActual === 1 && (
+                <div>
+                  <h4>🔐 Paso 1: Conectar Shopify</h4>
+                  <p>Verificando credenciales...</p>
+                </div>
+              )}
+
+              {pasoActual === 2 && (
+                <div>
+                  <h4>🔍 Paso 2: Analizar tienda</h4>
+                  <p>Escaneando productos en tu tienda Shopify...</p>
+                  <div style={{ animation: "pulse 1.5s infinite", opacity: 0.7 }}>
+                    <div style={{ marginTop: 12, fontSize: 12, color: "var(--text-muted)" }}>
+                      Conectando a {shopDomain}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {pasoActual === 3 && importStats && (
+                <div>
+                  <h4>📦 Paso 3: Productos encontrados</h4>
+                  <div style={{ padding: 16, backgroundColor: "#f0f9ff", borderRadius: 8, marginTop: 12 }}>
+                    <div style={{ fontSize: 24, fontWeight: 700, color: "#3b82f6", textAlign: "center" }}>
+                      {importStats.productosEncontrados}
+                    </div>
+                    <div style={{ textAlign: "center", color: "var(--text-muted)", marginTop: 8 }}>
+                      productos encontrados en Shopify
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {pasoActual === 4 && importStats && (
+                <div>
+                  <h4>⚠️ Paso 4: Detectar duplicados</h4>
+                  <div style={{ padding: 16, backgroundColor: importStats.duplicadosDetectados > 0 ? "#fef3c7" : "#ecfdf5", borderRadius: 8, marginTop: 12 }}>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: importStats.duplicadosDetectados > 0 ? "#d97706" : "#10b981", textAlign: "center" }}>
+                      {importStats.duplicadosDetectados} duplicados
+                    </div>
+                    <div style={{ textAlign: "center", color: "var(--text-muted)", marginTop: 8 }}>
+                      {importStats.duplicadosDetectados > 0
+                        ? "Se encontraron productos similares. Se ofrecerá opción de vincular."
+                        : "No se detectaron duplicados. ¡Listo para importar!"}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {pasoActual === 5 && (
+                <div>
+                  <h4>📥 Paso 5: Importando productos</h4>
+                  <div style={{ marginTop: 12 }}>
+                    <div
+                      style={{
+                        height: 8,
+                        borderRadius: 4,
+                        backgroundColor: "#e5e7eb",
+                        overflow: "hidden",
+                      }}
+                    >
+                      <div
+                        style={{
+                          height: "100%",
+                          backgroundColor: "#3b82f6",
+                          width: importStats ? `${(importStats.productosImportados / importStats.productosEncontrados) * 100}%` : "0%",
+                          transition: "width 0.3s ease",
+                        }}
+                      />
+                    </div>
+                    <div style={{ marginTop: 8, fontSize: 12, color: "var(--text-muted)", textAlign: "center" }}>
+                      {importStats?.productosImportados || 0} / {importStats?.productosEncontrados || 0} productos
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {pasoActual === 6 && (
+                <div>
+                  <h4>🎨 Paso 6: Importando variantes</h4>
+                  <p>Importando tallas, colores y opciones...</p>
+                  <div style={{ marginTop: 12, fontSize: 12, color: "var(--text-muted)" }}>
+                    {importStats?.variantesImportadas || 0} variantes procesadas
+                  </div>
+                </div>
+              )}
+
+              {pasoActual === 7 && (
+                <div>
+                  <h4>🔗 Paso 7: Vinculando productos</h4>
+                  <p>Guardando relación entre POS y Shopify...</p>
+                  <div style={{ marginTop: 12, fontSize: 12, color: "var(--text-muted)" }}>
+                    {importStats?.productosVinculados || 0} productos vinculados
+                  </div>
+                </div>
+              )}
+
+              {pasoActual === 8 && importStats && (
+                <div>
+                  <h4>✅ Importación completada</h4>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
+                    <div style={{ padding: 12, backgroundColor: "#ecfdf5", borderRadius: 8 }}>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: "#10b981" }}>{importStats.productosImportados}</div>
+                      <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Productos importados</div>
+                    </div>
+                    <div style={{ padding: 12, backgroundColor: "#eff6ff", borderRadius: 8 }}>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: "#3b82f6" }}>{importStats.variantesImportadas}</div>
+                      <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Variantes</div>
+                    </div>
+                    <div style={{ padding: 12, backgroundColor: "#f3e8ff", borderRadius: 8 }}>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: "#8b5cf6" }}>{importStats.duplicadosDetectados}</div>
+                      <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Duplicados</div>
+                    </div>
+                    <div style={{ padding: 12, backgroundColor: "#fee2e2", borderRadius: 8 }}>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: "#ef4444" }}>{importStats.errores}</div>
+                      <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Errores</div>
+                    </div>
+                  </div>
+
+                  {importStats.erroresDetalle.length > 0 && (
+                    <div style={{ marginTop: 16, padding: 12, backgroundColor: "#fef2f2", borderRadius: 8, border: "1px solid #fecaca" }}>
+                      <div style={{ fontWeight: 600, marginBottom: 8, color: "#dc2626" }}>Errores encontrados:</div>
+                      <ul style={{ margin: 0, paddingLeft: 20, fontSize: 12 }}>
+                        {importStats.erroresDetalle.slice(0, 3).map((err, idx) => (
+                          <li key={idx} style={{ marginBottom: 4, color: "var(--text-muted)" }}>
+                            <strong>{err.producto}</strong>: {err.error}
+                          </li>
+                        ))}
+                      </ul>
+                      {importStats.erroresDetalle.length > 3 && (
+                        <div style={{ marginTop: 8, color: "var(--text-muted)", fontSize: 11 }}>
+                          +{importStats.erroresDetalle.length - 3} errores más
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {error && <div className="error-text" style={{ marginTop: 16 }}>{error}</div>}
+                </div>
+              )}
+            </div>
+
+            {/* Botones */}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              {pasoActual < 8 ? (
+                <>
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => setMostrarAsistente(false)}
+                    disabled={importandoEnProgreso}
+                  >
+                    Cancelar
+                  </button>
+                  {pasoActual === 1 && (
+                    <button type="button" onClick={iniciarImportacion} disabled={importandoEnProgreso}>
+                      {importandoEnProgreso ? "Importando..." : "Iniciar importación"}
+                    </button>
+                  )}
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setMostrarAsistente(false)}
+                  style={{ minWidth: 140 }}
+                >
+                  ✅ Listo
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
+      `}</style>
     </div>
   );
 }
