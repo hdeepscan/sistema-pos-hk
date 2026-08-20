@@ -106,6 +106,40 @@ export async function shopifyRoutes(app: FastifyInstance) {
     }
   });
 
+  // Importación inicial de productos desde Shopify
+  app.post("/shopify/sync-inicial", async (request, reply) => {
+    const { empresaId } = request.user;
+    const config = await prisma.shopifyConfig.findUnique({ where: { empresaId } });
+    if (!config) return reply.code(400).send({ error: "Configura Shopify antes de importar" });
+    if (!config.accessToken) return reply.code(400).send({ error: "Token de acceso no disponible. Reconecta Shopify." });
+
+    try {
+      request.log.info(`[shopify-import] Iniciando importación para empresa ${empresaId}`);
+
+      const { ShopifyImportService } = await import("../lib/shopify-import-service.js");
+      const importService = new ShopifyImportService(config.shopDomain, config.accessToken, empresaId);
+
+      const stats = await importService.importarProductosInicial((progress) => {
+        request.log.info(`[shopify-import] Progreso: ${progress.productosImportados}/${progress.productosEncontrados} productos`);
+      });
+
+      // Actualizar última sincronización
+      await prisma.shopifyConfig.update({
+        where: { empresaId },
+        data: { ultimaSincronizacion: new Date() },
+      });
+
+      return reply.code(200).send(stats);
+    } catch (err) {
+      const mensaje = err instanceof Error ? err.message : "Error desconocido";
+      request.log.error(`[shopify-import] Error: ${mensaje}`);
+      return reply.code(502).send({
+        error: mensaje,
+        detalles: process.env.NODE_ENV === "development" ? String(err) : undefined,
+      });
+    }
+  });
+
   // Callback URL para OAuth2 de Shopify (cuando se implemente flujo con redirección)
   app.get("/shopify/callback", async (request, reply) => {
     const code = (request.query as any).code;
