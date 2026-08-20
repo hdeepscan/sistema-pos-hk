@@ -63,7 +63,7 @@ export default function Backups() {
     const archivo = await electronAPI.elegirArchivo([{ name: "Respaldo SQL", extensions: ["sql"] }]);
     if (!archivo) return;
     const confirmacion = prompt(
-      'Esto REEMPLAZA todos los datos actuales por los del respaldo. Esta accion no se puede deshacer.\n\nEscribe RESTAURAR para confirmar:'
+      '⚠️ ADVERTENCIA: Esto REEMPLAZA todos los datos actuales por los del respaldo.\nEsta accion NO SE PUEDE DESHACER.\n\nEscribe RESTAURAR para confirmar:'
     );
     if (confirmacion !== "RESTAURAR") return;
 
@@ -74,8 +74,32 @@ export default function Backups() {
       const bytes = base64ABuffer(archivo.contenidoBase64);
       // En web, axios maneja mejor Blob que Uint8Array
       const blob = new Blob([bytes], { type: "application/sql" });
-      await api.post("/backup/restaurar", blob, { headers: { "Content-Type": "application/sql" } });
-      setMensaje("Respaldo restaurado. Cierra sesion y vuelve a entrar para ver los datos restaurados.");
+
+      try {
+        // Intentar sin confirmación primero
+        await api.post("/backup/restaurar", blob, { headers: { "Content-Type": "application/sql" } });
+        setMensaje("Respaldo restaurado. Cierra sesion y vuelve a entrar para ver los datos restaurados.");
+      } catch (err: any) {
+        // Si es error 403 con requiresConfirmation, pedir confirmación extra
+        if (err.response?.status === 403 && err.response?.data?.requiresConfirmation) {
+          const confirmacionExtra = prompt(
+            `⚠️ RIESGO CRÍTICO:\n${err.response.data.error}\n\nEsta base de datos aloja MÚLTIPLES EMPRESAS.\nRestaurar un backup COMPLETO puede ELIMINAR datos de otros negocios.\n\nEscribe "ACEPTAR RIESGO" si entiendes y asumes este riesgo:`
+          );
+          if (confirmacionExtra !== "ACEPTAR RIESGO") {
+            setError("Restauración cancelada por el usuario");
+            setRestaurando(false);
+            return;
+          }
+
+          // Reintentar con confirmación
+          await api.post("/backup/restaurar", blob, {
+            headers: { "Content-Type": "application/sql", "X-Confirm-Restore": "true" },
+          });
+          setMensaje("✅ Respaldo restaurado (BD compartida). Cierra sesión y vuelve a entrar para ver los datos restaurados.");
+        } else {
+          throw err;
+        }
+      }
     } catch (err: any) {
       setError(mensajeError(err, "No se pudo restaurar el respaldo"));
     } finally {

@@ -75,8 +75,22 @@ export async function backupRoutes(app: FastifyInstance) {
     const { empresaId, usuarioId } = request.user;
     const databaseUrl = process.env.DATABASE_URL;
     if (!databaseUrl) return reply.code(500).send({ error: "DATABASE_URL no esta configurada" });
+
+    // Si es BD compartida, pedir confirmación explícita
     const bloqueo = await verificarBaseDeUnaSolaEmpresa();
-    if (bloqueo) return reply.code(403).send({ error: bloqueo });
+    if (bloqueo) {
+      // Permitir restauración pero solo si se pasa el header de confirmación
+      const confirmado = (request.headers["x-confirm-restore"] as string) === "true";
+      if (!confirmado) {
+        return reply.code(403).send({
+          error: bloqueo,
+          requiresConfirmation: true,
+          mensaje: "Esta base de datos es compartida (multi-empresa). Para restaurar, debes confirmar explícitamente que entiendes los riesgos.",
+        });
+      }
+      // Confirmación recibida, proceder con la restauración
+      request.log.warn(`[RESTORE] BD compartida: usuario ${usuarioId} está restaurando backup - riesgo de pérdida de datos`);
+    }
 
     const body = request.body as Buffer;
     if (!body || body.length === 0) {
