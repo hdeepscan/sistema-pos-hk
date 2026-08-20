@@ -115,7 +115,19 @@ export async function backupRoutes(app: FastifyInstance) {
 
     if (!resultado.ok) {
       request.log.error(`psql restore fallo: ${resultado.mensaje}`);
-      return reply.code(502).send({ error: "No se pudo restaurar el respaldo. Revisa que el archivo sea valido." });
+      // Mostrar el error real para debugging
+      const errorMensaje = resultado.mensaje.slice(0, 500); // Primeros 500 caracteres del error
+      return reply.code(502).send({
+        error: "No se pudo restaurar el respaldo. Revisa que el archivo sea válido.",
+        detalles: process.env.NODE_ENV === "development" ? errorMensaje : undefined,
+        causa: resultado.mensaje.includes("permission denied")
+          ? "Error de permisos en la base de datos"
+          : resultado.mensaje.includes("syntax error")
+          ? "Error de sintaxis en el archivo SQL"
+          : resultado.mensaje.includes("does not exist")
+          ? "Tabla o esquema no encontrado en la BD"
+          : "Error desconocido"
+      });
     }
 
     registrarAuditoria({
