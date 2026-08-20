@@ -31,6 +31,7 @@ export default function Configuracion() {
   const [buscandoUpdate, setBuscandoUpdate] = useState(false);
   const [sonidoActivado, setSonidoActivado] = useState(true);
   const [sonidoVolumen, setSonidoVolumen] = useState(0.6);
+  const [descuentosClave, setDescuentosClave] = useState("");
   const [puntosActivo, setPuntosActivo] = useState(false);
   const [pesosPorPunto, setPesosPorPunto] = useState("");
   const [valorPunto, setValorPunto] = useState("");
@@ -52,6 +53,7 @@ export default function Configuracion() {
       setImpresoraSeleccionada(c.printerName ?? "");
       setSonidoActivado(c.sonidoActivado);
       setSonidoVolumen(c.sonidoVolumen);
+      setDescuentosClave(c.descuentosClave ?? "");
       setEtqAncho(String(c.etiquetaAnchoMm ?? 50));
       setEtqAlto(String(c.etiquetaAltoMm ?? 25));
       setEtqOffsetX(String(c.etiquetaOffsetXMm ?? 0));
@@ -273,6 +275,33 @@ export default function Configuracion() {
             />
           </label>
         )}
+      </div>
+
+      <div className="card">
+        <h3>Descuentos</h3>
+        <label>
+          Clave para autorizar descuentos (usuarios normales necesitarán esta clave)
+          <input
+            type="password"
+            placeholder="Dejar vacío para no requerir clave"
+            value={descuentosClave}
+            onChange={(e) => setDescuentosClave(e.target.value)}
+          />
+        </label>
+        <p style={{ fontSize: 11.5, color: "var(--text-muted)", margin: "8px 0 0" }}>
+          💡 Si configuras una clave, los usuarios normales deberán ingresarla cada vez que intenten hacer un descuento. Los administradores pueden descontar sin clave.
+        </p>
+        <button
+          type="button"
+          onClick={async () => {
+            await window.pos.setConfig({ descuentosClave });
+            setMensajeEtq("Clave guardada correctamente");
+            setTimeout(() => setMensajeEtq(null), 3000);
+          }}
+          style={{ width: "fit-content", marginTop: 12 }}
+        >
+          Guardar clave
+        </button>
       </div>
 
       <div className="card">

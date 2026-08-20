@@ -158,6 +158,13 @@ export default function Pos() {
   const requiereCuenta = metodoPago !== "EFECTIVO" && metodoPago !== "CREDITO";
 
   useEffect(() => {
+    // Cargar config de descuentosClave y detectar si es administrador
+    electronAPI.getConfig().then((config) => {
+      setEsAdministrador(usuario?.permisos?.includes("admin.configurar") ?? false);
+    });
+  }, [usuario?.permisos]);
+
+  useEffect(() => {
     if (metodoPago !== "EFECTIVO") setDineroRecibido("");
     // Al elegir un pago no-efectivo/no-credito, sugiere la primera cuenta.
     if (metodoPago !== "EFECTIVO" && metodoPago !== "CREDITO") {
@@ -309,6 +316,32 @@ export default function Pos() {
     if (carrito.length > 0 && !confirm("El carrito actual tiene productos. ¿Reemplazarlo por la venta en espera?")) return;
     setCarrito(v.carrito);
     setEnEspera((prev) => prev.filter((e) => e.id !== v.id));
+  }
+
+  async function handleDescuentoChange(valor: string) {
+    // Si el valor es vacío, permitir sin restricción
+    if (!valor || Number(valor) <= 0) {
+      setDescuentoValor(valor);
+      return;
+    }
+
+    // Si es administrador, permitir descuento sin clave
+    if (esAdministrador) {
+      setDescuentoValor(valor);
+      return;
+    }
+
+    // Si no es administrador, pedir clave
+    const config = await electronAPI.getConfig();
+    if (config.descuentosClave) {
+      // Mostrar modal para pedir la clave
+      setMostrarModalClaveDescuento(true);
+      setClaveDescuentoIngresada("");
+      setDescuentoValor(valor); // Almacenar el valor temporalmente
+    } else {
+      // No hay clave configurada, permitir descuento
+      setDescuentoValor(valor);
+    }
   }
 
   function limpiarCarrito() {
@@ -733,7 +766,7 @@ export default function Pos() {
                   min={0}
                   placeholder="0"
                   value={descuentoValor}
-                  onChange={(e) => setDescuentoValor(e.target.value)}
+                  onChange={(e) => handleDescuentoChange(e.target.value)}
                   style={{ flex: 1 }}
                 />
               </div>
@@ -900,6 +933,55 @@ export default function Pos() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de clave de descuento */}
+      {mostrarModalClaveDescuento && (
+        <div className="modal-backdrop" onClick={() => setMostrarModalClaveDescuento(false)}>
+          <div className="card" style={{ width: 340 }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ marginTop: 0 }}>Autorización requerida</h3>
+            <p>Este usuario necesita ingresa la clave de autorización para aplicar descuentos.</p>
+            <input
+              type="password"
+              placeholder="Ingresa la clave"
+              value={claveDescuentoIngresada}
+              onChange={(e) => setClaveDescuentoIngresada(e.target.value)}
+              autoFocus
+              style={{ width: "100%", marginBottom: 12 }}
+            />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                type="button"
+                onClick={async () => {
+                  const config = await electronAPI.getConfig();
+                  if (claveDescuentoIngresada === config.descuentosClave) {
+                    setMostrarModalClaveDescuento(false);
+                    setClaveDescuentoIngresada("");
+                  } else {
+                    setError("Clave incorrecta. Intenta de nuevo.");
+                    setClaveDescuentoIngresada("");
+                  }
+                }}
+                style={{ flex: 1 }}
+              >
+                Confirmar
+              </button>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => {
+                  setMostrarModalClaveDescuento(false);
+                  setDescuentoValor("");
+                  setClaveDescuentoIngresada("");
+                  setError(null);
+                }}
+                style={{ flex: 1 }}
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}
