@@ -342,10 +342,28 @@ export const electronAPI = {
     const etiquetasHTML = items
       .flatMap((item: any, idx: number) =>
         Array.from({ length: item.copias || 1 }).map(() => `
-          <div style="width: 50mm; height: 25mm; border: 1px solid #ccc; padding: 2mm; page-break-inside: avoid; display: inline-block; margin: 2mm; box-sizing: border-box; font-family: sans-serif; text-align: center;">
-            <div style="font-size: 8px; font-weight: bold; max-width: 100%; overflow: hidden; text-overflow: ellipsis;">${item.nombre || ""}</div>
-            ${item.svgCodigoBarras ? `<div style="margin: 1mm 0;">${item.svgCodigoBarras}</div>` : ""}
-            <div style="font-size: 10px; font-weight: bold;">$${(item.precio || 0).toLocaleString("es-CO")}</div>
+          <div style="
+            width: 60mm;
+            height: 35mm;
+            border: 2px dashed #333;
+            padding: 3mm;
+            page-break-inside: avoid;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 2mm;
+          ">
+            <div style="font-size: 9px; font-weight: bold; width: 100%; max-width: 100%; overflow: hidden; text-overflow: ellipsis; line-height: 1.2;">
+              ${item.nombre || ""}
+            </div>
+            ${item.svgCodigoBarras ? `<div style="flex-grow: 1; display: flex; align-items: center; justify-content: center;">${item.svgCodigoBarras}</div>` : ""}
+            <div style="font-size: 11px; font-weight: bold; margin-top: 2mm;">
+              $${(item.precio || 0).toLocaleString("es-CO")}
+            </div>
           </div>
         `)
       )
@@ -358,12 +376,32 @@ export const electronAPI = {
           <meta charset="utf-8">
           <title>Etiquetas - Códigos de Barras</title>
           <style>
-            body { margin: 0; padding: 4mm; font-family: Arial, sans-serif; }
-            @media print { body { margin: 0; padding: 0; } }
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+              font-family: Arial, sans-serif;
+              padding: 8mm;
+              background: white;
+            }
+            .etiquetas-container {
+              display: grid;
+              grid-template-columns: repeat(3, 1fr);
+              gap: 8mm;
+              width: 100%;
+            }
+            @media print {
+              body { padding: 5mm; }
+              .etiquetas-container { gap: 5mm; }
+            }
+            @page {
+              margin: 8mm;
+              size: A4;
+            }
           </style>
         </head>
         <body>
-          ${etiquetasHTML}
+          <div class="etiquetas-container">
+            ${etiquetasHTML}
+          </div>
         </body>
       </html>
     `;
