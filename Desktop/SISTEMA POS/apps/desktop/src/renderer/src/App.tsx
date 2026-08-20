@@ -24,7 +24,6 @@ import Notificaciones from "./screens/Notificaciones";
 import Backups from "./screens/Backups";
 import Caja from "./screens/Caja";
 import Auditoria from "./screens/Auditoria";
-import Shopify from "./screens/Shopify";
 import MetaAds from "./screens/MetaAds";
 import CuentasBancarias from "./screens/CuentasBancarias";
 import Calendario from "./screens/Calendario";
@@ -114,7 +113,6 @@ export default function App() {
         <Route path="/backups" element={<Backups />} />
         <Route path="/caja" element={<Caja />} />
         <Route path="/auditoria" element={<Auditoria />} />
-        <Route path="/shopify" element={<Shopify />} />
         <Route path="/meta-ads" element={<MetaAds />} />
         <Route path="/cuentas-bancarias" element={<CuentasBancarias />} />
         <Route path="/calendario" element={<Calendario />} />

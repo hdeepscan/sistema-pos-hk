@@ -2,10 +2,8 @@ import type { PropsWithChildren } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useSesionStore, usePermiso } from "../lib/store";
-import { usePedidoShopify } from "../lib/socket";
 import { api } from "../lib/api";
 import { reproducir } from "../lib/sonidos";
-import type { PedidoShopifyEvent } from "@sistema-pos/shared";
 import logo from "../assets/logo.png";
 import { electronAPI } from "../lib/electron-api";
 
@@ -22,46 +20,12 @@ export default function Layout({ children }: PropsWithChildren) {
   const puedeVerReportes = usePermiso("reportes.ver");
   const puedeAdministrarConfiguracion = usePermiso("configuracion.administrar");
   const sucursalActiva = sucursales.find((s) => s.id === sucursalActivaId);
-  const [alertas, setAlertas] = useState<(PedidoShopifyEvent & { toastId: string })[]>([]);
   const [creditosVencidos, setCreditosVencidos] = useState(0);
   const [alertaCreditosOculta, setAlertaCreditosOculta] = useState(false);
   const [alertasCobro, setAlertasCobro] = useState(0);
   const [eventosHoy, setEventosHoy] = useState(0);
-  const [pedidosPendientes, setPedidosPendientes] = useState(0);
-  const [shopDomain, setShopDomain] = useState<string | null>(null);
   const [update, setUpdate] = useState<{ estado: string; version?: string; porcentaje?: number } | null>(null);
   const navigate = useNavigate();
-
-  useEffect(() => {
-    api
-      .get("/shopify/config")
-      .then(({ data }) => setShopDomain(data.conectado ? data.shopDomain : null))
-      .catch(() => setShopDomain(null));
-  }, []);
-
-  const cargarPendientesShopify = useCallback(() => {
-    api
-      .get<{ pendientes: number }>("/pedidos-shopify/resumen")
-      .then(({ data }) => setPedidosPendientes(data.pendientes))
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    cargarPendientesShopify();
-    const timer = setInterval(cargarPendientesShopify, INTERVALO_CREDITOS_MS);
-    return () => clearInterval(timer);
-  }, [cargarPendientesShopify]);
-
-  usePedidoShopify(
-    useCallback(
-      (evt: PedidoShopifyEvent) => {
-        void reproducir("pedido_shopify");
-        setAlertas((prev) => [...prev, { ...evt, toastId: `${evt.ordenId}-${Date.now()}` }]);
-        cargarPendientesShopify();
-      },
-      [cargarPendientesShopify]
-    )
-  );
 
   useEffect(() => {
     if (!puedeVerCreditos) return;
@@ -103,20 +67,6 @@ export default function Layout({ children }: PropsWithChildren) {
 
   function cerrarAlerta(toastId: string) {
     setAlertas((prev) => prev.filter((a) => a.toastId !== toastId));
-  }
-
-  function verPedido(ordenId: string) {
-    if (shopDomain) electronAPI.abrirEnlaceExterno(`https://${shopDomain}/admin/orders/${ordenId}`);
-  }
-
-  async function prepararPedido(alerta: PedidoShopifyEvent & { toastId: string }) {
-    try {
-      await api.patch(`/pedidos-shopify/${alerta.id}/atender`);
-    } catch {
-      // si ya se marco atendido desde otro lado, igual cerramos la alerta
-    }
-    cerrarAlerta(alerta.toastId);
-    cargarPendientesShopify();
   }
 
   async function cerrarSesion() {
@@ -178,7 +128,6 @@ export default function Layout({ children }: PropsWithChildren) {
         <NavLink to="/configuracion">Configuracion</NavLink>
         {puedeAdministrarConfiguracion && <NavLink to="/plantilla-recibo">Plantilla del recibo</NavLink>}
         {puedeAdministrarConfiguracion && <NavLink to="/backups">Copias de seguridad</NavLink>}
-        <NavLink to="/shopify">Shopify</NavLink>
         <NavLink to="/meta-ads">Meta Ads</NavLink>
 
         <div style={{ flex: 1 }} />
@@ -244,45 +193,6 @@ export default function Layout({ children }: PropsWithChildren) {
         )}
         {children}
       </main>
-
-      {alertas.length > 0 && (
-        <div style={{ position: "fixed", top: 16, right: 16, display: "flex", flexDirection: "column", gap: 8, zIndex: 100, width: 340 }}>
-          {alertas.map((a) => (
-            <div key={a.toastId} className="card pedido-alerta">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
-                <div>
-                  <div style={{ fontWeight: 700, marginBottom: 2 }}>🎉 ¡Nuevo pedido en Shopify!</div>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>
-                    Pedido {a.nombre} · ${a.total.toLocaleString("es-CO")}
-                  </div>
-                  {a.clienteNombre && <div style={{ fontSize: 12.5 }}>Cliente: {a.clienteNombre}</div>}
-                  {a.productos.length > 0 && (
-                    <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
-                      {a.productos.map((p) => `${p.cantidad}x ${p.nombre}`).join(", ")}
-                    </div>
-                  )}
-                  <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
-                    {new Date(a.fecha).toLocaleTimeString("es-CO")}
-                  </div>
-                </div>
-                <button className="secondary" style={{ padding: "2px 8px" }} onClick={() => cerrarAlerta(a.toastId)} type="button">
-                  ✕
-                </button>
-              </div>
-              <div className="toolbar" style={{ marginTop: 8 }}>
-                {shopDomain && (
-                  <button className="secondary" type="button" onClick={() => verPedido(a.ordenId)}>
-                    Ver pedido
-                  </button>
-                )}
-                <button type="button" onClick={() => prepararPedido(a)}>
-                  Preparar pedido
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
