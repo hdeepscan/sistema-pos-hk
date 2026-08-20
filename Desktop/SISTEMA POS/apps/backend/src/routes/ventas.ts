@@ -477,6 +477,24 @@ export async function ventasRoutes(app: FastifyInstance) {
         });
       }
       if (producto) {
+        // Agregar cambio a cola de sincronización (FASE 4)
+        void (async () => {
+          try {
+            const { ShopifySyncService } = await import("../lib/shopify-sync-service.js");
+            const syncService = new ShopifySyncService(empresaId);
+            if (producto.shopifyInventoryItemId) {
+              await syncService.agregarACola("INVENTORY_UPDATE", {
+                shopifyInventoryItemId: producto.shopifyInventoryItemId,
+                locationId: (await prisma.sucursal.findUnique({ where: { id: sucursalId } }))?.shopifyLocationId,
+                cantidad: -item.cantidad, // Negativo porque se vendió
+              });
+            }
+          } catch (err) {
+            console.error("[Sync Queue] Error agregando cambio:", err);
+          }
+        })();
+
+        // Mantener compatibilidad con flujo anterior
         void ajustarInventarioEnShopifySiCorresponde(empresaId, sucursalId, producto, -item.cantidad);
       }
     }

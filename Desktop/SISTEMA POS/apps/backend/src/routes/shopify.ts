@@ -172,6 +172,98 @@ export async function shopifyRoutes(app: FastifyInstance) {
     }
   });
 
+  // Procesar cola de sincronización (FASE 4)
+  app.post("/shopify/procesar-cola", async (request, reply) => {
+    const { empresaId } = request.user;
+    const config = await prisma.shopifyConfig.findUnique({ where: { empresaId } });
+    if (!config) return reply.code(400).send({ error: "Configura Shopify antes de procesar cola" });
+
+    try {
+      request.log.info(`[shopify-queue] Iniciando procesamiento de cola para empresa ${empresaId}`);
+
+      const { ShopifySyncService } = await import("../lib/shopify-sync-service.js");
+      const syncService = new ShopifySyncService(empresaId, config.shopDomain, config.accessToken);
+
+      const resultado = await syncService.procesarCola();
+
+      return reply.code(200).send({
+        procesados: resultado.procesados,
+        errores: resultado.errores,
+        timestamp: new Date(),
+      });
+    } catch (err) {
+      const mensaje = err instanceof Error ? err.message : "Error desconocido";
+      request.log.error(`[shopify-queue] Error: ${mensaje}`);
+      return reply.code(502).send({
+        error: mensaje,
+        detalles: process.env.NODE_ENV === "development" ? String(err) : undefined,
+      });
+    }
+  });
+
+  // Obtener estado de la cola
+  app.get("/shopify/cola-estado", async (request, reply) => {
+    const { empresaId } = request.user;
+
+    try {
+      const { ShopifySyncService } = await import("../lib/shopify-sync-service.js");
+      const syncService = new ShopifySyncService(empresaId);
+
+      const estado = await syncService.obtenerEstadoCola();
+
+      return reply.code(200).send(estado);
+    } catch (err) {
+      const mensaje = err instanceof Error ? err.message : "Error desconocido";
+      request.log.error(`[shopify-queue-status] Error: ${mensaje}`);
+      return reply.code(502).send({ error: mensaje });
+    }
+  });
+
+  // Webhook de Shopify (FASE 4)
+  // IMPORTANTE: Este endpoint NO requiere autenticación (es llamado por Shopify)
+  app.post<{ Body: Record<string, any> }>("/shopify/webhooks", async (request, reply) => {
+    try {
+      const payload = request.body;
+
+      // Extraer empresaId del header personalizado o del payload
+      // (esto debería configurarse en Shopify con un query param o header seguro)
+      const empresaId = (request.headers["x-empresaid"] as string) || null;
+
+      if (!empresaId) {
+        request.log.warn(`[shopify-webhook] Webhook recibido sin empresaId`);
+        return reply.code(400).send({ error: "empresaId requerido" });
+      }
+
+      request.log.info(`[shopify-webhook] Webhook recibido para empresa ${empresaId}`);
+
+      // Verificar que la empresa existe y tiene Shopify configurado
+      const config = await prisma.shopifyConfig.findUnique({ where: { empresaId } });
+      if (!config) {
+        return reply.code(400).send({ error: "Empresa no tiene Shopify configurado" });
+      }
+
+      // Procesar webhook
+      const { ShopifySyncService } = await import("../lib/shopify-sync-service.js");
+      const syncService = new ShopifySyncService(empresaId);
+
+      await syncService.procesarWebhook({
+        type: (request.headers["x-shopify-topic"] as string) || "unknown",
+        resourceId: payload.id?.toString() || "unknown",
+        resourceGid: payload.admin_graphql_api_id,
+        data: payload,
+      });
+
+      return reply.code(202).send({ status: "accepted" });
+    } catch (err) {
+      const mensaje = err instanceof Error ? err.message : "Error desconocido";
+      request.log.error(`[shopify-webhook] Error: ${mensaje}`);
+      return reply.code(502).send({
+        error: mensaje,
+        detalles: process.env.NODE_ENV === "development" ? String(err) : undefined,
+      });
+    }
+  });
+
   // Callback URL para OAuth2 de Shopify (cuando se implemente flujo con redirección)
   app.get("/shopify/callback", async (request, reply) => {
     const code = (request.query as any).code;

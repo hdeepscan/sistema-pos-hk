@@ -87,6 +87,8 @@ model Empresa {
   shopifyLocations ShopifyLocation[]
   shopifyInventoryItems ShopifyInventoryItem[]
   shopifyInventoryLevels ShopifyInventoryLevel[]
+  shopifySyncQueue ShopifySyncQueue[]
+  shopifyWebhookEvents ShopifyWebhookEvent[]
 
   @@map("empresas")
 }
@@ -191,6 +193,7 @@ model Producto {
   // queda restringido solo a las sucursales listadas.
   sucursalesDisponibles ProductoSucursal[]
   shopifyInventoryItems ShopifyInventoryItem[]
+  shopifySyncQueue ShopifySyncQueue[]
 
   @@unique([empresaId, sku])
   @@index([empresaId, codigoBarras])
@@ -831,4 +834,59 @@ model ShopifyInventoryLevel {
   @@index([empresaId])
   @@index([locationId])
   @@map("shopify_inventory_levels")
+}
+
+// FASE 4: Cola de sincronización bidireccional
+enum TipoCambioShopify {
+  INVENTORY_UPDATE     // Cambio de stock en POS
+  PRODUCT_UPDATE       // Actualizar producto
+  PRODUCT_CREATE       // Crear nuevo producto
+  PRICE_UPDATE         // Cambiar precio
+}
+
+enum EstadoSincronizacion {
+  PENDIENTE            // Esperando procesarse
+  PROCESANDO           // Siendo procesado
+  COMPLETADO           // Completado exitosamente
+  ERROR                // Error al procesar
+}
+
+// Cola de cambios pendientes para sincronizar con Shopify
+model ShopifySyncQueue {
+  id                   String    @id @default(uuid())
+  empresaId            String
+  empresa              Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  productoId           String?
+  producto             Producto? @relation(fields: [productoId], references: [id], onDelete: SetNull)
+  tipo                 TipoCambioShopify
+  estado               EstadoSincronizacion @default(PENDIENTE)
+  datos                String    // JSON con los cambios a sincronizar
+  intentos             Int       @default(0)
+  maxIntentos          Int       @default(3)
+  proximoIntento       DateTime  @default(now())
+  errorMensaje         String?
+  creadoEn             DateTime  @default(now())
+  procesadoEn          DateTime?
+
+  @@index([empresaId, estado, proximoIntento])
+  @@index([productoId])
+  @@map("shopify_sync_queue")
+}
+
+// Log de webhooks recibidos desde Shopify
+model ShopifyWebhookEvent {
+  id                   String    @id @default(uuid())
+  empresaId            String
+  empresa              Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  tipo                 String    // "products/update", "inventory/update", etc
+  shopifyResourceId    String    // ID del recurso en Shopify
+  shopifyResourceGid   String?   // GID completo (gid://shopify/...)
+  datos                String    // JSON completo del evento
+  procesado            Boolean   @default(false)
+  procesoError         String?
+  creadoEn             DateTime  @default(now())
+
+  @@index([empresaId, tipo, creadoEn])
+  @@index([empresaId, procesado])
+  @@map("shopify_webhook_events")
 }
