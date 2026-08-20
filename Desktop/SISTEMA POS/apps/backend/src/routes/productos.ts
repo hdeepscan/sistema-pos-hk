@@ -1076,4 +1076,85 @@ export async function productosRoutes(app: FastifyInstance) {
 
     return reply.code(201).send(nuevaVariante);
   });
+
+  // Importar productos desde CSV
+  app.post("/productos/importar", async (request, reply) => {
+    const { empresaId } = request.user;
+    const { productos } = request.body as {
+      productos: Array<{
+        sku: string;
+        nombre: string;
+        categoria?: string;
+        precio?: number;
+        costo?: number;
+        codigoBarras?: string;
+      }>;
+    };
+
+    if (!Array.isArray(productos) || productos.length === 0) {
+      return reply.code(400).send({ error: "Se requiere un array de productos" });
+    }
+
+    const resultados = {
+      creados: 0,
+      actualizados: 0,
+      errores: [] as string[],
+    };
+
+    try {
+      for (const prod of productos) {
+        if (!prod.sku || !prod.nombre) {
+          resultados.errores.push(`Falta SKU o nombre en producto`);
+          continue;
+        }
+
+        try {
+          const existente = await prisma.producto.findUnique({
+            where: { empresaId_sku: { empresaId, sku: prod.sku } },
+          });
+
+          if (existente) {
+            // Actualizar producto existente
+            await prisma.producto.update({
+              where: { id: existente.id },
+              data: {
+                nombre: prod.nombre,
+                categoria: prod.categoria || undefined,
+                precio: prod.precio ?? undefined,
+                costo: prod.costo ?? undefined,
+                codigoBarras: prod.codigoBarras || undefined,
+              },
+            });
+            resultados.actualizados++;
+          } else {
+            // Crear nuevo producto
+            await prisma.producto.create({
+              data: {
+                id: randomUUID(),
+                empresaId,
+                sku: prod.sku,
+                nombre: prod.nombre,
+                categoria: prod.categoria || null,
+                precio: prod.precio ?? 0,
+                costo: prod.costo ?? 0,
+                codigoBarras: prod.codigoBarras || null,
+                activo: true,
+              },
+            });
+            resultados.creados++;
+          }
+        } catch (err) {
+          resultados.errores.push(`Error procesando SKU ${prod.sku}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+
+      return reply.code(200).send(resultados);
+    } catch (err) {
+      request.log.error(err, "Error importando productos");
+      return reply.code(500).send({
+        error: "Error procesando importación",
+        detalles: process.env.NODE_ENV === "development" ? String(err) : undefined,
+      });
+    }
+  });
 }
