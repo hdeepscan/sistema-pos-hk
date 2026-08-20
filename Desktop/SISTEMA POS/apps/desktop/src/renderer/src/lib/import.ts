@@ -4,6 +4,7 @@ export interface ColumnaImport<T = any> {
   tipo?: "string" | "number" | "boolean"; // Tipo de conversión
   requerido?: boolean; // Si la columna es obligatoria
   validar?: (valor: any) => boolean; // Función de validación personalizada
+  alternativas?: string[]; // Nombres alternativos de la columna (para Shopify, etc)
 }
 
 function parseValue(valor: string, tipo?: string): any {
@@ -41,9 +42,25 @@ export async function importarCSV<T>(archivo: File, columnas: ColumnaImport<T>[]
         const indicesColumnas = new Map<string, number>();
 
         for (const col of columnas) {
-          const indice = encabezados.indexOf(col.encabezado);
-          if (indice === -1 && col.requerido !== false) {
-            console.warn(`Columna opcional "${col.encabezado}" no encontrada`);
+          // Buscar en el encabezado exacto
+          let indice = encabezados.findIndex(
+            (h) => h.toLowerCase() === col.encabezado.toLowerCase()
+          );
+
+          // Buscar en alternativas (para Shopify, etc)
+          if (indice === -1 && col.alternativas) {
+            for (const alt of col.alternativas) {
+              indice = encabezados.findIndex(
+                (h) => h.toLowerCase() === alt.toLowerCase()
+              );
+              if (indice !== -1) break;
+            }
+          }
+
+          if (indice === -1 && col.requerido) {
+            console.warn(
+              `Columna requerida "${col.encabezado}" no encontrada. Alternativas: ${col.alternativas?.join(", ") || "ninguna"}`
+            );
           }
           if (indice !== -1) {
             indicesColumnas.set(col.clave, indice);

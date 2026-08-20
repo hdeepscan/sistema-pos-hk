@@ -13,12 +13,46 @@ interface ProductoImportacion {
 }
 
 const COLUMNAS: ColumnaImport<ProductoImportacion>[] = [
-  { encabezado: "SKU", clave: "sku", requerido: true },
-  { encabezado: "Producto", clave: "nombre", requerido: true },
-  { encabezado: "Categoria", clave: "categoria", tipo: "string", requerido: false },
-  { encabezado: "Precio", clave: "precio", tipo: "number", requerido: false },
-  { encabezado: "Costo", clave: "costo", tipo: "number", requerido: false },
-  { encabezado: "Codigo de barras", clave: "codigoBarras", tipo: "string", requerido: false },
+  {
+    encabezado: "SKU",
+    clave: "sku",
+    requerido: true,
+    alternativas: ["Variant SKU", "sku", "product_id"],
+  },
+  {
+    encabezado: "Producto",
+    clave: "nombre",
+    requerido: true,
+    alternativas: ["Title", "Product Title", "nombre", "product_name"],
+  },
+  {
+    encabezado: "Categoria",
+    clave: "categoria",
+    tipo: "string",
+    requerido: false,
+    alternativas: ["Product Category", "Type", "categoria", "category"],
+  },
+  {
+    encabezado: "Precio",
+    clave: "precio",
+    tipo: "number",
+    requerido: false,
+    alternativas: ["Variant Price", "Price", "precio", "product_price"],
+  },
+  {
+    encabezado: "Costo",
+    clave: "costo",
+    tipo: "number",
+    requerido: false,
+    alternativas: ["Cost per item", "Cost", "costo", "product_cost"],
+  },
+  {
+    encabezado: "Codigo de barras",
+    clave: "codigoBarras",
+    tipo: "string",
+    requerido: false,
+    alternativas: ["Variant Barcode", "Barcode", "codigo_barras", "ean"],
+  },
 ];
 
 export function ModalImportarProductos({
