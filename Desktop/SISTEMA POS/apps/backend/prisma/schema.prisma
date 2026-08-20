@@ -84,6 +84,9 @@ model Empresa {
   creditosManuales CreditoManual[]
   cuentasBancarias CuentaBancaria[]
   eventosCalendario EventoCalendario[]
+  shopifyLocations ShopifyLocation[]
+  shopifyInventoryItems ShopifyInventoryItem[]
+  shopifyInventoryLevels ShopifyInventoryLevel[]
 
   @@map("empresas")
 }
@@ -187,6 +190,7 @@ model Producto {
   // Sin filas = disponible en todas las sucursales (default). Con filas,
   // queda restringido solo a las sucursales listadas.
   sucursalesDisponibles ProductoSucursal[]
+  shopifyInventoryItems ShopifyInventoryItem[]
 
   @@unique([empresaId, sku])
   @@index([empresaId, codigoBarras])
@@ -768,4 +772,63 @@ model PagoCreditoManual {
 
   @@index([cuotaId])
   @@map("pagos_credito_manual")
+}
+
+// Ubicaciones (warehouses) de Shopify sincronizadas para inventario
+model ShopifyLocation {
+  id                String    @id @default(uuid())
+  empresaId         String
+  empresa           Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  shopifyLocationId String    // Shopify GID: gid://shopify/Location/123456
+  nombre            String    // Ej: "Bodega Principal", "Tienda Física"
+  activa            Boolean   @default(true)
+  creadoEn          DateTime  @default(now())
+
+  inventoryLevels   ShopifyInventoryLevel[]
+
+  @@unique([empresaId, shopifyLocationId])
+  @@index([empresaId])
+  @@map("shopify_locations")
+}
+
+// Items de inventario de Shopify (variantes vinculadas con inventory tracking)
+model ShopifyInventoryItem {
+  id                    String    @id @default(uuid())
+  empresaId             String
+  empresa               Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  shopifyInventoryItemId String   // Shopify GID: gid://shopify/InventoryItem/123456
+  shopifyVariantId      String?   // Shopify GID para la variante
+  productoId            String?   // Vinculo con producto POS si existe
+  producto              Producto? @relation(fields: [productoId], references: [id], onDelete: SetNull)
+  tracked               Boolean   @default(true) // Si Shopify trackea este item
+  requiresShipping      Boolean   @default(true)
+  creadoEn              DateTime  @default(now())
+
+  inventoryLevels       ShopifyInventoryLevel[]
+
+  @@unique([empresaId, shopifyInventoryItemId])
+  @@index([empresaId, shopifyVariantId])
+  @@index([productoId])
+  @@map("shopify_inventory_items")
+}
+
+// Niveles de stock de Shopify por ubicacion
+model ShopifyInventoryLevel {
+  id                 String    @id @default(uuid())
+  empresaId          String
+  empresa            Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  inventoryItemId    String
+  inventoryItem      ShopifyInventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  locationId         String
+  location           ShopifyLocation @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  disponible         Int       @default(0)   // Cantidad disponible para venta
+  enMano             Int       @default(0)   // Cantidad fisica en mano
+  comprometida       Int       @default(0)   // Cantidad reservada/pendiente
+  entrante           Int       @default(0)   // Cantidad en transito/entrante
+  actualizadoEn      DateTime  @default(now()) @updatedAt
+
+  @@unique([inventoryItemId, locationId])
+  @@index([empresaId])
+  @@index([locationId])
+  @@map("shopify_inventory_levels")
 }

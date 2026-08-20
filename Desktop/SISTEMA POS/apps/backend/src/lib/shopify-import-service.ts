@@ -16,6 +16,15 @@ export interface ImportStats {
   erroresDetalle: Array<{ producto: string; error: string }>;
 }
 
+export interface ImportInventoryStats {
+  ubicacionesEncontradas: number;
+  ubicacionesImportadas: number;
+  itemsDeInventarioImportados: number;
+  nivelesDeInventarioImportados: number;
+  errores: number;
+  erroresDetalle: Array<{ ubicacion?: string; error: string }>;
+}
+
 export class ShopifyImportService {
   private client: ShopifyGraphQLClient;
   private empresaId: string;
@@ -183,6 +192,208 @@ export class ShopifyImportService {
     }
 
     console.log(`[Import] Producto importado: ${shopifyProduct.title} (${variants.length} variante(s))`);
+  }
+
+  /**
+   * FASE 3: Importar inventario (ubicaciones y niveles de stock)
+   */
+  async importarInventario(): Promise<ImportInventoryStats> {
+    const invStats: ImportInventoryStats = {
+      ubicacionesEncontradas: 0,
+      ubicacionesImportadas: 0,
+      itemsDeInventarioImportados: 0,
+      nivelesDeInventarioImportados: 0,
+      errores: 0,
+      erroresDetalle: [],
+    };
+
+    try {
+      console.log(`[Inventory] Iniciando importación de inventario para empresa ${this.empresaId}`);
+
+      // Paso 1: Importar ubicaciones (locations)
+      const locationsData = await this.client.getLocations();
+      const locations = locationsData.locations?.edges || [];
+      invStats.ubicacionesEncontradas = locations.length;
+
+      for (const { node: location } of locations) {
+        try {
+          await this.guardarUbicacion(location);
+          invStats.ubicacionesImportadas++;
+        } catch (error) {
+          invStats.errores++;
+          invStats.erroresDetalle.push({
+            ubicacion: location.name,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          console.error(`[Inventory Error] Ubicación ${location.name}:`, error);
+        }
+      }
+
+      // Paso 2: Obtener todas las variantes de productos importados y sincronizar inventario
+      const productosConShopifyId = await prisma.producto.findMany({
+        where: {
+          empresaId: this.empresaId,
+          shopifyInventoryItemId: { not: null },
+        },
+        select: {
+          id: true,
+          shopifyInventoryItemId: true,
+          nombre: true,
+        },
+      });
+
+      for (const producto of productosConShopifyId) {
+        try {
+          if (!producto.shopifyInventoryItemId) continue;
+
+          await this.guardarInventarioItem(producto.id, producto.shopifyInventoryItemId);
+          invStats.itemsDeInventarioImportados++;
+
+          // Obtener levels para este item
+          const levelsData = await this.client.getInventoryLevels(producto.shopifyInventoryItemId);
+          const levels = levelsData.inventoryItem?.inventoryLevels?.edges || [];
+
+          for (const { node: level } of levels) {
+            try {
+              await this.guardarNivelInventario(
+                producto.shopifyInventoryItemId,
+                level.location.id,
+                level
+              );
+              invStats.nivelesDeInventarioImportados++;
+            } catch (error) {
+              console.error(`[Inventory Level Error]`, error);
+            }
+          }
+        } catch (error) {
+          invStats.errores++;
+          invStats.erroresDetalle.push({
+            error: error instanceof Error ? error.message : String(error),
+          });
+          console.error(`[Inventory Error] Producto ${producto.nombre}:`, error);
+        }
+      }
+
+      console.log(`[Inventory] Importación completada:`, invStats);
+      return invStats;
+    } catch (error) {
+      console.error("[Inventory Fatal Error]", error);
+      throw error;
+    }
+  }
+
+  private async guardarUbicacion(location: any): Promise<void> {
+    const shopifyLocationId = location.id;
+    const ubicacionExistente = await (prisma as any).shopifyLocation.findFirst({
+      where: {
+        empresaId: this.empresaId,
+        shopifyLocationId,
+      },
+    });
+
+    if (ubicacionExistente) {
+      console.log(`[Inventory] Ubicación ya existe: ${location.name}`);
+      return;
+    }
+
+    await (prisma as any).shopifyLocation.create({
+      data: {
+        empresaId: this.empresaId,
+        shopifyLocationId,
+        nombre: location.name,
+        activa: location.isActive,
+      },
+    });
+
+    console.log(`[Inventory] Ubicación guardada: ${location.name}`);
+  }
+
+  private async guardarInventarioItem(productoId: string, shopifyInventoryItemId: string): Promise<void> {
+    const itemExistente = await (prisma as any).shopifyInventoryItem.findFirst({
+      where: {
+        empresaId: this.empresaId,
+        shopifyInventoryItemId,
+      },
+    });
+
+    if (itemExistente) {
+      // Actualizar vínculo con producto si no tiene
+      if (!itemExistente.productoId) {
+        await (prisma as any).shopifyInventoryItem.update({
+          where: { id: itemExistente.id },
+          data: { productoId },
+        });
+      }
+      return;
+    }
+
+    await (prisma as any).shopifyInventoryItem.create({
+      data: {
+        empresaId: this.empresaId,
+        shopifyInventoryItemId,
+        productoId,
+      },
+    });
+
+    console.log(`[Inventory] Item de inventario guardado: ${shopifyInventoryItemId}`);
+  }
+
+  private async guardarNivelInventario(
+    shopifyInventoryItemId: string,
+    shopifyLocationId: string,
+    level: any
+  ): Promise<void> {
+    // Obtener IDs locales
+    const inventoryItem = await (prisma as any).shopifyInventoryItem.findFirst({
+      where: {
+        empresaId: this.empresaId,
+        shopifyInventoryItemId,
+      },
+    });
+
+    const location = await (prisma as any).shopifyLocation.findFirst({
+      where: {
+        empresaId: this.empresaId,
+        shopifyLocationId,
+      },
+    });
+
+    if (!inventoryItem || !location) {
+      throw new Error(`Item o ubicación no encontrados para ${shopifyInventoryItemId}`);
+    }
+
+    const levelExistente = await (prisma as any).shopifyInventoryLevel.findFirst({
+      where: {
+        inventoryItemId: inventoryItem.id,
+        locationId: location.id,
+      },
+    });
+
+    if (levelExistente) {
+      // Actualizar
+      await (prisma as any).shopifyInventoryLevel.update({
+        where: { id: levelExistente.id },
+        data: {
+          disponible: level.available || 0,
+          enMano: level.onHand || 0,
+          comprometida: level.committed || 0,
+          entrante: level.incoming || 0,
+        },
+      });
+    } else {
+      // Crear
+      await (prisma as any).shopifyInventoryLevel.create({
+        data: {
+          empresaId: this.empresaId,
+          inventoryItemId: inventoryItem.id,
+          locationId: location.id,
+          disponible: level.available || 0,
+          enMano: level.onHand || 0,
+          comprometida: level.committed || 0,
+          entrante: level.incoming || 0,
+        },
+      });
+    }
   }
 
   // private async guardarLocations(locationsData: any): Promise<void> {

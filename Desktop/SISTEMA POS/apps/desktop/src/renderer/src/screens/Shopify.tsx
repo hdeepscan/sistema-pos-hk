@@ -22,7 +22,16 @@ interface ImportStats {
   erroresDetalle: Array<{ producto: string; error: string }>;
 }
 
-type PasoAsistente = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+interface ImportInventoryStats {
+  ubicacionesEncontradas: number;
+  ubicacionesImportadas: number;
+  itemsDeInventarioImportados: number;
+  nivelesDeInventarioImportados: number;
+  errores: number;
+  erroresDetalle: Array<{ ubicacion?: string; error: string }>;
+}
+
+type PasoAsistente = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
 
 export default function Shopify() {
   const { sucursales } = useSesionStore();
@@ -39,6 +48,7 @@ export default function Shopify() {
   const [mostrarAsistente, setMostrarAsistente] = useState(false);
   const [pasoActual, setPasoActual] = useState<PasoAsistente>(1);
   const [importStats, setImportStats] = useState<ImportStats | null>(null);
+  const [inventoryStats, setInventoryStats] = useState<ImportInventoryStats | null>(null);
   const [importandoEnProgreso, setImportandoEnProgreso] = useState(false);
   const [pasosPorCompletar, setPasosPorCompletar] = useState<Record<PasoAsistente, boolean>>({
     1: false,
@@ -49,6 +59,9 @@ export default function Shopify() {
     6: false,
     7: false,
     8: false,
+    9: false,
+    10: false,
+    11: false,
   });
 
   useEffect(() => {
@@ -121,15 +134,32 @@ export default function Shopify() {
       await new Promise((r) => setTimeout(r, 800));
       setPasosPorCompletar((p) => ({ ...p, 7: true }));
 
-      // Paso 8: Resultado final
+      // Paso 8: Mostrar resultado de productos
       setPasoActual(8);
+      await new Promise((r) => setTimeout(r, 800));
       setPasosPorCompletar((p) => ({ ...p, 8: true }));
+
+      // FASE 3: Sincronización de inventario
+      // Paso 9: Importar ubicaciones
+      setPasoActual(9);
+      await new Promise((r) => setTimeout(r, 800));
+
+      // Paso 10: Importar niveles de stock
+      setPasoActual(10);
+      const { data: invStats } = await api.post<ImportInventoryStats>("/shopify/sync-inventario");
+      setInventoryStats(invStats);
+      setPasosPorCompletar((p) => ({ ...p, 9: true }));
+      await new Promise((r) => setTimeout(r, 800));
+
+      // Paso 11: Sincronización completada
+      setPasoActual(11);
+      setPasosPorCompletar((p) => ({ ...p, 10: true, 11: true }));
 
       const { data: cfg } = await api.get<ShopifyConfigResp>("/shopify/config");
       setConfig(cfg);
     } catch (err: any) {
       setError(mensajeError(err, "Error durante la importación"));
-      setPasoActual(8);
+      setPasoActual(11);
     } finally {
       setImportandoEnProgreso(false);
     }
@@ -143,7 +173,10 @@ export default function Shopify() {
     { numero: 5, titulo: "Importar productos", icono: "📥" },
     { numero: 6, titulo: "Importar variantes", icono: "🎨" },
     { numero: 7, titulo: "Vincular productos", icono: "🔗" },
-    { numero: 8, titulo: "Resultado", icono: "✅" },
+    { numero: 8, titulo: "Resultado productos", icono: "✅" },
+    { numero: 9, titulo: "Ubicaciones", icono: "📍" },
+    { numero: 10, titulo: "Niveles de stock", icono: "📊" },
+    { numero: 11, titulo: "Resultado final", icono: "🎉" },
   ];
 
   return (
@@ -210,7 +243,7 @@ export default function Shopify() {
                 onClick={() => {
                   setMostrarAsistente(true);
                   setPasoActual(1);
-                  setPasosPorCompletar({ 1: false, 2: false, 3: false, 4: false, 5: false, 6: false, 7: false, 8: false });
+                  setPasosPorCompletar({ 1: false, 2: false, 3: false, 4: false, 5: false, 6: false, 7: false, 8: false, 9: false, 10: false, 11: false });
                 }}
               >
                 📥 Importar desde Shopify
@@ -228,12 +261,12 @@ export default function Shopify() {
       {/* ASISTENTE DE IMPORTACIÓN */}
       {mostrarAsistente && (
         <div className="modal-backdrop" onClick={() => !importandoEnProgreso && setMostrarAsistente(false)}>
-          <div className="card" style={{ width: 660, maxHeight: "90vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
+          <div className="card" style={{ width: 700, maxHeight: "90vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
             <h3 style={{ marginTop: 0, marginBottom: 20 }}>📦 Asistente de Importación desde Shopify</h3>
 
-            {/* Pasos */}
+            {/* Pasos - 3 filas de 4 + 1 fila de 3 */}
             <div style={{ marginBottom: 24 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 8 }}>
                 {pasos.slice(0, 4).map((paso) => (
                   <div
                     key={paso.numero}
@@ -258,8 +291,33 @@ export default function Shopify() {
                   </div>
                 ))}
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
-                {pasos.slice(4).map((paso) => (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 8 }}>
+                {pasos.slice(4, 8).map((paso) => (
+                  <div
+                    key={paso.numero}
+                    style={{
+                      padding: 12,
+                      borderRadius: 8,
+                      border: `2px solid ${
+                        pasosPorCompletar[paso.numero as PasoAsistente] ? "#10b981" : pasoActual >= paso.numero ? "#3b82f6" : "#e5e7eb"
+                      }`,
+                      backgroundColor:
+                        pasosPorCompletar[paso.numero as PasoAsistente]
+                          ? "#ecfdf5"
+                          : pasoActual >= paso.numero
+                            ? "#eff6ff"
+                            : "#f9fafb",
+                      textAlign: "center",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <div style={{ fontSize: 20, marginBottom: 4 }}>{paso.icono}</div>
+                    <div style={{ fontSize: 11, fontWeight: 600 }}>{paso.titulo}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                {pasos.slice(8).map((paso) => (
                   <div
                     key={paso.numero}
                     style={{
@@ -286,7 +344,7 @@ export default function Shopify() {
             </div>
 
             {/* Contenido por paso */}
-            <div style={{ minHeight: 200, marginBottom: 20 }}>
+            <div style={{ minHeight: 250, marginBottom: 20 }}>
               {pasoActual === 1 && (
                 <div>
                   <h4>🔐 Paso 1: Conectar Shopify</h4>
@@ -386,7 +444,7 @@ export default function Shopify() {
 
               {pasoActual === 8 && importStats && (
                 <div>
-                  <h4>✅ Importación completada</h4>
+                  <h4>✅ Paso 8: Resultado de productos</h4>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
                     <div style={{ padding: 12, backgroundColor: "#ecfdf5", borderRadius: 8 }}>
                       <div style={{ fontSize: 18, fontWeight: 700, color: "#10b981" }}>{importStats.productosImportados}</div>
@@ -396,31 +454,80 @@ export default function Shopify() {
                       <div style={{ fontSize: 18, fontWeight: 700, color: "#3b82f6" }}>{importStats.variantesImportadas}</div>
                       <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Variantes</div>
                     </div>
-                    <div style={{ padding: 12, backgroundColor: "#f3e8ff", borderRadius: 8 }}>
-                      <div style={{ fontSize: 18, fontWeight: 700, color: "#8b5cf6" }}>{importStats.duplicadosDetectados}</div>
-                      <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Duplicados</div>
-                    </div>
-                    <div style={{ padding: 12, backgroundColor: "#fee2e2", borderRadius: 8 }}>
-                      <div style={{ fontSize: 18, fontWeight: 700, color: "#ef4444" }}>{importStats.errores}</div>
-                      <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Errores</div>
-                    </div>
                   </div>
 
                   {importStats.erroresDetalle.length > 0 && (
-                    <div style={{ marginTop: 16, padding: 12, backgroundColor: "#fef2f2", borderRadius: 8, border: "1px solid #fecaca" }}>
-                      <div style={{ fontWeight: 600, marginBottom: 8, color: "#dc2626" }}>Errores encontrados:</div>
-                      <ul style={{ margin: 0, paddingLeft: 20, fontSize: 12 }}>
-                        {importStats.erroresDetalle.slice(0, 3).map((err, idx) => (
-                          <li key={idx} style={{ marginBottom: 4, color: "var(--text-muted)" }}>
-                            <strong>{err.producto}</strong>: {err.error}
+                    <div style={{ marginTop: 12, padding: 12, backgroundColor: "#fef2f2", borderRadius: 8, border: "1px solid #fecaca" }}>
+                      <div style={{ fontWeight: 600, marginBottom: 6, color: "#dc2626", fontSize: 12 }}>⚠️ {importStats.errores} errores encontrados</div>
+                      <ul style={{ margin: 0, paddingLeft: 16, fontSize: 11 }}>
+                        {importStats.erroresDetalle.slice(0, 2).map((err, idx) => (
+                          <li key={idx} style={{ marginBottom: 2, color: "var(--text-muted)" }}>
+                            {err.producto}: {err.error}
                           </li>
                         ))}
                       </ul>
-                      {importStats.erroresDetalle.length > 3 && (
-                        <div style={{ marginTop: 8, color: "var(--text-muted)", fontSize: 11 }}>
-                          +{importStats.erroresDetalle.length - 3} errores más
-                        </div>
-                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {pasoActual === 9 && (
+                <div>
+                  <h4>📍 Paso 9: Importando ubicaciones</h4>
+                  <p>Sincronizando almacenes y depósitos de Shopify...</p>
+                  <div style={{ animation: "pulse 1.5s infinite", opacity: 0.7, marginTop: 12, fontSize: 12, color: "var(--text-muted)" }}>
+                    Cargando ubicaciones...
+                  </div>
+                </div>
+              )}
+
+              {pasoActual === 10 && (
+                <div>
+                  <h4>📊 Paso 10: Sincronizando inventario</h4>
+                  <p>Traendo niveles de stock por ubicación...</p>
+                  <div style={{ animation: "pulse 1.5s infinite", opacity: 0.7, marginTop: 12, fontSize: 12, color: "var(--text-muted)" }}>
+                    Sincronizando niveles...
+                  </div>
+                </div>
+              )}
+
+              {pasoActual === 11 && importStats && inventoryStats && (
+                <div>
+                  <h4>🎉 Importación completada</h4>
+
+                  <div style={{ marginTop: 16 }}>
+                    <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>📦 Productos:</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+                      <div style={{ padding: 12, backgroundColor: "#ecfdf5", borderRadius: 8 }}>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: "#10b981" }}>{importStats.productosImportados}</div>
+                        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Importados</div>
+                      </div>
+                      <div style={{ padding: 12, backgroundColor: "#eff6ff", borderRadius: 8 }}>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: "#3b82f6" }}>{importStats.variantesImportadas}</div>
+                        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Variantes</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>📍 Inventario:</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <div style={{ padding: 12, backgroundColor: "#f3e8ff", borderRadius: 8 }}>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: "#8b5cf6" }}>{inventoryStats.ubicacionesImportadas}</div>
+                        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Ubicaciones</div>
+                      </div>
+                      <div style={{ padding: 12, backgroundColor: "#dbeafe", borderRadius: 8 }}>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: "#0284c7" }}>{inventoryStats.nivelesDeInventarioImportados}</div>
+                        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Niveles de stock</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {(importStats.errores > 0 || inventoryStats.errores > 0) && (
+                    <div style={{ marginTop: 16, padding: 12, backgroundColor: "#fee2e2", borderRadius: 8, border: "1px solid #fecaca" }}>
+                      <div style={{ fontWeight: 600, marginBottom: 6, color: "#dc2626" }}>
+                        ⚠️ {importStats.errores + inventoryStats.errores} errores totales
+                      </div>
                     </div>
                   )}
 
@@ -431,7 +538,7 @@ export default function Shopify() {
 
             {/* Botones */}
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              {pasoActual < 8 ? (
+              {pasoActual < 11 ? (
                 <>
                   <button
                     type="button"
@@ -453,7 +560,7 @@ export default function Shopify() {
                   onClick={() => setMostrarAsistente(false)}
                   style={{ minWidth: 140 }}
                 >
-                  ✅ Listo
+                  🎉 ¡Listo!
                 </button>
               )}
             </div>
