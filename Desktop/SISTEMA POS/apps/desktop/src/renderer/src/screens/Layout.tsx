@@ -91,9 +91,9 @@ export default function Layout({ children }: PropsWithChildren) {
         <NavLink to="/caja">Caja</NavLink>
         <NavLink to="/notificaciones">
           Notificaciones
-          {pedidosPendientes + alertasCobro > 0 && (
+          {alertasCobro > 0 && (
             <span className="badge warning" style={{ marginLeft: 6 }}>
-              {pedidosPendientes + alertasCobro}
+              {alertasCobro}
             </span>
           )}
         </NavLink>
