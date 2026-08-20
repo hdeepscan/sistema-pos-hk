@@ -31,7 +31,26 @@ interface ImportInventoryStats {
   erroresDetalle: Array<{ ubicacion?: string; error: string }>;
 }
 
+interface ColaEstado {
+  pendientes: number;
+  procesando: number;
+  completados: number;
+  errores: number;
+}
+
+interface SyncHistorial {
+  id: string;
+  tipo: string;
+  estado: string;
+  intentos: number;
+  errorMensaje?: string;
+  creadoEn: string;
+  procesadoEn?: string;
+  producto?: { nombre: string; sku: string };
+}
+
 type PasoAsistente = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
+type Pestaña = "configuracion" | "monitoreo" | "asistente";
 
 export default function Shopify() {
   const { sucursales } = useSesionStore();
@@ -51,18 +70,16 @@ export default function Shopify() {
   const [inventoryStats, setInventoryStats] = useState<ImportInventoryStats | null>(null);
   const [importandoEnProgreso, setImportandoEnProgreso] = useState(false);
   const [pasosPorCompletar, setPasosPorCompletar] = useState<Record<PasoAsistente, boolean>>({
-    1: false,
-    2: false,
-    3: false,
-    4: false,
-    5: false,
-    6: false,
-    7: false,
-    8: false,
-    9: false,
-    10: false,
-    11: false,
+    1: false, 2: false, 3: false, 4: false, 5: false, 6: false, 7: false, 8: false,
+    9: false, 10: false, 11: false,
   });
+
+  // Estado del dashboard
+  const [pestaña, setPestaña] = useState<Pestaña>("configuracion");
+  const [colaEstado, setColaEstado] = useState<ColaEstado | null>(null);
+  const [historial, setHistorial] = useState<SyncHistorial[]>([]);
+  const [cargandoMonitoreo, setCargandoMonitoreo] = useState(false);
+  const [procesandoCola, setProcesandoCola] = useState(false);
 
   useEffect(() => {
     api.get<ShopifyConfigResp>("/shopify/config").then(({ data }) => {
@@ -71,6 +88,31 @@ export default function Shopify() {
       if (data.sucursalEcommerceId) setSucursalEcommerceId(data.sucursalEcommerceId);
     });
   }, []);
+
+  // Cargar estado de la cola periódicamente
+  useEffect(() => {
+    if (pestaña !== "monitoreo") return;
+
+    const cargarMonitoreo = async () => {
+      try {
+        setCargandoMonitoreo(true);
+        const [estadoResp, historialResp] = await Promise.all([
+          api.get<ColaEstado>("/shopify/cola-estado"),
+          api.get<SyncHistorial[]>("/shopify/historial-sincronizacion?limit=20"),
+        ]);
+        setColaEstado(estadoResp.data);
+        setHistorial(historialResp.data);
+      } catch (err) {
+        console.error("Error cargando monitoreo:", err);
+      } finally {
+        setCargandoMonitoreo(false);
+      }
+    };
+
+    cargarMonitoreo();
+    const interval = setInterval(cargarMonitoreo, 5000); // Actualizar cada 5s
+    return () => clearInterval(interval);
+  }, [pestaña]);
 
   async function guardar(e: React.FormEvent) {
     e.preventDefault();
@@ -83,8 +125,6 @@ export default function Shopify() {
       const { data } = await api.get<ShopifyConfigResp>("/shopify/config");
       setConfig(data);
       setClientSecret("");
-
-      // Mostrar asistente después de guardar
       setTimeout(() => {
         setMostrarAsistente(true);
         setPasoActual(1);
@@ -101,21 +141,17 @@ export default function Shopify() {
     setError(null);
 
     try {
-      // Paso 1-2: Conectar y analizar
       setPasoActual(2);
       await new Promise((r) => setTimeout(r, 1000));
 
-      // Paso 3: Mostrar cantidad
       setPasoActual(3);
       setPasosPorCompletar((p) => ({ ...p, 1: true, 2: true }));
       await new Promise((r) => setTimeout(r, 800));
 
-      // Paso 4: Detectar duplicados
       setPasoActual(4);
       setPasosPorCompletar((p) => ({ ...p, 3: true }));
       await new Promise((r) => setTimeout(r, 800));
 
-      // Paso 5: Importar productos
       setPasoActual(5);
       setPasosPorCompletar((p) => ({ ...p, 4: true }));
 
@@ -124,34 +160,27 @@ export default function Shopify() {
       setPasosPorCompletar((p) => ({ ...p, 5: true }));
       await new Promise((r) => setTimeout(r, 800));
 
-      // Paso 6: Importar variantes
       setPasoActual(6);
       await new Promise((r) => setTimeout(r, 800));
       setPasosPorCompletar((p) => ({ ...p, 6: true }));
 
-      // Paso 7: Vincular productos
       setPasoActual(7);
       await new Promise((r) => setTimeout(r, 800));
       setPasosPorCompletar((p) => ({ ...p, 7: true }));
 
-      // Paso 8: Mostrar resultado de productos
       setPasoActual(8);
       await new Promise((r) => setTimeout(r, 800));
       setPasosPorCompletar((p) => ({ ...p, 8: true }));
 
-      // FASE 3: Sincronización de inventario
-      // Paso 9: Importar ubicaciones
       setPasoActual(9);
       await new Promise((r) => setTimeout(r, 800));
 
-      // Paso 10: Importar niveles de stock
       setPasoActual(10);
       const { data: invStats } = await api.post<ImportInventoryStats>("/shopify/sync-inventario");
       setInventoryStats(invStats);
       setPasosPorCompletar((p) => ({ ...p, 9: true }));
       await new Promise((r) => setTimeout(r, 800));
 
-      // Paso 11: Sincronización completada
       setPasoActual(11);
       setPasosPorCompletar((p) => ({ ...p, 10: true, 11: true }));
 
@@ -162,6 +191,45 @@ export default function Shopify() {
       setPasoActual(11);
     } finally {
       setImportandoEnProgreso(false);
+    }
+  }
+
+  async function procesarColaAhora() {
+    try {
+      setProcesandoCola(true);
+      await api.post("/shopify/procesar-cola");
+      setMensaje("✅ Cola procesada. Verifica el historial.");
+      // Recargar monitoreo
+      const [estadoResp, historialResp] = await Promise.all([
+        api.get<ColaEstado>("/shopify/cola-estado"),
+        api.get<SyncHistorial[]>("/shopify/historial-sincronizacion?limit=20"),
+      ]);
+      setColaEstado(estadoResp.data);
+      setHistorial(historialResp.data);
+    } catch (err: any) {
+      setError(mensajeError(err, "Error procesando cola"));
+    } finally {
+      setProcesandoCola(false);
+    }
+  }
+
+  async function reintentarTodos() {
+    try {
+      const res = await api.post<{ count: number }>("/shopify/reintentar-todos");
+      setMensaje(`✅ ${res.data.count} cambios marcados para reintentar`);
+      setTimeout(() => {
+        const cargarMonitoreo = async () => {
+          const [estadoResp, historialResp] = await Promise.all([
+            api.get<ColaEstado>("/shopify/cola-estado"),
+            api.get<SyncHistorial[]>("/shopify/historial-sincronizacion?limit=20"),
+          ]);
+          setColaEstado(estadoResp.data);
+          setHistorial(historialResp.data);
+        };
+        cargarMonitoreo();
+      }, 1000);
+    } catch (err: any) {
+      setError(mensajeError(err, "Error reintentando"));
     }
   }
 
@@ -189,82 +257,195 @@ export default function Shopify() {
         {config?.conectado && <span className="badge success">Conectado</span>}
       </div>
 
-      <div className="card" style={{ maxWidth: 520 }}>
-        <h4 style={{ marginTop: 0 }}>Credenciales de la app (Shopify Dev Dashboard)</h4>
-        <form className="grid-form" onSubmit={guardar}>
-          <label>
-            Dominio de la tienda
-            <input
-              placeholder="tu-tienda.myshopify.com"
-              value={shopDomain}
-              onChange={(e) => setShopDomain(e.target.value)}
-              required
-            />
-            <span style={{ fontWeight: 400, fontSize: 11.5, color: "var(--text-muted)" }}>
-              Debe terminar en <strong>.myshopify.com</strong> — NO uses tu dominio publico (ej. mitienda.com).
-              Lo encuentras en Shopify: Configuracion → Dominios.
-            </span>
-          </label>
-          <label>
-            Client ID
-            <input value={clientId} onChange={(e) => setClientId(e.target.value)} required />
-          </label>
-          <label>
-            Client Secret {config?.conectado && <span style={{ fontWeight: 400 }}>(guardado: {config.clientSecret})</span>}
-            <input
-              type="password"
-              value={clientSecret}
-              onChange={(e) => setClientSecret(e.target.value)}
-              placeholder={config?.conectado ? "Dejar vacio para no cambiarlo" : ""}
-              required={!config?.conectado}
-            />
-          </label>
-          <label>
-            Sucursal que representa tu canal ecommerce
-            <select value={sucursalEcommerceId} onChange={(e) => setSucursalEcommerceId(e.target.value)} required>
-              <option value="">Selecciona una sucursal</option>
-              {sucursales.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.nombre}
-                </option>
-              ))}
-            </select>
-          </label>
-          {error && <span className="error-text">{error}</span>}
-          {mensaje && <span className="badge success" style={{ width: "fit-content" }}>{mensaje}</span>}
-          <div style={{ display: "flex", gap: 8 }}>
-            <button type="submit" disabled={guardando}>
-              {guardando ? "Guardando..." : "Guardar credenciales"}
+      {/* TABS */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, borderBottom: "1px solid var(--border)" }}>
+        <button
+          className={pestaña === "configuracion" ? "" : "secondary"}
+          onClick={() => setPestaña("configuracion")}
+          style={{ padding: "12px 16px", background: pestaña === "configuracion" ? "var(--bg-hover)" : "transparent" }}
+        >
+          ⚙️ Configuración
+        </button>
+        <button
+          className={pestaña === "monitoreo" ? "" : "secondary"}
+          onClick={() => setPestaña("monitoreo")}
+          style={{ padding: "12px 16px", background: pestaña === "monitoreo" ? "var(--bg-hover)" : "transparent" }}
+        >
+          📊 Monitoreo {colaEstado && colaEstado.errores > 0 && <span className="badge danger" style={{ marginLeft: 6 }}>{colaEstado.errores}</span>}
+        </button>
+      </div>
+
+      {/* PESTAÑA: CONFIGURACIÓN */}
+      {pestaña === "configuracion" && (
+        <div className="card" style={{ maxWidth: 520 }}>
+          <h4 style={{ marginTop: 0 }}>Credenciales de la app (Shopify Dev Dashboard)</h4>
+          <form className="grid-form" onSubmit={guardar}>
+            <label>
+              Dominio de la tienda
+              <input
+                placeholder="tu-tienda.myshopify.com"
+                value={shopDomain}
+                onChange={(e) => setShopDomain(e.target.value)}
+                required
+              />
+              <span style={{ fontWeight: 400, fontSize: 11.5, color: "var(--text-muted)" }}>
+                Debe terminar en <strong>.myshopify.com</strong>
+              </span>
+            </label>
+            <label>
+              Client ID
+              <input value={clientId} onChange={(e) => setClientId(e.target.value)} required />
+            </label>
+            <label>
+              Client Secret {config?.conectado && <span style={{ fontWeight: 400 }}>(guardado)</span>}
+              <input
+                type="password"
+                value={clientSecret}
+                onChange={(e) => setClientSecret(e.target.value)}
+                placeholder={config?.conectado ? "Dejar vacio para no cambiarlo" : ""}
+                required={!config?.conectado}
+              />
+            </label>
+            <label>
+              Sucursal para ecommerce
+              <select value={sucursalEcommerceId} onChange={(e) => setSucursalEcommerceId(e.target.value)} required>
+                <option value="">Selecciona</option>
+                {sucursales.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.nombre}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {error && <span className="error-text">{error}</span>}
+            {mensaje && <span className="badge success" style={{ width: "fit-content" }}>{mensaje}</span>}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button type="submit" disabled={guardando}>
+                {guardando ? "Guardando..." : "Guardar credenciales"}
+              </button>
+              {config?.conectado && (
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => {
+                    setMostrarAsistente(true);
+                    setPasoActual(1);
+                  }}
+                >
+                  📥 Importar desde Shopify
+                </button>
+              )}
+            </div>
+            {config?.ultimaSincronizacion && (
+              <p style={{ fontSize: 12, color: "var(--text-muted)", margin: 0 }}>
+                Ultima sincronizacion: {new Date(config.ultimaSincronizacion).toLocaleString("es-CO")}
+              </p>
+            )}
+          </form>
+        </div>
+      )}
+
+      {/* PESTAÑA: MONITOREO */}
+      {pestaña === "monitoreo" && (
+        <div>
+          {/* ESTADO DE LA COLA */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
+            <div className="card">
+              <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>Pendientes</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: "#f59e0b" }}>
+                {cargandoMonitoreo ? "..." : colaEstado?.pendientes || 0}
+              </div>
+            </div>
+            <div className="card">
+              <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>Procesando</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: "#3b82f6" }}>
+                {cargandoMonitoreo ? "..." : colaEstado?.procesando || 0}
+              </div>
+            </div>
+            <div className="card">
+              <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>Completados</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: "#10b981" }}>
+                {cargandoMonitoreo ? "..." : colaEstado?.completados || 0}
+              </div>
+            </div>
+            <div className="card">
+              <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>Errores</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: colaEstado?.errores && colaEstado.errores > 0 ? "#ef4444" : "#10b981" }}>
+                {cargandoMonitoreo ? "..." : colaEstado?.errores || 0}
+              </div>
+            </div>
+          </div>
+
+          {/* BOTONES DE ACCIÓN */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+            <button onClick={procesarColaAhora} disabled={procesandoCola} className="secondary">
+              {procesandoCola ? "Procesando..." : "🔄 Procesar cola ahora"}
             </button>
-            {config?.conectado && !mostrarAsistente && (
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => {
-                  setMostrarAsistente(true);
-                  setPasoActual(1);
-                  setPasosPorCompletar({ 1: false, 2: false, 3: false, 4: false, 5: false, 6: false, 7: false, 8: false, 9: false, 10: false, 11: false });
-                }}
-              >
-                📥 Importar desde Shopify
+            {colaEstado?.errores && colaEstado.errores > 0 && (
+              <button onClick={reintentarTodos} className="secondary" style={{ color: "#ef4444" }}>
+                🔁 Reintentar {colaEstado.errores} errores
               </button>
             )}
           </div>
-          {config?.ultimaSincronizacion && (
-            <p style={{ fontSize: 12, color: "var(--text-muted)", margin: 0 }}>
-              Ultima sincronizacion: {new Date(config.ultimaSincronizacion).toLocaleString("es-CO")}
-            </p>
-          )}
-        </form>
-      </div>
 
-      {/* ASISTENTE DE IMPORTACIÓN */}
+          {/* HISTORIAL */}
+          <div className="card">
+            <h4 style={{ marginTop: 0 }}>Historial de Sincronización (últimos 20)</h4>
+            {cargandoMonitoreo ? (
+              <p>Cargando...</p>
+            ) : historial.length === 0 ? (
+              <p style={{ color: "var(--text-muted)" }}>Sin cambios aún</p>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                      <th style={{ textAlign: "left", padding: 8 }}>Tipo</th>
+                      <th style={{ textAlign: "left", padding: 8 }}>Producto</th>
+                      <th style={{ textAlign: "left", padding: 8 }}>Estado</th>
+                      <th style={{ textAlign: "left", padding: 8 }}>Intentos</th>
+                      <th style={{ textAlign: "left", padding: 8 }}>Fecha</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historial.map((item) => (
+                      <tr key={item.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                        <td style={{ padding: 8 }}>
+                          {item.tipo === "INVENTORY_UPDATE" && "📦"}
+                          {item.tipo === "PRICE_UPDATE" && "💰"}
+                          {item.tipo === "PRODUCT_UPDATE" && "✏️"}
+                        </td>
+                        <td style={{ padding: 8 }}>{item.producto?.nombre || "-"}</td>
+                        <td style={{ padding: 8 }}>
+                          <span
+                            className={`badge ${
+                              item.estado === "COMPLETADO" ? "success" : item.estado === "ERROR" ? "danger" : "warning"
+                            }`}
+                          >
+                            {item.estado}
+                          </span>
+                        </td>
+                        <td style={{ padding: 8 }}>{item.intentos}</td>
+                        <td style={{ padding: 8, fontSize: 11, color: "var(--text-muted)" }}>
+                          {new Date(item.creadoEn).toLocaleString("es-CO")}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ASISTENTE MODAL */}
       {mostrarAsistente && (
         <div className="modal-backdrop" onClick={() => !importandoEnProgreso && setMostrarAsistente(false)}>
           <div className="card" style={{ width: 700, maxHeight: "90vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
             <h3 style={{ marginTop: 0, marginBottom: 20 }}>📦 Asistente de Importación desde Shopify</h3>
 
-            {/* Pasos - 3 filas de 4 + 1 fila de 3 */}
+            {/* PASOS */}
             <div style={{ marginBottom: 24 }}>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 8 }}>
                 {pasos.slice(0, 4).map((paso) => (
@@ -283,7 +464,6 @@ export default function Shopify() {
                             ? "#eff6ff"
                             : "#f9fafb",
                       textAlign: "center",
-                      cursor: "pointer",
                     }}
                   >
                     <div style={{ fontSize: 20, marginBottom: 4 }}>{paso.icono}</div>
@@ -308,7 +488,6 @@ export default function Shopify() {
                             ? "#eff6ff"
                             : "#f9fafb",
                       textAlign: "center",
-                      cursor: "pointer",
                     }}
                   >
                     <div style={{ fontSize: 20, marginBottom: 4 }}>{paso.icono}</div>
@@ -333,7 +512,6 @@ export default function Shopify() {
                             ? "#eff6ff"
                             : "#f9fafb",
                       textAlign: "center",
-                      cursor: "pointer",
                     }}
                   >
                     <div style={{ fontSize: 20, marginBottom: 4 }}>{paso.icono}</div>
@@ -343,224 +521,78 @@ export default function Shopify() {
               </div>
             </div>
 
-            {/* Contenido por paso */}
+            {/* CONTENIDO POR PASO */}
             <div style={{ minHeight: 250, marginBottom: 20 }}>
-              {pasoActual === 1 && (
-                <div>
-                  <h4>🔐 Paso 1: Conectar Shopify</h4>
-                  <p>Verificando credenciales...</p>
-                </div>
-              )}
-
-              {pasoActual === 2 && (
-                <div>
-                  <h4>🔍 Paso 2: Analizar tienda</h4>
-                  <p>Escaneando productos en tu tienda Shopify...</p>
-                  <div style={{ animation: "pulse 1.5s infinite", opacity: 0.7 }}>
-                    <div style={{ marginTop: 12, fontSize: 12, color: "var(--text-muted)" }}>
-                      Conectando a {shopDomain}
-                    </div>
-                  </div>
-                </div>
-              )}
-
+              {pasoActual === 1 && <div><h4>🔐 Paso 1: Conectar Shopify</h4><p>Verificando credenciales...</p></div>}
+              {pasoActual === 2 && <div><h4>🔍 Paso 2: Analizar tienda</h4><p>Escaneando productos...</p></div>}
               {pasoActual === 3 && importStats && (
                 <div>
                   <h4>📦 Paso 3: Productos encontrados</h4>
-                  <div style={{ padding: 16, backgroundColor: "#f0f9ff", borderRadius: 8, marginTop: 12 }}>
-                    <div style={{ fontSize: 24, fontWeight: 700, color: "#3b82f6", textAlign: "center" }}>
-                      {importStats.productosEncontrados}
-                    </div>
-                    <div style={{ textAlign: "center", color: "var(--text-muted)", marginTop: 8 }}>
-                      productos encontrados en Shopify
-                    </div>
+                  <div style={{ padding: 16, backgroundColor: "#f0f9ff", borderRadius: 8, marginTop: 12, textAlign: "center" }}>
+                    <div style={{ fontSize: 24, fontWeight: 700, color: "#3b82f6" }}>{importStats.productosEncontrados}</div>
+                    <div style={{ color: "var(--text-muted)" }}>productos encontrados</div>
                   </div>
                 </div>
               )}
-
               {pasoActual === 4 && importStats && (
                 <div>
                   <h4>⚠️ Paso 4: Detectar duplicados</h4>
-                  <div style={{ padding: 16, backgroundColor: importStats.duplicadosDetectados > 0 ? "#fef3c7" : "#ecfdf5", borderRadius: 8, marginTop: 12 }}>
-                    <div style={{ fontSize: 20, fontWeight: 700, color: importStats.duplicadosDetectados > 0 ? "#d97706" : "#10b981", textAlign: "center" }}>
+                  <div style={{ padding: 16, backgroundColor: importStats.duplicadosDetectados > 0 ? "#fef3c7" : "#ecfdf5", borderRadius: 8, marginTop: 12, textAlign: "center" }}>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: importStats.duplicadosDetectados > 0 ? "#d97706" : "#10b981" }}>
                       {importStats.duplicadosDetectados} duplicados
-                    </div>
-                    <div style={{ textAlign: "center", color: "var(--text-muted)", marginTop: 8 }}>
-                      {importStats.duplicadosDetectados > 0
-                        ? "Se encontraron productos similares. Se ofrecerá opción de vincular."
-                        : "No se detectaron duplicados. ¡Listo para importar!"}
                     </div>
                   </div>
                 </div>
               )}
-
               {pasoActual === 5 && (
                 <div>
                   <h4>📥 Paso 5: Importando productos</h4>
                   <div style={{ marginTop: 12 }}>
-                    <div
-                      style={{
-                        height: 8,
-                        borderRadius: 4,
-                        backgroundColor: "#e5e7eb",
-                        overflow: "hidden",
-                      }}
-                    >
-                      <div
-                        style={{
-                          height: "100%",
-                          backgroundColor: "#3b82f6",
-                          width: importStats ? `${(importStats.productosImportados / importStats.productosEncontrados) * 100}%` : "0%",
-                          transition: "width 0.3s ease",
-                        }}
-                      />
+                    <div style={{ height: 8, borderRadius: 4, backgroundColor: "#e5e7eb", overflow: "hidden" }}>
+                      <div style={{ height: "100%", backgroundColor: "#3b82f6", width: importStats ? `${(importStats.productosImportados / importStats.productosEncontrados) * 100}%` : "0%", transition: "width 0.3s" }} />
                     </div>
                     <div style={{ marginTop: 8, fontSize: 12, color: "var(--text-muted)", textAlign: "center" }}>
-                      {importStats?.productosImportados || 0} / {importStats?.productosEncontrados || 0} productos
+                      {importStats?.productosImportados || 0} / {importStats?.productosEncontrados || 0}
                     </div>
                   </div>
                 </div>
               )}
-
-              {pasoActual === 6 && (
-                <div>
-                  <h4>🎨 Paso 6: Importando variantes</h4>
-                  <p>Importando tallas, colores y opciones...</p>
-                  <div style={{ marginTop: 12, fontSize: 12, color: "var(--text-muted)" }}>
-                    {importStats?.variantesImportadas || 0} variantes procesadas
-                  </div>
-                </div>
-              )}
-
-              {pasoActual === 7 && (
-                <div>
-                  <h4>🔗 Paso 7: Vinculando productos</h4>
-                  <p>Guardando relación entre POS y Shopify...</p>
-                  <div style={{ marginTop: 12, fontSize: 12, color: "var(--text-muted)" }}>
-                    {importStats?.productosVinculados || 0} productos vinculados
-                  </div>
-                </div>
-              )}
-
-              {pasoActual === 8 && importStats && (
-                <div>
-                  <h4>✅ Paso 8: Resultado de productos</h4>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
-                    <div style={{ padding: 12, backgroundColor: "#ecfdf5", borderRadius: 8 }}>
-                      <div style={{ fontSize: 18, fontWeight: 700, color: "#10b981" }}>{importStats.productosImportados}</div>
-                      <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Productos importados</div>
-                    </div>
-                    <div style={{ padding: 12, backgroundColor: "#eff6ff", borderRadius: 8 }}>
-                      <div style={{ fontSize: 18, fontWeight: 700, color: "#3b82f6" }}>{importStats.variantesImportadas}</div>
-                      <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Variantes</div>
-                    </div>
-                  </div>
-
-                  {importStats.erroresDetalle.length > 0 && (
-                    <div style={{ marginTop: 12, padding: 12, backgroundColor: "#fef2f2", borderRadius: 8, border: "1px solid #fecaca" }}>
-                      <div style={{ fontWeight: 600, marginBottom: 6, color: "#dc2626", fontSize: 12 }}>⚠️ {importStats.errores} errores encontrados</div>
-                      <ul style={{ margin: 0, paddingLeft: 16, fontSize: 11 }}>
-                        {importStats.erroresDetalle.slice(0, 2).map((err, idx) => (
-                          <li key={idx} style={{ marginBottom: 2, color: "var(--text-muted)" }}>
-                            {err.producto}: {err.error}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {pasoActual === 9 && (
-                <div>
-                  <h4>📍 Paso 9: Importando ubicaciones</h4>
-                  <p>Sincronizando almacenes y depósitos de Shopify...</p>
-                  <div style={{ animation: "pulse 1.5s infinite", opacity: 0.7, marginTop: 12, fontSize: 12, color: "var(--text-muted)" }}>
-                    Cargando ubicaciones...
-                  </div>
-                </div>
-              )}
-
-              {pasoActual === 10 && (
-                <div>
-                  <h4>📊 Paso 10: Sincronizando inventario</h4>
-                  <p>Traendo niveles de stock por ubicación...</p>
-                  <div style={{ animation: "pulse 1.5s infinite", opacity: 0.7, marginTop: 12, fontSize: 12, color: "var(--text-muted)" }}>
-                    Sincronizando niveles...
-                  </div>
-                </div>
-              )}
-
               {pasoActual === 11 && importStats && inventoryStats && (
                 <div>
                   <h4>🎉 Importación completada</h4>
-
-                  <div style={{ marginTop: 16 }}>
-                    <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>📦 Productos:</div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
-                      <div style={{ padding: 12, backgroundColor: "#ecfdf5", borderRadius: 8 }}>
-                        <div style={{ fontSize: 16, fontWeight: 700, color: "#10b981" }}>{importStats.productosImportados}</div>
-                        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Importados</div>
-                      </div>
-                      <div style={{ padding: 12, backgroundColor: "#eff6ff", borderRadius: 8 }}>
-                        <div style={{ fontSize: 16, fontWeight: 700, color: "#3b82f6" }}>{importStats.variantesImportadas}</div>
-                        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Variantes</div>
-                      </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
+                    <div style={{ padding: 12, backgroundColor: "#ecfdf5", borderRadius: 8 }}>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: "#10b981" }}>{importStats.productosImportados}</div>
+                      <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Productos</div>
+                    </div>
+                    <div style={{ padding: 12, backgroundColor: "#dbeafe", borderRadius: 8 }}>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: "#0284c7" }}>{inventoryStats.nivelesDeInventarioImportados}</div>
+                      <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Niveles</div>
                     </div>
                   </div>
-
-                  <div>
-                    <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>📍 Inventario:</div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                      <div style={{ padding: 12, backgroundColor: "#f3e8ff", borderRadius: 8 }}>
-                        <div style={{ fontSize: 16, fontWeight: 700, color: "#8b5cf6" }}>{inventoryStats.ubicacionesImportadas}</div>
-                        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Ubicaciones</div>
-                      </div>
-                      <div style={{ padding: 12, backgroundColor: "#dbeafe", borderRadius: 8 }}>
-                        <div style={{ fontSize: 16, fontWeight: 700, color: "#0284c7" }}>{inventoryStats.nivelesDeInventarioImportados}</div>
-                        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Niveles de stock</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {(importStats.errores > 0 || inventoryStats.errores > 0) && (
-                    <div style={{ marginTop: 16, padding: 12, backgroundColor: "#fee2e2", borderRadius: 8, border: "1px solid #fecaca" }}>
-                      <div style={{ fontWeight: 600, marginBottom: 6, color: "#dc2626" }}>
-                        ⚠️ {importStats.errores + inventoryStats.errores} errores totales
-                      </div>
-                    </div>
-                  )}
-
-                  {error && <div className="error-text" style={{ marginTop: 16 }}>{error}</div>}
                 </div>
+              )}
+              {pasoActual > 11 || (pasoActual < 11 && pasoActual > 5 && pasoActual !== 3 && pasoActual !== 4) && (
+                <div><h4>✅ Paso {pasoActual}: Procesando...</h4><p>Por favor espera.</p></div>
               )}
             </div>
 
-            {/* Botones */}
+            {/* BOTONES */}
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
               {pasoActual < 11 ? (
                 <>
-                  <button
-                    type="button"
-                    className="secondary"
-                    onClick={() => setMostrarAsistente(false)}
-                    disabled={importandoEnProgreso}
-                  >
+                  <button type="button" className="secondary" onClick={() => setMostrarAsistente(false)} disabled={importandoEnProgreso}>
                     Cancelar
                   </button>
                   {pasoActual === 1 && (
                     <button type="button" onClick={iniciarImportacion} disabled={importandoEnProgreso}>
-                      {importandoEnProgreso ? "Importando..." : "Iniciar importación"}
+                      {importandoEnProgreso ? "Importando..." : "Iniciar"}
                     </button>
                   )}
                 </>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => setMostrarAsistente(false)}
-                  style={{ minWidth: 140 }}
-                >
-                  🎉 ¡Listo!
+                <button type="button" onClick={() => setMostrarAsistente(false)}>
+                  🎉 Listo
                 </button>
               )}
             </div>
