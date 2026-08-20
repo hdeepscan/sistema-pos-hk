@@ -43,6 +43,11 @@ const FORMATOS_ETIQUETA: { valor: EtiquetaFormato; titulo: string; detalle: stri
     detalle: "Etiquetas 50 × 25 mm en rollo termico, una sola por fila (media hoja).",
   },
   {
+    valor: "zebra3",
+    titulo: "Zebra ZT230 · 3 por fila",
+    detalle: "Impresora Zebra ZT230, 3 etiquetas por fila (~33.3 × 25 mm), optimizado para rollo de 104mm de ancho.",
+  },
+  {
     valor: "carta",
     titulo: "Hoja tamaño carta",
     detalle: "Hoja carta en impresora normal, varias etiquetas por hoja para recortar.",

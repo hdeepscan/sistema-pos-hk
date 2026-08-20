@@ -89,6 +89,21 @@ function formatoEtiqueta(formato: EtiquetaFormato, cal: CalibracionEtiqueta): { 
     };
   }
 
+  // Zebra ZT230: 3 etiquetas por fila, ~33.3mm cada una (100mm total)
+  if (formato === "zebra3") {
+    const anchoPorEtiqueta = 33.3;
+    const anchoPagina = anchoPorEtiqueta * 3; // ~100mm
+    const bcAnchoZebra = Math.max(20, anchoPorEtiqueta - 2);
+    return {
+      pageSize: { width: um(anchoPagina), height: um(h) },
+      css: `
+        @page { size: ${anchoPagina}mm ${h}mm; margin: 0; }
+        .hoja { display: grid; grid-template-columns: repeat(3, ${anchoPorEtiqueta}mm); gap: 0; }
+        .etiqueta { width: ${anchoPorEtiqueta}mm; height: ${h}mm; padding: 0; }
+        .barcode svg { width: ${bcAnchoZebra}mm; height: ${bcAlto}mm; }`,
+    };
+  }
+
   const columnas = formato === "rollo2" ? 2 : 1;
   const anchoPagina = a * columnas;
   return {

@@ -92,7 +92,8 @@ export interface EtiquetaData {
 // - rollo2: rollo termico de etiquetas 50x25mm, 2 columnas (2 al ancho)
 // - rollo1: rollo termico de etiquetas 50x25mm, 1 columna (media hoja)
 // - carta: hoja tamaño carta (impresora normal), varias etiquetas por hoja
-export type EtiquetaFormato = "rollo2" | "rollo1" | "carta";
+// - zebra3: Zebra ZT230, etiquetas ~33.3x25mm, 3 columnas (3 al ancho, 100mm total)
+export type EtiquetaFormato = "rollo2" | "rollo1" | "carta" | "zebra3";
 
 export interface ReporteCajaData {
   empresaNombre: string;
