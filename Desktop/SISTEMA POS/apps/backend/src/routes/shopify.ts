@@ -105,4 +105,20 @@ export async function shopifyRoutes(app: FastifyInstance) {
       return reply.code(502).send({ error: err instanceof Error ? err.message : "Error publicando en Shopify" });
     }
   });
+
+  // Callback URL para OAuth2 de Shopify (cuando se implemente flujo con redirección)
+  app.get("/shopify/callback", async (request, reply) => {
+    const code = (request.query as any).code;
+    const state = (request.query as any).state;
+
+    if (!code || !state) {
+      return reply.code(400).send({ error: "Parámetros code y state requeridos" });
+    }
+
+    // Esta ruta es un placeholder para futuro flujo OAuth2 con redirección.
+    // Actualmente se usa un flujo simplificado donde el usuario ingresa
+    // manualmente el Client ID y Refresh Token.
+    request.log.info(`[shopify-oauth] Callback recibido. State: ${state}`);
+    return reply.send({ status: "ok", message: "OAuth callback recibido" });
+  });
 }
