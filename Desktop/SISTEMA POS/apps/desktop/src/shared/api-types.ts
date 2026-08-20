@@ -25,6 +25,8 @@ export interface AppConfig {
   // de pagina real = alto + separacion; si no coincide, las etiquetas se van
   // corriendo una tras otra.
   etiquetaSeparacionMm: number;
+  // Clave configurada por admin para autorizar descuentos a usuarios normales
+  descuentosClave: string | null;
 }
 
 export interface EstadoActualizacion {

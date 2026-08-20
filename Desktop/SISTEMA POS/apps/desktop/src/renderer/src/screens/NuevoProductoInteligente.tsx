@@ -85,6 +85,8 @@ export function NuevoProductoInteligente({
   const { sucursales } = useSesionStore();
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [categorias, setCategorias] = useState<string[]>([]);
+  const [colecciones, setColecciones] = useState<Coleccion[]>([]);
+  const [coleccionesSeleccionadas, setColeccionesSeleccionadas] = useState<string[]>([]);
 
   // Campos base
   const [nombre, setNombre] = useState("");
@@ -128,6 +130,7 @@ export function NuevoProductoInteligente({
   useEffect(() => {
     api.get<Proveedor[]>("/proveedores").then(({ data }) => setProveedores(data)).catch(() => setProveedores([]));
     api.get<string[]>("/productos/categorias").then(({ data }) => setCategorias(data)).catch(() => setCategorias([]));
+    api.get<Coleccion[]>("/colecciones").then(({ data }) => setColecciones(data)).catch(() => setColecciones([]));
     api
       .get("/shopify/config")
       .then(({ data }) => setShopifyConectado(!!data.conectado))
@@ -301,6 +304,20 @@ export function NuevoProductoInteligente({
       }
 
       const { data } = await api.post("/productos/completo", cuerpo);
+
+      // Asociar colecciones seleccionadas al producto recién creado
+      if (coleccionesSeleccionadas.length > 0 && data?.id) {
+        for (const coleccionId of coleccionesSeleccionadas) {
+          try {
+            await api.post(`/colecciones/${coleccionId}/productos`, {
+              productoId: data.id,
+            });
+          } catch (err) {
+            console.error(`Error asociando coleccion ${coleccionId}:`, err);
+          }
+        }
+      }
+
       onCreado();
       // Si Shopify se intento pero fallo, avisamos y dejamos el modal abierto
       // para que el usuario lea la causa; el producto ya quedo creado local.
@@ -407,6 +424,32 @@ export function NuevoProductoInteligente({
             Descripcion
             <textarea rows={2} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
           </label>
+
+          {/* ---- Colecciones ---- */}
+          {colecciones.length > 0 && (
+            <div>
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-muted)" }}>Colecciones</span>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 6 }}>
+                {colecciones.map((c) => (
+                  <label key={c.id} style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <input
+                      type="checkbox"
+                      checked={coleccionesSeleccionadas.includes(c.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setColeccionesSeleccionadas([...coleccionesSeleccionadas, c.id]);
+                        } else {
+                          setColeccionesSeleccionadas(coleccionesSeleccionadas.filter((id) => id !== c.id));
+                        }
+                      }}
+                      style={{ width: "auto" }}
+                    />
+                    {c.titulo}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* ---- Imagenes ---- */}
           <div>
