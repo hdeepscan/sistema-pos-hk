@@ -1283,16 +1283,15 @@ function VariantesCard({ producto, onActualizado }: { producto: ProductoDetalle;
     <div className="card">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
         <h4 style={{ margin: 0 }}>Variantes</h4>
-        {producto.shopifyProductId ? (
-          <button className="secondary" type="button" onClick={() => setMostrarForm((v) => !v)}>
-            Agregar variante
-          </button>
-        ) : (
-          <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
-            Conecta este producto a Shopify (guardando cambios) para poder agregar variantes
-          </span>
-        )}
+        <button className="secondary" type="button" onClick={() => setMostrarForm((v) => !v)}>
+          {mostrarForm ? "Cancelar" : "Agregar variante"}
+        </button>
       </div>
+      {!producto.shopifyProductId && (
+        <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10, padding: "8px 12px", background: "var(--bg-secondary)", borderRadius: 6 }}>
+          ℹ️ Las variantes se guardarán localmente. Se sincronizarán con Shopify cuando conectes este producto.
+        </div>
+      )}
 
       {mostrarForm && (
         <form className="grid-form" onSubmit={guardar} style={{ marginBottom: 12, maxWidth: 360 }}>

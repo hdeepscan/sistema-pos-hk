@@ -1008,35 +1008,39 @@ export async function productosRoutes(app: FastifyInstance) {
 
     const producto = await prisma.producto.findFirst({ where: { id, empresaId } });
     if (!producto) return reply.code(404).send({ error: "Producto no encontrado" });
-    if (!producto.shopifyProductId) {
-      return reply.code(400).send({ error: "Este producto no esta vinculado a Shopify todavia" });
-    }
 
     const existente = await prisma.producto.findUnique({
       where: { empresaId_sku: { empresaId, sku: parsed.data.sku } },
     });
     if (existente) return reply.code(409).send({ error: "Ya existe un producto con ese SKU" });
 
-    let ids: { shopifyVariantId: string; shopifyInventoryItemId: string };
-    try {
-      ids = await crearVarianteEnShopify(empresaId, producto.shopifyProductId, parsed.data as any);
-    } catch (err) {
-      request.log.error(err);
-      const mensaje = err instanceof Error ? err.message : "";
-      if (mensaje.includes("already exists")) {
-        return reply.code(409).send({
-          error: `Esa combinacion (${parsed.data.opcionValor}) ya existe en este producto. Elige una talla/color diferente.`,
-        });
+    // Intentar crear en Shopify solo si el producto está vinculado
+    let ids: { shopifyVariantId: string; shopifyInventoryItemId: string } | null = null;
+    let shopifyError: string | null = null;
+
+    if (producto.shopifyProductId) {
+      try {
+        ids = await crearVarianteEnShopify(empresaId, producto.shopifyProductId, parsed.data as any);
+      } catch (err) {
+        request.log.error(err);
+        const mensaje = err instanceof Error ? err.message : "";
+        if (mensaje.includes("already exists")) {
+          return reply.code(409).send({
+            error: `Esa combinacion (${parsed.data.opcionValor}) ya existe en este producto. Elige una talla/color diferente.`,
+          });
+        }
+        if (mensaje.includes("linked to a metafield")) {
+          return reply.code(502).send({
+            error:
+              "Este producto usa opciones vinculadas a un metafield en Shopify (por ejemplo, un color estandarizado con muestra de color). " +
+              "Shopify no permite crear valores nuevos para ese tipo de opcion desde la API; el valor debe existir ya en la lista de opciones " +
+              "definida en Shopify, o tienes que agregarlo primero desde el admin de Shopify.",
+          });
+        }
+        // Si falla, guardar localmente pero avisar del error
+        shopifyError = mensaje || "No se pudo sincronizar con Shopify";
+        request.log.warn(`[variante] Creando localmente pero Shopify falló: ${shopifyError}`);
       }
-      if (mensaje.includes("linked to a metafield")) {
-        return reply.code(502).send({
-          error:
-            "Este producto usa opciones vinculadas a un metafield en Shopify (por ejemplo, un color estandarizado con muestra de color). " +
-            "Shopify no permite crear valores nuevos para ese tipo de opcion desde la API; el valor debe existir ya en la lista de opciones " +
-            "definida en Shopify, o tienes que agregarlo primero desde el admin de Shopify.",
-        });
-      }
-      return reply.code(502).send({ error: mensaje || "No se pudo crear la variante en Shopify" });
     }
 
     const nuevaVariante = await prisma.$transaction(async (tx) => {
@@ -1053,8 +1057,8 @@ export async function productosRoutes(app: FastifyInstance) {
           grupoOpciones: producto.grupoOpciones,
           grupoVariantes: producto.grupoVariantes,
           shopifyProductId: producto.shopifyProductId,
-          shopifyVariantId: ids.shopifyVariantId,
-          shopifyInventoryItemId: ids.shopifyInventoryItemId,
+          shopifyVariantId: ids?.shopifyVariantId ?? null,
+          shopifyInventoryItemId: ids?.shopifyInventoryItemId ?? null,
           imagenUrl: producto.imagenUrl,
         },
       });
@@ -1073,6 +1077,14 @@ export async function productosRoutes(app: FastifyInstance) {
       }
       return nueva;
     });
+
+    // Si hay error de Shopify pero la variante se creó localmente, informar al cliente
+    if (shopifyError) {
+      return reply.code(201).send({
+        ...nuevaVariante,
+        _warning: `Variante creada localmente, pero no se pudo sincronizar con Shopify: ${shopifyError}. Se sincronizará cuando conectes este producto.`,
+      });
+    }
 
     return reply.code(201).send(nuevaVariante);
   });
