@@ -4,6 +4,7 @@ import { useSesionStore } from "../lib/store";
 import { leerArchivoComoDataUrl } from "../lib/files";
 import { generarSvgCodigoBarras, generarCodigoBarrasEan13 } from "../lib/barcode";
 import { BotonesExportar } from "../lib/BotonesExportar";
+import { ModalImportarProductos } from "../lib/ModalImportarProductos";
 import type { ColumnaExport } from "../lib/export";
 import { mensajeError } from "../lib/errores";
 import { electronAPI } from "../lib/electron-api";
@@ -110,6 +111,7 @@ export default function Productos() {
   const [detalle, setDetalle] = useState<ProductoDetalle | null>(null);
   const [colecciones, setColecciones] = useState<Coleccion[]>([]);
   const [mostrarNuevo, setMostrarNuevo] = useState(false);
+  const [modalImportarAbierto, setModalImportarAbierto] = useState(false);
 
   const cargarLista = useCallback(async () => {
     const { data } = await api.get<Producto[]>("/productos", { params: busqueda ? { q: busqueda } : undefined });
@@ -170,6 +172,9 @@ export default function Productos() {
         </div>
         <div className="toolbar">
           <BotonesExportar nombreArchivo="productos" titulo="Productos" columnas={COLUMNAS_PRODUCTOS} filas={productos} />
+          <button onClick={() => setModalImportarAbierto(true)} type="button" className="secondary">
+            <IconoMas /> Importar CSV
+          </button>
           <button onClick={() => setMostrarNuevo(true)} type="button">
             Nuevo producto
           </button>
@@ -249,6 +254,14 @@ export default function Productos() {
           }}
         />
       )}
+
+      <ModalImportarProductos
+        abierto={modalImportarAbierto}
+        onCerrar={() => setModalImportarAbierto(false)}
+        onSuccess={() => {
+          cargarLista();
+        }}
+      />
     </div>
   );
 }
