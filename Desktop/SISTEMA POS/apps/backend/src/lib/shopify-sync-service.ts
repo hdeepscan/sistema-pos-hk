@@ -152,31 +152,49 @@ export class ShopifySyncService {
       console.log(`[Sync Queue] Cambio ${cambio.id} completado exitosamente`);
     } catch (error) {
       const intentosRestantes = cambio.maxIntentos - cambio.intentos - 1;
-      const nuevoIntento = this.calcularProximoIntento(cambio.intentos);
+      const errorAnalisis = this.esErrorReintentable(error);
+      const errorMsg = error instanceof Error ? error.message : String(error);
 
-      console.error(`[Sync Queue] Error en cambio ${cambio.id}:`, error);
+      console.error(`[Sync Queue] ❌ Error en cambio ${cambio.id}: ${errorAnalisis.razon}`);
+      console.error(`[Sync Queue] Mensaje: ${errorMsg}`);
 
-      if (intentosRestantes > 0) {
-        // Reintentar más tarde
+      // Verificar si es reintentable
+      if (errorAnalisis.reintentable && intentosRestantes > 0) {
+        // Reintentar más tarde con backoff exponencial
+        let nuevoIntento = this.calcularProximoIntento(cambio.intentos);
+
+        // Si es rate limit, esperar más tiempo
+        if (errorAnalisis.delayExtra) {
+          nuevoIntento = new Date(Date.now() + errorAnalisis.delayExtra * 1000);
+          console.log(`[Sync Queue] ⏳ Rate limit detectado - esperando ${errorAnalisis.delayExtra}s`);
+        }
+
         await (prisma as any).shopifySyncQueue.update({
           where: { id: cambio.id },
           data: {
             estado: "PENDIENTE",
             intentos: cambio.intentos + 1,
             proximoIntento: nuevoIntento,
-            errorMensaje: error instanceof Error ? error.message : String(error),
+            errorMensaje: `[Intento ${cambio.intentos + 1}/${cambio.maxIntentos}] ${errorAnalisis.razon}: ${errorMsg.slice(0, 100)}`,
           },
         });
       } else {
-        // Máximo de intentos alcanzado
+        // No reintentable o máximo de intentos alcanzado
+        const estado = errorAnalisis.reintentable ? "ERROR" : "ERROR";
+        const mensajeFinal = errorAnalisis.reintentable
+          ? `Máximo de intentos alcanzado (${cambio.maxIntentos}). Error: ${errorMsg.slice(0, 200)}`
+          : `No reintentable: ${errorAnalisis.razon}. Error: ${errorMsg.slice(0, 200)}`;
+
         await (prisma as any).shopifySyncQueue.update({
           where: { id: cambio.id },
           data: {
-            estado: "ERROR",
+            estado,
             intentos: cambio.intentos + 1,
-            errorMensaje: `Máximo de intentos alcanzado. Error: ${error instanceof Error ? error.message : String(error)}`,
+            errorMensaje: mensajeFinal,
           },
         });
+
+        console.error(`[Sync Queue] 🛑 Cambio marcado como ERROR: ${mensajeFinal}`);
       }
     }
   }
@@ -192,12 +210,64 @@ export class ShopifySyncService {
   }
 
   /**
+   * Analizar error de Shopify y determinar si es reintentable
+   */
+  private esErrorReintentable(error: any): {
+    reintentable: boolean;
+    razon: string;
+    delayExtra?: number; // Segundos adicionales si es rate limit
+  } {
+    const mensaje = error.message || String(error);
+
+    // Rate limit (HTTP 429)
+    if (
+      mensaje.includes("429") ||
+      mensaje.includes("rate limit") ||
+      mensaje.includes("throttle")
+    ) {
+      return {
+        reintentable: true,
+        razon: "Rate limit de Shopify",
+        delayExtra: 60, // Esperar 1 minuto más
+      };
+    }
+
+    // Timeout/conexión
+    if (
+      mensaje.includes("timeout") ||
+      mensaje.includes("ECONNREFUSED") ||
+      mensaje.includes("ENOTFOUND")
+    ) {
+      return {
+        reintentable: true,
+        razon: "Error de conexión",
+      };
+    }
+
+    // Errores de validación (no reintentables)
+    if (
+      mensaje.includes("Invalid") ||
+      mensaje.includes("validation") ||
+      mensaje.includes("not found")
+    ) {
+      return {
+        reintentable: false,
+        razon: "Error de validación - no se reintentará",
+      };
+    }
+
+    // Por defecto, reintentar
+    return {
+      reintentable: true,
+      razon: "Error genérico - se reintentará",
+    };
+  }
+
+  /**
    * Sincronizar cambio de inventario con Shopify
    */
   private async sincronizarInventario(datos: Record<string, any>): Promise<void> {
     if (!this.client) throw new Error("Cliente GraphQL no disponible");
-
-    console.log(`[Sync] Sincronizando inventario:`, datos);
 
     const { shopifyInventoryItemId, locationId, cantidad } = datos;
 
@@ -205,14 +275,23 @@ export class ShopifySyncService {
       throw new Error("Datos incompletos para sincronizar inventario");
     }
 
-    // Aquí iría la llamada a GraphQL para actualizar inventory en Shopify
-    // Por ahora, solo logueamos
     console.log(
-      `[Sync] Actualizando inventario Shopify: Item=${shopifyInventoryItemId}, Location=${locationId}, Cantidad=${cantidad}`
+      `[Sync] Actualizando inventario Shopify: Item=${shopifyInventoryItemId}, Delta=${cantidad}`
     );
 
-    // TODO: Implementar mutation GraphQL de inventoryAdjust
-    // await this.client.adjustInventory(shopifyInventoryItemId, locationId, cantidad);
+    try {
+      const resultado = await this.client.adjustInventory(shopifyInventoryItemId, locationId, cantidad);
+
+      if (resultado.inventoryAdjustQuantity?.userErrors?.length > 0) {
+        const errores = resultado.inventoryAdjustQuantity.userErrors;
+        throw new Error(`Error Shopify: ${errores.map((e: any) => e.message).join(", ")}`);
+      }
+
+      console.log(`[Sync] ✅ Inventario sincronizado exitosamente`);
+    } catch (error) {
+      console.error(`[Sync] ❌ Error sincronizando inventario:`, error);
+      throw error;
+    }
   }
 
   /**
@@ -221,18 +300,30 @@ export class ShopifySyncService {
   private async sincronizarPrecio(datos: Record<string, any>): Promise<void> {
     if (!this.client) throw new Error("Cliente GraphQL no disponible");
 
-    console.log(`[Sync] Sincronizando precio:`, datos);
-
-    const { shopifyProductId, shopifyVariantId, nuevoPrecio } = datos;
+    const { shopifyVariantId, nuevoPrecio } = datos;
 
     if (!shopifyVariantId || nuevoPrecio === undefined) {
       throw new Error("Datos incompletos para sincronizar precio");
     }
 
-    // TODO: Implementar mutation GraphQL de productVariantUpdate
-    console.log(
-      `[Sync] Actualizando precio Shopify: Variante=${shopifyVariantId}, Precio=${nuevoPrecio}`
-    );
+    console.log(`[Sync] Actualizando precio Shopify: Variante=${shopifyVariantId}, Precio=${nuevoPrecio}`);
+
+    try {
+      const resultado = await this.client.updateVariantPrice(
+        shopifyVariantId,
+        String(nuevoPrecio)
+      );
+
+      if (resultado.productVariantUpdate?.userErrors?.length > 0) {
+        const errores = resultado.productVariantUpdate.userErrors;
+        throw new Error(`Error Shopify: ${errores.map((e: any) => e.message).join(", ")}`);
+      }
+
+      console.log(`[Sync] ✅ Precio sincronizado exitosamente`);
+    } catch (error) {
+      console.error(`[Sync] ❌ Error sincronizando precio:`, error);
+      throw error;
+    }
   }
 
   /**
@@ -241,16 +332,31 @@ export class ShopifySyncService {
   private async sincronizarProducto(datos: Record<string, any>): Promise<void> {
     if (!this.client) throw new Error("Cliente GraphQL no disponible");
 
-    console.log(`[Sync] Sincronizando producto:`, datos);
-
     const { shopifyProductId, nombre, descripcion, activo } = datos;
 
     if (!shopifyProductId) {
       throw new Error("Datos incompletos para sincronizar producto");
     }
 
-    // TODO: Implementar mutation GraphQL de productUpdate
     console.log(`[Sync] Actualizando producto Shopify: ${shopifyProductId}`);
+
+    try {
+      const resultado = await this.client.updateProduct(shopifyProductId, {
+        nombre,
+        descripcion,
+        activo,
+      });
+
+      if (resultado.productUpdate?.userErrors?.length > 0) {
+        const errores = resultado.productUpdate.userErrors;
+        throw new Error(`Error Shopify: ${errores.map((e: any) => e.message).join(", ")}`);
+      }
+
+      console.log(`[Sync] ✅ Producto sincronizado exitosamente`);
+    } catch (error) {
+      console.error(`[Sync] ❌ Error sincronizando producto:`, error);
+      throw error;
+    }
   }
 
   /**
@@ -360,12 +466,80 @@ export class ShopifySyncService {
    * Procesar webhook de orden (venta en Shopify)
    */
   private async procesarOrdenShopify(data: Record<string, any>): Promise<void> {
-    console.log(`[Webhook] Orden procesada en Shopify:`, data.id);
+    console.log(`[Webhook] Procesando orden Shopify #${data.order_number}`);
 
-    // TODO: Actualizar inventario en POS cuando se vende en Shopify
-    // TODO: Crear registro de venta en POS si es necesario
+    try {
+      const shopifyOrderId = String(data.id);
+      const orderNumber = data.order_number;
 
-    console.log(`[Webhook] Procesando orden Shopify: ${data.id}`);
+      // Verificar si ya existe en POS (evitar duplicados)
+      const ordenExistente = await (prisma as any).shopifyWebhookEvent.findFirst({
+        where: {
+          empresaId: this.empresaId,
+          shopifyResourceId: shopifyOrderId,
+          tipo: "orders/create",
+          procesado: true,
+        },
+      });
+
+      if (ordenExistente) {
+        console.log(`[Webhook] Orden ya procesada: #${orderNumber}`);
+        return;
+      }
+
+      // Procesar solo órdenes pagadas/confirmadas
+      const financialStatus = data.financial_status; // authorized, captured, refunded, etc.
+      const fulfillmentStatus = data.fulfillment_status; // fulfilled, partial, unshipped, etc.
+
+      if (financialStatus === "paid" || financialStatus === "captured") {
+        // Actualizar inventario por cada line item vendido
+        for (const lineItem of data.line_items || []) {
+          const sku = lineItem.sku;
+          const cantidad = lineItem.quantity;
+
+          // Buscar producto en POS por SKU
+          const producto = await prisma.producto.findFirst({
+            where: {
+              empresaId: this.empresaId,
+              sku,
+            },
+          });
+
+          if (producto) {
+            // Restar cantidad del inventario en la sucursal de ecommerce
+            const sucursal = await prisma.sucursal.findFirst({
+              where: { empresaId: this.empresaId, tipo: "ECOMMERCE" },
+            });
+
+            if (sucursal) {
+              // Actualizar inventario
+              const invActual = await prisma.inventarioSucursal.findUnique({
+                where: { productoId_sucursalId: { productoId: producto.id, sucursalId: sucursal.id } },
+              });
+
+              const nuevaCantidad = Math.max(0, (invActual?.cantidad ?? 0) - cantidad);
+
+              await prisma.inventarioSucursal.upsert({
+                where: { productoId_sucursalId: { productoId: producto.id, sucursalId: sucursal.id } },
+                update: { cantidad: nuevaCantidad },
+                create: { productoId: producto.id, sucursalId: sucursal.id, cantidad: nuevaCantidad },
+              });
+
+              console.log(`[Webhook] ✅ Actualizado inventario: ${producto.nombre} (-${cantidad})`);
+            }
+          } else {
+            console.warn(`[Webhook] ⚠️ Producto no encontrado en POS: SKU=${sku}`);
+          }
+        }
+
+        console.log(`[Webhook] ✅ Orden #${orderNumber} procesada exitosamente`);
+      } else {
+        console.log(`[Webhook] ⚠️ Orden #${orderNumber} no pagada aún: ${financialStatus}`);
+      }
+    } catch (error) {
+      console.error(`[Webhook] ❌ Error procesando orden:`, error);
+      throw error;
+    }
   }
 
   /**

@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { GuardarShopifyConfigSchema } from "@sistema-pos/shared";
 import { prisma } from "../lib/prisma.js";
 import { normalizarDominio, validarDominioShopify, sincronizarProductos } from "../lib/shopify.js";
+import { verificarWebhookShopify } from "../lib/shopify-webhook-verify.js";
 import { mensajeDeValidacion } from "../lib/errores.js";
 
 function enmascarar(secreto: string) {
@@ -219,28 +220,81 @@ export async function shopifyRoutes(app: FastifyInstance) {
     }
   });
 
+  // Obtener historial detallado de sincronización (para dashboard)
+  app.get("/shopify/historial-sincronizacion", async (request, reply) => {
+    const { empresaId } = request.user;
+    const { limit, estado, tipo } = request.query as {
+      limit?: string;
+      estado?: string;
+      tipo?: string;
+    };
+
+    try {
+      const filtros: Record<string, any> = { empresaId };
+      if (estado) filtros.estado = estado;
+      if (tipo) filtros.tipo = tipo;
+
+      const historial = await (prisma as any).shopifySyncQueue.findMany({
+        where: filtros,
+        orderBy: { creadoEn: "desc" },
+        take: Math.min(Number(limit) || 50, 500),
+        select: {
+          id: true,
+          tipo: true,
+          estado: true,
+          intentos: true,
+          errorMensaje: true,
+          creadoEn: true,
+          procesadoEn: true,
+          proximoIntento: true,
+          producto: { select: { nombre: true, sku: true } },
+        },
+      });
+
+      return reply.code(200).send(historial);
+    } catch (err) {
+      const mensaje = err instanceof Error ? err.message : "Error desconocido";
+      request.log.error(`[shopify-historial] Error: ${mensaje}`);
+      return reply.code(502).send({ error: mensaje });
+    }
+  });
+
   // Webhook de Shopify (FASE 4)
   // IMPORTANTE: Este endpoint NO requiere autenticación (es llamado por Shopify)
   app.post<{ Body: Record<string, any> }>("/shopify/webhooks", async (request, reply) => {
     try {
-      const payload = request.body;
-
-      // Extraer empresaId del header personalizado o del payload
-      // (esto debería configurarse en Shopify con un query param o header seguro)
+      // Extraer empresaId del header personalizado
+      // IMPORTANTE: Esto debe pasarse de forma segura (no en el URL)
+      // En Shopify, puedes agregar headers personalizados en la configuración del webhook
       const empresaId = (request.headers["x-empresaid"] as string) || null;
 
       if (!empresaId) {
         request.log.warn(`[shopify-webhook] Webhook recibido sin empresaId`);
-        return reply.code(400).send({ error: "empresaId requerido" });
+        return reply.code(400).send({ error: "empresaId requerido en header X-EmpresaId" });
       }
-
-      request.log.info(`[shopify-webhook] Webhook recibido para empresa ${empresaId}`);
 
       // Verificar que la empresa existe y tiene Shopify configurado
       const config = await prisma.shopifyConfig.findUnique({ where: { empresaId } });
       if (!config) {
+        request.log.warn(`[shopify-webhook] Empresa ${empresaId} no tiene Shopify configurado`);
         return reply.code(400).send({ error: "Empresa no tiene Shopify configurado" });
       }
+
+      // 🔐 VERIFICAR HMAC-SHA256 (seguridad)
+      // Shopify envía el HMAC en X-Shopify-Hmac-SHA256
+      const hmacHeader = request.headers["x-shopify-hmac-sha256"] as string;
+      const bodyString = JSON.stringify(request.body);
+
+      if (!verificarWebhookShopify(bodyString, hmacHeader, config.clientSecret)) {
+        request.log.error(`[shopify-webhook] ❌ HMAC verification falló para empresa ${empresaId}`);
+        return reply.code(401).send({ error: "Webhook signature verification failed" });
+      }
+
+      request.log.info(
+        `[shopify-webhook] ✅ Webhook verificado para empresa ${empresaId.slice(0, 8)}`
+      );
+
+      const payload = request.body;
 
       // Procesar webhook
       const { ShopifySyncService } = await import("../lib/shopify-sync-service.js");
@@ -261,6 +315,65 @@ export async function shopifyRoutes(app: FastifyInstance) {
         error: mensaje,
         detalles: process.env.NODE_ENV === "development" ? String(err) : undefined,
       });
+    }
+  });
+
+  // Reintentar cambio específico
+  app.post("/shopify/reintentar/:cambioId", async (request, reply) => {
+    const { empresaId } = request.user;
+    const { cambioId } = request.params as { cambioId: string };
+
+    try {
+      const cambio = await (prisma as any).shopifySyncQueue.findFirst({
+        where: { id: cambioId, empresaId },
+      });
+
+      if (!cambio) {
+        return reply.code(404).send({ error: "Cambio no encontrado" });
+      }
+
+      // Resetear para reintentar
+      await (prisma as any).shopifySyncQueue.update({
+        where: { id: cambioId },
+        data: {
+          estado: "PENDIENTE",
+          intentos: 0,
+          proximoIntento: new Date(),
+          errorMensaje: null,
+        },
+      });
+
+      return reply.code(200).send({ message: "Cambio marcado para reintentar" });
+    } catch (err) {
+      const mensaje = err instanceof Error ? err.message : "Error desconocido";
+      request.log.error(`[shopify-reintentar] Error: ${mensaje}`);
+      return reply.code(502).send({ error: mensaje });
+    }
+  });
+
+  // Reintentar todos los cambios en ERROR
+  app.post("/shopify/reintentar-todos", async (request, reply) => {
+    const { empresaId } = request.user;
+
+    try {
+      const resultado = await (prisma as any).shopifySyncQueue.updateMany({
+        where: { empresaId, estado: "ERROR" },
+        data: {
+          estado: "PENDIENTE",
+          intentos: 0,
+          proximoIntento: new Date(),
+          errorMensaje: null,
+        },
+      });
+
+      return reply.code(200).send({
+        message: `${resultado.count} cambios marcados para reintentar`,
+        count: resultado.count,
+      });
+    } catch (err) {
+      const mensaje = err instanceof Error ? err.message : "Error desconocido";
+      request.log.error(`[shopify-reintentar-todos] Error: ${mensaje}`);
+      return reply.code(502).send({ error: mensaje });
     }
   });
 

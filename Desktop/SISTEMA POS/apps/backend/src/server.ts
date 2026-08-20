@@ -31,6 +31,7 @@ import { cajaRoutes } from "./routes/caja.js";
 import { fidelizacionRoutes } from "./routes/fidelizacion.js";
 import { iniciarPollerShopify } from "./lib/poller.js";
 import { iniciarBackupAutomatico } from "./lib/auto-backup.js";
+import { iniciarShopifyQueueWorker } from "./lib/shopify-queue-worker.js";
 import { initializeDatabase } from "./lib/initialize-db.js";
 
 // bodyLimit ampliado para permitir subir imagenes de producto en base64 y
@@ -159,3 +160,4 @@ await app.listen({ port, host: "0.0.0.0" });
 initWebSocket(app.server);
 iniciarPollerShopify();
 iniciarBackupAutomatico();
+iniciarShopifyQueueWorker(); // FASE 4: Procesar cola de sincronización

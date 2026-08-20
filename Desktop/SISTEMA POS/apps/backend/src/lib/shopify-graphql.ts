@@ -235,4 +235,120 @@ export class ShopifyGraphQLClient {
       variables: { id: inventoryItemId },
     });
   }
+
+  // FASE 4: Mutations para sincronización bidireccional
+
+  /**
+   * Ajustar inventario en Shopify (cambio de stock)
+   */
+  async adjustInventory(inventoryItemId: string, locationId: string, deltaQuantity: number): Promise<any> {
+    const mutation = `
+      mutation AdjustInventory($input: InventoryAdjustQuantityInput!) {
+        inventoryAdjustQuantity(input: $input) {
+          inventoryLevel {
+            id
+            available
+            onHand
+            location {
+              id
+              name
+            }
+          }
+          inventoryAdjustmentGroup {
+            reason
+            createdAt
+          }
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `;
+
+    return this.query({
+      query: mutation,
+      variables: {
+        input: {
+          inventoryItemId,
+          availableDelta: deltaQuantity,
+        },
+      },
+    });
+  }
+
+  /**
+   * Actualizar precio de variante
+   */
+  async updateVariantPrice(variantId: string, price: string): Promise<any> {
+    const mutation = `
+      mutation UpdateVariantPrice($input: ProductVariantInput!) {
+        productVariantUpdate(input: $input) {
+          productVariant {
+            id
+            price
+            compareAtPrice
+          }
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `;
+
+    return this.query({
+      query: mutation,
+      variables: {
+        input: {
+          id: variantId,
+          price,
+        },
+      },
+    });
+  }
+
+  /**
+   * Actualizar producto (nombre, descripción, estado)
+   */
+  async updateProduct(productId: string, updates: Record<string, any>): Promise<any> {
+    const mutation = `
+      mutation UpdateProduct($input: ProductInput!) {
+        productUpdate(input: $input) {
+          product {
+            id
+            title
+            bodyHtml
+            status
+            vendor
+          }
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `;
+
+    const input: Record<string, any> = { id: productId };
+    if (updates.nombre) input.title = updates.nombre;
+    if (updates.descripcion) input.bodyHtml = updates.descripcion;
+    if (updates.activo !== undefined) input.status = updates.activo ? "ACTIVE" : "ARCHIVED";
+    if (updates.marca) input.vendor = updates.marca;
+
+    return this.query({
+      query: mutation,
+      variables: { input },
+    });
+  }
+
+  /**
+   * Crear orden/transacción (cuando se vende en POS, registrar en Shopify)
+   */
+  async registrarVentaEnShopify(orderId: string, lineItems: any[]): Promise<any> {
+    // Esta es una operación compleja que requeriría crear una "order" en Shopify
+    // Por ahora, solo es un placeholder
+    console.log(`[Shopify] Registrar venta en Shopify: ${orderId}`);
+    return { success: true };
+  }
 }
