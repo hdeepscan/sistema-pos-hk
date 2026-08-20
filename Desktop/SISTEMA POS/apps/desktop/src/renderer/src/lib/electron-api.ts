@@ -241,6 +241,14 @@ export const electronAPI = {
     return await (window as any).pos.printEtiquetas(items, printer, formato);
   },
 
+  async printODescargarEtiquetas(items: any, printer: string, formato: string) {
+    if (!this.isElectron()) {
+      console.warn("printODescargarEtiquetas not available in web");
+      return { imprimio: false, mensaje: "No disponible en web" };
+    }
+    return await (window as any).pos.printODescargarEtiquetas(items, printer, formato);
+  },
+
   async queueAdd(item: any) {
     if (!this.isElectron()) {
       console.warn("queueAdd not available in web");

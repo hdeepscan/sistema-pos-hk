@@ -9,6 +9,7 @@ import {
   listPrinters,
   printRecibo,
   printEtiquetas,
+  printODescargarEtiquetas,
   printReporteCaja,
   type ReciboData,
   type EtiquetaData,
@@ -180,6 +181,20 @@ ipcMain.handle(
     // La calibracion (tamaño real y desplazamiento) sale de la configuracion.
     const cfg = readConfig();
     return printEtiquetas(args.etiquetas, args.deviceName, args.formato, {
+      anchoMm: cfg.etiquetaAnchoMm,
+      altoMm: cfg.etiquetaAltoMm,
+      offsetXMm: cfg.etiquetaOffsetXMm,
+      offsetYMm: cfg.etiquetaOffsetYMm,
+    });
+  }
+);
+
+// Imprime si hay impresora disponible; si no, genera PDF automáticamente
+ipcMain.handle(
+  "printer:etiquetas-o-descargar",
+  (_e, args: { etiquetas: EtiquetaData[]; deviceName: string | null; formato?: EtiquetaFormato }) => {
+    const cfg = readConfig();
+    return printODescargarEtiquetas(args.etiquetas, args.deviceName, args.formato, {
       anchoMm: cfg.etiquetaAnchoMm,
       altoMm: cfg.etiquetaAltoMm,
       offsetXMm: cfg.etiquetaOffsetXMm,

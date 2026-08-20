@@ -12,6 +12,8 @@ const api: PosApi = {
   printRecibo: (data, deviceName) => ipcRenderer.invoke("printer:print", { data, deviceName }),
   printEtiquetas: (etiquetas, deviceName, formato) =>
     ipcRenderer.invoke("printer:etiquetas", { etiquetas, deviceName, formato }),
+  printODescargarEtiquetas: (etiquetas, deviceName, formato) =>
+    ipcRenderer.invoke("printer:etiquetas-o-descargar", { etiquetas, deviceName, formato }),
   printReporteCaja: (data, deviceName) => ipcRenderer.invoke("printer:reporteCaja", { data, deviceName }),
 
   getVersion: () => ipcRenderer.invoke("app:version"),

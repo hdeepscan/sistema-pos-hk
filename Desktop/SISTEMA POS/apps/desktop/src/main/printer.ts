@@ -53,6 +53,35 @@ async function imprimirHtml(html: string, deviceName: string | null, pageSize?: 
   }
 }
 
+// Si falla la impresión, genera un PDF automáticamente
+async function generarPDF(html: string, nombreArchivo: string, pageSize?: PageSize): Promise<string> {
+  const win = new BrowserWindow({ show: false });
+  try {
+    await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+
+    const opciones: any = {
+      margins: { marginType: "none" },
+      printBackground: true,
+      pageSize: pageSize || "A4",
+    };
+
+    const pdfData = await win.webContents.printToPDF(opciones);
+
+    // Guardar en la carpeta de Descargas
+    const { app } = await import("electron");
+    const rutaDescargas = app.getPath("downloads");
+    const fs = await import("fs");
+    const path = await import("path");
+
+    const rutaArchivo = path.join(rutaDescargas, `${nombreArchivo}.pdf`);
+    fs.writeFileSync(rutaArchivo, pdfData);
+
+    return rutaArchivo;
+  } finally {
+    win.destroy();
+  }
+}
+
 export async function printRecibo(data: ReciboData, deviceName: string | null): Promise<void> {
   await imprimirHtml(construirReciboHtml(data), deviceName);
 }
@@ -172,6 +201,47 @@ export async function printEtiquetas(
   const cal: CalibracionEtiqueta = { ...CALIBRACION_DEFECTO, ...calibracion };
   const { pageSize } = formatoEtiqueta(formato, cal);
   await imprimirHtml(etiquetasHtml(etiquetas, formato, cal), deviceName, pageSize);
+}
+
+// Intenta imprimir; si falla, genera PDF automáticamente
+export async function printODescargarEtiquetas(
+  etiquetas: EtiquetaData[],
+  deviceName: string | null,
+  formato: EtiquetaFormato = "rollo2",
+  calibracion?: Partial<CalibracionEtiqueta>
+): Promise<{ imprimio: boolean; rutaPDF?: string; mensaje: string }> {
+  const cal: CalibracionEtiqueta = { ...CALIBRACION_DEFECTO, ...calibracion };
+  const { pageSize } = formatoEtiqueta(formato, cal);
+  const html = etiquetasHtml(etiquetas, formato, cal);
+
+  // Intentar imprimir
+  try {
+    await imprimirHtml(html, deviceName, pageSize);
+    return {
+      imprimio: true,
+      mensaje: `${etiquetas.length} etiqueta${etiquetas.length === 1 ? "" : "s"} enviada${etiquetas.length === 1 ? "" : "s"} a la impresora`,
+    };
+  } catch (err) {
+    // Si hay impresora configurada y falla, es probable que no esté disponible
+    // Si no hay impresora, generar PDF directamente
+    if (deviceName) {
+      console.warn("Impresora no disponible, generando PDF:", err);
+    }
+
+    try {
+      const fecha = new Date().toISOString().split("T")[0];
+      const nombreArchivo = `etiquetas-${formato}-${fecha}`;
+      const rutaPDF = await generarPDF(html, nombreArchivo, pageSize);
+
+      return {
+        imprimio: false,
+        rutaPDF,
+        mensaje: `No se encontró impresora. PDF guardado en Descargas: ${nombreArchivo}.pdf`,
+      };
+    } catch (pdfErr) {
+      throw new Error(`Error al imprimir y generar PDF: ${pdfErr}`);
+    }
+  }
 }
 
 function reporteCajaHtml(d: ReporteCajaData): string {

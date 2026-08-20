@@ -986,10 +986,18 @@ function EtiquetaCard({ producto, onActualizado }: { producto: ProductoDetalle; 
         return;
       }
       const config = await electronAPI.getConfig();
-      await electronAPI.printEtiquetas(items, config.printerName, formato);
-      setMensaje(`${totalEtiquetas} etiqueta${totalEtiquetas === 1 ? "" : "s"} enviada${totalEtiquetas === 1 ? "" : "s"} a la impresora`);
-    } catch {
-      setError("No se pudo imprimir. Revisa que haya una impresora configurada en Configuracion.");
+      const resultado = await electronAPI.printODescargarEtiquetas(items, config.printerName, formato);
+      if (resultado) {
+        setMensaje(resultado.mensaje);
+        if (!resultado.imprimio && resultado.rutaPDF) {
+          setMensaje(
+            resultado.mensaje + " (La carpeta de Descargas debería abrirse automáticamente)"
+          );
+        }
+      }
+    } catch (err) {
+      console.error("Error al imprimir:", err);
+      setError("No se pudo imprimir ni generar PDF. Verifica la configuración de la impresora.");
     } finally {
       setImprimiendo(false);
     }

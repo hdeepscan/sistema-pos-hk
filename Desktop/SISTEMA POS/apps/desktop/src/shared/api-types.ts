@@ -128,6 +128,11 @@ export interface PosApi {
   listPrinters: () => Promise<string[]>;
   printRecibo: (data: ReciboData, deviceName: string | null) => Promise<void>;
   printEtiquetas: (etiquetas: EtiquetaData[], deviceName: string | null, formato?: EtiquetaFormato) => Promise<void>;
+  printODescargarEtiquetas: (
+    etiquetas: EtiquetaData[],
+    deviceName: string | null,
+    formato?: EtiquetaFormato
+  ) => Promise<{ imprimio: boolean; rutaPDF?: string; mensaje: string }>;
   printReporteCaja: (data: ReporteCajaData, deviceName: string | null) => Promise<void>;
 
   getVersion: () => Promise<string>;
