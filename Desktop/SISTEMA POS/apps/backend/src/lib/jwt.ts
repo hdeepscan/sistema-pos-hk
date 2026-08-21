@@ -55,9 +55,16 @@ export async function registerJwt(app: FastifyInstance) {
     }
 
     request.user.rol = usuario.rol;
-    request.user.permisos = (
-      usuario.permisos.length > 0 ? usuario.permisos : PERMISOS_POR_ROL[usuario.rol]
-    ) as Permiso[];
+    // Para roles administrativos (ADMIN, GERENTE, SUPERVISOR), siempre usa los permisos
+    // del rol para garantizar sincronización automática cuando se agregan nuevos permisos.
+    // Para CAJERO y BODEGA, permite personalizaciones.
+    if (["ADMIN", "GERENTE", "SUPERVISOR"].includes(usuario.rol)) {
+      request.user.permisos = PERMISOS_POR_ROL[usuario.rol] as Permiso[];
+    } else {
+      request.user.permisos = (
+        usuario.permisos.length > 0 ? usuario.permisos : PERMISOS_POR_ROL[usuario.rol]
+      ) as Permiso[];
+    }
   });
 }
 
