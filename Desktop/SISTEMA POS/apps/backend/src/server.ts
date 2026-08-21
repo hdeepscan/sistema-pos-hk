@@ -160,4 +160,5 @@ await app.listen({ port, host: "0.0.0.0" });
 initWebSocket(app.server);
 iniciarPollerShopify();
 iniciarBackupAutomatico();
-iniciarShopifyQueueWorker(); // FASE 4: Procesar cola de sincronización
+// TODO: Habilitar cuando las migraciones Shopify estén aplicadas en BD
+// iniciarShopifyQueueWorker(); // FASE 4: Procesar cola de sincronización
