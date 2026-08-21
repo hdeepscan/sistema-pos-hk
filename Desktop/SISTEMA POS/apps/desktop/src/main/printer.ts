@@ -26,28 +26,55 @@ export async function listPrinters(): Promise<string[]> {
 async function imprimirHtml(html: string, deviceName: string | null, pageSize?: PageSize): Promise<void> {
   const win = new BrowserWindow({ show: false });
   const PRINT_TIMEOUT = 30000;
+
   try {
+    console.log(`[PRINT-HTML] Loading HTML content...`);
     await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+
+    console.log(`[PRINT-HTML] Sending to printer: ${deviceName || "default"}`);
+    console.log(`[PRINT-HTML] Page size: ${pageSize ? JSON.stringify(pageSize) : "default"}`);
+
     await Promise.race([
       new Promise<void>((resolve, reject) => {
-        win.webContents.print(
-          {
-            silent: true,
-            printBackground: true,
-            deviceName: deviceName ?? undefined,
-            margins: { marginType: "none" },
-            ...(pageSize ? { pageSize } : {}),
-          },
-          (ok, errorType) => {
-            if (ok) resolve();
-            else reject(new Error(errorType || "Error en impresora"));
+        const printOptions: any = {
+          silent: true,
+          printBackground: true,
+          margins: { marginType: "none" },
+        };
+
+        // Only set deviceName if it's explicitly provided
+        if (deviceName && deviceName.trim()) {
+          printOptions.deviceName = deviceName;
+          console.log(`[PRINT-HTML] Using explicit printer: ${deviceName}`);
+        } else {
+          console.log(`[PRINT-HTML] Using system default printer`);
+        }
+
+        if (pageSize) {
+          printOptions.pageSize = pageSize;
+        }
+
+        win.webContents.print(printOptions, (ok, errorType) => {
+          if (ok) {
+            console.log(`[PRINT-HTML] Print job sent successfully`);
+            resolve();
+          } else {
+            const errorMsg = errorType || "Unknown printer error";
+            console.error(`[PRINT-HTML] Print failed: ${errorMsg}`);
+            reject(new Error(errorMsg));
           }
-        );
+        });
       }),
       new Promise<void>((_, reject) =>
-        setTimeout(() => reject(new Error("Tiempo agotado al imprimir")), PRINT_TIMEOUT)
+        setTimeout(() => {
+          console.error(`[PRINT-HTML] Print timeout after ${PRINT_TIMEOUT}ms`);
+          reject(new Error("Tiempo agotado al imprimir"));
+        }, PRINT_TIMEOUT)
       ),
     ]);
+  } catch (err) {
+    console.error(`[PRINT-HTML] Exception during print:`, err);
+    throw err;
   } finally {
     win.destroy();
   }
@@ -83,7 +110,33 @@ async function generarPDF(html: string, nombreArchivo: string, pageSize?: PageSi
 }
 
 export async function printRecibo(data: ReciboData, deviceName: string | null): Promise<void> {
-  await imprimirHtml(construirReciboHtml(data), deviceName);
+  try {
+    console.log(`[PRINT] Attempting to print recibo to: ${deviceName || "default printer"}`);
+    await imprimirHtml(construirReciboHtml(data), deviceName);
+    console.log(`[PRINT] Recibo printed successfully`);
+  } catch (err) {
+    console.error(`[PRINT] Print failed:`, err);
+    // Fallback: generate PDF automatically when print fails
+    try {
+      console.log(`[PRINT] Generating PDF fallback...`);
+      const fecha = new Date().toISOString().split("T")[0];
+      const hora = new Date().toTimeString().slice(0, 5);
+      const nombreArchivo = `recibo-${data.consecutivo}-${fecha}-${hora}`;
+      const rutaPDF = await generarPDF(construirReciboHtml(data), nombreArchivo, { width: 80000, height: 200000 });
+      console.log(`[PRINT] PDF generated at: ${rutaPDF}`);
+      // Show notification to user (in renderer process)
+      const { BrowserWindow } = await import("electron");
+      BrowserWindow.getAllWindows().forEach(win => {
+        win.webContents.send("print:fallback", {
+          tipo: "recibo",
+          mensaje: `Impresora no disponible. PDF guardado en Descargas: ${nombreArchivo}.pdf`
+        });
+      });
+    } catch (pdfErr) {
+      console.error(`[PRINT] PDF generation also failed:`, pdfErr);
+      throw new Error(`Error al imprimir y generar PDF: ${pdfErr}`);
+    }
+  }
 }
 
 // Calibracion de la etiqueta: medidas reales del rollo y desplazamiento fino
@@ -214,31 +267,35 @@ export async function printODescargarEtiquetas(
   const { pageSize } = formatoEtiqueta(formato, cal);
   const html = etiquetasHtml(etiquetas, formato, cal);
 
+  console.log(`[PRINT LABELS] Attempting to print ${etiquetas.length} etiqueta(s) to: ${deviceName || "default printer"}`);
+
   // Intentar imprimir
   try {
     await imprimirHtml(html, deviceName, pageSize);
+    console.log(`[PRINT LABELS] Successfully printed to ${deviceName}`);
     return {
       imprimio: true,
-      mensaje: `${etiquetas.length} etiqueta${etiquetas.length === 1 ? "" : "s"} enviada${etiquetas.length === 1 ? "" : "s"} a la impresora`,
+      mensaje: `${etiquetas.length} etiqueta${etiquetas.length === 1 ? "" : "s"} impresa${etiquetas.length === 1 ? "" : "s"} correctamente`,
     };
   } catch (err) {
     // Si hay impresora configurada y falla, es probable que no esté disponible
     // Si no hay impresora, generar PDF directamente
-    if (deviceName) {
-      console.warn("Impresora no disponible, generando PDF:", err);
-    }
+    console.warn(`[PRINT LABELS] Print failed, generating PDF fallback:`, err);
 
     try {
       const fecha = new Date().toISOString().split("T")[0];
-      const nombreArchivo = `etiquetas-${formato}-${fecha}`;
+      const hora = new Date().toTimeString().slice(0, 5);
+      const nombreArchivo = `etiquetas-${formato}-${fecha}-${hora}`;
       const rutaPDF = await generarPDF(html, nombreArchivo, pageSize);
 
+      console.log(`[PRINT LABELS] PDF generated at: ${rutaPDF}`);
       return {
         imprimio: false,
         rutaPDF,
-        mensaje: `No se encontró impresora. PDF guardado en Descargas: ${nombreArchivo}.pdf`,
+        mensaje: `Impresora no disponible. PDF guardado en Descargas: ${nombreArchivo}.pdf`,
       };
     } catch (pdfErr) {
+      console.error(`[PRINT LABELS] PDF generation failed:`, pdfErr);
       throw new Error(`Error al imprimir y generar PDF: ${pdfErr}`);
     }
   }

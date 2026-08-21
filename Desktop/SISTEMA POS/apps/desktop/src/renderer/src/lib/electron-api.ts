@@ -168,6 +168,7 @@ export const electronAPI = {
     if (!this.isElectron()) {
       // Web: generate and download PDF
       try {
+        console.log("[RECEIPT] Web mode - generating PDF");
         const html = construirReciboHtml(data);
         const doc = new jsPDF({
           orientation: "portrait",
@@ -212,23 +213,72 @@ export const electronAPI = {
           // Trigger download
           const fecha = new Date().toISOString().slice(0, 10);
           const hora = new Date().toTimeString().slice(0, 5);
+          console.log(`[RECEIPT] Downloading PDF: recibo-${data.consecutivo}-${fecha}-${hora}.pdf`);
           doc.save(`recibo-${data.consecutivo}-${fecha}-${hora}.pdf`);
         } finally {
           document.body.removeChild(container);
         }
       } catch (error) {
-        console.error("Error generating PDF:", error);
+        console.error("[RECEIPT] Error generating PDF:", error);
         throw error;
       }
     } else {
       // Electron: use native print (deviceName is the correct parameter)
+      console.log(`[RECEIPT] Electron mode - printing with deviceName: ${deviceName || "default"}`);
       try {
-        return await (window as any).pos.printRecibo(data, deviceName);
+        await (window as any).pos.printRecibo(data, deviceName);
+        console.log("[RECEIPT] Print successful");
       } catch (err) {
-        console.error("Print failed, attempting fallback:", err);
-        // Fallback: if print fails and deviceName is configured, log the error
-        // but don't block the venta (already saved)
-        throw err;
+        console.error("[RECEIPT] Print failed:", err);
+        // Generate PDF as fallback in Electron too
+        try {
+          console.log("[RECEIPT] Attempting PDF fallback...");
+          const html = construirReciboHtml(data);
+          const doc = new jsPDF({
+            orientation: "portrait",
+            unit: "mm",
+            format: [80, 200],
+          });
+
+          const container = document.createElement("div");
+          container.innerHTML = html;
+          container.style.position = "absolute";
+          container.style.left = "-9999px";
+          container.style.width = "80mm";
+          document.body.appendChild(container);
+
+          try {
+            const canvas = await html2canvas(container, {
+              scale: 2,
+              useCORS: true,
+              backgroundColor: "#ffffff",
+            });
+
+            const imgData = canvas.toDataURL("image/png");
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const ratio = canvas.width / canvas.height;
+            let height = pageHeight;
+            let width = height * ratio;
+            if (width > pageWidth) {
+              width = pageWidth;
+              height = width / ratio;
+            }
+
+            const x = (pageWidth - width) / 2;
+            doc.addImage(imgData, "PNG", x, 0, width, height);
+
+            const fecha = new Date().toISOString().slice(0, 10);
+            const hora = new Date().toTimeString().slice(0, 5);
+            doc.save(`recibo-${data.consecutivo}-${fecha}-${hora}.pdf`);
+            console.log("[RECEIPT] PDF fallback successful");
+          } finally {
+            document.body.removeChild(container);
+          }
+        } catch (pdfErr) {
+          console.error("[RECEIPT] PDF fallback also failed:", pdfErr);
+          // Don't throw - venta is already saved in backend
+        }
       }
     }
   },
