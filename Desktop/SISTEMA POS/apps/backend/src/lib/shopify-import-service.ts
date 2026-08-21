@@ -68,6 +68,11 @@ export class ShopifyImportService {
           throw new Error("No se obtuvieron datos de productos desde Shopify. Verifica tu conexión y token.");
         }
 
+        // LOG DETALLADO: Ver estructura de productsData.products
+        console.log(`[Import] productsData.products estructura:`, JSON.stringify(productsData.products).substring(0, 500));
+        console.log(`[Import] ¿Tiene edges?:`, Array.isArray(productsData.products?.edges));
+        console.log(`[Import] ¿Es array?:`, Array.isArray(productsData.products));
+
         const products = productsData.products?.edges || [];
         this.stats.productosEncontrados += products.length;
 
