@@ -153,6 +153,9 @@ export class ShopifyImportService {
     const primeraVarianteNode = primeraVariante.node;
     const imagenUrl = shopifyProduct.images?.edges?.[0]?.node?.url || null;
 
+    const shopifyVariantId = primeraVarianteNode.id.replace("gid://shopify/ProductVariant/", "");
+    const shopifyInventoryItemId = primeraVarianteNode.inventoryItem?.id.replace("gid://shopify/InventoryItem/", "") || null;
+
     const producto = await prisma.producto.create({
       data: {
         empresaId: this.empresaId,
@@ -169,6 +172,8 @@ export class ShopifyImportService {
         grupoOpciones: JSON.stringify(primeraVarianteNode.selectedOptions || []),
         grupoVariantes: shopifyProductId,
         shopifyProductId: shopifyProductId,
+        shopifyVariantId: shopifyVariantId,
+        shopifyInventoryItemId: shopifyInventoryItemId,
       },
     });
 
@@ -179,13 +184,15 @@ export class ShopifyImportService {
       for (let i = 1; i < variants.length; i++) {
         const variantNode = variants[i].node;
         const variantImageUrl = variantNode.image?.url || imagenUrl;
+        const variantShopifyId = variantNode.id.replace("gid://shopify/ProductVariant/", "");
+        const variantInventoryItemId = variantNode.inventoryItem?.id.replace("gid://shopify/InventoryItem/", "") || null;
 
         await prisma.producto.create({
           data: {
             empresaId: this.empresaId,
             nombre: shopifyProduct.title,
             descripcion: shopifyProduct.description || "",
-            sku: variantNode.sku || `SKU-${variantNode.id.replace("gid://shopify/ProductVariant/", "")}`,
+            sku: variantNode.sku || `SKU-${variantShopifyId}`,
             codigoBarras: variantNode.barcode || null,
             precio: parseFloat(variantNode.price || "0"),
             categoria: shopifyProduct.productType || null,
@@ -196,6 +203,8 @@ export class ShopifyImportService {
             grupoOpciones: JSON.stringify(variantNode.selectedOptions || []),
             grupoVariantes: shopifyProductId,
             shopifyProductId: shopifyProductId,
+            shopifyVariantId: variantShopifyId,
+            shopifyInventoryItemId: variantInventoryItemId,
           },
         });
 
