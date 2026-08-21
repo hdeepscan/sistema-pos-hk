@@ -61,6 +61,13 @@ export class ShopifyImportService {
         console.log(`[Import] Cargando lote ${iteracion} de productos...`);
 
         const productsData = await this.client.getProductsInitial(cursor);
+
+        // Validar que productsData sea válido
+        if (!productsData || !productsData.products) {
+          console.error("[Import Error] No data returned from Shopify. Response:", productsData);
+          throw new Error("No se obtuvieron datos de productos desde Shopify. Verifica tu conexión y token.");
+        }
+
         const products = productsData.products?.edges || [];
         this.stats.productosEncontrados += products.length;
 
