@@ -169,13 +169,10 @@ export async function shopifyRoutes(app: FastifyInstance) {
         });
       }
 
-      const redirectUri = process.env.SHOPIFY_OAUTH_REDIRECT_URI;
-      if (!redirectUri) {
-        return reply.code(500).send({
-          ok: false,
-          error: "SHOPIFY_OAUTH_REDIRECT_URI no configurada",
-        });
-      }
+      // Construir redirect_uri dinámicamente basado en el host actual
+      const protocol = request.protocol;
+      const host = request.hostname;
+      const redirectUri = `${protocol}://${host}/shopify/callback`;
 
       const { authorizationUrl, state } = generarUrlAutorizacion({
         shop: config.shopDomain,
