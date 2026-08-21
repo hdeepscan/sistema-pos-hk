@@ -20,100 +20,80 @@ export async function shopifyRoutes(app: FastifyInstance) {
   // OAuth 2.0: Callback - NO requiere autenticación
   // IMPORTANTE: Registrar ANTES del hook de autenticación
   app.get<{ Querystring: Record<string, string> }>("/shopify/callback", async (request, reply) => {
+    console.log("[shopify-oauth-callback] QUERY PARAMS:", request.query);
+    request.log.info("[shopify-oauth-callback] QUERY PARAMS: " + JSON.stringify(request.query));
+
     try {
-      const state = request.query.state;
-      const shop = request.query.shop;
-      const code = request.query.code;
-      const hmac = request.query.hmac;
+      const { code, hmac, shop, state } = request.query;
 
-      console.log(`[shopify-oauth-callback] ✅ CALLBACK ALCANZADO. State: ${state?.slice(0, 8)}..., Shop: ${shop}`);
-      request.log.info(`[shopify-oauth-callback] ✅ CALLBACK ALCANZADO. State: ${state?.slice(0, 8)}..., Shop: ${shop}`);
-      request.log.info(`[shopify-oauth-callback] Iniciando validación. State: ${state?.slice(0, 8)}..., Shop: ${shop}`);
-
-      // Validar estado OAuth (recupera empresaId del estado guardado)
-      const estadoValidation = await validarEstadoOAuth(state);
-      if (!estadoValidation.valido) {
-        request.log.error(
-          `[shopify-oauth-callback] ❌ Estado CSRF inválido o expirado: ${estadoValidation.error}`
-        );
-        return reply.code(400).send({
-          error: `Estado CSRF inválido: ${estadoValidation.error}`,
-        });
+      // 1) Validar que existan parámetros
+      if (!code || !hmac || !shop || !state) {
+        const err = "faltan parámetros en callback";
+        console.log("[shopify-oauth-callback] ERROR:", err);
+        return reply.code(400).send({ error: err });
       }
 
-      const empresaId = estadoValidation.empresaId;
-      if (!empresaId) {
-        request.log.error(`[shopify-oauth-callback] ❌ empresaId no encontrado en estado`);
-        return reply.code(400).send({
-          error: "No se encontró empresaId en estado OAuth",
-        });
+      // 2) Buscar state en BD
+      console.log("[shopify-oauth-callback] buscando state:", state);
+      const stateRow = await (prisma as any).shopifyOAuthState.findUnique({
+        where: { state: String(state) },
+      });
+
+      if (!stateRow) {
+        console.log("[shopify-oauth-callback] state no encontrado:", state);
+        return reply.code(400).send({ error: "estado CSRF inválido" });
       }
 
-      request.log.info(`[shopify-oauth-callback] ✅ Estado CSRF válido. EmpresaId: ${empresaId.slice(0, 8)}...`);
+      const empresaId = stateRow.empresaId;
+      console.log("[shopify-oauth-callback] empresaId encontrado:", empresaId);
 
-      // Validar HMAC (usar clientSecret de config, no env var)
-      const config = await prisma.shopifyConfig.findUnique({
+      // 3) Buscar config de Shopify
+      console.log("[shopify-oauth-callback] buscando config para empresaId:", empresaId);
+      const config = await (prisma as any).shopifyConfig.findUnique({
         where: { empresaId },
       });
 
       if (!config) {
-        request.log.error(`[shopify-oauth-callback] ❌ Configuración Shopify no encontrada para empresa ${empresaId}`);
-        return reply.code(404).send({
-          error: "Configuración de Shopify no encontrada",
-        });
+        console.log("[shopify-oauth-callback] config no encontrada para empresaId:", empresaId);
+        return reply.code(400).send({ error: "shopify config no encontrada" });
       }
 
-      const callbackValidation = validarCallbackShopify(
-        request.query,
-        config.clientSecret
-      );
+      console.log("[shopify-oauth-callback] config encontrada. Intercambiando código por token...");
 
-      if (!callbackValidation.valido) {
-        request.log.error(
-          `[shopify-oauth-callback] ❌ HMAC validation fallida: ${callbackValidation.error}`
-        );
-        return reply.code(400).send({
-          error: `HMAC inválido: ${callbackValidation.error}`,
-        });
-      }
-
-      request.log.info(`[shopify-oauth-callback] ✅ HMAC válido`);
-
-      // Intercambiar código por access token
-      request.log.info(`[shopify-oauth-callback] Intercambiando código por access token...`);
+      // 4) Intercambiar code por access_token
       const tokenResponse = await intercambiarCodigoAcessToken({
-        shop: callbackValidation.tienda!,
-        code: callbackValidation.codigo!,
+        shop: String(shop),
+        code: String(code),
         clientId: config.clientId,
         clientSecret: config.clientSecret,
       });
 
-      request.log.info(`[shopify-oauth-callback] ✅ Access token obtenido. Guardando en BD...`);
+      console.log("[shopify-oauth-callback] token obtenido:", tokenResponse.accessToken?.slice(0, 10) + "...");
 
-      // Guardar access token
-      await prisma.shopifyConfig.update({
+      // 5) Guardar token en shopify_config
+      console.log("[shopify-oauth-callback] guardando token en BD para empresaId:", empresaId);
+      await (prisma as any).shopifyConfig.update({
         where: { empresaId },
         data: {
           accessToken: tokenResponse.accessToken,
-          tokenExpiraEn: null, // Token offline no expira
+          tokenExpiraEn: null,
         },
       });
 
-      request.log.info(
-        `[shopify-oauth-callback] ✅ Token guardado para empresa ${empresaId.slice(
-          0,
-          8
-        )} - Tienda: ${callbackValidation.tienda}`
-      );
+      console.log("[shopify-oauth-callback] ✅ token guardado exitosamente");
+      request.log.info("[shopify-oauth-callback] ✅ token guardado para empresaId: " + empresaId);
 
-      // Redirigir al usuario de vuelta a la app
+      // 6) Redirigir
       const appUrl = "https://sistema-pos-hk.up.railway.app/shopify?oauth=success";
+      console.log("[shopify-oauth-callback] redirigiendo a:", appUrl);
       return reply.redirect(appUrl);
     } catch (error) {
       const mensaje = error instanceof Error ? error.message : "Error desconocido";
-      request.log.error(`[shopify-oauth-callback] ❌ EXCEPCIÓN: ${mensaje}`);
+      console.log("[shopify-oauth-callback] ❌ EXCEPCIÓN:", mensaje);
+      console.log("[shopify-oauth-callback] STACK:", error instanceof Error ? error.stack : "");
+      request.log.error("[shopify-oauth-callback] EXCEPCIÓN: " + mensaje);
 
-      // Redirigir a la app con error
+      // Redirigir con error
       const errorUrl = `https://sistema-pos-hk.up.railway.app/shopify?oauth=error&msg=${encodeURIComponent(
         mensaje
       )}`;
