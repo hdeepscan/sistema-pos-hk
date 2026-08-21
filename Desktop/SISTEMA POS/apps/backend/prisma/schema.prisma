@@ -89,6 +89,8 @@ model Empresa {
   shopifyInventoryLevels ShopifyInventoryLevel[]
   shopifySyncQueue ShopifySyncQueue[]
   shopifyWebhookEvents ShopifyWebhookEvent[]
+  cuentasContables CuentaContable[]
+  asientosContables AsientoContable[]
 
   @@map("empresas")
 }
