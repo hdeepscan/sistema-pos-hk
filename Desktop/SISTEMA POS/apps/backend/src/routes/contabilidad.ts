@@ -2,6 +2,115 @@ import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { mensajeDeValidacion } from "../lib/errores.js";
 
+// Función helper para crear un asiento contable automáticamente desde una venta
+export async function crearAsientoDesdeVenta(
+  empresaId: string,
+  venta: {
+    id: string;
+    total: number;
+    impuestoTotal?: number;
+    metodoPago: string;
+    consecutivo: number;
+  }
+) {
+  try {
+    // Obtener o crear las cuentas necesarias
+    const [cuentaVentas, cuentaIVA, cuentaCaja] = await Promise.all([
+      prisma.cuentaContable.upsert({
+        where: { empresaId_codigo: { empresaId, codigo: "4105" } },
+        update: {},
+        create: {
+          empresaId,
+          codigo: "4105",
+          nombre: "Ventas",
+          tipo: "INGRESO",
+          descripcion: "Ingresos por ventas",
+        },
+      }),
+      prisma.cuentaContable.upsert({
+        where: { empresaId_codigo: { empresaId, codigo: "2408" } },
+        update: {},
+        create: {
+          empresaId,
+          codigo: "2408",
+          nombre: "IVA Cobrado",
+          tipo: "PASIVO",
+          descripcion: "IVA por cobrar",
+        },
+      }),
+      prisma.cuentaContable.upsert({
+        where: { empresaId_codigo: { empresaId, codigo: "1105" } },
+        update: {},
+        create: {
+          empresaId,
+          codigo: "1105",
+          nombre: "Caja",
+          tipo: "ACTIVO",
+          descripcion: "Efectivo en caja",
+        },
+      }),
+    ]);
+
+    // Calcular el neto de ventas (sin IVA)
+    const ivaTotal = venta.impuestoTotal ?? 0;
+    const ventaNeta = venta.total - ivaTotal;
+
+    // Crear líneas del asiento
+    const lineas: any[] = [
+      {
+        cuentaId: cuentaCaja.id,
+        descripcion: `Venta #${venta.consecutivo}`,
+        debe: venta.total,
+        haber: 0,
+      },
+      {
+        cuentaId: cuentaVentas.id,
+        descripcion: `Venta #${venta.consecutivo}`,
+        debe: 0,
+        haber: ventaNeta,
+      },
+    ];
+
+    // Si hay IVA, agregar línea
+    if (ivaTotal > 0) {
+      lineas.push({
+        cuentaId: cuentaIVA.id,
+        descripcion: `IVA Venta #${venta.consecutivo}`,
+        debe: 0,
+        haber: ivaTotal,
+      });
+    }
+
+    // Crear el asiento contable
+    await prisma.asientoContable.create({
+      data: {
+        empresaId,
+        fecha: new Date(),
+        descripcion: `Venta #${venta.consecutivo}`,
+        referencia: `VENTA_${venta.id}`,
+        estado: "CONTABILIZADO", // Se contabiliza automáticamente
+        contabilizadoEn: new Date(),
+        totalDebe: venta.total.toString(),
+        totalHaber: venta.total.toString(),
+        lineas: {
+          create: lineas.map((l, idx) => ({
+            cuentaId: l.cuentaId,
+            descripcion: l.descripcion,
+            debe: l.debe,
+            haber: l.haber,
+            orden: idx,
+          })),
+        },
+      },
+    });
+
+    console.log(`[Contabilidad] Asiento creado automáticamente para venta #${venta.consecutivo}`);
+  } catch (err) {
+    console.error(`[Contabilidad] Error creando asiento para venta #${venta.consecutivo}:`, err);
+    // No lanzar error: la falta de asiento no debe bloquear la venta
+  }
+}
+
 export async function contabilidadRoutes(app: FastifyInstance) {
   app.addHook("preHandler", app.authenticate);
 

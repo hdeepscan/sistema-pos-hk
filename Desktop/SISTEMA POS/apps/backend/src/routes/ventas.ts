@@ -7,6 +7,7 @@ import { ajustarInventarioEnShopifySiCorresponde } from "../lib/shopify.js";
 import { enviarEventoCompraAMeta } from "../lib/meta.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
 import { mensajeDeValidacion } from "../lib/errores.js";
+import { crearAsientoDesdeVenta } from "./contabilidad.js";
 
 const MS_DIA = 24 * 60 * 60 * 1000;
 
@@ -447,6 +448,17 @@ export async function ventasRoutes(app: FastifyInstance) {
     const puntosSaldo = clienteId
       ? (await prisma.cliente.findUnique({ where: { id: clienteId }, select: { puntos: true } }))?.puntos ?? 0
       : 0;
+
+    // Sincronizar automáticamente: crear asiento contable
+    void (async () => {
+      await crearAsientoDesdeVenta(empresaId, {
+        id: venta.id,
+        total: Number(venta.total),
+        impuestoTotal: venta.impuestoTotal ? Number(venta.impuestoTotal) : undefined,
+        metodoPago,
+        consecutivo: venta.consecutivo,
+      });
+    })();
 
     emitVentaCreada(empresaId, {
       ventaId: venta.id,
