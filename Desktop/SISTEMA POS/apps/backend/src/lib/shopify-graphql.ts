@@ -56,12 +56,12 @@ export class ShopifyGraphQLClient {
       const result: GraphQLResponse = await response.json();
 
       // Manejar errores GraphQL
-      if (result.errors && result.errors.length > 0) {
+      if (Array.isArray(result.errors) && result.errors.length > 0) {
         const errorMsg = result.errors.map((e) => e.message).join(", ");
         throw new Error(`GraphQL Error: ${errorMsg}`);
       }
 
-      if (result.userErrors && result.userErrors.length > 0) {
+      if (Array.isArray(result.userErrors) && result.userErrors.length > 0) {
         const errorMsg = result.userErrors.map((e) => e.message).join(", ");
         throw new Error(`GraphQL User Error: ${errorMsg}`);
       }
