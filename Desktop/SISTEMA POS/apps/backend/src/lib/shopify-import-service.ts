@@ -164,7 +164,7 @@ export class ShopifyImportService {
         categoria: shopifyProduct.productType || null,
         marca: shopifyProduct.vendor || null,
         imagenUrl: imagenUrl,
-        activo: shopifyProduct.status === "active",
+        activo: true, // Siempre activo cuando se importa de Shopify
         varianteTitulo: primeraVarianteNode.title || "Default",
         grupoOpciones: JSON.stringify(primeraVarianteNode.selectedOptions || []),
         grupoVariantes: shopifyProductId,
@@ -191,7 +191,7 @@ export class ShopifyImportService {
             categoria: shopifyProduct.productType || null,
             marca: shopifyProduct.vendor || null,
             imagenUrl: variantImageUrl,
-            activo: shopifyProduct.status === "active",
+            activo: true, // Siempre activo cuando se importa de Shopify
             varianteTitulo: variantNode.title || `Variante ${i + 1}`,
             grupoOpciones: JSON.stringify(variantNode.selectedOptions || []),
             grupoVariantes: shopifyProductId,
