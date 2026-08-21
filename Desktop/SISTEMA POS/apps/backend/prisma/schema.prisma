@@ -946,7 +946,6 @@ model AsientoContable {
   id                   String    @id @default(uuid())
   empresaId            String
   empresa              Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  numero               Int       @default(autoincrement()) // Número secuencial del asiento
   fecha                DateTime
   descripcion          String
   referencia           String?   // Ref a venta, factura, etc
