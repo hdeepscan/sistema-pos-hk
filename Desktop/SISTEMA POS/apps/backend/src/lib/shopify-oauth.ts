@@ -11,6 +11,7 @@ const SHOPIFY_SCOPES = [
   "read_products",
   "write_inventory",
   "read_inventory",
+  "read_locations",
   "write_orders",
   "read_orders",
   "write_fulfillments",
