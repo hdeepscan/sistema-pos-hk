@@ -26,6 +26,8 @@ export async function shopifyRoutes(app: FastifyInstance) {
       const code = request.query.code;
       const hmac = request.query.hmac;
 
+      console.log(`[shopify-oauth-callback] ✅ CALLBACK ALCANZADO. State: ${state?.slice(0, 8)}..., Shop: ${shop}`);
+      request.log.info(`[shopify-oauth-callback] ✅ CALLBACK ALCANZADO. State: ${state?.slice(0, 8)}..., Shop: ${shop}`);
       request.log.info(`[shopify-oauth-callback] Iniciando validación. State: ${state?.slice(0, 8)}..., Shop: ${shop}`);
 
       // Validar estado OAuth (recupera empresaId del estado guardado)
