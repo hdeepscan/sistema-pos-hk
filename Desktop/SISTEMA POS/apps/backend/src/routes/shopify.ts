@@ -4,12 +4,103 @@ import { prisma } from "../lib/prisma.js";
 import { normalizarDominio, validarDominioShopify, sincronizarProductos } from "../lib/shopify.js";
 import { verificarWebhookShopify } from "../lib/shopify-webhook-verify.js";
 import { mensajeDeValidacion } from "../lib/errores.js";
+import {
+  generarUrlAutorizacion,
+  validarCallbackShopify,
+  intercambiarCodigoAcessToken,
+  guardarEstadoOAuth,
+  validarEstadoOAuth,
+} from "../lib/shopify-oauth.js";
 
 function enmascarar(secreto: string) {
   return secreto.length <= 4 ? "****" : `${"*".repeat(secreto.length - 4)}${secreto.slice(-4)}`;
 }
 
 export async function shopifyRoutes(app: FastifyInstance) {
+  // OAuth 2.0: Callback - NO requiere autenticación
+  // IMPORTANTE: Registrar ANTES del hook de autenticación
+  app.get<{ Querystring: Record<string, string> }>("/shopify/callback", async (request, reply) => {
+    try {
+      const state = request.query.state;
+
+      // Validar estado OAuth (recupera empresaId del estado guardado)
+      const estadoValidation = validarEstadoOAuth(state);
+      if (!estadoValidation.valido) {
+        request.log.warn(
+          `[shopify-oauth-callback] ❌ Estado inválido: ${estadoValidation.error}`
+        );
+        return reply.code(400).send({
+          error: estadoValidation.error,
+        });
+      }
+
+      const empresaId = estadoValidation.empresaId!;
+
+      // Validar callback de Shopify (HMAC)
+      const callbackValidation = validarCallbackShopify(
+        request.query,
+        process.env.SHOPIFY_CLIENT_SECRET || ""
+      );
+
+      if (!callbackValidation.valido) {
+        request.log.warn(
+          `[shopify-oauth-callback] ❌ HMAC validation fallida: ${callbackValidation.error}`
+        );
+        return reply.code(400).send({
+          error: callbackValidation.error,
+        });
+      }
+
+      const config = await prisma.shopifyConfig.findUnique({
+        where: { empresaId },
+      });
+
+      if (!config) {
+        return reply.code(404).send({
+          error: "Configuración de Shopify no encontrada",
+        });
+      }
+
+      // Intercambiar código por access token
+      const tokenResponse = await intercambiarCodigoAcessToken({
+        shop: callbackValidation.tienda!,
+        code: callbackValidation.codigo!,
+        clientId: config.clientId,
+        clientSecret: config.clientSecret,
+      });
+
+      // Guardar access token
+      await prisma.shopifyConfig.update({
+        where: { empresaId },
+        data: {
+          accessToken: tokenResponse.accessToken,
+          tokenExpiraEn: null, // Token offline no expira
+        },
+      });
+
+      request.log.info(
+        `[shopify-oauth-callback] ✅ Token guardado para empresa ${empresaId.slice(
+          0,
+          8
+        )} - Tienda: ${callbackValidation.tienda}`
+      );
+
+      // Redirigir al usuario de vuelta a la app
+      const appUrl = "https://sistema-pos-hk.up.railway.app/shopify?oauth=success";
+      return reply.redirect(appUrl);
+    } catch (error) {
+      const mensaje = error instanceof Error ? error.message : "Error desconocido";
+      request.log.error(`[shopify-oauth-callback] ❌ Error: ${mensaje}`);
+
+      // Redirigir a la app con error
+      const errorUrl = `https://sistema-pos-hk.up.railway.app/shopify?oauth=error&msg=${encodeURIComponent(
+        mensaje
+      )}`;
+      return reply.redirect(errorUrl);
+    }
+  });
+
+  // Resto de endpoints requieren autenticación
   app.addHook("preHandler", app.authenticate);
 
   app.get("/shopify/config", async (request) => {
@@ -62,77 +153,58 @@ export async function shopifyRoutes(app: FastifyInstance) {
     return reply.code(201).send({ conectado: true, shopDomain: config.shopDomain });
   });
 
-  // Guardar Access Token y validar contra Shopify
-  app.put("/shopify/config/access-token", async (request, reply) => {
+  // OAuth 2.0: Iniciar flujo de autorización
+  app.get("/shopify/connect", async (request, reply) => {
     const { empresaId } = request.user;
-    const { accessToken } = request.body as { accessToken?: string };
-
-    if (!accessToken?.trim()) {
-      return reply.code(400).send({
-        ok: false,
-        message: "Access token es obligatorio"
-      });
-    }
 
     try {
-      // Obtener config actual
       const config = await prisma.shopifyConfig.findUnique({
-        where: { empresaId }
+        where: { empresaId },
       });
 
       if (!config) {
         return reply.code(400).send({
-          ok: false,
-          message: "Configura primero el dominio y credenciales"
+          error: "Configura primero el dominio y credenciales de Shopify",
         });
       }
 
-      // Validar token con una query simple
-      const { ShopifyGraphQLClient } = await import("../lib/shopify-graphql.js");
-      const client = new ShopifyGraphQLClient(config.shopDomain, accessToken);
-
-      const response = await client.query({
-        query: `
-          query {
-            shop {
-              id
-              name
-            }
-          }
-        `,
-      });
-
-      if (!response.shop) {
-        throw new Error("Token inválido o sin permisos");
+      const redirectUri = process.env.SHOPIFY_OAUTH_REDIRECT_URI;
+      if (!redirectUri) {
+        return reply.code(500).send({
+          error: "SHOPIFY_OAUTH_REDIRECT_URI no configurada",
+        });
       }
 
-      // Guardar token
-      await prisma.shopifyConfig.update({
-        where: { empresaId },
-        data: {
-          accessToken,
-          tokenExpiraEn: null, // Token estático, no expira
-        },
+      const { authorizationUrl, state } = generarUrlAutorizacion({
+        shop: config.shopDomain,
+        clientId: config.clientId,
+        clientSecret: config.clientSecret,
+        redirectUri,
+        empresaId,
       });
 
-      request.log.info(`[shopify-token] ✅ Token guardado para ${response.shop.name}`);
+      // Guardar estado para validar después
+      await guardarEstadoOAuth(empresaId, state, config.shopDomain);
 
-      return reply.code(200).send({
-        ok: true,
-        message: `Token guardado correctamente. Tienda: ${response.shop.name}`,
-        shopName: response.shop.name,
-      });
+      request.log.info(
+        `[shopify-oauth-connect] 🔗 Iniciando OAuth para empresa ${empresaId.slice(
+          0,
+          8
+        )}`
+      );
+
+      return reply.redirect(authorizationUrl);
     } catch (error) {
       const mensaje = error instanceof Error ? error.message : "Error desconocido";
-      request.log.error(`[shopify-token] Error: ${mensaje}`);
+      request.log.error(`[shopify-oauth-connect] Error: ${mensaje}`);
 
-      return reply.code(400).send({
-        ok: false,
-        message: "El access token es inválido o no tiene permisos suficientes",
-        details: mensaje,
+      return reply.code(500).send({
+        error: "Error iniciando flujo OAuth",
+        details: process.env.NODE_ENV === "development" ? mensaje : undefined,
       });
     }
   });
+
 
   app.post("/shopify/sync", async (request, reply) => {
     const { empresaId } = request.user;
@@ -449,19 +521,4 @@ export async function shopifyRoutes(app: FastifyInstance) {
     }
   });
 
-  // Callback URL para OAuth2 de Shopify (cuando se implemente flujo con redirección)
-  app.get("/shopify/callback", async (request, reply) => {
-    const code = (request.query as any).code;
-    const state = (request.query as any).state;
-
-    if (!code || !state) {
-      return reply.code(400).send({ error: "Parámetros code y state requeridos" });
-    }
-
-    // Esta ruta es un placeholder para futuro flujo OAuth2 con redirección.
-    // Actualmente se usa un flujo simplificado donde el usuario ingresa
-    // manualmente el Client ID y Refresh Token.
-    request.log.info(`[shopify-oauth] Callback recibido. State: ${state}`);
-    return reply.send({ status: "ok", message: "OAuth callback recibido" });
-  });
 }

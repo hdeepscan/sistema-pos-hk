@@ -59,9 +59,8 @@ export default function Shopify() {
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [sucursalEcommerceId, setSucursalEcommerceId] = useState("");
-  const [accessToken, setAccessToken] = useState("");
   const [guardando, setGuardando] = useState(false);
-  const [guardandoToken, setGuardandoToken] = useState(false);
+  const [conectandoOAuth, setConectandoOAuth] = useState(false);
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -123,7 +122,7 @@ export default function Shopify() {
     setMensaje(null);
     try {
       await api.post("/shopify/config", { shopDomain, clientId, clientSecret, sucursalEcommerceId });
-      setMensaje("✅ Credenciales guardadas. Ahora pega el Access Token.");
+      setMensaje("✅ Credenciales guardadas. Ahora conecta Shopify con OAuth.");
       const { data } = await api.get<ShopifyConfigResp>("/shopify/config");
       setConfig(data);
       setClientSecret("");
@@ -134,25 +133,22 @@ export default function Shopify() {
     }
   }
 
-  async function guardarAccessToken(e: React.FormEvent) {
-    e.preventDefault();
-    setGuardandoToken(true);
+  async function conectarShopifyOAuth() {
+    setConectandoOAuth(true);
     setError(null);
     setMensaje(null);
     try {
-      const res = await api.put("/shopify/config/access-token", { accessToken });
-      setMensaje(`✅ ${res.data.message}`);
-      const { data } = await api.get<ShopifyConfigResp>("/shopify/config");
-      setConfig(data);
-      setAccessToken("");
-      setTimeout(() => {
-        setMostrarAsistente(true);
-        setPasoActual(1);
-      }, 500);
+      // Esta llamada redirigirá al usuario al flujo OAuth de Shopify
+      const response = await api.get("/shopify/connect");
+      // El servidor redirige automáticamente, pero por si acaso:
+      if (response.status === 200 && (response.data as any).redirect) {
+        window.location.href = (response.data as any).redirect;
+      }
     } catch (err: any) {
-      setError(mensajeError(err, "Error validando token"));
+      // Puede que el servidor haya redirigido directamente
+      console.log("Redirigiendo a Shopify OAuth...");
     } finally {
-      setGuardandoToken(false);
+      setConectandoOAuth(false);
     }
   }
 
@@ -358,33 +354,24 @@ export default function Shopify() {
             </div>
           </form>
 
-          {/* CAMPO: ACCESS TOKEN */}
+          {/* BOTÓN: CONECTAR SHOPIFY (OAuth) */}
           {config?.conectado && (
-            <form className="grid-form" onSubmit={guardarAccessToken} style={{ marginTop: 24, paddingTop: 24, borderTop: "1px solid var(--border)" }}>
-              <h4 style={{ marginTop: 0 }}>📌 Access Token (Admin API)</h4>
+            <div style={{ marginTop: 24, paddingTop: 24, borderTop: "1px solid var(--border)" }}>
+              <h4 style={{ marginTop: 0 }}>🔗 Autorizar con Shopify</h4>
               <p style={{ fontSize: 13, color: "var(--text-muted)" }}>
-                Copia tu Admin API access token desde Shopify Dev Dashboard:<br />
-                Tu app → Configuration → Admin API access tokens → Create token
+                Se abrirá la página de autorización de Shopify donde podrás autorizar la app.
               </p>
-              <label>
-                Access Token
-                <input
-                  type="password"
-                  value={accessToken}
-                  onChange={(e) => setAccessToken(e.target.value)}
-                  placeholder="Pega el token aquí"
-                  required
-                />
-                <span style={{ fontWeight: 400, fontSize: 11.5, color: "var(--text-muted)" }}>
-                  El token se valida automáticamente con Shopify
-                </span>
-              </label>
               {error && <span className="error-text">{error}</span>}
               {mensaje && <span className="badge success" style={{ width: "fit-content" }}>{mensaje}</span>}
-              <button type="submit" disabled={guardandoToken} className="secondary">
-                {guardandoToken ? "Validando..." : "🔑 Validar y guardar token"}
+              <button
+                type="button"
+                onClick={conectarShopifyOAuth}
+                disabled={conectandoOAuth}
+                className="secondary"
+              >
+                {conectandoOAuth ? "Redirigiendo..." : "🔑 Conectar Shopify"}
               </button>
-            </form>
+            </div>
           )}
         </div>
       )}
