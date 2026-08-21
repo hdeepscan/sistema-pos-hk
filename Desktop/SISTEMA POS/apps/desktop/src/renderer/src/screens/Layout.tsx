@@ -181,6 +181,9 @@ export default function Layout({ children }: PropsWithChildren) {
         <NavLink to="/shopify">Shopify</NavLink>
         <NavLink to="/meta-ads">Meta Ads</NavLink>
 
+        <div className="sidebar-section-label">Contabilidad</div>
+        <NavLink to="/contabilidad">Contabilidad</NavLink>
+
         <div style={{ flex: 1 }} />
         <button className="secondary" onClick={cerrarSesion} type="button" style={{ marginTop: 12 }}>
           Cerrar sesion

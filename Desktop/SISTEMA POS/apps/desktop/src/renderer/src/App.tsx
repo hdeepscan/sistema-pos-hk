@@ -28,6 +28,7 @@ import Shopify from "./screens/Shopify";
 import MetaAds from "./screens/MetaAds";
 import CuentasBancarias from "./screens/CuentasBancarias";
 import Calendario from "./screens/Calendario";
+import Contabilidad from "./screens/Contabilidad";
 
 export default function App() {
   const { token, sucursalActivaId, hidratado, setApiBaseUrl, setSesion, setSucursalActiva, setHidratado } =
@@ -118,6 +119,7 @@ export default function App() {
         <Route path="/meta-ads" element={<MetaAds />} />
         <Route path="/cuentas-bancarias" element={<CuentasBancarias />} />
         <Route path="/calendario" element={<Calendario />} />
+        <Route path="/contabilidad" element={<Contabilidad />} />
         <Route path="*" element={<Navigate to="/pos" replace />} />
       </Routes>
       </ErrorBoundary>
