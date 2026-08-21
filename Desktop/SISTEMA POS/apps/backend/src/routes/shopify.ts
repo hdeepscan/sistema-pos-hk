@@ -531,4 +531,161 @@ export async function shopifyRoutes(app: FastifyInstance) {
     }
   });
 
+  // Obtener niveles de inventario actuales
+  app.get("/shopify/inventario", async (request, reply) => {
+    const { empresaId } = request.user;
+    const config = await prisma.shopifyConfig.findUnique({ where: { empresaId } });
+    if (!config) return reply.code(400).send({ error: "Configura Shopify primero" });
+
+    try {
+      const inventario = await (prisma as any).shopifyInventoryLevel.findMany({
+        where: { empresaId },
+        include: {
+          inventoryItem: {
+            include: {
+              producto: { select: { id: true, nombre: true, sku: true } },
+            },
+          },
+          location: { select: { id: true, nombre: true } },
+        },
+        orderBy: { creadoEn: "desc" },
+        take: 100,
+      });
+
+      return reply.code(200).send(inventario);
+    } catch (err) {
+      const mensaje = err instanceof Error ? err.message : "Error desconocido";
+      request.log.error(`[shopify-inventario] Error: ${mensaje}`);
+      return reply.code(502).send({ error: mensaje });
+    }
+  });
+
+  // Registrar webhooks en Shopify
+  app.post("/shopify/webhooks/registrar", async (request, reply) => {
+    const { empresaId } = request.user;
+    const config = await prisma.shopifyConfig.findUnique({ where: { empresaId } });
+    if (!config) return reply.code(400).send({ error: "Configura Shopify primero" });
+    if (!config.accessToken) return reply.code(400).send({ error: "Token de acceso no disponible" });
+
+    try {
+      request.log.info(`[shopify-webhooks] Registrando webhooks para ${config.shopDomain}`);
+
+      // Determinar URL base para webhooks
+      const webhookUrl = process.env.WEBHOOK_URL || "https://sistema-pos-hk.up.railway.app";
+
+      // Webhooks a registrar
+      const webhooks = [
+        { topic: "products/update", address: `${webhookUrl}/shopify/webhooks/products/update` },
+        { topic: "inventory_levels/update", address: `${webhookUrl}/shopify/webhooks/inventory/update` },
+        { topic: "orders/create", address: `${webhookUrl}/shopify/webhooks/orders/create` },
+        { topic: "orders/update", address: `${webhookUrl}/shopify/webhooks/orders/update` },
+      ];
+
+      const { ShopifyGraphQLClient } = await import("../lib/shopify-graphql.js");
+      const client = new ShopifyGraphQLClient(config.shopDomain, config.accessToken);
+
+      const resultados = [];
+      for (const webhook of webhooks) {
+        try {
+          const query = `
+            mutation CreateWebhook($input: WebhookSubscriptionInput!) {
+              webhookSubscriptionCreate(input: $input) {
+                webhookSubscription {
+                  id
+                  topic
+                  endpoint {
+                    __typename
+                  }
+                }
+                userErrors {
+                  field
+                  message
+                }
+              }
+            }
+          `;
+
+          const result = await client.query({
+            query,
+            variables: {
+              input: {
+                topic: webhook.topic,
+                webhookSubscription: {
+                  callbackUrl: webhook.address,
+                  format: "JSON",
+                },
+              },
+            },
+          });
+
+          resultados.push({
+            topic: webhook.topic,
+            success: !result.userErrors || result.userErrors.length === 0,
+            errors: result.userErrors,
+          });
+        } catch (err) {
+          resultados.push({
+            topic: webhook.topic,
+            success: false,
+            error: err instanceof Error ? err.message : "Error desconocido",
+          });
+        }
+      }
+
+      return reply.code(200).send({ webhooks: resultados });
+    } catch (err) {
+      const mensaje = err instanceof Error ? err.message : "Error desconocido";
+      request.log.error(`[shopify-webhooks] Error: ${mensaje}`);
+      return reply.code(502).send({ error: mensaje });
+    }
+  });
+
+  // Recibir webhooks de Shopify (sin autenticación)
+  app.post<{ Params: Record<string, string> }>("/shopify/webhooks/:tipo/:accion", async (request, reply) => {
+    const { tipo, accion } = request.params;
+    const hmacHeader = request.headers["x-shopify-hmac-sha256"] as string;
+    const body = JSON.stringify(request.body);
+
+    try {
+      if (!hmacHeader || !verificarWebhookShopify(hmacHeader, body, process.env.SHOPIFY_WEBHOOK_SECRET || "")) {
+        return reply.code(401).send({ error: "Webhook no verificado" });
+      }
+
+      const payload = request.body as any;
+      const shopDomain = payload.myshopify_domain || payload.shop?.myshopify_domain;
+
+      if (!shopDomain) {
+        return reply.code(400).send({ error: "No se encontró dominio de la tienda" });
+      }
+
+      // Buscar empresa por shopDomain
+      const config = await prisma.shopifyConfig.findFirst({ where: { shopDomain } });
+      if (!config) {
+        return reply.code(404).send({ error: "Tienda no configurada" });
+      }
+
+      request.log.info(`[shopify-webhook] ${tipo}/${accion} para ${shopDomain}`);
+
+      // Procesar según tipo de webhook
+      if (tipo === "products" && accion === "update") {
+        const productId = String(payload.id);
+        request.log.info(`[webhook-product-update] Producto actualizado: ${productId}`);
+        // TODO: Sincronizar producto actualizado
+      } else if (tipo === "inventory" && accion === "update") {
+        request.log.info(`[webhook-inventory-update] Inventario actualizado`);
+        // TODO: Sincronizar inventario actualizado
+      } else if (tipo === "orders" && (accion === "create" || accion === "update")) {
+        const orderId = String(payload.id);
+        request.log.info(`[webhook-order-${accion}] Orden ${accion === "create" ? "creada" : "actualizada"}: ${orderId}`);
+        // TODO: Procesar orden
+      }
+
+      return reply.code(200).send({ ok: true });
+    } catch (err) {
+      const mensaje = err instanceof Error ? err.message : "Error desconocido";
+      request.log.error(`[shopify-webhook] Error: ${mensaje}`);
+      return reply.code(500).send({ error: mensaje });
+    }
+  });
+
 }
