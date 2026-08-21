@@ -102,7 +102,14 @@ export async function authRoutes(app: FastifyInstance) {
   });
 
   app.get("/auth/me", { preHandler: [app.authenticate] }, async (request) => {
-    return { user: request.user };
+    return {
+      user: request.user,
+      debug: {
+        rol: request.user.rol,
+        permisosActuales: request.user.permisos,
+        tieneContabilidad: request.user.permisos.includes("contabilidad.ver"),
+      }
+    };
   });
 
   // Registra el cierre de sesion en la auditoria (lo llama el desktop antes
