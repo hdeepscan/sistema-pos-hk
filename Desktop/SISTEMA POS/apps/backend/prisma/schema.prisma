@@ -904,3 +904,80 @@ model ShopifyWebhookEvent {
   @@index([empresaId, procesado])
   @@map("shopify_webhook_events")
 }
+
+// ========== MÓDULO DE CONTABILIDAD ==========
+
+enum TipoCuentaContable {
+  ACTIVO
+  PASIVO
+  PATRIMONIO
+  INGRESO
+  GASTO
+}
+
+enum EstadoAsiento {
+  BORRADOR
+  CONTABILIZADO
+  ANULADO
+}
+
+// Plan de cuentas
+model CuentaContable {
+  id                   String    @id @default(uuid())
+  empresaId            String
+  empresa              Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  codigo               String    // Ej: "1-1-1-001" o "110"
+  nombre               String    // Ej: "Caja"
+  tipo                 TipoCuentaContable
+  descripcion          String?
+  activa               Boolean   @default(true)
+  creadoEn             DateTime  @default(now())
+  actualizadoEn        DateTime  @updatedAt
+
+  asientos             LineaAsiento[]
+
+  @@unique([empresaId, codigo])
+  @@index([empresaId, tipo])
+  @@map("cuentas_contables")
+}
+
+// Asientos contables (movimientos contables)
+model AsientoContable {
+  id                   String    @id @default(uuid())
+  empresaId            String
+  empresa              Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  numero               Int       @default(autoincrement()) // Número secuencial del asiento
+  fecha                DateTime
+  descripcion          String
+  referencia           String?   // Ref a venta, factura, etc
+  estado               EstadoAsiento @default(BORRADOR)
+  totalDebe            Decimal   @default(0)
+  totalHaber           Decimal   @default(0)
+  creadoEn             DateTime  @default(now())
+  actualizadoEn        DateTime  @updatedAt
+  contabilizadoEn      DateTime?
+
+  lineas               LineaAsiento[]
+
+  @@index([empresaId, fecha])
+  @@index([empresaId, estado])
+  @@index([referencia])
+  @@map("asientos_contables")
+}
+
+// Líneas del asiento (debe/haber)
+model LineaAsiento {
+  id                   String    @id @default(uuid())
+  asientoId            String
+  asiento              AsientoContable @relation(fields: [asientoId], references: [id], onDelete: Cascade)
+  cuentaId             String
+  cuenta               CuentaContable @relation(fields: [cuentaId], references: [id], onDelete: Restrict)
+  descripcion          String?
+  debe                 Decimal   @default(0)
+  haber                Decimal   @default(0)
+  orden                Int       @default(0) // Orden en el asiento
+
+  @@index([asientoId])
+  @@index([cuentaId])
+  @@map("lineas_asiento")
+}
