@@ -1,6 +1,6 @@
 import { prisma } from "./prisma.js";
 
-const API_VERSION = "2024-10";
+const API_VERSION = "2026-07";
 
 export function normalizarDominio(input: string): string {
   let d = input.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
