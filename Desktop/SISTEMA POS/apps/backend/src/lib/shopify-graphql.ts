@@ -44,6 +44,9 @@ export class ShopifyGraphQLClient {
     }
 
     try {
+      console.log(`[Shopify GraphQL] Iniciando query a: ${this.endpoint}`);
+      console.log(`[Shopify GraphQL] Token: ${this.accessToken.substring(0, 20)}...`);
+
       const response = await fetch(this.endpoint, {
         method: "POST",
         headers: {
@@ -53,15 +56,22 @@ export class ShopifyGraphQLClient {
         body: JSON.stringify(params),
       });
 
+      console.log(`[Shopify GraphQL] Response Status: ${response.status} ${response.statusText}`);
+
       const result: GraphQLResponse = await response.json();
+
+      // LOG COMPLETO DE LA RESPUESTA
+      console.log(`[Shopify GraphQL] Raw Response (completo):`, JSON.stringify(result, null, 2).substring(0, 2000));
 
       // Manejar errores GraphQL
       if (Array.isArray(result.errors) && result.errors.length > 0) {
+        console.error(`[Shopify GraphQL] Errors encontrados:`, JSON.stringify(result.errors, null, 2));
         const errorMsg = result.errors.map((e) => e.message).join(", ");
         throw new Error(`GraphQL Error: ${errorMsg}`);
       }
 
       if (Array.isArray(result.userErrors) && result.userErrors.length > 0) {
+        console.error(`[Shopify GraphQL] User Errors encontrados:`, JSON.stringify(result.userErrors, null, 2));
         const errorMsg = result.userErrors.map((e) => e.message).join(", ");
         throw new Error(`GraphQL User Error: ${errorMsg}`);
       }
