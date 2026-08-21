@@ -436,7 +436,7 @@ model ShopifyConfig {
   ultimaAlertaOrdenes DateTime?
   creadoEn            DateTime  @default(now())
 
-  @@map("ShopifyConfig")
+  @@map("shopify_config")
 }
 
 // Credenciales de la integracion con Meta Ads (Marketing API + Conversions
