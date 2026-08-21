@@ -156,35 +156,50 @@ export async function intercambiarCodigoAcessToken(params: {
   };
 }
 
-// Almacenamiento temporal en memoria (en producción, usar Redis)
-const oauthStates = new Map<
+// Almacenamiento en memoria como fallback (si BD no está disponible)
+const oauthStatesMemory = new Map<
   string,
   { empresaId: string; shop: string; expiradoEn: number }
 >();
 
 /**
  * Guardar estado temporal de OAuth (para validar después)
- * La razón: necesitamos verificar el estado en el callback
- * El estado incluye empresaId codificado para poder recuperarlo después
+ * Intenta guardar en BD primero, fallback a memoria
  */
-export function guardarEstadoOAuth(
+export async function guardarEstadoOAuth(
   empresaId: string,
   state: string,
   shop: string
-): void {
-  // Guardar en memoria con expiración de 10 minutos
-  oauthStates.set(state, {
+): Promise<void> {
+  // Intentar guardar en BD (tabla que se creará después)
+  try {
+    await (prisma as any).shopifyOAuthState.create({
+      data: {
+        state,
+        empresaId,
+        shop,
+        expiradoEn: new Date(Date.now() + 10 * 60 * 1000), // 10 minutos
+      },
+    });
+    return;
+  } catch (error) {
+    // Tabla no existe, usar memoria como fallback
+    console.warn("[shopify-oauth] BD no disponible, usando memoria para estado OAuth");
+  }
+
+  // Fallback: guardar en memoria con expiración de 10 minutos
+  oauthStatesMemory.set(state, {
     empresaId,
     shop,
     expiradoEn: Date.now() + 10 * 60 * 1000,
   });
 
   // Limpiar estados expirados ocasionalmente
-  if (oauthStates.size > 1000) {
+  if (oauthStatesMemory.size > 1000) {
     const ahora = Date.now();
-    for (const [key, value] of oauthStates.entries()) {
+    for (const [key, value] of oauthStatesMemory.entries()) {
       if (value.expiradoEn < ahora) {
-        oauthStates.delete(key);
+        oauthStatesMemory.delete(key);
       }
     }
   }
@@ -192,23 +207,57 @@ export function guardarEstadoOAuth(
 
 /**
  * Validar y obtener estado OAuth guardado
+ * Busca primero en BD, luego en memoria
  */
-export function validarEstadoOAuth(
+export async function validarEstadoOAuth(
   state: string
-): { valido: boolean; empresaId?: string; shop?: string; error?: string } {
-  const record = oauthStates.get(state);
+): Promise<{ valido: boolean; empresaId?: string; shop?: string; error?: string }> {
+  // Intentar buscar en BD primero
+  try {
+    const record = await (prisma as any).shopifyOAuthState.findUnique({
+      where: { state },
+    });
+
+    if (record && record.expiradoEn > new Date()) {
+      // Eliminar para no reutilizar
+      await (prisma as any).shopifyOAuthState.delete({
+        where: { state },
+      }).catch(() => {});
+
+      return {
+        valido: true,
+        empresaId: record.empresaId,
+        shop: record.shop,
+      };
+    }
+
+    if (record && record.expiradoEn <= new Date()) {
+      // Limpiar expirado
+      await (prisma as any).shopifyOAuthState.delete({
+        where: { state },
+      }).catch(() => {});
+
+      return { valido: false, error: "Estado OAuth expirado (10 minutos)" };
+    }
+  } catch (error) {
+    // Tabla no existe, buscar en memoria
+    console.warn("[shopify-oauth] BD no disponible, buscando en memoria");
+  }
+
+  // Fallback: buscar en memoria
+  const record = oauthStatesMemory.get(state);
 
   if (!record) {
     return { valido: false, error: "Estado OAuth no encontrado" };
   }
 
   if (record.expiradoEn < Date.now()) {
-    oauthStates.delete(state);
+    oauthStatesMemory.delete(state);
     return { valido: false, error: "Estado OAuth expirado (10 minutos)" };
   }
 
   // Eliminar el registro para que no se reutilice
-  oauthStates.delete(state);
+  oauthStatesMemory.delete(state);
 
   return {
     valido: true,

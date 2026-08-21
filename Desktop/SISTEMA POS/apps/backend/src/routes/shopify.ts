@@ -24,7 +24,7 @@ export async function shopifyRoutes(app: FastifyInstance) {
       const state = request.query.state;
 
       // Validar estado OAuth (recupera empresaId del estado guardado)
-      const estadoValidation = validarEstadoOAuth(state);
+      const estadoValidation = await validarEstadoOAuth(state);
       if (!estadoValidation.valido) {
         request.log.warn(
           `[shopify-oauth-callback] ❌ Estado inválido: ${estadoValidation.error}`
@@ -188,7 +188,7 @@ export async function shopifyRoutes(app: FastifyInstance) {
       });
 
       // Guardar estado para validar después
-      guardarEstadoOAuth(empresaId, state, config.shopDomain);
+      await guardarEstadoOAuth(empresaId, state, config.shopDomain);
 
       request.log.info(
         `[shopify-oauth-connect] 🔗 Iniciando OAuth para empresa ${empresaId.slice(
