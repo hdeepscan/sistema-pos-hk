@@ -253,6 +253,23 @@ export default function Shopify() {
     }
   }
 
+  const [sincronizandoInventario, setSincronizandoInventario] = useState(false);
+  async function sincronizarInventarioAhora() {
+    try {
+      setSincronizandoInventario(true);
+      setError(null);
+      setMensaje(null);
+      const res = await api.post<ImportInventoryStats>("/shopify/sync-inventario");
+      setMensaje(`✅ Inventario sincronizado: ${res.data.nivelesDeInventarioImportados} niveles actualizados`);
+      const { data: cfg } = await api.get<ShopifyConfigResp>("/shopify/config");
+      setConfig(cfg);
+    } catch (err: any) {
+      setError(mensajeError(err, "Error sincronizando inventario"));
+    } finally {
+      setSincronizandoInventario(false);
+    }
+  }
+
   const pasos = [
     { numero: 1, titulo: "Conectar Shopify", icono: "🔐" },
     { numero: 2, titulo: "Analizar tienda", icono: "🔍" },
@@ -339,21 +356,31 @@ export default function Shopify() {
             </label>
             {error && <span className="error-text">{error}</span>}
             {mensaje && <span className="badge success" style={{ width: "fit-content" }}>{mensaje}</span>}
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button type="submit" disabled={guardando}>
                 {guardando ? "Guardando..." : "Guardar credenciales"}
               </button>
               {config?.conectado && (
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={() => {
-                    setMostrarAsistente(true);
-                    setPasoActual(1);
-                  }}
-                >
-                  📥 Importar desde Shopify
-                </button>
+                <>
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => {
+                      setMostrarAsistente(true);
+                      setPasoActual(1);
+                    }}
+                  >
+                    📥 Importar desde Shopify
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={sincronizarInventarioAhora}
+                    disabled={sincronizandoInventario}
+                  >
+                    {sincronizandoInventario ? "Sincronizando..." : "📊 Sincronizar inventario"}
+                  </button>
+                </>
               )}
             </div>
           </form>
