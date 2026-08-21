@@ -439,6 +439,20 @@ model ShopifyConfig {
   @@map("shopify_config")
 }
 
+// Estado temporal para OAuth (protección CSRF)
+model ShopifyOAuthState {
+  id          String    @id @default(uuid())
+  state       String    @unique
+  empresaId   String
+  shop        String
+  expiradoEn  DateTime
+  creadoEn    DateTime  @default(now())
+
+  @@index([state])
+  @@index([empresaId])
+  @@map("shopify_oauth_state")
+}
+
 // Credenciales de la integracion con Meta Ads (Marketing API + Conversions
 // API). Una por empresa.
 model MetaConfig {
