@@ -26,6 +26,8 @@ export const PERMISOS = [
   "descuentos.aplicar",
   "facturas.anular",
   "caja.administrar",
+  "contabilidad.ver",
+  "contabilidad.administrar",
 ] as const;
 export type Permiso = (typeof PERMISOS)[number];
 
@@ -48,6 +50,8 @@ export const ETIQUETAS_PERMISOS: Record<Permiso, string> = {
   "facturas.anular": "Anular facturas",
   "ventas.sin_stock": "Vender sin existencias",
   "caja.administrar": "Abrir y cerrar caja",
+  "contabilidad.ver": "Ver contabilidad",
+  "contabilidad.administrar": "Administrar contabilidad",
 };
 
 // Roles predefinidos con sus permisos por defecto. "GERENTE" se mantiene solo
@@ -69,6 +73,8 @@ export const PERMISOS_POR_ROL: Record<RolUsuario, Permiso[]> = {
     "descuentos.aplicar",
     "caja.administrar",
     "ventas.sin_stock",
+    "contabilidad.ver",
+    "contabilidad.administrar",
   ],
   SUPERVISOR: [
     "ventas.ver",
@@ -84,6 +90,8 @@ export const PERMISOS_POR_ROL: Record<RolUsuario, Permiso[]> = {
     "descuentos.aplicar",
     "caja.administrar",
     "ventas.sin_stock",
+    "contabilidad.ver",
+    "contabilidad.administrar",
   ],
   CAJERO: [
     "ventas.ver",

@@ -117,8 +117,12 @@ export async function contabilidadRoutes(app: FastifyInstance) {
   // ===== PLAN DE CUENTAS =====
 
   // Obtener plan de cuentas
-  app.get("/contabilidad/cuentas", async (request) => {
-    const { empresaId } = request.user;
+  app.get("/contabilidad/cuentas", async (request, reply) => {
+    const { empresaId, permisos } = request.user;
+
+    if (!permisos.includes("contabilidad.ver")) {
+      return reply.code(403).send({ error: "No tienes permiso para acceder a Contabilidad" });
+    }
 
     try {
       const cuentas = await prisma.cuentaContable.findMany({
@@ -135,7 +139,12 @@ export async function contabilidadRoutes(app: FastifyInstance) {
 
   // Crear cuenta contable
   app.post("/contabilidad/cuentas", async (request, reply) => {
-    const { empresaId } = request.user;
+    const { empresaId, permisos } = request.user;
+
+    if (!permisos.includes("contabilidad.administrar")) {
+      return reply.code(403).send({ error: "No tienes permiso para administrar Contabilidad" });
+    }
+
     const { codigo, nombre, tipo, descripcion } = request.body as any;
 
     if (!codigo || !nombre || !tipo) {
@@ -166,8 +175,13 @@ export async function contabilidadRoutes(app: FastifyInstance) {
   // ===== ASIENTOS CONTABLES =====
 
   // Obtener asientos
-  app.get("/contabilidad/asientos", async (request) => {
-    const { empresaId } = request.user;
+  app.get("/contabilidad/asientos", async (request, reply) => {
+    const { empresaId, permisos } = request.user;
+
+    if (!permisos.includes("contabilidad.ver")) {
+      return reply.code(403).send({ error: "No tienes permiso para acceder a Contabilidad" });
+    }
+
     const { estado, fecha_inicio, fecha_fin } = request.query as any;
 
     try {
@@ -201,7 +215,12 @@ export async function contabilidadRoutes(app: FastifyInstance) {
 
   // Crear asiento contable
   app.post("/contabilidad/asientos", async (request, reply) => {
-    const { empresaId } = request.user;
+    const { empresaId, permisos } = request.user;
+
+    if (!permisos.includes("contabilidad.administrar")) {
+      return reply.code(403).send({ error: "No tienes permiso para administrar Contabilidad" });
+    }
+
     const { fecha, descripcion, referencia, lineas } = request.body as any;
 
     if (!fecha || !descripcion || !lineas || lineas.length === 0) {
@@ -252,7 +271,12 @@ export async function contabilidadRoutes(app: FastifyInstance) {
 
   // Contabilizar asiento (cambiar estado a CONTABILIZADO)
   app.post("/contabilidad/asientos/:id/contabilizar", async (request, reply) => {
-    const { empresaId } = request.user;
+    const { empresaId, permisos } = request.user;
+
+    if (!permisos.includes("contabilidad.administrar")) {
+      return reply.code(403).send({ error: "No tienes permiso para administrar Contabilidad" });
+    }
+
     const { id } = request.params as any;
 
     try {
@@ -293,8 +317,12 @@ export async function contabilidadRoutes(app: FastifyInstance) {
   // ===== REPORTES =====
 
   // Balance General
-  app.get("/contabilidad/reportes/balance-general", async (request) => {
-    const { empresaId } = request.user;
+  app.get("/contabilidad/reportes/balance-general", async (request, reply) => {
+    const { empresaId, permisos } = request.user;
+
+    if (!permisos.includes("contabilidad.ver")) {
+      return reply.code(403).send({ error: "No tienes permiso para acceder a Contabilidad" });
+    }
 
     try {
       const cuentas = await prisma.cuentaContable.findMany({
@@ -332,8 +360,12 @@ export async function contabilidadRoutes(app: FastifyInstance) {
   });
 
   // Estado de Resultados
-  app.get("/contabilidad/reportes/estado-resultados", async (request) => {
-    const { empresaId } = request.user;
+  app.get("/contabilidad/reportes/estado-resultados", async (request, reply) => {
+    const { empresaId, permisos } = request.user;
+
+    if (!permisos.includes("contabilidad.ver")) {
+      return reply.code(403).send({ error: "No tienes permiso para acceder a Contabilidad" });
+    }
 
     try {
       const cuentas = await prisma.cuentaContable.findMany({
