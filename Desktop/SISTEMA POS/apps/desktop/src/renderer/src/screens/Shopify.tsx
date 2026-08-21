@@ -138,15 +138,19 @@ export default function Shopify() {
     setError(null);
     setMensaje(null);
     try {
-      // Esta llamada redirigirá al usuario al flujo OAuth de Shopify
-      const response = await api.get("/shopify/connect");
-      // El servidor redirige automáticamente, pero por si acaso:
-      if (response.status === 200 && (response.data as any).redirect) {
-        window.location.href = (response.data as any).redirect;
+      // Solicitar URL de autorización OAuth al backend
+      const response = await api.get<{ ok: boolean; authorizationUrl: string }>(
+        "/shopify/connect"
+      );
+
+      if (response.data.ok && response.data.authorizationUrl) {
+        // Navegar a la URL de autorización de Shopify
+        window.location.href = response.data.authorizationUrl;
+      } else {
+        setError("No se pudo obtener la URL de autorización");
       }
     } catch (err: any) {
-      // Puede que el servidor haya redirigido directamente
-      console.log("Redirigiendo a Shopify OAuth...");
+      setError(mensajeError(err, "Error iniciando flujo OAuth con Shopify"));
     } finally {
       setConectandoOAuth(false);
     }

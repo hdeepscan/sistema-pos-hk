@@ -164,6 +164,7 @@ export async function shopifyRoutes(app: FastifyInstance) {
 
       if (!config) {
         return reply.code(400).send({
+          ok: false,
           error: "Configura primero el dominio y credenciales de Shopify",
         });
       }
@@ -171,6 +172,7 @@ export async function shopifyRoutes(app: FastifyInstance) {
       const redirectUri = process.env.SHOPIFY_OAUTH_REDIRECT_URI;
       if (!redirectUri) {
         return reply.code(500).send({
+          ok: false,
           error: "SHOPIFY_OAUTH_REDIRECT_URI no configurada",
         });
       }
@@ -184,7 +186,7 @@ export async function shopifyRoutes(app: FastifyInstance) {
       });
 
       // Guardar estado para validar después
-      await guardarEstadoOAuth(empresaId, state, config.shopDomain);
+      guardarEstadoOAuth(empresaId, state, config.shopDomain);
 
       request.log.info(
         `[shopify-oauth-connect] 🔗 Iniciando OAuth para empresa ${empresaId.slice(
@@ -193,12 +195,18 @@ export async function shopifyRoutes(app: FastifyInstance) {
         )}`
       );
 
-      return reply.redirect(authorizationUrl);
+      // Devolver la URL de autorización al cliente
+      // El cliente navegará a esta URL manualmente
+      return reply.code(200).send({
+        ok: true,
+        authorizationUrl,
+      });
     } catch (error) {
       const mensaje = error instanceof Error ? error.message : "Error desconocido";
       request.log.error(`[shopify-oauth-connect] Error: ${mensaje}`);
 
       return reply.code(500).send({
+        ok: false,
         error: "Error iniciando flujo OAuth",
         details: process.env.NODE_ENV === "development" ? mensaje : undefined,
       });
