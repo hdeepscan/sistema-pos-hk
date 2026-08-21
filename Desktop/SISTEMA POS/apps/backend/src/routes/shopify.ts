@@ -139,8 +139,7 @@ export async function shopifyRoutes(app: FastifyInstance) {
         clientId: parsed.data.clientId,
         clientSecret: parsed.data.clientSecret,
         sucursalEcommerceId: parsed.data.sucursalEcommerceId,
-        accessToken: null,
-        tokenExpiraEn: null,
+        // NO borra accessToken si ya existe (solo OAuth lo actualiza)
       },
       create: {
         empresaId,
