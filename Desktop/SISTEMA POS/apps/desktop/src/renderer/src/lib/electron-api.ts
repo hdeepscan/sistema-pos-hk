@@ -164,7 +164,7 @@ export const electronAPI = {
     return await (window as any).pos.printRecibo(data);
   },
 
-  async generarReciboPDF(data: any, printerName?: string | null) {
+  async generarReciboPDF(data: any, deviceName?: string | null) {
     if (!this.isElectron()) {
       // Web: generate and download PDF
       try {
@@ -172,7 +172,7 @@ export const electronAPI = {
         const doc = new jsPDF({
           orientation: "portrait",
           unit: "mm",
-          format: "a4",
+          format: [80, 200], // Thermal printer size: 80mm x 200mm
         });
 
         // Create temporary container for HTML rendering
@@ -181,6 +181,7 @@ export const electronAPI = {
         container.style.position = "absolute";
         container.style.left = "-9999px";
         container.style.width = "80mm";
+        container.style.fontSize = "11px";
         document.body.appendChild(container);
 
         try {
@@ -206,7 +207,7 @@ export const electronAPI = {
           }
 
           const x = (pageWidth - width) / 2;
-          doc.addImage(imgData, "PNG", x, 10, width, height);
+          doc.addImage(imgData, "PNG", x, 0, width, height);
 
           // Trigger download
           const fecha = new Date().toISOString().slice(0, 10);
@@ -220,8 +221,15 @@ export const electronAPI = {
         throw error;
       }
     } else {
-      // Electron: use native print
-      return await (window as any).pos.printRecibo(data, printerName);
+      // Electron: use native print (deviceName is the correct parameter)
+      try {
+        return await (window as any).pos.printRecibo(data, deviceName);
+      } catch (err) {
+        console.error("Print failed, attempting fallback:", err);
+        // Fallback: if print fails and deviceName is configured, log the error
+        // but don't block the venta (already saved)
+        throw err;
+      }
     }
   },
 
