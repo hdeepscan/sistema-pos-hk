@@ -35,6 +35,11 @@ export async function registerJwt(app: FastifyInstance) {
   // request: asi, desactivar un usuario o cambiar su rol/permisos aplica de
   // inmediato sin esperar a que expire o se renueve el token.
   app.decorate("authenticate", async (request: FastifyRequest, reply: FastifyReply) => {
+    // SKIP: /shopify/callback no requiere autenticación de usuario (OAuth requiere state CSRF en BD)
+    if (request.url.startsWith("/shopify/callback")) {
+      return; // Sin autenticación, continúa normalmente
+    }
+
     try {
       await request.jwtVerify();
     } catch {
