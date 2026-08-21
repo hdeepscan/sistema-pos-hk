@@ -134,8 +134,6 @@ export class ShopifyGraphQLClient {
                     barcode
                     price
                     compareAtPrice
-                    weight
-                    weightUnit
                     title
                     selectedOptions {
                       name
