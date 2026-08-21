@@ -93,7 +93,7 @@ export class ShopifyGraphQLClient {
         console.log(`[Shopify] Query Cost: ${result.extensions.cost.actualQueryCost}/${result.extensions.cost.requestedQueryCost}, Available: ${currentlyAvailable}`);
       }
 
-      const dataStr = result.data ? JSON.stringify(result.data).slice(0, 500) : 'null';
+      const dataStr = result.data ? JSON.stringify(result.data).slice(0, 5000) : 'null';
       console.log(`[Shopify GraphQL] Query returned data:`, dataStr);
       return result.data as T;
     } catch (error) {
