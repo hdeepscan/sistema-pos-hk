@@ -169,10 +169,15 @@ export async function shopifyRoutes(app: FastifyInstance) {
         });
       }
 
-      // Construir redirect_uri dinámicamente basado en el host actual
-      const protocol = request.protocol;
-      const host = request.hostname;
-      const redirectUri = `${protocol}://${host}/shopify/callback`;
+      // Construir redirect_uri usando la URL de la app desde env var
+      // En Railway, request.protocol devuelve 'http' detrás del proxy, así que usamos SHOPIFY_APP_URL
+      const appUrl =
+        process.env.SHOPIFY_APP_URL ||
+        (request.protocol === "https"
+          ? `https://${request.hostname}`
+          : `http://localhost:${process.env.PORT || 3000}`);
+
+      const redirectUri = `${appUrl}/shopify/callback`;
 
       const { authorizationUrl, state } = generarUrlAutorizacion({
         shop: config.shopDomain,
