@@ -22,28 +22,248 @@ export function construirReciboHtml(data: ReciboData): string {
       <head>
         <meta charset="utf-8" />
         <style>
+          /* Reset de estilos */
           * { margin: 0; padding: 0; box-sizing: border-box; }
+
+          /* Configuración para pantalla (vista previa) */
+          html, body {
+            margin: 0;
+            padding: 0;
+            background: #f5f5f5;
+          }
+
           body {
-            font-family: 'Courier New', monospace;
+            font-family: 'Courier New', Courier, monospace;
             width: 80mm;
-            font-size: 11px;
-            line-height: 1.2;
+            margin: 10px auto;
             padding: 0;
             background: white;
+            font-size: 11px;
+            line-height: 1.3;
+            color: #000;
           }
-          h2 { text-align: center; margin: 3px 0; font-size: 13px; font-weight: bold; }
-          .center { text-align: center; }
-          table { width: 100%; border-collapse: collapse; margin: 3px 0; }
-          td { padding: 2px 0; }
-          td:last-child { text-align: right; }
-          .total { font-weight: bold; font-size: 13px; margin: 3px 0; text-align: center; }
-          hr { border: none; border-top: 1px dashed #000; margin: 2px 0; }
-          img.logo { display: block; margin: 2px auto; max-width: 70mm; max-height: 50px; }
-          img.promo { display: block; margin: 3px auto; max-width: 75mm; }
-          img.qr { display: block; margin: 3px auto; width: 60px; height: 60px; }
-          .cupon { border: 1px dashed #000; padding: 3px; text-align: center; margin: 3px 0; font-weight: bold; font-size: 10px; }
-          .footer { font-size: 9px; text-align: center; margin: 2px 0; }
-          .valor { text-align: right; display: inline-block; width: 100%; }
+
+          /* Estilos para pantalla */
+          h2 {
+            text-align: center;
+            margin: 4px 0;
+            font-size: 14px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          }
+
+          .center {
+            text-align: center;
+            word-break: break-word;
+          }
+
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 3px 0;
+            table-layout: fixed;
+          }
+
+          td {
+            padding: 2px 0;
+            word-break: break-word;
+            overflow-wrap: break-word;
+          }
+
+          td:first-child {
+            text-align: left;
+            padding-right: 4px;
+            flex: 1;
+          }
+
+          td:last-child {
+            text-align: right;
+            padding-left: 4px;
+            white-space: nowrap;
+          }
+
+          .total {
+            font-weight: 900;
+            font-size: 14px;
+            margin: 4px 0;
+            text-align: center;
+            text-transform: uppercase;
+            border-top: 1px dashed #000;
+            border-bottom: 1px dashed #000;
+            padding: 3px 0;
+          }
+
+          hr {
+            border: none;
+            border-top: 1px dashed #000;
+            margin: 3px 0;
+          }
+
+          img.logo {
+            display: block;
+            margin: 3px auto;
+            max-width: 70mm;
+            max-height: 40px;
+            height: auto;
+          }
+
+          img.promo {
+            display: block;
+            margin: 3px auto;
+            max-width: 76mm;
+            height: auto;
+          }
+
+          img.qr {
+            display: block;
+            margin: 3px auto;
+            width: 50px;
+            height: 50px;
+          }
+
+          .cupon {
+            border: 1px dashed #000;
+            padding: 3px;
+            text-align: center;
+            margin: 3px 0;
+            font-weight: bold;
+            font-size: 10px;
+            word-break: break-word;
+          }
+
+          .footer {
+            font-size: 9px;
+            text-align: center;
+            margin: 3px 0;
+            color: #666;
+          }
+
+          .valor {
+            text-align: right;
+            display: inline-block;
+            width: 100%;
+            padding-left: 4px;
+          }
+
+          /* REGLA CRÍTICA PARA IMPRESIÓN */
+          @page {
+            size: 80mm auto;
+            margin: 0;
+            padding: 0;
+          }
+
+          @media print {
+            html, body {
+              margin: 0;
+              padding: 0;
+              background: white;
+              width: 80mm;
+            }
+
+            body {
+              width: 80mm !important;
+              margin: 0;
+              padding: 0;
+              font-size: 10px;
+              line-height: 1.25;
+            }
+
+            h2 {
+              font-size: 13px;
+              margin: 2px 0;
+              font-weight: 900;
+            }
+
+            table {
+              margin: 2px 0;
+              width: 100%;
+              table-layout: fixed;
+            }
+
+            td {
+              padding: 1px 0;
+              font-size: 10px;
+              word-break: break-word;
+            }
+
+            td:first-child {
+              max-width: 50mm;
+              word-break: break-word;
+              flex-basis: auto;
+            }
+
+            td:last-child {
+              max-width: 25mm;
+              text-align: right;
+              padding-left: 2px;
+            }
+
+            .total {
+              font-size: 12px;
+              margin: 2px 0;
+              padding: 2px 0;
+              font-weight: 900;
+            }
+
+            hr {
+              margin: 2px 0;
+              border: none;
+              border-top: 1px dashed #000;
+            }
+
+            img.logo {
+              max-width: 76mm;
+              max-height: 30px;
+              margin: 2px auto;
+              display: block;
+            }
+
+            img.promo {
+              max-width: 76mm;
+              margin: 2px auto;
+              display: block;
+            }
+
+            .footer {
+              font-size: 8px;
+              margin: 2px 0;
+            }
+
+            .cupon {
+              font-size: 9px;
+              padding: 2px;
+              margin: 2px 0;
+            }
+
+            /* Estilos para distribución de líneas */
+            div[style*="display:flex"] {
+              display: flex !important;
+              justify-content: space-between !important;
+              width: 100%;
+              margin: 1px 0;
+              padding: 0;
+            }
+
+            div[style*="display:flex"] span {
+              flex-grow: 0;
+              word-break: break-word;
+            }
+
+            div[style*="display:flex"] span:last-child {
+              text-align: right;
+              flex-grow: 0;
+              padding-left: 4px;
+              white-space: nowrap;
+            }
+
+            /* Eliminar espacios en blanco de más */
+            div {
+              margin: 0;
+              padding: 0;
+              line-height: 1.25;
+            }
+          }
         </style>
       </head>
       <body>
@@ -62,14 +282,14 @@ export function construirReciboHtml(data: ReciboData): string {
         <hr />
         <table>${filas}</table>
         <hr />
-        ${data.subtotal !== undefined && (data.descuento || data.valorPuntosRedimidos) ? `<div>Subtotal:<span class="valor">$${data.subtotal.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</span></div>` : ""}
-        ${data.descuento ? `<div>Descuento:<span class="valor">-$${data.descuento.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</span></div>` : ""}
-        ${data.valorPuntosRedimidos ? `<div>Puntos:<span class="valor">-$${data.valorPuntosRedimidos.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</span></div>` : ""}
-        ${data.impuesto ? `<div>Base:<span class="valor">$${(data.total - data.impuesto).toLocaleString("es-CO", { minimumFractionDigits: 2 })}</span></div><div>IVA:<span class="valor">$${data.impuesto.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</span></div>` : ""}
+        ${data.subtotal !== undefined && (data.descuento || data.valorPuntosRedimidos) ? `<div style="display:flex;justify-content:space-between"><span>Subtotal:</span><span style="text-align:right">$${data.subtotal.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</span></div>` : ""}
+        ${data.descuento ? `<div style="display:flex;justify-content:space-between"><span>Descuento:</span><span style="text-align:right">-$${data.descuento.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</span></div>` : ""}
+        ${data.valorPuntosRedimidos ? `<div style="display:flex;justify-content:space-between"><span>Puntos:</span><span style="text-align:right">-$${data.valorPuntosRedimidos.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</span></div>` : ""}
+        ${data.impuesto ? `<div style="display:flex;justify-content:space-between"><span>Base:</span><span style="text-align:right">$${(data.total - data.impuesto).toLocaleString("es-CO", { minimumFractionDigits: 2 })}</span></div><div style="display:flex;justify-content:space-between"><span>IVA:</span><span style="text-align:right">$${data.impuesto.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</span></div>` : ""}
         <div class="total">TOTAL: $${data.total.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</div>
-        <div>Pago: ${escapeHtml(data.metodoPago)}</div>
-        ${data.dineroRecibido !== undefined ? `<div>Recibido:<span class="valor">$${data.dineroRecibido.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</span></div>` : ""}
-        ${data.cambio !== undefined ? `<div>Cambio:<span class="valor">$${data.cambio.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</span></div>` : ""}
+        <div style="display:flex;justify-content:space-between"><span>Pago:</span><span>${escapeHtml(data.metodoPago)}</span></div>
+        ${data.dineroRecibido !== undefined ? `<div style="display:flex;justify-content:space-between"><span>Recibido:</span><span style="text-align:right">$${data.dineroRecibido.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</span></div>` : ""}
+        ${data.cambio !== undefined ? `<div style="display:flex;justify-content:space-between"><span>Cambio:</span><span style="text-align:right">$${data.cambio.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</span></div>` : ""}
         ${data.puntosGanados ? `<div style="font-size:10px">Puntos: +${data.puntosGanados} | Saldo: ${data.puntosSaldo ?? "-"}</div>` : ""}
         <hr />
         <div class="center">${p?.mensajeAgradecimiento ? escapeHtml(p.mensajeAgradecimiento) : "¡Gracias por su compra!"}</div>
