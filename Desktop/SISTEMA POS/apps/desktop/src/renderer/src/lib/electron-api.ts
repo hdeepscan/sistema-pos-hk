@@ -308,46 +308,72 @@ export const electronAPI = {
   },
 
   // Generar y descargar PDF de etiquetas en web
-  // Usa dimensiones físicas REALES en mm, no A4
   async descargarEtiquetasPDF(items: any, formato: string) {
     try {
-      console.log(`[WEB-ETIQUETAS] Generando PDF con formato: ${formato}`);
+      console.log(`[WEB-PDF] Generando PDF: ${formato} con ${items.length} etiqueta(s)`);
 
-      // Dimensiones físicas reales según formato
-      const labelConfigs: Record<string, { widthMm: number; heightMm: number; cols?: number }> = {
-        rollo2: { widthMm: 100, heightMm: 25, cols: 2 },
-        rollo1: { widthMm: 50, heightMm: 25, cols: 1 },
-        carta: { widthMm: 210, heightMm: 297, cols: 4 },
-        zebra3: { widthMm: 100, heightMm: 25, cols: 3 },
+      // TAMAÑOS FÍSICOS REALES
+      const configs: Record<string, any> = {
+        rollo2: {
+          labelW: 50,  // Ancho etiqueta individual
+          labelH: 25,  // Alto etiqueta
+          cols: 2,     // 2 etiquetas por fila
+          pageW: 100,  // Ancho total página
+          pageH: 25,   // Alto total página
+        },
+        rollo1: {
+          labelW: 50,
+          labelH: 25,
+          cols: 1,
+          pageW: 50,
+          pageH: 25,
+        },
+        carta: {
+          labelW: 52.5, // 210mm / 4 columnas = 52.5mm
+          labelH: 59.4, // 297mm / 5 filas = 59.4mm
+          cols: 4,
+          pageW: 210,
+          pageH: 297,
+        },
+        zebra3: {
+          labelW: 30,   // Ancho etiqueta individual
+          labelH: 25,   // Alto etiqueta
+          cols: 3,      // 3 etiquetas por fila
+          pageW: 100,   // Total: 2.5mm margen + 30mm + 2.5mm gap + 30mm + 2.5mm gap + 30mm + 2.5mm margen = 100mm
+          pageH: 25,
+          gap: 2.5,     // Gap entre etiquetas
+          margin: 2.5,  // Margen lateral
+        },
       };
 
-      const config = labelConfigs[formato] || labelConfigs.rollo2;
+      const config = configs[formato];
+      if (!config) throw new Error(`Formato no soportado: ${formato}`);
 
-      // Crear PDF con dimensiones FÍSICAS REALES
+      // Crear PDF con tamaño EXACTO
       const doc = new jsPDF({
         orientation: "portrait",
         unit: "mm",
-        format: [config.widthMm, config.heightMm],
+        format: [config.pageW, config.pageH],
       });
 
-      // Generar HTML con CSS para el PDF
+      // Generar HTML optimizado
       const html = this.generarHTMLEtiquetasPDF(items, config);
 
-      // Crear contenedor temporal con MISMO TAMAÑO que el PDF
+      // Crear contenedor con tamaño EXACTO en píxeles (96 dpi estándar)
       const container = document.createElement("div");
       container.innerHTML = html;
       container.style.position = "absolute";
       container.style.left = "-9999px";
-      container.style.width = `${config.widthMm}mm`; // ANCHO REAL
-      container.style.height = `${config.heightMm}mm`; // ALTO REAL
+      container.style.width = `${config.pageW * 3.78}px`; // mm a píxeles (96dpi)
+      container.style.height = `${config.pageH * 3.78}px`;
       container.style.padding = "0";
       container.style.margin = "0";
       document.body.appendChild(container);
 
       try {
-        // Renderizar HTML a canvas con escala 1:1
+        // Renderizar a canvas
         const canvas = await html2canvas(container, {
-          scale: 1, // Sin escala - dimensiones reales
+          scale: 2, // Mejor calidad
           useCORS: true,
           backgroundColor: "#ffffff",
           windowHeight: container.scrollHeight,
@@ -357,57 +383,49 @@ export const electronAPI = {
         // Convertir canvas a imagen
         const imgData = canvas.toDataURL("image/png");
 
-        // Agregar imagen al PDF sin escalar
-        doc.addImage(
-          imgData,
-          "PNG",
-          0, // x
-          0, // y
-          config.widthMm, // ancho
-          config.heightMm // alto
-        );
+        // Agregar imagen al PDF (llenar toda la página)
+        doc.addImage(imgData, "PNG", 0, 0, config.pageW, config.pageH);
 
-        // Descargar PDF
+        // Descargar
         const fecha = new Date().toISOString().slice(0, 10);
         const hora = new Date().toTimeString().slice(0, 5);
-        const nombreArchivo = `etiquetas-${formato}-${fecha}-${hora}`;
-
-        console.log(`[WEB-ETIQUETAS] Descargando PDF: ${nombreArchivo}`);
-        doc.save(`${nombreArchivo}.pdf`);
+        doc.save(`etiquetas-${formato}-${fecha}-${hora}.pdf`);
 
         return {
           imprimio: false,
-          mensaje: `PDF descargado: ${items.length} etiqueta${items.length === 1 ? "" : "s"} (${config.widthMm}x${config.heightMm}mm)`,
+          mensaje: `✅ PDF descargado: ${items.length} etiqueta${items.length === 1 ? "" : "s"} (${config.pageW}x${config.pageH}mm)`,
         };
       } finally {
         document.body.removeChild(container);
       }
     } catch (err) {
-      console.error("[WEB-ETIQUETAS] Error generando PDF:", err);
+      console.error("[WEB-PDF] Error:", err);
       return {
         imprimio: false,
-        mensaje: "Error al generar PDF de etiquetas",
+        mensaje: `❌ Error al generar PDF: ${err}`,
       };
     }
   },
 
-  // Generar HTML optimizado para PDF con dimensiones físicas reales
+  // Generar HTML optimizado para cada formato
   generarHTMLEtiquetasPDF(items: any, config: any): string {
     const etiquetasHTML = items
       .flatMap((item: any) =>
         Array.from({ length: item.copias || 1 }).map(() => `
           <div class="etiqueta">
-            <div class="nombre">${item.nombre || ""}</div>
-            ${item.variante ? `<div class="variante">${item.variante}</div>` : ""}
-            ${item.svgCodigoBarras ? `<div class="barcode">${item.svgCodigoBarras}</div>` : ""}
+            <div class="nombre">${(item.nombre || "").substring(0, 15)}</div>
+            ${item.variante ? `<div class="variante">${(item.variante || "").substring(0, 20)}</div>` : ""}
+            ${item.svgCodigoBarras || ""}
             <div class="precio">$${(item.precio || 0).toLocaleString("es-CO")}</div>
           </div>
         `)
       )
       .join("");
 
-    const columnWidth = config.widthMm / (config.cols || 1);
-    const gap = config.cols === 3 ? 2.5 : 0; // Gap para zebra3
+    const isZebra3 = config.gap !== undefined;
+    const gridTemplate = isZebra3
+      ? `repeat(${config.cols}, ${config.labelW}mm)`
+      : `repeat(${config.cols}, 1fr)`;
 
     return `
       <!DOCTYPE html>
@@ -416,92 +434,65 @@ export const electronAPI = {
           <meta charset="utf-8">
           <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
-
+            html, body { width: ${config.pageW}mm; height: ${config.pageH}mm; }
             body {
-              width: ${config.widthMm}mm;
-              height: ${config.heightMm}mm;
               font-family: Arial, sans-serif;
               background: white;
+              padding: ${isZebra3 ? config.margin : 0}mm;
             }
-
-            .contenedor {
+            .grid {
               display: grid;
-              grid-template-columns: ${Array(config.cols || 1)
-                .fill(`1fr`)
-                .join(" ")};
-              ${gap ? `gap: ${gap}mm;` : ""}
-              ${gap ? `padding: 0 ${gap}mm;` : ""}
+              grid-template-columns: ${gridTemplate};
+              ${isZebra3 ? `gap: ${config.gap}mm;` : "gap: 0;"}
               width: 100%;
               height: 100%;
             }
-
             .etiqueta {
-              width: ${columnWidth - (gap || 0)}mm;
-              height: ${config.heightMm}mm;
+              width: ${config.labelW}mm;
+              height: ${config.labelH}mm;
               display: flex;
               flex-direction: column;
               align-items: center;
               justify-content: center;
-              padding: 2mm;
-              border: 1px solid #eee;
+              padding: 1.5mm;
               overflow: hidden;
             }
-
             .nombre {
-              font-size: 7px;
+              font-size: 8px;
               font-weight: bold;
               text-align: center;
               width: 100%;
-              line-height: 1;
-              margin-bottom: 1mm;
-              max-height: 4mm;
+              line-height: 1.1;
+              margin-bottom: 0.5mm;
+              max-height: 3mm;
               overflow: hidden;
-              display: -webkit-box;
-              -webkit-line-clamp: 2;
-              -webkit-box-orient: vertical;
             }
-
             .variante {
-              font-size: 5px;
+              font-size: 6px;
               color: #666;
               text-align: center;
               width: 100%;
-              margin-bottom: 1mm;
+              margin-bottom: 0.5mm;
               max-height: 2mm;
               overflow: hidden;
             }
-
-            .barcode {
-              flex-grow: 1;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              width: 100%;
-              margin: 1mm 0;
-            }
-
-            .barcode svg {
-              max-width: 100%;
-              max-height: 8mm;
+            svg {
+              max-width: ${config.labelW - 3}mm;
+              max-height: 7mm;
               width: auto;
               height: auto;
+              margin: 0.5mm 0;
             }
-
             .precio {
-              font-size: 11px;
+              font-size: 10px;
               font-weight: bold;
               text-align: center;
               width: 100%;
-            }
-
-            @media print {
-              body { margin: 0; padding: 0; }
-              .etiqueta { border: none; }
             }
           </style>
         </head>
         <body>
-          <div class="contenedor">
+          <div class="grid">
             ${etiquetasHTML}
           </div>
         </body>
