@@ -301,78 +301,10 @@ export const electronAPI = {
 
   async printODescargarEtiquetas(items: any, printer: string | null, formato: string) {
     if (!this.isElectron()) {
-      // En web: usar endpoint universal del backend
-      return this.imprimirDesdeBackend(items, printer, formato);
+      // En web: generar PDF para descargar
+      return this.descargarEtiquetasPDF(items, formato);
     }
     return await (window as any).pos.printODescargarEtiquetas(items, printer, formato);
-  },
-
-  // Usar endpoint universal de impresión del backend
-  async imprimirDesdeBackend(items: any, printer: string | null, formato: string) {
-    try {
-      console.log(`[PRINT-WEB] Enviando solicitud al backend...`);
-      console.log(`[PRINT-WEB] Impresora: ${printer || "NINGUNA"}`);
-
-      // Obtener token del store (necesario para autenticación)
-      const { useSesionStore } = await import("./store");
-      const { token } = useSesionStore.getState();
-
-      // Usar URL relativa (funciona en web y Electron)
-      const url = "/api/print";
-
-      console.log(`[PRINT-WEB] URL: ${url}`);
-      console.log(`[PRINT-WEB] Token disponible: ${!!token}`);
-
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: token ? `Bearer ${token}` : "",
-        },
-        body: JSON.stringify({
-          etiquetas: items,
-          formato: formato,
-          printerName: printer,
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        console.error(`[PRINT-WEB] Error del backend:`, error);
-        throw new Error(error.error || "Error en impresión");
-      }
-
-      // Verificar el tipo de respuesta
-      const contentType = response.headers.get("content-type");
-
-      if (contentType?.includes("text/plain")) {
-        // Es un archivo ZPL para descargar
-        const zpl = await response.text();
-        const blob = new Blob([zpl], { type: "text/plain" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `etiquetas-${Date.now()}.zpl`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-
-        console.log(`[PRINT-WEB] Archivo ZPL descargado`);
-        return {
-          imprimio: false,
-          mensaje: `Archivo ZPL descargado: etiquetas-${Date.now()}.zpl`,
-        };
-      } else {
-        // Es JSON con confirmación de impresión
-        const result = await response.json();
-        console.log(`[PRINT-WEB] Respuesta del backend:`, result);
-        return result;
-      }
-    } catch (error: any) {
-      console.error(`[PRINT-WEB] Error:`, error);
-      throw error;
-    }
   },
 
   // Generar y descargar PDF de etiquetas en web

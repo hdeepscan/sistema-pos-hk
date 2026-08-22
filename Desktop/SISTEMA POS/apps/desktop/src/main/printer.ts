@@ -2,23 +2,33 @@ import { BrowserWindow } from "electron";
 import type { ReciboData, EtiquetaData, EtiquetaFormato, ReporteCajaData } from "../shared/api-types.js";
 import { construirReciboHtml } from "../shared/recibo-html.js";
 
-// Importar usb para acceso directo a la impresora Zebra
-let usb: any;
-try {
-  usb = require("usb");
-} catch {
-  console.warn("[ZEBRA] Librería USB no disponible - se usará fallback");
-}
-
 export type { ReciboData, EtiquetaData, EtiquetaFormato, ReporteCajaData };
 
 type PageSize = "Letter" | { width: number; height: number };
 
-// Detectar si una impresora es Zebra por su nombre
-function esZebra(deviceName: string | null): boolean {
-  if (!deviceName) return false;
-  return /zebra|zt\d+|zpl/i.test(deviceName);
-}
+/**
+ * CONFIGURACIÓN DE IMPRESORAS TÉRMICAS
+ * Define dimensiones físicas reales en milímetros (mm)
+ */
+const THERMAL_PRINTER_CONFIGS = {
+  "58mm": {
+    widthMm: 58,
+    marginMm: 2,
+    usableWidthMm: 54,
+  },
+  "80mm": {
+    widthMm: 80,
+    marginMm: 2,
+    usableWidthMm: 76,
+  },
+} as const;
+
+const LABEL_CONFIGS = {
+  "rollo2": { widthMm: 50, heightMm: 25 },
+  "rollo1": { widthMm: 50, heightMm: 25 },
+  "carta": { widthMm: 210, heightMm: 297 },
+  "zebra3": { widthMm: 30, heightMm: 25 },
+} as const;
 
 function escapeHtml(value: string): string {
   return value
@@ -37,6 +47,10 @@ export async function listPrinters(): Promise<string[]> {
   }
 }
 
+/**
+ * Imprime HTML a través del driver de impresora del sistema
+ * Usa tamaño de página exacto (sin escalado)
+ */
 async function imprimirHtml(html: string, deviceName: string | null, pageSize?: PageSize): Promise<void> {
   const win = new BrowserWindow({ show: false });
   const PRINT_TIMEOUT = 30000;
@@ -54,9 +68,9 @@ async function imprimirHtml(html: string, deviceName: string | null, pageSize?: 
           silent: true,
           printBackground: true,
           margins: { marginType: "none" },
+          scaleFactor: 100, // 100% - sin escalado automático
         };
 
-        // Only set deviceName if it's explicitly provided
         if (deviceName && deviceName.trim()) {
           printOptions.deviceName = deviceName;
           console.log(`[PRINT-HTML] Using explicit printer: ${deviceName}`);
@@ -94,7 +108,10 @@ async function imprimirHtml(html: string, deviceName: string | null, pageSize?: 
   }
 }
 
-// Si falla la impresión, genera un PDF automáticamente
+/**
+ * Genera PDF con dimensiones físicas reales
+ * El PDF es la fuente única del diseño de impresión
+ */
 async function generarPDF(html: string, nombreArchivo: string, pageSize?: PageSize): Promise<string> {
   const win = new BrowserWindow({ show: false });
   try {
@@ -104,11 +121,11 @@ async function generarPDF(html: string, nombreArchivo: string, pageSize?: PageSi
       margins: { marginType: "none" },
       printBackground: true,
       pageSize: pageSize || "A4",
+      scaleFactor: 100, // Sin escalado
     };
 
     const pdfData = await win.webContents.printToPDF(opciones);
 
-    // Guardar en la carpeta de Descargas
     const { app } = await import("electron");
     const rutaDescargas = app.getPath("downloads");
     const fs = await import("fs");
@@ -117,62 +134,91 @@ async function generarPDF(html: string, nombreArchivo: string, pageSize?: PageSi
     const rutaArchivo = path.join(rutaDescargas, `${nombreArchivo}.pdf`);
     fs.writeFileSync(rutaArchivo, pdfData);
 
+    console.log(`[PRINT-PDF] PDF guardado en: ${rutaArchivo}`);
     return rutaArchivo;
   } finally {
     win.destroy();
   }
 }
 
+/**
+ * RECIBOS - Flujo: Intentar imprimir → Fallback a PDF
+ */
 export async function printRecibo(data: ReciboData, deviceName: string | null): Promise<void> {
   try {
-    console.log(`[PRINT] Attempting to print recibo to: ${deviceName || "default printer"}`);
-    await imprimirHtml(construirReciboHtml(data), deviceName);
-    console.log(`[PRINT] Recibo printed successfully`);
+    console.log(`[RECIBO] Attempting to print to: ${deviceName || "default printer"}`);
+
+    // Detectar ancho de recibo (58 o 80 mm)
+    const ancho = deviceName?.includes("58") ? "58mm" : "80mm";
+    const config = THERMAL_PRINTER_CONFIGS[ancho as keyof typeof THERMAL_PRINTER_CONFIGS];
+
+    // Generar HTML con dimensiones correctas
+    const html = construirReciboHtml(data);
+
+    // PageSize en milímetros para Electron
+    const pageSize = {
+      width: config.widthMm * 1000 / 25.4, // mm a puntos (72 dpi)
+      height: 200000, // Alto variable - se adapta al contenido
+    };
+
+    await imprimirHtml(html, deviceName, pageSize);
+    console.log(`[RECIBO] ✅ Recibo impreso correctamente`);
   } catch (err) {
-    console.error(`[PRINT] Print failed:`, err);
-    // Fallback: generate PDF automatically when print fails
+    console.error(`[RECIBO] Print failed:`, err);
+    // Fallback: generar PDF
     try {
-      console.log(`[PRINT] Generating PDF fallback...`);
+      console.log(`[RECIBO] Generando PDF como fallback...`);
       const fecha = new Date().toISOString().split("T")[0];
       const hora = new Date().toTimeString().slice(0, 5);
       const nombreArchivo = `recibo-${data.consecutivo}-${fecha}-${hora}`;
-      const rutaPDF = await generarPDF(construirReciboHtml(data), nombreArchivo, { width: 80000, height: 200000 });
-      console.log(`[PRINT] PDF generated at: ${rutaPDF}`);
-      // Show notification to user (in renderer process)
+
+      const ancho = "80mm"; // Asumir 80mm para PDF
+      const config = THERMAL_PRINTER_CONFIGS[ancho as keyof typeof THERMAL_PRINTER_CONFIGS];
+      const pageSize = {
+        width: config.widthMm * 1000 / 25.4,
+        height: 200000,
+      };
+
+      const rutaPDF = await generarPDF(construirReciboHtml(data), nombreArchivo, pageSize);
+
+      // Notificar al usuario
       const { BrowserWindow } = await import("electron");
       BrowserWindow.getAllWindows().forEach(win => {
         win.webContents.send("print:fallback", {
           tipo: "recibo",
-          mensaje: `Impresora no disponible. PDF guardado en Descargas: ${nombreArchivo}.pdf`
+          mensaje: `Impresora no disponible. PDF guardado: ${nombreArchivo}.pdf`
         });
       });
     } catch (pdfErr) {
-      console.error(`[PRINT] PDF generation also failed:`, pdfErr);
-      throw new Error(`Error al imprimir y generar PDF: ${pdfErr}`);
+      console.error(`[RECIBO] PDF generation failed:`, pdfErr);
+      throw new Error(`Error al imprimir recibo: ${pdfErr}`);
     }
   }
 }
 
-// Calibracion de la etiqueta: medidas reales del rollo y desplazamiento fino
-// (cada impresora/rollo corre distinto y hay que centrarlo).
-export interface CalibracionEtiqueta {
+/**
+ * ETIQUETAS - Configuración de formato y tamaño
+ */
+interface CalibracionEtiqueta {
   anchoMm: number;
   altoMm: number;
   offsetXMm: number;
   offsetYMm: number;
 }
 
-const CALIBRACION_DEFECTO: CalibracionEtiqueta = { anchoMm: 50, altoMm: 25, offsetXMm: 0, offsetYMm: 0 };
+const CALIBRACION_DEFECTO: CalibracionEtiqueta = {
+  anchoMm: 50,
+  altoMm: 25,
+  offsetXMm: 0,
+  offsetYMm: 0,
+};
 
-// Cada formato define el tamaño de pagina (para el driver) y el CSS de la
-// hoja, usando las medidas calibradas.
-function formatoEtiqueta(formato: EtiquetaFormato, cal: CalibracionEtiqueta): { pageSize: PageSize; css: string } {
+function formatoEtiqueta(
+  formato: EtiquetaFormato,
+  cal: CalibracionEtiqueta
+): { pageSize: PageSize; css: string } {
   const { anchoMm: a, altoMm: h } = cal;
-  // micrones = mm * 1000 (lo que espera Electron en pageSize).
-  const um = (mm: number) => Math.round(mm * 1000);
-  // El codigo de barras ocupa casi todo el ancho y ~55% del alto.
-  const bcAncho = Math.max(20, a - 3);
-  const bcAlto = Math.max(8, h * 0.52);
+  const umToPts = (mm: number) => Math.round(mm * 1000 / 25.4);
 
   if (formato === "carta") {
     return {
@@ -181,43 +227,51 @@ function formatoEtiqueta(formato: EtiquetaFormato, cal: CalibracionEtiqueta): { 
         @page { size: Letter; margin: 8mm; }
         .hoja { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2mm; }
         .etiqueta { height: ${h}mm; border: 1px dashed #ccc; }
-        .barcode svg { width: ${bcAncho - 4}mm; height: ${bcAlto}mm; }`,
+        .barcode svg { width: ${a - 4}mm; height: ${h * 0.52}mm; }
+      `,
     };
   }
 
-  // Zebra ZT230: 3 etiquetas × 30mm + gaps de 2.5mm = 100mm total
-  // Layout: [2.5mm margen][30mm etiq][2.5mm gap][30mm etiq][2.5mm gap][30mm etiq][2.5mm margen]
   if (formato === "zebra3") {
-    const anchoPorEtiqueta = 30;
-    const gapMm = 2.5;
-    const margenLateral = 2.5;
-    const anchoPagina = margenLateral + anchoPorEtiqueta + gapMm + anchoPorEtiqueta + gapMm + anchoPorEtiqueta + margenLateral; // = 100mm
-    const bcAnchoZebra = Math.max(20, anchoPorEtiqueta - 2);
+    const anchoEtiq = 30;
+    const gap = 2.5;
+    const margen = 2.5;
+    const total = margen + anchoEtiq + gap + anchoEtiq + gap + anchoEtiq + margen; // 100mm
+
     return {
-      pageSize: { width: um(anchoPagina), height: um(h) },
+      pageSize: {
+        width: umToPts(total),
+        height: umToPts(h),
+      },
       css: `
-        @page { size: ${anchoPagina}mm ${h}mm; margin: 0; padding: 0; }
+        @page { size: ${total}mm ${h}mm; margin: 0; padding: 0; }
         .hoja {
           display: grid;
-          grid-template-columns: repeat(3, ${anchoPorEtiqueta}mm);
-          gap: ${gapMm}mm;
-          padding: 0 ${margenLateral}mm;
+          grid-template-columns: repeat(3, ${anchoEtiq}mm);
+          gap: ${gap}mm;
+          padding: 0 ${margen}mm;
           width: 100%;
         }
-        .etiqueta { width: ${anchoPorEtiqueta}mm; height: ${h}mm; padding: 0; margin: 0; }
-        .barcode svg { width: ${bcAnchoZebra}mm; height: ${bcAlto}mm; }`,
+        .etiqueta { width: ${anchoEtiq}mm; height: ${h}mm; }
+        .barcode svg { width: ${anchoEtiq - 2}mm; height: ${h * 0.52}mm; }
+      `,
     };
   }
 
-  const columnas = formato === "rollo2" ? 2 : 1;
-  const anchoPagina = a * columnas;
+  const cols = formato === "rollo1" ? 1 : 2;
+  const ancho = a * cols;
+
   return {
-    pageSize: { width: um(anchoPagina), height: um(h) },
+    pageSize: {
+      width: umToPts(ancho),
+      height: umToPts(h),
+    },
     css: `
-      @page { size: ${anchoPagina}mm ${h}mm; margin: 0; }
-      .hoja { display: grid; grid-template-columns: ${Array(columnas).fill(`${a}mm`).join(" ")}; }
+      @page { size: ${ancho}mm ${h}mm; margin: 0; }
+      .hoja { display: grid; grid-template-columns: repeat(${cols}, ${a}mm); }
       .etiqueta { width: ${a}mm; height: ${h}mm; }
-      .barcode svg { width: ${bcAncho}mm; height: ${bcAlto}mm; }`,
+      .barcode svg { width: ${a - 3}mm; height: ${h * 0.52}mm; }
+    `,
   };
 }
 
@@ -239,19 +293,19 @@ function etiquetasHtml(
     )
     .join("");
 
+  const { css } = formatoEtiqueta(formato, cal);
+
   return `
     <html>
       <head>
         <meta charset="utf-8" />
         <style>
-          body { font-family: sans-serif; margin: 0; }
+          body { font-family: sans-serif; margin: 0; padding: 0; }
           .etiqueta {
             padding: 0; box-sizing: border-box; overflow: hidden; page-break-inside: avoid;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            /* Desplazamiento fino para centrar en la etiqueta fisica. */
             transform: translate(${cal.offsetXMm}mm, ${cal.offsetYMm}mm);
           }
-          /* El nombre puede ocupar hasta 2 lineas para aprovechar el ancho. */
           .nombre {
             font-size: 9px; font-weight: 600; line-height: 1.05; text-align: center; max-width: 100%;
             overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
@@ -259,185 +313,13 @@ function etiquetasHtml(
           .variante { font-size: 7.5px; line-height: 1.1; text-align: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
           .barcode { line-height: 0; margin: 0.3mm 0; }
           .precio { font-size: 13px; font-weight: 800; line-height: 1.1; }
-          ${formatoEtiqueta(formato, cal).css}
+          ${css}
         </style>
       </head>
       <body>
         <div class="hoja">${tarjetas}</div>
       </body>
     </html>`;
-}
-
-// Generar ZPL (Zebra Programming Language) para impresoras Zebra
-function generarZPL(
-  etiquetas: EtiquetaData[],
-  formato: EtiquetaFormato
-): string {
-  // Configuración de etiquetas Zebra
-  const config = {
-    // Ancho de etiqueta en mm
-    anchoMm: formato === "zebra3" ? 30 : 50,
-    // Alto de etiqueta en mm
-    altoMm: 25,
-    // Velocidad de impresión (1-14, 6 es estándar)
-    velocidad: 6,
-    // Densidad (0-30, 15 es estándar)
-    darkness: 15,
-    // Resolución (203 = 203dpi estándar Zebra)
-    dpi: 203,
-  };
-
-  // Convertir mm a puntos ZPL (8 puntos = 1mm aprox)
-  const mmAPuntos = (mm: number) => Math.round(mm * 8);
-  const anchoZebra = mmAPuntos(config.anchoMm);
-  const altoZebra = mmAPuntos(config.altoMm);
-
-  // Inicializar ZPL
-  let zpl = "^XA\n"; // Inicio de etiqueta
-  zpl += `^LL${altoZebra}\n`; // Establecer alto de etiqueta
-  zpl += `^PW${anchoZebra}\n`; // Establecer ancho de etiqueta
-  zpl += `^PR${config.velocidad}\n`; // Velocidad de impresión
-  zpl += `^MD${config.darkness}\n`; // Densidad
-
-  // Generar cada etiqueta (o copia)
-  let etiquetaIndex = 0;
-  for (const etiqueta of etiquetas) {
-    for (let copia = 0; copia < etiqueta.copias; copia++) {
-      console.log(`[ZPL] Generando etiqueta ${etiquetaIndex + 1}/${etiquetas.length * (etiquetas[0]?.copias || 1)}`);
-
-      // Posición Y para el nombre (desde arriba)
-      zpl += "^FO10,20\n"; // Posición X,Y
-      zpl += "^A0N,25,25\n"; // Fuente, orientación, altura, ancho
-      zpl += `^FD${escapeZpl(etiqueta.nombre.substring(0, 20))}\n`; // Nombre (máx 20 caracteres)
-      zpl += "^FS\n"; // Fin de campo
-
-      // Variante (si existe)
-      if (etiqueta.variante) {
-        zpl += "^FO10,50\n";
-        zpl += "^A0N,15,15\n";
-        zpl += `^FD${escapeZpl(etiqueta.variante.substring(0, 25))}\n`;
-        zpl += "^FS\n";
-      }
-
-      // Código de barras (usando Code128)
-      zpl += "^FO15,75\n";
-      zpl += "^BCN,40,Y,N,N\n"; // Code128, alto 40, mostrar texto
-      zpl += `^FD${escapeZpl(etiqueta.sku)}\n`; // Usar SKU como código de barras
-      zpl += "^FS\n";
-
-      // Precio
-      zpl += "^FO10,120\n";
-      zpl += "^A0N,30,30\n"; // Fuente más grande para precio
-      zpl += `^FD$${(etiqueta.precio / 100).toFixed(0)}\n`;
-      zpl += "^FS\n";
-
-      // Fin de etiqueta
-      zpl += "^XZ\n"; // Final de impresión
-
-      etiquetaIndex++;
-    }
-  }
-
-  return zpl;
-}
-
-// Escapar caracteres especiales para ZPL
-function escapeZpl(text: string): string {
-  return text
-    .replace(/[^a-zA-Z0-9\s\-_.]/g, "") // Remover caracteres especiales
-    .substring(0, 50); // Limitar longitud
-}
-
-// Enviar datos ZPL raw a una impresora Zebra por USB
-async function enviarDataAImpresora(deviceName: string, data: string): Promise<void> {
-  console.log(`[ZEBRA] Enviando ${data.length} bytes a impresora: ${deviceName}`);
-
-  // IDs de Zebra Technologies
-  // Vendor ID: 0x0A5F es el ID estándar de Zebra
-  const ZEBRA_VENDOR_ID = 0x0a5f;
-
-  // Si usb está disponible, intentar acceso directo
-  if (usb) {
-    try {
-      console.log(`[ZEBRA] Buscando dispositivos USB de Zebra (VID: 0x${ZEBRA_VENDOR_ID.toString(16)})...`);
-
-      const devices = usb.getDeviceList();
-      console.log(`[ZEBRA] Encontrados ${devices.length} dispositivos USB`);
-
-      // Buscar la Zebra
-      let zebraDevice = null;
-      for (const device of devices) {
-        const descriptor = device.deviceDescriptor;
-        console.log(`[ZEBRA] Verificando: VID=0x${descriptor.idVendor.toString(16)}, PID=0x${descriptor.idProduct.toString(16)}`);
-
-        if (descriptor.idVendor === ZEBRA_VENDOR_ID) {
-          console.log(`[ZEBRA] ✅ Encontrada Zebra: VID=0x${descriptor.idVendor.toString(16)}, PID=0x${descriptor.idProduct.toString(16)}`);
-          zebraDevice = device;
-          break;
-        }
-      }
-
-      if (!zebraDevice) {
-        console.warn(`[ZEBRA] No se encontró dispositivo Zebra con VID 0x${ZEBRA_VENDOR_ID.toString(16)}`);
-        throw new Error("Dispositivo Zebra no encontrado en USB");
-      }
-
-      // Abrir el dispositivo
-      zebraDevice.open();
-      console.log(`[ZEBRA] Dispositivo abierto`);
-
-      try {
-        // Configuración típica de endpoints para impresoras Zebra
-        // OUT endpoint es usualmente 0x01 para datos
-        const OUT_ENDPOINT = 0x01;
-
-        // Convertir string a Buffer
-        const buffer = Buffer.from(data, "utf8");
-
-        console.log(`[ZEBRA] Enviando ${buffer.length} bytes al endpoint 0x${OUT_ENDPOINT.toString(16)}...`);
-
-        // Enviar datos en chunks si es necesario (algunos endpoints tienen límites)
-        const chunkSize = 4096;
-        for (let i = 0; i < buffer.length; i += chunkSize) {
-          const chunk = buffer.slice(i, Math.min(i + chunkSize, buffer.length));
-          await zebraDevice.controlTransfer(
-            0x40, // requestType: HOST_TO_DEVICE | VENDOR
-            0,    // request
-            0,    // value
-            0,    // index
-            chunk
-          );
-          console.log(`[ZEBRA] Enviado chunk ${i / chunkSize + 1} de ${Math.ceil(buffer.length / chunkSize)}`);
-        }
-
-        console.log(`[ZEBRA] ✅ ZPL enviado exitosamente a Zebra`);
-      } finally {
-        zebraDevice.close();
-        console.log(`[ZEBRA] Dispositivo cerrado`);
-      }
-
-      return;
-    } catch (err) {
-      console.error(`[ZEBRA] Error enviando por USB:`, err);
-      // Continuará con el fallback de archivo
-    }
-  } else {
-    console.log(`[ZEBRA] Librería USB no disponible, usando fallback`);
-  }
-
-  // ===== FALLBACK: Guardar archivo ZPL =====
-  const { writeFileSync } = await import("fs");
-  const { tmpdir } = await import("os");
-  const { join } = await import("path");
-
-  const rutaTemp = join(tmpdir(), `zebra_${Date.now()}.zpl`);
-  writeFileSync(rutaTemp, data);
-
-  console.log(`[ZEBRA] ⚠️ Archivo ZPL guardado en: ${rutaTemp}`);
-  console.log(`[ZEBRA] PRÓXIMOS PASOS:`);
-  console.log(`[ZEBRA] 1. Copiar el contenido del archivo ZPL`);
-  console.log(`[ZEBRA] 2. Enviar manualmente a la impresora Zebra`);
-  console.log(`[ZEBRA] O configurar acceso raw de Windows a la impresora`);
 }
 
 export async function printEtiquetas(
@@ -451,58 +333,31 @@ export async function printEtiquetas(
   await imprimirHtml(etiquetasHtml(etiquetas, formato, cal), deviceName, pageSize);
 }
 
-// Intenta imprimir; si falla, genera PDF automáticamente
-// Para Zebra: intenta enviar ZPL directamente
+/**
+ * ETIQUETAS - Intenta imprimir, si falla descarga PDF
+ */
 export async function printODescargarEtiquetas(
   etiquetas: EtiquetaData[],
   deviceName: string | null,
   formato: EtiquetaFormato = "rollo2",
   calibracion?: Partial<CalibracionEtiqueta>
 ): Promise<{ imprimio: boolean; rutaPDF?: string; mensaje: string }> {
-  console.log(`[PRINT LABELS] Attempting to print ${etiquetas.length} etiqueta(s) to: ${deviceName || "default printer"}`);
-  console.log(`[PRINT LABELS] Formato: ${formato}, esZebra: ${esZebra(deviceName)}`);
-
-  // ===== FLUJO ZEBRA =====
-  if (esZebra(deviceName)) {
-    console.log(`[ZEBRA] Detectada impresora Zebra: ${deviceName}`);
-    try {
-      const zpl = generarZPL(etiquetas, formato);
-      console.log(`[ZEBRA] ZPL generado (${zpl.length} bytes)`);
-      console.log(`[ZEBRA] Primeras líneas:\n${zpl.split("\n").slice(0, 10).join("\n")}`);
-
-      // Enviar a la impresora
-      await enviarDataAImpresora(deviceName, zpl);
-
-      return {
-        imprimio: true,
-        mensaje: `✅ ${etiquetas.length} etiqueta${etiquetas.length === 1 ? "" : "s"} enviada${etiquetas.length === 1 ? "" : "s"} a Zebra correctamente`,
-      };
-    } catch (err) {
-      console.error(`[ZEBRA] Error imprimiendo en Zebra:`, err);
-      // Fallback a PDF si Zebra falla
-      console.log(`[ZEBRA] Fallback a PDF...`);
-    }
-  }
-
-  // ===== FLUJO HTML/PDF (para impresoras normales o fallback) =====
   const cal: CalibracionEtiqueta = { ...CALIBRACION_DEFECTO, ...calibracion };
   const { pageSize } = formatoEtiqueta(formato, cal);
   const html = etiquetasHtml(etiquetas, formato, cal);
 
-  console.log(`[PRINT LABELS] Intentando flujo HTML/PDF...`);
+  console.log(`[ETIQUETAS] Intentando imprimir ${etiquetas.length} etiqueta(s)...`);
 
-  // Intentar imprimir con HTML
+  // Intentar imprimir
   try {
     await imprimirHtml(html, deviceName, pageSize);
-    console.log(`[PRINT LABELS] Successfully printed to ${deviceName}`);
+    console.log(`[ETIQUETAS] ✅ Etiquetas impresas correctamente`);
     return {
       imprimio: true,
       mensaje: `${etiquetas.length} etiqueta${etiquetas.length === 1 ? "" : "s"} impresa${etiquetas.length === 1 ? "" : "s"} correctamente`,
     };
   } catch (err) {
-    // Si hay impresora configurada y falla, es probable que no esté disponible
-    // Si no hay impresora, generar PDF directamente
-    console.warn(`[PRINT LABELS] HTML print failed, generating PDF fallback:`, err);
+    console.warn(`[ETIQUETAS] Impresión fallida, generando PDF como fallback:`, err);
 
     try {
       const fecha = new Date().toISOString().split("T")[0];
@@ -510,25 +365,29 @@ export async function printODescargarEtiquetas(
       const nombreArchivo = `etiquetas-${formato}-${fecha}-${hora}`;
       const rutaPDF = await generarPDF(html, nombreArchivo, pageSize);
 
-      console.log(`[PRINT LABELS] PDF generated at: ${rutaPDF}`);
+      console.log(`[ETIQUETAS] PDF generado en: ${rutaPDF}`);
       return {
         imprimio: false,
         rutaPDF,
-        mensaje: `Impresora no disponible. PDF guardado en Descargas: ${nombreArchivo}.pdf`,
+        mensaje: `Impresora no disponible. PDF guardado: ${nombreArchivo}.pdf`,
       };
     } catch (pdfErr) {
-      console.error(`[PRINT LABELS] PDF generation failed:`, pdfErr);
-      throw new Error(`Error al imprimir y generar PDF: ${pdfErr}`);
+      console.error(`[ETIQUETAS] PDF generation failed:`, pdfErr);
+      throw new Error(`Error al procesar etiquetas: ${pdfErr}`);
     }
   }
 }
 
+/**
+ * REPORTE DE CAJA
+ */
 function reporteCajaHtml(d: ReporteCajaData): string {
   const fila = (label: string, valor: string, bold = false) => `
     <tr>
       <td>${escapeHtml(label)}</td>
       <td style="text-align:right;${bold ? "font-weight:bold" : ""}">${escapeHtml(valor)}</td>
     </tr>`;
+
   return `
     <html>
       <head>
@@ -550,23 +409,30 @@ function reporteCajaHtml(d: ReporteCajaData): string {
         <table>
           ${fila("Apertura", d.fechaApertura)}
           ${fila("Cierre", d.fechaCierre)}
-          ${fila("Abrio", d.usuarioApertura)}
-          ${fila("Cerro", d.usuarioCierre)}
+          ${fila("Abrió", d.usuarioApertura)}
+          ${fila("Cerró", d.usuarioCierre)}
         </table>
         <hr />
         <table>
           ${fila("Monto inicial", `$${d.montoInicial.toFixed(2)}`)}
           ${fila("Ventas en efectivo", `$${d.ventasEfectivo.toFixed(2)}`)}
           ${fila("Total esperado", `$${d.totalEsperado.toFixed(2)}`, true)}
-          ${fila("Contado fisicamente", `$${d.montoContado.toFixed(2)}`)}
+          ${fila("Contado físicamente", `$${d.montoContado.toFixed(2)}`)}
           ${fila(d.diferencia >= 0 ? "Sobrante" : "Faltante", `$${Math.abs(d.diferencia).toFixed(2)}`, true)}
         </table>
         <hr />
-        <div class="center" style="font-size:10px">Sistema desarrollado por POS HK.</div>
+        <div class="center" style="font-size:10px">Sistema POS HK</div>
       </body>
     </html>`;
 }
 
 export async function printReporteCaja(data: ReporteCajaData, deviceName: string | null): Promise<void> {
-  await imprimirHtml(reporteCajaHtml(data), deviceName);
+  try {
+    console.log(`[CAJA] Imprimiendo reporte de caja...`);
+    await imprimirHtml(reporteCajaHtml(data), deviceName);
+    console.log(`[CAJA] ✅ Reporte impreso correctamente`);
+  } catch (err) {
+    console.error(`[CAJA] Print failed:`, err);
+    throw new Error(`Error al imprimir reporte de caja: ${err}`);
+  }
 }
