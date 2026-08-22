@@ -130,10 +130,10 @@ export async function contabilidadRoutes(app: FastifyInstance) {
         orderBy: { codigo: "asc" },
       });
 
-      return cuentas;
+      return reply.send(cuentas);
     } catch (err) {
       const mensaje = err instanceof Error ? err.message : "Error desconocido";
-      return { error: mensaje };
+      return reply.code(500).send({ error: mensaje });
     }
   });
 
@@ -206,10 +206,10 @@ export async function contabilidadRoutes(app: FastifyInstance) {
         take: 100,
       });
 
-      return asientos;
+      return reply.send(asientos);
     } catch (err) {
       const mensaje = err instanceof Error ? err.message : "Error desconocido";
-      return { error: mensaje };
+      return reply.code(500).send({ error: mensaje });
     }
   });
 
@@ -307,7 +307,7 @@ export async function contabilidadRoutes(app: FastifyInstance) {
         },
       });
 
-      return actualizado;
+      return reply.send(actualizado);
     } catch (err) {
       const mensaje = err instanceof Error ? err.message : "Error desconocido";
       return reply.code(500).send({ error: mensaje });
@@ -352,10 +352,10 @@ export async function contabilidadRoutes(app: FastifyInstance) {
         };
       });
 
-      return balance;
+      return reply.send(balance);
     } catch (err) {
       const mensaje = err instanceof Error ? err.message : "Error desconocido";
-      return { error: mensaje };
+      return reply.code(500).send({ error: mensaje });
     }
   });
 
@@ -402,14 +402,14 @@ export async function contabilidadRoutes(app: FastifyInstance) {
           return sum + saldo;
         }, 0);
 
-      return {
+      return reply.send({
         ingresos,
         gastos,
         utilidadNeta: ingresos - gastos,
-      };
+      });
     } catch (err) {
       const mensaje = err instanceof Error ? err.message : "Error desconocido";
-      return { error: mensaje };
+      return reply.code(500).send({ error: mensaje });
     }
   });
 }
