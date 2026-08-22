@@ -562,3 +562,32 @@ export interface PedidoShopifyEvent {
   productos: { nombre: string; cantidad: number }[];
   fecha: string;
 }
+
+// ---------- Utilidades para formatear variantes ----------
+
+/**
+ * Formatea varianteTitulo limpiando JSON y devolviendo texto legible.
+ * Maneja múltiples formatos:
+ * - JSON: [{"name":"Color","value":"Negro"}] → "Color: Negro"
+ * - String con separadores: "Rojo / M" → "Rojo / M"
+ * - Texto plano: "UNICA" → "UNICA"
+ */
+export function formatearVariante(varianteTitulo: string | null): string {
+  if (!varianteTitulo) return "";
+
+  // Intentar parsear como JSON de opciones
+  try {
+    const parsed = JSON.parse(varianteTitulo);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      const opciones = parsed
+        .filter((opt: any) => opt.name && opt.value)
+        .map((opt: any) => `${opt.name}: ${opt.value}`)
+        .join(", ");
+      if (opciones) return opciones;
+    }
+  } catch {
+    // No es JSON, devolver como está
+  }
+
+  return varianteTitulo;
+}

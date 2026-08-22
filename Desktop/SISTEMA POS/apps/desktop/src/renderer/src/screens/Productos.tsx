@@ -10,6 +10,7 @@ import { mensajeError } from "../lib/errores";
 import { electronAPI } from "../lib/electron-api";
 import { NuevoProductoInteligente } from "./NuevoProductoInteligente";
 import type { EtiquetaFormato } from "../../../shared/api-types";
+import { formatearVariante } from "@sistema-pos/shared";
 import {
   IconoInfo,
   IconoPrecio,
@@ -21,27 +22,12 @@ import {
   IconoMas,
 } from "../lib/iconos";
 
-// Convierte la variante en lineas legibles:
-// - Si varianteTitulo es JSON con opciones: parsea y formatea
-// - Si es string "Rojo / M" con grupoOpciones "Color|Talla": usa esos nombres
-// - Si es string plano: lo devuelve como está
-function lineasVariante(u: { varianteTitulo: string | null; grupoOpciones: string | null }): string[] {
+// Convierte la variante en lineas legibles usando formatearVariante de shared
+// Luego las divide por comas para mostrar en múltiples líneas
+function lineasVariante(u: { varianteTitulo: string | null }): string[] {
   if (!u.varianteTitulo) return [];
-
-  // Intentar parsear como JSON de opciones (ej: [{"name":"Color","value":"Negro"}])
-  try {
-    const parsed = JSON.parse(u.varianteTitulo);
-    if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].name && parsed[0].value) {
-      return parsed.map((opt: { name: string; value: string }) => `${opt.name}: ${opt.value}`);
-    }
-  } catch {
-    // No es JSON, continuar con parsing tradicional
-  }
-
-  // Formato tradicional: "Rojo / M" con grupoOpciones "Color|Talla"
-  const valores = u.varianteTitulo.split("/").map((v) => v.trim()).filter(Boolean);
-  const nombres = u.grupoOpciones ? u.grupoOpciones.split("|").map((n) => n.trim()) : [];
-  return valores.map((valor, i) => (nombres[i] ? `${nombres[i]}: ${valor}` : valor));
+  const formateado = formatearVariante(u.varianteTitulo);
+  return formateado ? formateado.split(",").map((l) => l.trim()) : [];
 }
 
 const FORMATOS_ETIQUETA: { valor: EtiquetaFormato; titulo: string; detalle: string }[] = [
@@ -763,7 +749,7 @@ function DetalleProducto({
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <h3 style={{ margin: 0, fontSize: 18 }}>{producto.nombre}</h3>
-            {producto.varianteTitulo && <span className="badge neutral">{producto.varianteTitulo}</span>}
+            {producto.varianteTitulo && <span className="badge neutral">{formatearVariante(producto.varianteTitulo)}</span>}
             <span className={`badge ${activo ? "success" : "neutral"}`}>{activo ? "Activo" : "Inactivo"}</span>
             {producto.shopifyProductId ? (
               <span className="badge success">Shopify</span>
@@ -1407,7 +1393,7 @@ function VariantesCard({ producto, onActualizado }: { producto: ProductoDetalle;
           <tbody>
             {producto.variantes.map((v) => (
               <tr key={v.id}>
-                <td>{v.varianteTitulo ?? "-"}</td>
+                <td>{formatearVariante(v.varianteTitulo) || "-"}</td>
                 <td>{v.sku}</td>
                 <td>${Number(v.precio).toLocaleString("es-CO")}</td>
               </tr>
