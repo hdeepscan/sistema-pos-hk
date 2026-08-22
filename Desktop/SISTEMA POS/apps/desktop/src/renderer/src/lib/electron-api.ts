@@ -283,15 +283,15 @@ export const electronAPI = {
     }
   },
 
-  async printReporteCaja(data: any) {
+  async printReporteCaja(data: any, deviceName?: string | null) {
     if (!this.isElectron()) {
       console.warn("printReporteCaja not available in web");
       return;
     }
-    return await (window as any).pos.printReporteCaja(data);
+    return await (window as any).pos.printReporteCaja(data, deviceName);
   },
 
-  async printEtiquetas(items: any, printer: string, formato: string) {
+  async printEtiquetas(items: any, printer: string | null, formato: string) {
     if (!this.isElectron()) {
       console.warn("printEtiquetas not available in web");
       return;
@@ -299,7 +299,7 @@ export const electronAPI = {
     return await (window as any).pos.printEtiquetas(items, printer, formato);
   },
 
-  async printODescargarEtiquetas(items: any, printer: string, formato: string) {
+  async printODescargarEtiquetas(items: any, printer: string | null, formato: string) {
     if (!this.isElectron()) {
       // En web: generar PDF/HTML para descargar
       return this.descargarEtiquetasPDF(items, formato);
