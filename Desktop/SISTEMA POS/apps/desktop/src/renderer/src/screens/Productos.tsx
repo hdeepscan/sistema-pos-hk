@@ -986,14 +986,21 @@ function EtiquetaCard({ producto, onActualizado }: { producto: ProductoDetalle; 
         return;
       }
       const config = await electronAPI.getConfig();
-      const resultado = await electronAPI.printODescargarEtiquetas(items, config.printerName, formato);
-      if (resultado) {
-        setMensaje(resultado.mensaje);
-        if (!resultado.imprimio && resultado.rutaPDF) {
-          setMensaje(
-            resultado.mensaje + " (La carpeta de Descargas debería abrirse automáticamente)"
-          );
-        }
+      console.log(`[LABELS] Printing ${items.length} etiqueta(s) with printer: ${config.printerName || "default"}`);
+
+      // Use printEtiquetas for direct printing (no PDF fallback)
+      // If no printer is configured, show error instead of downloading PDF
+      if (!config.printerName) {
+        setError("No hay impresora configurada. Ve a Configuración > Impresoras para configurar una.");
+        return;
+      }
+
+      try {
+        await electronAPI.printEtiquetas(items, config.printerName, formato);
+        setMensaje(`${items.length} etiqueta${items.length === 1 ? "" : "s"} enviada${items.length === 1 ? "" : "s"} a la impresora`);
+      } catch (printErr) {
+        console.error("[LABELS] Print error:", printErr);
+        setError(`Error al imprimir: ${printErr instanceof Error ? printErr.message : "Error desconocido"}`);
       }
     } catch (err) {
       console.error("Error al imprimir:", err);
