@@ -313,10 +313,15 @@ export const electronAPI = {
       console.log(`[PRINT-WEB] Enviando solicitud al backend...`);
       console.log(`[PRINT-WEB] Impresora: ${printer || "NINGUNA"}`);
 
-      const response = await fetch("/api/print", {
+      // Obtener token del store (necesario para autenticación)
+      const { useSesionStore } = await import("./store");
+      const { apiBaseUrl, token } = useSesionStore.getState();
+
+      const response = await fetch(`${apiBaseUrl}/api/print`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: token ? `Bearer ${token}` : "",
         },
         body: JSON.stringify({
           etiquetas: items,
