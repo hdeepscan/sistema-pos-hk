@@ -988,28 +988,23 @@ function EtiquetaCard({ producto, onActualizado }: { producto: ProductoDetalle; 
       const config = await electronAPI.getConfig();
       console.log(`[LABELS] Processing ${items.length} etiqueta(s)`);
 
-      try {
-        // Use printODescargarEtiquetas which has smart logic:
-        // - If printer configured: try to print, fallback to PDF if fails
-        // - If no printer: automatically generate PDF
-        const resultado = await electronAPI.printODescargarEtiquetas(
-          items,
-          config.printerName || "",
-          formato
-        );
+      // Use printODescargarEtiquetas which has smart logic:
+      // - If printer configured: try to print, fallback to PDF if fails
+      // - If no printer: automatically generate PDF
+      const resultado = await electronAPI.printODescargarEtiquetas(
+        items,
+        config.printerName || null,
+        formato
+      );
 
-        if (resultado.imprimio) {
-          setMensaje(`${items.length} etiqueta${items.length === 1 ? "" : "s"} impresa${items.length === 1 ? "" : "s"} correctamente`);
-        } else {
-          setMensaje(resultado.mensaje || `${items.length} etiqueta${items.length === 1 ? "" : "s"} descargada${items.length === 1 ? "" : "s"} como PDF`);
-        }
-      } catch (printErr) {
-        console.error("[LABELS] Error:", printErr);
-        setError(`Error al procesar etiquetas: ${printErr instanceof Error ? printErr.message : "Error desconocido"}`);
+      if (resultado.imprimio) {
+        setMensaje(`${items.length} etiqueta${items.length === 1 ? "" : "s"} impresa${items.length === 1 ? "" : "s"} correctamente`);
+      } else {
+        setMensaje(resultado.mensaje || `${items.length} etiqueta${items.length === 1 ? "" : "s"} descargada${items.length === 1 ? "" : "s"} como PDF`);
       }
     } catch (err) {
-      console.error("Error al imprimir:", err);
-      setError("No se pudo imprimir ni generar PDF. Verifica la configuración de la impresora.");
+      console.error("[LABELS] Error:", err);
+      setError(`Error al procesar etiquetas: ${err instanceof Error ? err.message : "Error desconocido"}`);
     } finally {
       setImprimiendo(false);
     }
