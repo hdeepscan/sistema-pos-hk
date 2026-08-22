@@ -986,21 +986,26 @@ function EtiquetaCard({ producto, onActualizado }: { producto: ProductoDetalle; 
         return;
       }
       const config = await electronAPI.getConfig();
-      console.log(`[LABELS] Printing ${items.length} etiqueta(s) with printer: ${config.printerName || "default"}`);
-
-      // Use printEtiquetas for direct printing (no PDF fallback)
-      // If no printer is configured, show error instead of downloading PDF
-      if (!config.printerName) {
-        setError("No hay impresora configurada. Ve a Configuración > Impresoras para configurar una.");
-        return;
-      }
+      console.log(`[LABELS] Processing ${items.length} etiqueta(s)`);
 
       try {
-        await electronAPI.printEtiquetas(items, config.printerName, formato);
-        setMensaje(`${items.length} etiqueta${items.length === 1 ? "" : "s"} enviada${items.length === 1 ? "" : "s"} a la impresora`);
+        // Use printODescargarEtiquetas which has smart logic:
+        // - If printer configured: try to print, fallback to PDF if fails
+        // - If no printer: automatically generate PDF
+        const resultado = await electronAPI.printODescargarEtiquetas(
+          items,
+          config.printerName || "",
+          formato
+        );
+
+        if (resultado.imprimio) {
+          setMensaje(`${items.length} etiqueta${items.length === 1 ? "" : "s"} impresa${items.length === 1 ? "" : "s"} correctamente`);
+        } else {
+          setMensaje(resultado.mensaje || `${items.length} etiqueta${items.length === 1 ? "" : "s"} descargada${items.length === 1 ? "" : "s"} como PDF`);
+        }
       } catch (printErr) {
-        console.error("[LABELS] Print error:", printErr);
-        setError(`Error al imprimir: ${printErr instanceof Error ? printErr.message : "Error desconocido"}`);
+        console.error("[LABELS] Error:", printErr);
+        setError(`Error al procesar etiquetas: ${printErr instanceof Error ? printErr.message : "Error desconocido"}`);
       }
     } catch (err) {
       console.error("Error al imprimir:", err);

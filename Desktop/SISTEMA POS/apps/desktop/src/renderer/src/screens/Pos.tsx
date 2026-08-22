@@ -469,13 +469,15 @@ export default function Pos() {
 
     try {
       console.log(`[RECEIPT] Attempting to print with printer: ${config.printerName || "default"}`);
-      // Use printRecibo for direct printing to configured printer
-      await electronAPI.printRecibo(reciboData, config.printerName);
-      console.log("[RECEIPT] Print successful");
+      // Use generarReciboPDF which has smart logic:
+      // - If printer configured: try to print, fallback to PDF if fails
+      // - If no printer: automatically generate PDF
+      await electronAPI.generarReciboPDF(reciboData, config.printerName);
+      console.log("[RECEIPT] Print/PDF generation successful");
     } catch (printErr) {
       // Venta ya está guardada en backend, pero notificamos al usuario del error de impresión
       console.error("[RECEIPT] Print error:", printErr);
-      setMensaje(`Venta guardada pero no se pudo imprimir: ${printErr instanceof Error ? printErr.message : "Error desconocido"}`);
+      setMensaje(`Venta guardada pero hubo un problema con la impresión: ${printErr instanceof Error ? printErr.message : "Error desconocido"}`);
     }
 
     void reproducir("venta");
