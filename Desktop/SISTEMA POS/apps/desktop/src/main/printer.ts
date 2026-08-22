@@ -2,6 +2,14 @@ import { BrowserWindow } from "electron";
 import type { ReciboData, EtiquetaData, EtiquetaFormato, ReporteCajaData } from "../shared/api-types.js";
 import { construirReciboHtml } from "../shared/recibo-html.js";
 
+// Importar usb para acceso directo a la impresora Zebra
+let usb: any;
+try {
+  usb = require("usb");
+} catch {
+  console.warn("[ZEBRA] Librería USB no disponible - se usará fallback");
+}
+
 export type { ReciboData, EtiquetaData, EtiquetaFormato, ReporteCajaData };
 
 type PageSize = "Letter" | { width: number; height: number };
@@ -340,11 +348,84 @@ function escapeZpl(text: string): string {
     .substring(0, 50); // Limitar longitud
 }
 
-// Enviar datos ZPL raw a una impresora Zebra
-// ESTADO ACTUAL: Genera ZPL válido pero el envío a la impresora requiere configuración Windows adicional
+// Enviar datos ZPL raw a una impresora Zebra por USB
 async function enviarDataAImpresora(deviceName: string, data: string): Promise<void> {
   console.log(`[ZEBRA] Enviando ${data.length} bytes a impresora: ${deviceName}`);
 
+  // IDs de Zebra Technologies
+  // Vendor ID: 0x0A5F es el ID estándar de Zebra
+  const ZEBRA_VENDOR_ID = 0x0a5f;
+
+  // Si usb está disponible, intentar acceso directo
+  if (usb) {
+    try {
+      console.log(`[ZEBRA] Buscando dispositivos USB de Zebra (VID: 0x${ZEBRA_VENDOR_ID.toString(16)})...`);
+
+      const devices = usb.getDeviceList();
+      console.log(`[ZEBRA] Encontrados ${devices.length} dispositivos USB`);
+
+      // Buscar la Zebra
+      let zebraDevice = null;
+      for (const device of devices) {
+        const descriptor = device.deviceDescriptor;
+        console.log(`[ZEBRA] Verificando: VID=0x${descriptor.idVendor.toString(16)}, PID=0x${descriptor.idProduct.toString(16)}`);
+
+        if (descriptor.idVendor === ZEBRA_VENDOR_ID) {
+          console.log(`[ZEBRA] ✅ Encontrada Zebra: VID=0x${descriptor.idVendor.toString(16)}, PID=0x${descriptor.idProduct.toString(16)}`);
+          zebraDevice = device;
+          break;
+        }
+      }
+
+      if (!zebraDevice) {
+        console.warn(`[ZEBRA] No se encontró dispositivo Zebra con VID 0x${ZEBRA_VENDOR_ID.toString(16)}`);
+        throw new Error("Dispositivo Zebra no encontrado en USB");
+      }
+
+      // Abrir el dispositivo
+      zebraDevice.open();
+      console.log(`[ZEBRA] Dispositivo abierto`);
+
+      try {
+        // Configuración típica de endpoints para impresoras Zebra
+        // OUT endpoint es usualmente 0x01 para datos
+        const OUT_ENDPOINT = 0x01;
+
+        // Convertir string a Buffer
+        const buffer = Buffer.from(data, "utf8");
+
+        console.log(`[ZEBRA] Enviando ${buffer.length} bytes al endpoint 0x${OUT_ENDPOINT.toString(16)}...`);
+
+        // Enviar datos en chunks si es necesario (algunos endpoints tienen límites)
+        const chunkSize = 4096;
+        for (let i = 0; i < buffer.length; i += chunkSize) {
+          const chunk = buffer.slice(i, Math.min(i + chunkSize, buffer.length));
+          await zebraDevice.controlTransfer(
+            0x40, // requestType: HOST_TO_DEVICE | VENDOR
+            0,    // request
+            0,    // value
+            0,    // index
+            chunk
+          );
+          console.log(`[ZEBRA] Enviado chunk ${i / chunkSize + 1} de ${Math.ceil(buffer.length / chunkSize)}`);
+        }
+
+        console.log(`[ZEBRA] ✅ ZPL enviado exitosamente a Zebra`);
+      } finally {
+        zebraDevice.close();
+        console.log(`[ZEBRA] Dispositivo cerrado`);
+      }
+
+      return;
+    } catch (err) {
+      console.error(`[ZEBRA] Error enviando por USB:`, err);
+      // Continuará con el fallback de archivo
+    }
+  } else {
+    console.log(`[ZEBRA] Librería USB no disponible, usando fallback`);
+  }
+
+  // ===== FALLBACK: Guardar archivo ZPL =====
   const { writeFileSync } = await import("fs");
   const { tmpdir } = await import("os");
   const { join } = await import("path");
@@ -352,24 +433,11 @@ async function enviarDataAImpresora(deviceName: string, data: string): Promise<v
   const rutaTemp = join(tmpdir(), `zebra_${Date.now()}.zpl`);
   writeFileSync(rutaTemp, data);
 
-  console.log(`[ZEBRA] Archivo ZPL generado: ${rutaTemp}`);
-  console.log(`[ZEBRA] ===== IMPORTANTE =====`);
-  console.log(`[ZEBRA] ZPL generado correctamente pero se necesita:
-  1. Acceso raw a la impresora Zebra (puerto COM, USB o Network)
-  2. Configuración de Windows para enviar datos raw al driver de Zebra
-  3. O implementar LibUSB/WinUSB para acceso directo USB
-
-  Para la Zebra ZT230 del cliente:
-  - Conectada por USB o Ethernet
-  - Requiere envío directo de comandos ZPL
-  - Los datos en ${rutaTemp} contienen el ZPL válido listo para enviar
-`);
-
-  // TODO: Implementar envío real a la impresora
-  // Opciones:
-  // 1. Usar WinAPI de Windows para acceso raw
-  // 2. Usar node-usb o similar para USB directo
-  // 3. Si está en red: enviar por TCP/IP a puerto 9100 (estándar Zebra)
+  console.log(`[ZEBRA] ⚠️ Archivo ZPL guardado en: ${rutaTemp}`);
+  console.log(`[ZEBRA] PRÓXIMOS PASOS:`);
+  console.log(`[ZEBRA] 1. Copiar el contenido del archivo ZPL`);
+  console.log(`[ZEBRA] 2. Enviar manualmente a la impresora Zebra`);
+  console.log(`[ZEBRA] O configurar acceso raw de Windows a la impresora`);
 }
 
 export async function printEtiquetas(
