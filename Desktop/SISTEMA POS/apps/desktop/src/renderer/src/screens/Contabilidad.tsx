@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { api } from "../lib/api";
-import { useSesionStore } from "../lib/store";
+import { useSesionStore, usePermiso } from "../lib/store";
 import { mensajeError } from "../lib/errores";
 
 interface CuentaContable {
@@ -35,7 +35,7 @@ interface AsientoContable {
 type Pestaña = "plan-cuentas" | "asientos" | "reportes";
 
 export default function Contabilidad() {
-  const { rol } = useSesionStore();
+  const puedeVerContabilidad = usePermiso("contabilidad.ver");
   const [pestaña, setPestaña] = useState<Pestaña>("plan-cuentas");
   const [cuentas, setCuentas] = useState<CuentaContable[]>([]);
   const [asientos, setAsientos] = useState<AsientoContable[]>([]);
@@ -54,8 +54,8 @@ export default function Contabilidad() {
     lineas: [{ cuentaId: "", descripcion: "", debe: 0, haber: 0 }],
   });
 
-  // Solo admin puede acceder
-  if (rol !== "ADMIN") {
+  // Requiere permiso de contabilidad
+  if (!puedeVerContabilidad) {
     return <div style={{ padding: 20 }}>No tienes permiso para acceder a Contabilidad</div>;
   }
 

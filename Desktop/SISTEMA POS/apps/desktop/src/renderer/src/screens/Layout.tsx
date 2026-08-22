@@ -21,6 +21,7 @@ export default function Layout({ children }: PropsWithChildren) {
   const puedeAdministrarGastos = usePermiso("gastos.administrar");
   const puedeVerReportes = usePermiso("reportes.ver");
   const puedeAdministrarConfiguracion = usePermiso("configuracion.administrar");
+  const puedeVerContabilidad = usePermiso("contabilidad.ver");
   const sucursalActiva = sucursales.find((s) => s.id === sucursalActivaId);
   const [alertas, setAlertas] = useState<(PedidoShopifyEvent & { toastId: string })[]>([]);
   const [creditosVencidos, setCreditosVencidos] = useState(0);
@@ -181,8 +182,12 @@ export default function Layout({ children }: PropsWithChildren) {
         <NavLink to="/shopify">Shopify</NavLink>
         <NavLink to="/meta-ads">Meta Ads</NavLink>
 
-        <div className="sidebar-section-label">Contabilidad</div>
-        <NavLink to="/contabilidad">Contabilidad</NavLink>
+        {puedeVerContabilidad && (
+          <>
+            <div className="sidebar-section-label">Contabilidad</div>
+            <NavLink to="/contabilidad">Contabilidad</NavLink>
+          </>
+        )}
 
         <div style={{ flex: 1 }} />
         <button className="secondary" onClick={cerrarSesion} type="button" style={{ marginTop: 12 }}>
