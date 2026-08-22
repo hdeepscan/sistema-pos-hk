@@ -308,91 +308,205 @@ export const electronAPI = {
   },
 
   // Generar y descargar PDF de etiquetas en web
+  // Usa dimensiones físicas REALES en mm, no A4
   async descargarEtiquetasPDF(items: any, formato: string) {
     try {
-      // Generar HTML con las etiquetas
-      const html = this.generarHTMLEtiquetas(items);
+      console.log(`[WEB-ETIQUETAS] Generando PDF con formato: ${formato}`);
 
-      // Crear contenedor temporal
+      // Dimensiones físicas reales según formato
+      const labelConfigs: Record<string, { widthMm: number; heightMm: number; cols?: number }> = {
+        rollo2: { widthMm: 100, heightMm: 25, cols: 2 },
+        rollo1: { widthMm: 50, heightMm: 25, cols: 1 },
+        carta: { widthMm: 210, heightMm: 297, cols: 4 },
+        zebra3: { widthMm: 100, heightMm: 25, cols: 3 },
+      };
+
+      const config = labelConfigs[formato] || labelConfigs.rollo2;
+
+      // Crear PDF con dimensiones FÍSICAS REALES
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: [config.widthMm, config.heightMm],
+      });
+
+      // Generar HTML con CSS para el PDF
+      const html = this.generarHTMLEtiquetasPDF(items, config);
+
+      // Crear contenedor temporal con MISMO TAMAÑO que el PDF
       const container = document.createElement("div");
       container.innerHTML = html;
       container.style.position = "absolute";
       container.style.left = "-9999px";
-      container.style.width = "210mm"; // Ancho A4
-      container.style.padding = "10mm";
+      container.style.width = `${config.widthMm}mm`; // ANCHO REAL
+      container.style.height = `${config.heightMm}mm`; // ALTO REAL
+      container.style.padding = "0";
+      container.style.margin = "0";
       document.body.appendChild(container);
 
       try {
-        // Renderizar HTML a canvas
+        // Renderizar HTML a canvas con escala 1:1
         const canvas = await html2canvas(container, {
-          scale: 2,
+          scale: 1, // Sin escala - dimensiones reales
           useCORS: true,
           backgroundColor: "#ffffff",
+          windowHeight: container.scrollHeight,
+          windowWidth: container.scrollWidth,
         });
 
-        // Crear PDF con orientación vertical
-        const doc = new jsPDF({
-          orientation: "portrait",
-          unit: "mm",
-          format: "a4",
-        });
-
-        const pageWidth = doc.internal.pageSize.getWidth();
-        const pageHeight = doc.internal.pageSize.getHeight();
-        const canvasWidth = canvas.width;
-        const canvasHeight = canvas.height;
-        const ratio = canvasWidth / canvasHeight;
-
-        let height = pageHeight;
-        let width = height * ratio;
-
-        if (width > pageWidth) {
-          width = pageWidth;
-          height = width / ratio;
-        }
-
+        // Convertir canvas a imagen
         const imgData = canvas.toDataURL("image/png");
-        const x = (pageWidth - width) / 2;
 
-        // Primer página
-        doc.addImage(imgData, "PNG", x, 10, width, height);
-
-        // Si el contenido es muy largo, añadir más páginas
-        let remainingHeight = canvasHeight - (pageHeight - 20) / ratio;
-        let pageNumber = 1;
-        while (remainingHeight > 0) {
-          doc.addPage("a4");
-          pageNumber++;
-          doc.addImage(
-            imgData,
-            "PNG",
-            x,
-            10 - ((pageNumber - 1) * (pageHeight - 20)) / ratio,
-            width,
-            height
-          );
-          remainingHeight -= (pageHeight - 20) / ratio;
-        }
+        // Agregar imagen al PDF sin escalar
+        doc.addImage(
+          imgData,
+          "PNG",
+          0, // x
+          0, // y
+          config.widthMm, // ancho
+          config.heightMm // alto
+        );
 
         // Descargar PDF
         const fecha = new Date().toISOString().slice(0, 10);
         const hora = new Date().toTimeString().slice(0, 5);
-        doc.save(`etiquetas-${fecha}-${hora}.pdf`);
+        const nombreArchivo = `etiquetas-${formato}-${fecha}-${hora}`;
+
+        console.log(`[WEB-ETIQUETAS] Descargando PDF: ${nombreArchivo}`);
+        doc.save(`${nombreArchivo}.pdf`);
 
         return {
           imprimio: false,
-          mensaje: `PDF descargado: ${items.length} etiqueta${items.length === 1 ? "" : "s"}`,
+          mensaje: `PDF descargado: ${items.length} etiqueta${items.length === 1 ? "" : "s"} (${config.widthMm}x${config.heightMm}mm)`,
         };
       } finally {
         document.body.removeChild(container);
       }
     } catch (err) {
-      console.error("Error generando PDF de etiquetas:", err);
+      console.error("[WEB-ETIQUETAS] Error generando PDF:", err);
       return {
         imprimio: false,
-        mensaje: "Error al generar PDF de etiquetas. Intenta desde Electron.",
+        mensaje: "Error al generar PDF de etiquetas",
       };
     }
+  },
+
+  // Generar HTML optimizado para PDF con dimensiones físicas reales
+  generarHTMLEtiquetasPDF(items: any, config: any): string {
+    const etiquetasHTML = items
+      .flatMap((item: any) =>
+        Array.from({ length: item.copias || 1 }).map(() => `
+          <div class="etiqueta">
+            <div class="nombre">${item.nombre || ""}</div>
+            ${item.variante ? `<div class="variante">${item.variante}</div>` : ""}
+            ${item.svgCodigoBarras ? `<div class="barcode">${item.svgCodigoBarras}</div>` : ""}
+            <div class="precio">$${(item.precio || 0).toLocaleString("es-CO")}</div>
+          </div>
+        `)
+      )
+      .join("");
+
+    const columnWidth = config.widthMm / (config.cols || 1);
+    const gap = config.cols === 3 ? 2.5 : 0; // Gap para zebra3
+
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+
+            body {
+              width: ${config.widthMm}mm;
+              height: ${config.heightMm}mm;
+              font-family: Arial, sans-serif;
+              background: white;
+            }
+
+            .contenedor {
+              display: grid;
+              grid-template-columns: ${Array(config.cols || 1)
+                .fill(`1fr`)
+                .join(" ")};
+              ${gap ? `gap: ${gap}mm;` : ""}
+              ${gap ? `padding: 0 ${gap}mm;` : ""}
+              width: 100%;
+              height: 100%;
+            }
+
+            .etiqueta {
+              width: ${columnWidth - (gap || 0)}mm;
+              height: ${config.heightMm}mm;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              padding: 2mm;
+              border: 1px solid #eee;
+              overflow: hidden;
+            }
+
+            .nombre {
+              font-size: 7px;
+              font-weight: bold;
+              text-align: center;
+              width: 100%;
+              line-height: 1;
+              margin-bottom: 1mm;
+              max-height: 4mm;
+              overflow: hidden;
+              display: -webkit-box;
+              -webkit-line-clamp: 2;
+              -webkit-box-orient: vertical;
+            }
+
+            .variante {
+              font-size: 5px;
+              color: #666;
+              text-align: center;
+              width: 100%;
+              margin-bottom: 1mm;
+              max-height: 2mm;
+              overflow: hidden;
+            }
+
+            .barcode {
+              flex-grow: 1;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              width: 100%;
+              margin: 1mm 0;
+            }
+
+            .barcode svg {
+              max-width: 100%;
+              max-height: 8mm;
+              width: auto;
+              height: auto;
+            }
+
+            .precio {
+              font-size: 11px;
+              font-weight: bold;
+              text-align: center;
+              width: 100%;
+            }
+
+            @media print {
+              body { margin: 0; padding: 0; }
+              .etiqueta { border: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="contenedor">
+            ${etiquetasHTML}
+          </div>
+        </body>
+      </html>
+    `;
   },
 
   // Generar HTML para etiquetas (versión simplificada para web)
