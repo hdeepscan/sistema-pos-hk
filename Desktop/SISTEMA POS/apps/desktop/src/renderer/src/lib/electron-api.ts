@@ -315,9 +315,15 @@ export const electronAPI = {
 
       // Obtener token del store (necesario para autenticación)
       const { useSesionStore } = await import("./store");
-      const { apiBaseUrl, token } = useSesionStore.getState();
+      const { token } = useSesionStore.getState();
 
-      const response = await fetch(`${apiBaseUrl}/api/print`, {
+      // Usar URL relativa (funciona en web y Electron)
+      const url = "/api/print";
+
+      console.log(`[PRINT-WEB] URL: ${url}`);
+      console.log(`[PRINT-WEB] Token disponible: ${!!token}`);
+
+      const response = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
