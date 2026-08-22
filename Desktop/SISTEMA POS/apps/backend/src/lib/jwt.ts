@@ -60,6 +60,7 @@ export async function registerJwt(app: FastifyInstance) {
     // Para CAJERO y BODEGA, permite personalizaciones.
     if (["ADMIN", "GERENTE", "SUPERVISOR"].includes(usuario.rol)) {
       request.user.permisos = PERMISOS_POR_ROL[usuario.rol] as Permiso[];
+      console.log(`[AUTH] Usuario ${request.user.usuarioId} (${usuario.rol}) sincronizó permisos:`, request.user.permisos);
     } else {
       request.user.permisos = (
         usuario.permisos.length > 0 ? usuario.permisos : PERMISOS_POR_ROL[usuario.rol]
