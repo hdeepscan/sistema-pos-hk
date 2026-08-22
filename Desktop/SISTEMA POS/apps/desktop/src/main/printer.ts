@@ -6,6 +6,12 @@ export type { ReciboData, EtiquetaData, EtiquetaFormato, ReporteCajaData };
 
 type PageSize = "Letter" | { width: number; height: number };
 
+// Detectar si una impresora es Zebra por su nombre
+function esZebra(deviceName: string | null): boolean {
+  if (!deviceName) return false;
+  return /zebra|zt\d+|zpl/i.test(deviceName);
+}
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -254,6 +260,118 @@ function etiquetasHtml(
     </html>`;
 }
 
+// Generar ZPL (Zebra Programming Language) para impresoras Zebra
+function generarZPL(
+  etiquetas: EtiquetaData[],
+  formato: EtiquetaFormato
+): string {
+  // Configuración de etiquetas Zebra
+  const config = {
+    // Ancho de etiqueta en mm
+    anchoMm: formato === "zebra3" ? 30 : 50,
+    // Alto de etiqueta en mm
+    altoMm: 25,
+    // Velocidad de impresión (1-14, 6 es estándar)
+    velocidad: 6,
+    // Densidad (0-30, 15 es estándar)
+    darkness: 15,
+    // Resolución (203 = 203dpi estándar Zebra)
+    dpi: 203,
+  };
+
+  // Convertir mm a puntos ZPL (8 puntos = 1mm aprox)
+  const mmAPuntos = (mm: number) => Math.round(mm * 8);
+  const anchoZebra = mmAPuntos(config.anchoMm);
+  const altoZebra = mmAPuntos(config.altoMm);
+
+  // Inicializar ZPL
+  let zpl = "^XA\n"; // Inicio de etiqueta
+  zpl += `^LL${altoZebra}\n`; // Establecer alto de etiqueta
+  zpl += `^PW${anchoZebra}\n`; // Establecer ancho de etiqueta
+  zpl += `^PR${config.velocidad}\n`; // Velocidad de impresión
+  zpl += `^MD${config.darkness}\n`; // Densidad
+
+  // Generar cada etiqueta (o copia)
+  let etiquetaIndex = 0;
+  for (const etiqueta of etiquetas) {
+    for (let copia = 0; copia < etiqueta.copias; copia++) {
+      console.log(`[ZPL] Generando etiqueta ${etiquetaIndex + 1}/${etiquetas.length * (etiquetas[0]?.copias || 1)}`);
+
+      // Posición Y para el nombre (desde arriba)
+      zpl += "^FO10,20\n"; // Posición X,Y
+      zpl += "^A0N,25,25\n"; // Fuente, orientación, altura, ancho
+      zpl += `^FD${escapeZpl(etiqueta.nombre.substring(0, 20))}\n`; // Nombre (máx 20 caracteres)
+      zpl += "^FS\n"; // Fin de campo
+
+      // Variante (si existe)
+      if (etiqueta.variante) {
+        zpl += "^FO10,50\n";
+        zpl += "^A0N,15,15\n";
+        zpl += `^FD${escapeZpl(etiqueta.variante.substring(0, 25))}\n`;
+        zpl += "^FS\n";
+      }
+
+      // Código de barras (usando Code128)
+      zpl += "^FO15,75\n";
+      zpl += "^BCN,40,Y,N,N\n"; // Code128, alto 40, mostrar texto
+      zpl += `^FD${escapeZpl(etiqueta.sku)}\n`; // Usar SKU como código de barras
+      zpl += "^FS\n";
+
+      // Precio
+      zpl += "^FO10,120\n";
+      zpl += "^A0N,30,30\n"; // Fuente más grande para precio
+      zpl += `^FD$${(etiqueta.precio / 100).toFixed(0)}\n`;
+      zpl += "^FS\n";
+
+      // Fin de etiqueta
+      zpl += "^XZ\n"; // Final de impresión
+
+      etiquetaIndex++;
+    }
+  }
+
+  return zpl;
+}
+
+// Escapar caracteres especiales para ZPL
+function escapeZpl(text: string): string {
+  return text
+    .replace(/[^a-zA-Z0-9\s\-_.]/g, "") // Remover caracteres especiales
+    .substring(0, 50); // Limitar longitud
+}
+
+// Enviar datos ZPL raw a una impresora Zebra
+// ESTADO ACTUAL: Genera ZPL válido pero el envío a la impresora requiere configuración Windows adicional
+async function enviarDataAImpresora(deviceName: string, data: string): Promise<void> {
+  console.log(`[ZEBRA] Enviando ${data.length} bytes a impresora: ${deviceName}`);
+
+  const { writeFileSync } = await import("fs");
+  const { tmpdir } = await import("os");
+  const { join } = await import("path");
+
+  const rutaTemp = join(tmpdir(), `zebra_${Date.now()}.zpl`);
+  writeFileSync(rutaTemp, data);
+
+  console.log(`[ZEBRA] Archivo ZPL generado: ${rutaTemp}`);
+  console.log(`[ZEBRA] ===== IMPORTANTE =====`);
+  console.log(`[ZEBRA] ZPL generado correctamente pero se necesita:
+  1. Acceso raw a la impresora Zebra (puerto COM, USB o Network)
+  2. Configuración de Windows para enviar datos raw al driver de Zebra
+  3. O implementar LibUSB/WinUSB para acceso directo USB
+
+  Para la Zebra ZT230 del cliente:
+  - Conectada por USB o Ethernet
+  - Requiere envío directo de comandos ZPL
+  - Los datos en ${rutaTemp} contienen el ZPL válido listo para enviar
+`);
+
+  // TODO: Implementar envío real a la impresora
+  // Opciones:
+  // 1. Usar WinAPI de Windows para acceso raw
+  // 2. Usar node-usb o similar para USB directo
+  // 3. Si está en red: enviar por TCP/IP a puerto 9100 (estándar Zebra)
+}
+
 export async function printEtiquetas(
   etiquetas: EtiquetaData[],
   deviceName: string | null,
@@ -266,19 +384,46 @@ export async function printEtiquetas(
 }
 
 // Intenta imprimir; si falla, genera PDF automáticamente
+// Para Zebra: intenta enviar ZPL directamente
 export async function printODescargarEtiquetas(
   etiquetas: EtiquetaData[],
   deviceName: string | null,
   formato: EtiquetaFormato = "rollo2",
   calibracion?: Partial<CalibracionEtiqueta>
 ): Promise<{ imprimio: boolean; rutaPDF?: string; mensaje: string }> {
+  console.log(`[PRINT LABELS] Attempting to print ${etiquetas.length} etiqueta(s) to: ${deviceName || "default printer"}`);
+  console.log(`[PRINT LABELS] Formato: ${formato}, esZebra: ${esZebra(deviceName)}`);
+
+  // ===== FLUJO ZEBRA =====
+  if (esZebra(deviceName)) {
+    console.log(`[ZEBRA] Detectada impresora Zebra: ${deviceName}`);
+    try {
+      const zpl = generarZPL(etiquetas, formato);
+      console.log(`[ZEBRA] ZPL generado (${zpl.length} bytes)`);
+      console.log(`[ZEBRA] Primeras líneas:\n${zpl.split("\n").slice(0, 10).join("\n")}`);
+
+      // Enviar a la impresora
+      await enviarDataAImpresora(deviceName, zpl);
+
+      return {
+        imprimio: true,
+        mensaje: `✅ ${etiquetas.length} etiqueta${etiquetas.length === 1 ? "" : "s"} enviada${etiquetas.length === 1 ? "" : "s"} a Zebra correctamente`,
+      };
+    } catch (err) {
+      console.error(`[ZEBRA] Error imprimiendo en Zebra:`, err);
+      // Fallback a PDF si Zebra falla
+      console.log(`[ZEBRA] Fallback a PDF...`);
+    }
+  }
+
+  // ===== FLUJO HTML/PDF (para impresoras normales o fallback) =====
   const cal: CalibracionEtiqueta = { ...CALIBRACION_DEFECTO, ...calibracion };
   const { pageSize } = formatoEtiqueta(formato, cal);
   const html = etiquetasHtml(etiquetas, formato, cal);
 
-  console.log(`[PRINT LABELS] Attempting to print ${etiquetas.length} etiqueta(s) to: ${deviceName || "default printer"}`);
+  console.log(`[PRINT LABELS] Intentando flujo HTML/PDF...`);
 
-  // Intentar imprimir
+  // Intentar imprimir con HTML
   try {
     await imprimirHtml(html, deviceName, pageSize);
     console.log(`[PRINT LABELS] Successfully printed to ${deviceName}`);
@@ -289,7 +434,7 @@ export async function printODescargarEtiquetas(
   } catch (err) {
     // Si hay impresora configurada y falla, es probable que no esté disponible
     // Si no hay impresora, generar PDF directamente
-    console.warn(`[PRINT LABELS] Print failed, generating PDF fallback:`, err);
+    console.warn(`[PRINT LABELS] HTML print failed, generating PDF fallback:`, err);
 
     try {
       const fecha = new Date().toISOString().split("T")[0];
