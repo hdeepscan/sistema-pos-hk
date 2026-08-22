@@ -987,6 +987,8 @@ function EtiquetaCard({ producto, onActualizado }: { producto: ProductoDetalle; 
       }
       const config = await electronAPI.getConfig();
       console.log(`[LABELS] Processing ${items.length} etiqueta(s)`);
+      console.log(`[LABELS] Printer configured: ${config.printerName || "NONE"}`);
+      console.log(`[LABELS] Is Electron: ${electronAPI.isElectron()}`);
 
       // Use printODescargarEtiquetas which has smart logic:
       // - If printer configured: try to print, fallback to PDF if fails
@@ -996,6 +998,8 @@ function EtiquetaCard({ producto, onActualizado }: { producto: ProductoDetalle; 
         config.printerName || null,
         formato
       );
+
+      console.log(`[LABELS] Result:`, resultado);
 
       if (resultado.imprimio) {
         setMensaje(`${items.length} etiqueta${items.length === 1 ? "" : "s"} impresa${items.length === 1 ? "" : "s"} correctamente`);
