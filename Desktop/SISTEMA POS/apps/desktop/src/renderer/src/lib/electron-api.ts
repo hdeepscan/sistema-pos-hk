@@ -369,10 +369,11 @@ export const electronAPI = {
           let x, y;
 
           if (config.gap !== undefined) {
-            // zebra3: 3 columnas con gaps
+            // zebra3: 3 columnas con gaps - CON MÚLTIPLES FILAS
             const col = idx % config.cols;
+            const fila = Math.floor(idx / config.cols);
             x = config.margin + col * (config.labelW + config.gap);
-            y = 0;
+            y = fila * config.labelH; // Calcular fila para múltiples etiquetas
           } else {
             // rollo1/rollo2
             const col = idx % config.cols;
