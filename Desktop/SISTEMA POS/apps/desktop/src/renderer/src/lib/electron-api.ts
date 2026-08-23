@@ -504,12 +504,13 @@ export const electronAPI = {
       // Espacios internos de la etiqueta (en puntos)
       const innerMargin = 8; // ~1mm
 
-      // POSICIONES VERTICALES INTERNAS (sin superposición)
-      const nameY = labelY + 8; // Nombre en la parte superior
-      const variantY = nameY + 20; // Variante debajo del nombre
-      const codeTextY = variantY + (item.variante ? 16 : 4); // Código SKU
-      const barcodeY = codeTextY + 10; // Código de barras
-      const priceY = barcodeY + 42; // Precio al final
+      // POSICIONES VERTICALES - ESPACIOS AMPLIOS (2CM ENTRE ELEMENTOS PRINCIPALES)
+      // Cada etiqueta tiene 200 puntos de alto, distribuir sin sobreposiciones
+      const nameY = labelY + 4; // Nombre en top
+      const variantY = nameY + 60; // Variante: +60 puntos de espacio (mucho más abajo)
+      const codeTextY = variantY + 40; // SKU pequeño
+      const barcodeY = codeTextY + 50; // Barcode con mucho espacio
+      const priceY = barcodeY + 50; // Precio al final
 
       // NOMBRE - Tamaño medio, bold
       zpl += `^CF0,18,12
