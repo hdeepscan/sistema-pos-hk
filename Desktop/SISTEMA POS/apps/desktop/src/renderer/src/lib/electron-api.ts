@@ -403,52 +403,76 @@ export const electronAPI = {
     }
   },
 
-  // Renderizar UNA etiqueta en el PDF
+  // Renderizar UNA etiqueta en el PDF con DISTRIBUCIÓN VERTICAL CORRECTA
   async renderizarEtiquetaEnPDF(doc: any, item: any, x: number, y: number, config: any) {
-    const margin = 0.7;
+    const margin = 0.5; // Margen horizontal y vertical
     const contentW = config.labelW - margin * 2;
+    const contentH = config.labelH - margin * 2; // Altura disponible total
 
-    // LAYOUT PROPORTIONAL para cada formato
-    // Definir altura del código de barras con quiet zone (márgenes blancos)
-    const quietZone = 0.5; // mm margen blanco arriba y abajo del código
+    // ===== TAMAÑOS DE FUENTE Y ESPACIOS PARA CADA ELEMENTO =====
+    const fontSize = {
+      nombre: config.labelH === 25 ? 7 : 8,
+      variante: config.labelH === 25 ? 5 : 6,
+      precio: config.labelH === 25 ? 7.5 : 9,
+    };
 
-    // Para etiquetas de 25mm: máx 6mm de alto (incluido quiet zone)
-    // Para etiquetas de 59.4mm (carta): máx 12mm de alto
-    const maxBarcodeHeightContent = config.labelH === 25 ? 5 : 10;
-    const barcodeHeight = maxBarcodeHeightContent; // Alto SOLO del código (sin quiet zone)
-    const barcodeHeightTotal = barcodeHeight + quietZone * 2; // Alto total con márgenes
+    // Altura aproximada de texto (línea base a línea base)
+    const lineHeights = {
+      nombre: fontSize.nombre * 0.35, // ~2.5mm para 7pt
+      variante: fontSize.variante * 0.35, // ~1.75mm para 5pt
+      precio: fontSize.precio * 0.35, // ~2.6mm para 7.5pt
+    };
+
+    // CÓDIGO DE BARRAS (tamaño FIJO, NO MODIFICAR)
+    const quietZone = 0.3; // Margen blanco alrededor código
+    const barcodeHeight = config.labelH === 25 ? 5 : 10;
+    const barcodeHeightTotal = barcodeHeight + quietZone * 2;
+
+    // ===== CÁLCULOS DE ESPACIO DISPONIBLE =====
+    const hasVariante = item.variante && item.variante.trim().length > 0;
+
+    // Altura requerida por elementos FIJOS
+    const fixedHeight = lineHeights.nombre + lineHeights.precio + barcodeHeightTotal;
+    const varianteHeight = hasVariante ? lineHeights.variante + 0.3 : 0; // +0.3 espaciado
+    const totalFixedHeight = fixedHeight + varianteHeight;
+
+    // Espacio restante para distribuir como gaps
+    const availableSpace = contentH - totalFixedHeight;
+    const gap = Math.max(0.2, availableSpace / 4); // Distribuir en 4 gaps
+
+    // ===== POSICIONAMIENTO VERTICAL =====
+    let posY = y + margin;
 
     // NOMBRE (arriba)
-    doc.setFontSize(7.5);
+    doc.setFontSize(fontSize.nombre);
     doc.setFont(undefined, "bold");
     doc.text(
-      (item.nombre || "").substring(0, 18),
+      (item.nombre || "").substring(0, 20),
       x + config.labelW / 2,
-      y + margin + 1,
+      posY,
       { align: "center", maxWidth: contentW }
     );
+    posY += lineHeights.nombre + gap;
 
     // VARIANTE (si existe)
-    let currentY = y + margin + 2.5;
-    if (item.variante) {
-      doc.setFontSize(5.5);
+    if (hasVariante) {
+      doc.setFontSize(fontSize.variante);
       doc.setFont(undefined, "normal");
       doc.text(
-        (item.variante || "").substring(0, 20),
+        (item.variante || "").substring(0, 25),
         x + config.labelW / 2,
-        currentY,
+        posY,
         { align: "center", maxWidth: contentW }
       );
-      currentY += 1.3;
+      posY += lineHeights.variante + gap;
     }
 
     // CÓDIGO DE BARRAS - USAR SVG REAL si existe
-    currentY += 0.2;
-    const quietZoneY = currentY;
-    const barcodeY = quietZoneY + quietZone;
+    const barcodeY = posY + quietZone;
+    posY += barcodeHeightTotal + gap;
 
     if (item.svgCodigoBarras) {
-      // Usar SVG real del código de barras
+      // Usar SVG real del código de barras (MANTENER TAMAÑO EXACTO)
       await this.renderizarSVGEnPDF(
         doc,
         item.svgCodigoBarras,
@@ -459,7 +483,7 @@ export const electronAPI = {
       );
     } else {
       // Fallback: usar SKU como texto si no hay SVG
-      doc.setFontSize(6);
+      doc.setFontSize(5);
       doc.setFont(undefined, "normal");
       doc.text(
         item.sku || item.id || "---",
@@ -469,13 +493,14 @@ export const electronAPI = {
       );
     }
 
-    // PRECIO (abajo)
-    doc.setFontSize(8.5);
+    // PRECIO (abajo - posición ABSOLUTA para garantizar que siempre esté al final)
+    doc.setFontSize(fontSize.precio);
     doc.setFont(undefined, "bold");
+    const priceY = y + config.labelH - margin - lineHeights.precio;
     doc.text(
       `$${(item.precio || 0).toLocaleString("es-CO")}`,
       x + config.labelW / 2,
-      y + config.labelH - margin - 0.2,
+      priceY,
       { align: "center", maxWidth: contentW }
     );
   },
