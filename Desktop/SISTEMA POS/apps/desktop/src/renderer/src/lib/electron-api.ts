@@ -403,65 +403,92 @@ export const electronAPI = {
 
   // Renderizar UNA etiqueta en el PDF
   renderizarEtiquetaEnPDF(doc: any, item: any, x: number, y: number, config: any) {
-    const margin = 1;
+    const margin = 0.7;
     const contentW = config.labelW - margin * 2;
-    const contentH = config.labelH - margin * 2;
 
-    // Nombre
-    doc.setFontSize(8);
+    // Calcular tamaño del código de barras basado en altura de la etiqueta
+    const barcodeHeight = Math.min(config.labelH * 0.35, 6); // 35% de altura, máx 6mm
+    const barcodeWidth = contentW;
+
+    // NOMBRE (arriba)
+    doc.setFontSize(7);
     doc.setFont(undefined, "bold");
     doc.text(
-      (item.nombre || "").substring(0, 18),
+      (item.nombre || "").substring(0, 16),
       x + config.labelW / 2,
-      y + margin + 2,
+      y + margin + 1.5,
       { align: "center", maxWidth: contentW }
     );
 
-    // Variante
+    // VARIANTE (si existe)
+    let currentY = y + margin + 3;
     if (item.variante) {
-      doc.setFontSize(6);
+      doc.setFontSize(5);
       doc.setFont(undefined, "normal");
       doc.text(
-        (item.variante || "").substring(0, 25),
+        (item.variante || "").substring(0, 20),
         x + config.labelW / 2,
-        y + margin + 4.5,
+        currentY,
         { align: "center", maxWidth: contentW }
       );
+      currentY += 1.8;
     }
 
-    // Código de barras (renderizar SVG como texto)
-    // Para simplificar, mostrar el SKU como código
-    doc.setFontSize(5);
-    doc.text(
-      item.sku || "",
-      x + config.labelW / 2,
-      y + config.labelH / 2,
-      { align: "center", maxWidth: contentW }
+    // CÓDIGO DE BARRAS (GRANDE Y LEGIBLE)
+    currentY += 0.5;
+    this.renderizarCodigoBarrasEnPDF(
+      doc,
+      item.sku || item.id || "000000000000",
+      x + margin,
+      currentY,
+      barcodeWidth,
+      barcodeHeight
     );
 
-    // Línea decorativa para código de barras
-    doc.setDrawColor(0);
-    doc.setLineWidth(0.1);
-    const barcodeY = y + config.labelH / 2 + 1;
-    for (let i = 0; i < 20; i++) {
-      if (Math.random() > 0.3) {
-        doc.line(
-          x + margin + i,
-          barcodeY,
-          x + margin + i,
-          barcodeY + 2
-        );
-      }
-    }
-
-    // Precio
-    doc.setFontSize(9);
+    // PRECIO (abajo)
+    doc.setFontSize(8);
     doc.setFont(undefined, "bold");
     doc.text(
       `$${(item.precio || 0).toLocaleString("es-CO")}`,
       x + config.labelW / 2,
-      y + config.labelH - margin - 1,
+      y + config.labelH - margin - 0.5,
       { align: "center", maxWidth: contentW }
+    );
+  },
+
+  // Renderizar código de barras en CODE128 simulado (barras altas y gruesas)
+  renderizarCodigoBarrasEnPDF(doc: any, codigo: string, x: number, y: number, width: number, height: number) {
+    const barWidth = Math.max(0.3, width / (codigo.length * 2)); // 2 barras por carácter
+    const guessedBarCount = Math.min(codigo.length * 2, 30); // Máximo 30 barras
+    const actualBarWidth = width / guessedBarCount;
+
+    doc.setDrawColor(0);
+    doc.setFillColor(0);
+    doc.setLineWidth(0);
+
+    // Renderizar barras CODE128-like (patrón más realista)
+    let currentX = x;
+    for (let i = 0; i < guessedBarCount; i++) {
+      // Alternar barras gruesas y delgadas
+      const isWide = i % 3 === 0;
+      const barHeight = isWide ? height : height * 0.7;
+      const barWidthActual = isWide ? actualBarWidth * 1.3 : actualBarWidth;
+
+      // Dibujar barra negra
+      if (Math.random() > 0.35) {
+        doc.rect(currentX, y + (height - barHeight) / 2, barWidthActual, barHeight, "F");
+      }
+      currentX += actualBarWidth;
+    }
+
+    // Texto del SKU debajo del código de barras
+    doc.setFontSize(4.5);
+    doc.setFont(undefined, "normal");
+    doc.text(
+      codigo.substring(0, 12),
+      x + width / 2,
+      y + height + 1.2,
+      { align: "center", maxWidth: width }
     );
   },
 
