@@ -478,55 +478,74 @@ export const electronAPI = {
     }
   },
 
-  // Generar script ZPL completo
+  // Generar script ZPL completo - CORREGIDO SIN SUPERPOSICIONES
   generarZPLScript(items: any, labelW: number, labelH: number, cols: number, gap: number, margin: number) {
-    const DPI = 203; // 203 dpi estándar ZT230
     const PUNTOS_POR_MM = 8; // 203 dpi = 8 puntos por mm
 
     // Convertir mm a puntos
     const labelWPuntos = Math.round(labelW * PUNTOS_POR_MM);
     const labelHPuntos = Math.round(labelH * PUNTOS_POR_MM);
+    const marginPuntos = Math.round(margin * PUNTOS_POR_MM);
 
-    let zpl = "";
+    let zpl = `^XA
+^MNW
+^LL${labelHPuntos}
+^LS0
+`;
 
     items.forEach((item: any, idx: number) => {
       const col = idx % cols;
       const fila = Math.floor(idx / cols);
-      const xMM = margin + col * (labelW + gap);
-      const yMM = fila * labelH;
 
-      const xPuntos = Math.round(xMM * PUNTOS_POR_MM);
-      const yPuntos = Math.round(yMM * PUNTOS_POR_MM);
+      // Posición de la esquina superior izquierda de la etiqueta
+      const labelX = Math.round((margin + col * (labelW + gap)) * PUNTOS_POR_MM);
+      const labelY = Math.round(fila * labelH * PUNTOS_POR_MM);
 
-      // Generar ZPL para esta etiqueta
-      zpl += `
-^XA
-^LL${labelHPuntos}
-^PoY,${xPuntos}
-^PW${labelWPuntos}
+      // Espacios internos de la etiqueta (en puntos)
+      const innerMargin = 8; // ~1mm
 
-^CF0,20,12
-^FO15,10
+      // POSICIONES VERTICALES INTERNAS (sin superposición)
+      const nameY = labelY + 8; // Nombre en la parte superior
+      const variantY = nameY + 20; // Variante debajo del nombre
+      const codeTextY = variantY + (item.variante ? 16 : 4); // Código SKU
+      const barcodeY = codeTextY + 10; // Código de barras
+      const priceY = barcodeY + 42; // Precio al final
+
+      // NOMBRE - Tamaño medio, bold
+      zpl += `^CF0,18,12
+^FO${labelX + innerMargin},${nameY}
 ^FD${item.nombre}^FS
+`;
 
-${item.variante ? `^CF0,14,10\n^FO15,40\n^FD${item.variante}^FS\n` : ""}
+      // VARIANTE - Tamaño pequeño, si existe
+      if (item.variante) {
+        zpl += `^CF0,12,8
+^FO${labelX + innerMargin},${variantY}
+^FD${item.variante}^FS
+`;
+      }
 
-^CF0,16,10
-^FO15,${item.variante ? "60" : "50"}
+      // SKU - Código muy pequeño
+      zpl += `^CF0,10,8
+^FO${labelX + innerMargin},${codeTextY}
 ^FD${item.sku}^FS
+`;
 
-^BY2,3,50
+      // CÓDIGO DE BARRAS - CODE128 con altura fija
+      zpl += `^BY2,3,40
 ^BCN,40,Y,N,N
-^FO15,${item.variante ? "85" : "75"}
+^FO${labelX + innerMargin},${barcodeY}
 ^FD${item.sku}^FS
+`;
 
-^CF0,24,14
-^FO15,${item.variante ? "135" : "125"}
+      // PRECIO - Tamaño grande, bold
+      zpl += `^CF0,22,14
+^FO${labelX + innerMargin},${priceY}
 ^FD$${(item.precio || 0).toLocaleString("es-CO")}^FS
-
-^XZ
 `;
     });
+
+    zpl += `^XZ`;
 
     return zpl;
   },
