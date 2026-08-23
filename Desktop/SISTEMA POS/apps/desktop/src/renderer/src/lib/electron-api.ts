@@ -434,7 +434,9 @@ export const electronAPI = {
     const priceGap = 0.3; // Entre código y precio
 
     // ===== POSICIONAMIENTO VERTICAL COMPACTO =====
-    let posY = y + margin;
+    // Dejar margen superior más generoso para evitar recortes
+    const topMargin = config.labelH === 25 ? 1.2 : 1.5; // Más espacio arriba
+    let posY = y + topMargin;
 
     // NOMBRE (arriba)
     doc.setFontSize(fontSize.nombre);
