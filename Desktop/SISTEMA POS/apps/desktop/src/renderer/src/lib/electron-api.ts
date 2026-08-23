@@ -344,7 +344,8 @@ export const electronAPI = {
         const filasPerPagina = 5; // 297mm / 59.4mm ≈ 5 filas
         const totalEtiquetasPerPagina = etiquetasPerFila * filasPerPagina;
 
-        etiquetas.forEach((item, idx) => {
+        for (let idx = 0; idx < etiquetas.length; idx++) {
+          const item = etiquetas[idx];
           if (etiquetaEnPagina > 0 && etiquetaEnPagina % totalEtiquetasPerPagina === 0) {
             doc.addPage();
             pageNum++;
@@ -358,12 +359,13 @@ export const electronAPI = {
           const x = col * 52.5; // 210 / 4
           const y = fila * 59.4; // 297 / 5
 
-          this.renderizarEtiquetaEnPDF(doc, item, x, y, config);
+          await this.renderizarEtiquetaEnPDF(doc, item, x, y, config);
           etiquetaEnPagina++;
-        });
+        }
       } else {
         // Para rollo (todos en una página)
-        etiquetas.forEach((item, idx) => {
+        for (let idx = 0; idx < etiquetas.length; idx++) {
+          const item = etiquetas[idx];
           let x, y;
 
           if (config.gap !== undefined) {
@@ -379,8 +381,8 @@ export const electronAPI = {
             y = fila * config.labelH;
           }
 
-          this.renderizarEtiquetaEnPDF(doc, item, x, y, config);
-        });
+          await this.renderizarEtiquetaEnPDF(doc, item, x, y, config);
+        }
       }
 
       // Descargar
@@ -402,15 +404,19 @@ export const electronAPI = {
   },
 
   // Renderizar UNA etiqueta en el PDF
-  renderizarEtiquetaEnPDF(doc: any, item: any, x: number, y: number, config: any) {
+  async renderizarEtiquetaEnPDF(doc: any, item: any, x: number, y: number, config: any) {
     const margin = 0.7;
     const contentW = config.labelW - margin * 2;
 
-    // Tamaño del código de barras: balanceado entre legibilidad y espacio
-    // Para rollo/zebra3 (25mm): ~4-5mm de alto
-    // Para carta (59.4mm): ~10mm de alto
-    const barcodeHeight = config.labelH === 25 ? 4.5 : Math.min(config.labelH * 0.18, 10);
-    const barcodeWidth = contentW;
+    // LAYOUT PROPORTIONAL para cada formato
+    // Definir altura del código de barras con quiet zone (márgenes blancos)
+    const quietZone = 0.5; // mm margen blanco arriba y abajo del código
+
+    // Para etiquetas de 25mm: máx 6mm de alto (incluido quiet zone)
+    // Para etiquetas de 59.4mm (carta): máx 12mm de alto
+    const maxBarcodeHeightContent = config.labelH === 25 ? 5 : 10;
+    const barcodeHeight = maxBarcodeHeightContent; // Alto SOLO del código (sin quiet zone)
+    const barcodeHeightTotal = barcodeHeight + quietZone * 2; // Alto total con márgenes
 
     // NOMBRE (arriba)
     doc.setFontSize(7.5);
@@ -418,12 +424,12 @@ export const electronAPI = {
     doc.text(
       (item.nombre || "").substring(0, 18),
       x + config.labelW / 2,
-      y + margin + 1.2,
+      y + margin + 1,
       { align: "center", maxWidth: contentW }
     );
 
     // VARIANTE (si existe)
-    let currentY = y + margin + 2.8;
+    let currentY = y + margin + 2.5;
     if (item.variante) {
       doc.setFontSize(5.5);
       doc.setFont(undefined, "normal");
@@ -433,19 +439,35 @@ export const electronAPI = {
         currentY,
         { align: "center", maxWidth: contentW }
       );
-      currentY += 1.5;
+      currentY += 1.3;
     }
 
-    // CÓDIGO DE BARRAS (LEGIBLE PERO BALANCEADO)
-    currentY += 0.3;
-    this.renderizarCodigoBarrasEnPDF(
-      doc,
-      item.sku || item.id || "000000000000",
-      x + margin,
-      currentY,
-      barcodeWidth,
-      barcodeHeight
-    );
+    // CÓDIGO DE BARRAS - USAR SVG REAL si existe
+    currentY += 0.2;
+    const quietZoneY = currentY;
+    const barcodeY = quietZoneY + quietZone;
+
+    if (item.svgCodigoBarras) {
+      // Usar SVG real del código de barras
+      await this.renderizarSVGEnPDF(
+        doc,
+        item.svgCodigoBarras,
+        x + margin,
+        barcodeY,
+        contentW,
+        barcodeHeight
+      );
+    } else {
+      // Fallback: usar SKU como texto si no hay SVG
+      doc.setFontSize(6);
+      doc.setFont(undefined, "normal");
+      doc.text(
+        item.sku || item.id || "---",
+        x + config.labelW / 2,
+        barcodeY + barcodeHeight / 2,
+        { align: "center", maxWidth: contentW }
+      );
+    }
 
     // PRECIO (abajo)
     doc.setFontSize(8.5);
@@ -453,45 +475,50 @@ export const electronAPI = {
     doc.text(
       `$${(item.precio || 0).toLocaleString("es-CO")}`,
       x + config.labelW / 2,
-      y + config.labelH - margin - 0.3,
+      y + config.labelH - margin - 0.2,
       { align: "center", maxWidth: contentW }
     );
   },
 
-  // Renderizar código de barras en CODE128 simulado (barras altas y gruesas)
-  renderizarCodigoBarrasEnPDF(doc: any, codigo: string, x: number, y: number, width: number, height: number) {
-    const barWidth = Math.max(0.3, width / (codigo.length * 2)); // 2 barras por carácter
-    const guessedBarCount = Math.min(codigo.length * 2, 30); // Máximo 30 barras
-    const actualBarWidth = width / guessedBarCount;
+  // Renderizar SVG del código de barras en el PDF
+  async renderizarSVGEnPDF(doc: any, svgString: string, x: number, y: number, width: number, height: number) {
+    try {
+      // Crear contenedor temporal para SVG
+      const svgContainer = document.createElement("div");
+      svgContainer.innerHTML = svgString;
+      svgContainer.style.position = "absolute";
+      svgContainer.style.left = "-9999px";
+      svgContainer.style.width = `${width}mm`;
+      svgContainer.style.height = `${height}mm`;
+      svgContainer.style.display = "flex";
+      svgContainer.style.alignItems = "center";
+      svgContainer.style.justifyContent = "center";
+      svgContainer.style.background = "white";
 
-    doc.setDrawColor(0);
-    doc.setFillColor(0);
-    doc.setLineWidth(0);
+      document.body.appendChild(svgContainer);
 
-    // Renderizar barras CODE128-like (patrón más realista)
-    let currentX = x;
-    for (let i = 0; i < guessedBarCount; i++) {
-      // Alternar barras gruesas y delgadas
-      const isWide = i % 3 === 0;
-      const barHeight = isWide ? height : height * 0.7;
-      const barWidthActual = isWide ? actualBarWidth * 1.3 : actualBarWidth;
+      try {
+        // Renderizar SVG a canvas con resolución alta
+        const canvas = await html2canvas(svgContainer, {
+          scale: 3, // Alta resolución para código de barras
+          backgroundColor: "#ffffff",
+          useCORS: true,
+          windowWidth: width * 3.78, // mm a píxeles (96 dpi)
+          windowHeight: height * 3.78,
+        });
 
-      // Dibujar barra negra
-      if (Math.random() > 0.35) {
-        doc.rect(currentX, y + (height - barHeight) / 2, barWidthActual, barHeight, "F");
+        // Convertir canvas a imagen PNG
+        const imgData = canvas.toDataURL("image/png");
+
+        // Agregar imagen al PDF con tamaño exacto
+        doc.addImage(imgData, "PNG", x, y, width, height);
+      } finally {
+        document.body.removeChild(svgContainer);
       }
-      currentX += actualBarWidth;
+    } catch (err) {
+      console.error("[PDF-BARCODE] Error renderizando SVG:", err);
+      // Silently fail - fallback al texto ocurre en renderizarEtiquetaEnPDF
     }
-
-    // Texto del SKU debajo del código de barras
-    doc.setFontSize(4.5);
-    doc.setFont(undefined, "normal");
-    doc.text(
-      codigo.substring(0, 12),
-      x + width / 2,
-      y + height + 1.2,
-      { align: "center", maxWidth: width }
-    );
   },
 
   // Generar HTML para etiquetas (versión simplificada para web)
