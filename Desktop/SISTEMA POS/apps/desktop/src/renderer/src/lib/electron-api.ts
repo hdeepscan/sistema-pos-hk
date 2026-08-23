@@ -301,8 +301,20 @@ export const electronAPI = {
 
   async printODescargarEtiquetas(items: any, printer: string | null, formato: string) {
     if (!this.isElectron()) {
-      // En web: generar PDF para descargar
-      return this.descargarEtiquetasPDF(items, formato);
+      // En web: generar PDF y ZPL (si es zebra3)
+      const pdfResult = await this.descargarEtiquetasPDF(items, formato);
+
+      // Si es zebra3, generar también ZPL
+      if (formato === "zebra3") {
+        await new Promise(resolve => setTimeout(resolve, 500)); // Pequeño delay para no sobrecargar
+        const zplResult = await this.descargarZPLEtiquetas(items, formato);
+        return {
+          imprimio: false,
+          mensaje: `✅ PDF + ZPL descargados:\n- PDF: Para web/navegador\n- ZPL: Para Zebra ZT230 + ZebraDesigner`,
+        };
+      }
+
+      return pdfResult;
     }
     return await (window as any).pos.printODescargarEtiquetas(items, printer, formato);
   },
@@ -402,6 +414,121 @@ export const electronAPI = {
         mensaje: `❌ Error: ${err}`,
       };
     }
+  },
+
+  // Generar y descargar ZPL de etiquetas (SOLO para zebra3 - Zebra ZT230)
+  async descargarZPLEtiquetas(items: any, formato: string) {
+    try {
+      if (formato !== "zebra3") {
+        return {
+          imprimio: false,
+          mensaje: `❌ ZPL solo disponible para formato zebra3`,
+        };
+      }
+
+      console.log(`[ZPL] Generando ZPL: ${formato} con ${items.length} etiqueta(s)`);
+
+      // Configuración para zebra3: 32x25mm, 3 columnas
+      const labelW = 32; // mm
+      const labelH = 25; // mm
+      const cols = 3;
+      const gap = 2.5; // mm entre etiquetas
+      const margin = 2.5; // mm margen lateral
+
+      // Resolver SVG a texto si es necesario (fallback a SKU)
+      const etiquetasConSKU = items.flatMap((item: any) =>
+        Array.from({ length: item.copias || 1 }, () => ({
+          ...item,
+          sku: item.sku || item.id || "NOSKU",
+          nombre: (item.nombre || "").substring(0, 20),
+          variante: (item.variante || "").substring(0, 20),
+          precio: item.precio || 0,
+        }))
+      );
+
+      // Generar ZPL
+      let zpl = this.generarZPLScript(etiquetasConSKU, labelW, labelH, cols, gap, margin);
+
+      // Descargar como archivo .zpl
+      const fecha = new Date().toISOString().slice(0, 10);
+      const hora = new Date().toTimeString().slice(0, 5);
+      const nombreArchivo = `etiquetas-${formato}-${fecha}-${hora}.zpl`;
+
+      const blob = new Blob([zpl], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = nombreArchivo;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      console.log(`[ZPL] Descargado: ${nombreArchivo}`);
+      return {
+        imprimio: false,
+        mensaje: `✅ ZPL descargado: ${items.length} etiqueta${items.length === 1 ? "" : "s"} - Abre en ZebraDesigner`,
+      };
+    } catch (err) {
+      console.error("[ZPL] Error:", err);
+      return {
+        imprimio: false,
+        mensaje: `❌ Error generando ZPL: ${err}`,
+      };
+    }
+  },
+
+  // Generar script ZPL completo
+  generarZPLScript(items: any, labelW: number, labelH: number, cols: number, gap: number, margin: number) {
+    const DPI = 203; // 203 dpi estándar ZT230
+    const PUNTOS_POR_MM = 8; // 203 dpi = 8 puntos por mm
+
+    // Convertir mm a puntos
+    const labelWPuntos = Math.round(labelW * PUNTOS_POR_MM);
+    const labelHPuntos = Math.round(labelH * PUNTOS_POR_MM);
+
+    let zpl = "";
+
+    items.forEach((item: any, idx: number) => {
+      const col = idx % cols;
+      const fila = Math.floor(idx / cols);
+      const xMM = margin + col * (labelW + gap);
+      const yMM = fila * labelH;
+
+      const xPuntos = Math.round(xMM * PUNTOS_POR_MM);
+      const yPuntos = Math.round(yMM * PUNTOS_POR_MM);
+
+      // Generar ZPL para esta etiqueta
+      zpl += `
+^XA
+^LL${labelHPuntos}
+^PoY,${xPuntos}
+^PW${labelWPuntos}
+
+^CF0,20,12
+^FO15,10
+^FD${item.nombre}^FS
+
+${item.variante ? `^CF0,14,10\n^FO15,40\n^FD${item.variante}^FS\n` : ""}
+
+^CF0,16,10
+^FO15,${item.variante ? "60" : "50"}
+^FD${item.sku}^FS
+
+^BY2,3,50
+^BCN,40,Y,N,N
+^FO15,${item.variante ? "85" : "75"}
+^FD${item.sku}^FS
+
+^CF0,24,14
+^FO15,${item.variante ? "135" : "125"}
+^FD$${(item.precio || 0).toLocaleString("es-CO")}^FS
+
+^XZ
+`;
+    });
+
+    return zpl;
   },
 
   // Renderizar UNA etiqueta en el PDF con DISTRIBUCIÓN VERTICAL COMPACTA
