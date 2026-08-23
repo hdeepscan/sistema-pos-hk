@@ -435,7 +435,7 @@ export const electronAPI = {
 
     // ===== POSICIONAMIENTO VERTICAL COMPACTO =====
     // Dejar margen superior más generoso para evitar recortes
-    const topMargin = config.labelH === 25 ? 1.2 : 1.5; // Más espacio arriba
+    const topMargin = config.labelH === 25 ? 3.2 : 3.5; // Baja más el contenido
     let posY = y + topMargin;
 
     // NOMBRE (arriba)
