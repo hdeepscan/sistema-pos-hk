@@ -430,7 +430,7 @@ export const electronAPI = {
     // ===== ESPACIADOS FIJOS (NO VARIABLES) =====
     // Usar espaciados mínimos consistentes en lugar de distribuir todo el espacio
     const smallGap = 0.25; // Entre nombre y variante
-    const mediumGap = 0.35; // Entre variante/nombre y código
+    const mediumGap = 1.85; // Entre variante/nombre y código (aumentado +1.5mm para bajar código)
     const priceGap = 0.3; // Entre código y precio
 
     // ===== POSICIONAMIENTO VERTICAL COMPACTO =====
