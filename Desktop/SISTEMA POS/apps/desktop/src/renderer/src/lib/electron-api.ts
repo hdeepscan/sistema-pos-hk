@@ -403,11 +403,10 @@ export const electronAPI = {
     }
   },
 
-  // Renderizar UNA etiqueta en el PDF con DISTRIBUCIÓN VERTICAL CORRECTA
+  // Renderizar UNA etiqueta en el PDF con DISTRIBUCIÓN VERTICAL COMPACTA
   async renderizarEtiquetaEnPDF(doc: any, item: any, x: number, y: number, config: any) {
     const margin = 0.5; // Margen horizontal y vertical
     const contentW = config.labelW - margin * 2;
-    const contentH = config.labelH - margin * 2; // Altura disponible total
 
     // ===== TAMAÑOS DE FUENTE Y ESPACIOS PARA CADA ELEMENTO =====
     const fontSize = {
@@ -418,58 +417,56 @@ export const electronAPI = {
 
     // Altura aproximada de texto (línea base a línea base)
     const lineHeights = {
-      nombre: fontSize.nombre * 0.35, // ~2.5mm para 7pt
-      variante: fontSize.variante * 0.35, // ~1.75mm para 5pt
-      precio: fontSize.precio * 0.35, // ~2.6mm para 7.5pt
+      nombre: fontSize.nombre * 0.32, // Reducido para ser más compacto
+      variante: fontSize.variante * 0.32,
+      precio: fontSize.precio * 0.32,
     };
 
     // CÓDIGO DE BARRAS (tamaño FIJO, NO MODIFICAR)
-    const quietZone = 0.3; // Margen blanco alrededor código
+    const quietZone = 0.2; // Margen blanco mínimo alrededor código
     const barcodeHeight = config.labelH === 25 ? 5 : 10;
     const barcodeHeightTotal = barcodeHeight + quietZone * 2;
 
-    // ===== CÁLCULOS DE ESPACIO DISPONIBLE =====
-    const hasVariante = item.variante && item.variante.trim().length > 0;
+    // ===== ESPACIADOS FIJOS (NO VARIABLES) =====
+    // Usar espaciados mínimos consistentes en lugar de distribuir todo el espacio
+    const smallGap = 0.25; // Entre nombre y variante
+    const mediumGap = 0.35; // Entre variante/nombre y código
+    const priceGap = 0.3; // Entre código y precio
 
-    // Altura requerida por elementos FIJOS
-    const fixedHeight = lineHeights.nombre + lineHeights.precio + barcodeHeightTotal;
-    const varianteHeight = hasVariante ? lineHeights.variante + 0.3 : 0; // +0.3 espaciado
-    const totalFixedHeight = fixedHeight + varianteHeight;
-
-    // Espacio restante para distribuir como gaps
-    const availableSpace = contentH - totalFixedHeight;
-    const gap = Math.max(0.2, availableSpace / 4); // Distribuir en 4 gaps
-
-    // ===== POSICIONAMIENTO VERTICAL =====
+    // ===== POSICIONAMIENTO VERTICAL COMPACTO =====
     let posY = y + margin;
 
     // NOMBRE (arriba)
     doc.setFontSize(fontSize.nombre);
     doc.setFont(undefined, "bold");
     doc.text(
-      (item.nombre || "").substring(0, 20),
+      (item.nombre || "").substring(0, 22),
       x + config.labelW / 2,
       posY,
       { align: "center", maxWidth: contentW }
     );
-    posY += lineHeights.nombre + gap;
+    posY += lineHeights.nombre + smallGap;
 
     // VARIANTE (si existe)
+    const hasVariante = item.variante && item.variante.trim().length > 0;
     if (hasVariante) {
       doc.setFontSize(fontSize.variante);
       doc.setFont(undefined, "normal");
       doc.text(
-        (item.variante || "").substring(0, 25),
+        (item.variante || "").substring(0, 28),
         x + config.labelW / 2,
         posY,
         { align: "center", maxWidth: contentW }
       );
-      posY += lineHeights.variante + gap;
+      posY += lineHeights.variante + mediumGap;
+    } else {
+      // Si no hay variante, usar más espacio antes del código
+      posY += mediumGap;
     }
 
     // CÓDIGO DE BARRAS - USAR SVG REAL si existe
     const barcodeY = posY + quietZone;
-    posY += barcodeHeightTotal + gap;
+    posY += barcodeHeightTotal + priceGap;
 
     if (item.svgCodigoBarras) {
       // Usar SVG real del código de barras (MANTENER TAMAÑO EXACTO)
@@ -493,10 +490,10 @@ export const electronAPI = {
       );
     }
 
-    // PRECIO (abajo - posición ABSOLUTA para garantizar que siempre esté al final)
+    // PRECIO (abajo - posición ABSOLUTA para garantizar que siempre esté visible)
     doc.setFontSize(fontSize.precio);
     doc.setFont(undefined, "bold");
-    const priceY = y + config.labelH - margin - lineHeights.precio;
+    const priceY = y + config.labelH - margin - lineHeights.precio * 0.5;
     doc.text(
       `$${(item.precio || 0).toLocaleString("es-CO")}`,
       x + config.labelW / 2,
