@@ -504,13 +504,13 @@ export const electronAPI = {
       // Espacios internos de la etiqueta (en puntos)
       const innerMargin = 8; // ~1mm
 
-      // POSICIONES VERTICALES - BAJAR VARIANTE Y CÓDIGO 2CM
-      // Nombre mantiene su posición, variante y código bajan 2cm (160 puntos)
+      // POSICIONES VERTICALES - BAJAR VARIANTE Y CÓDIGO (manteniendo TODO visible)
+      // Etiqueta = 200 puntos, distribuir inteligentemente para bajar elementos
       const nameY = labelY + 4; // Nombre en top (SIN CAMBIOS)
-      const variantY = nameY + 60 + 160; // Variante: baja 2cm (160 puntos) más
-      const codeTextY = variantY + 40; // SKU pequeño
-      const barcodeY = codeTextY + 50 + 160; // Barcode: baja 2cm (160 puntos) más
-      const priceY = barcodeY + 50; // Precio al final
+      const variantY = nameY + 50; // Variante: baja más que antes
+      const codeTextY = variantY + 45; // SKU pequeño
+      const barcodeY = codeTextY + 45; // Barcode más abajo pero VISIBLE
+      const priceY = barcodeY + 52; // Precio al final
 
       // NOMBRE - Tamaño medio, bold
       zpl += `^CF0,18,12
@@ -576,9 +576,9 @@ export const electronAPI = {
     const barcodeHeightTotal = barcodeHeight + quietZone * 2;
 
     // ===== ESPACIADOS FIJOS (NO VARIABLES) =====
-    // Usar espaciados mínimos consistentes en lugar de distribuir todo el espacio
-    const smallGap = 20.25; // Entre nombre y variante (+2cm hacia abajo)
-    const mediumGap = 21.85; // Entre variante y código (+2cm hacia abajo)
+    // Bajar elementos pero manteniéndolos VISIBLES en la etiqueta (25mm = 200 puntos)
+    const smallGap = 6.2; // Entre nombre y variante (espaciado mayor)
+    const mediumGap = 5.6; // Entre variante y código (espaciado mayor)
     const priceGap = 0.3; // Entre código y precio
 
     // ===== POSICIONAMIENTO VERTICAL COMPACTO =====
