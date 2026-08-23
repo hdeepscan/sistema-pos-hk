@@ -504,12 +504,12 @@ export const electronAPI = {
       // Espacios internos de la etiqueta (en puntos)
       const innerMargin = 8; // ~1mm
 
-      // POSICIONES VERTICALES - ESPACIOS AMPLIOS (2CM ENTRE ELEMENTOS PRINCIPALES)
-      // Cada etiqueta tiene 200 puntos de alto, distribuir sin sobreposiciones
-      const nameY = labelY + 4; // Nombre en top
-      const variantY = nameY + 60; // Variante: +60 puntos de espacio (mucho más abajo)
+      // POSICIONES VERTICALES - BAJAR VARIANTE Y CÓDIGO 2CM
+      // Nombre mantiene su posición, variante y código bajan 2cm (160 puntos)
+      const nameY = labelY + 4; // Nombre en top (SIN CAMBIOS)
+      const variantY = nameY + 60 + 160; // Variante: baja 2cm (160 puntos) más
       const codeTextY = variantY + 40; // SKU pequeño
-      const barcodeY = codeTextY + 50; // Barcode con mucho espacio
+      const barcodeY = codeTextY + 50 + 160; // Barcode: baja 2cm (160 puntos) más
       const priceY = barcodeY + 50; // Precio al final
 
       // NOMBRE - Tamaño medio, bold
@@ -577,8 +577,8 @@ export const electronAPI = {
 
     // ===== ESPACIADOS FIJOS (NO VARIABLES) =====
     // Usar espaciados mínimos consistentes en lugar de distribuir todo el espacio
-    const smallGap = 0.25; // Entre nombre y variante
-    const mediumGap = 1.85; // Entre variante/nombre y código (aumentado +1.5mm para bajar código)
+    const smallGap = 20.25; // Entre nombre y variante (+2cm hacia abajo)
+    const mediumGap = 21.85; // Entre variante y código (+2cm hacia abajo)
     const priceGap = 0.3; // Entre código y precio
 
     // ===== POSICIONAMIENTO VERTICAL COMPACTO =====
