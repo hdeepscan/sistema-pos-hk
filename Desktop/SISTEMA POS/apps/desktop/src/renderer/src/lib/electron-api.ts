@@ -406,24 +406,26 @@ export const electronAPI = {
     const margin = 0.7;
     const contentW = config.labelW - margin * 2;
 
-    // Calcular tamaño del código de barras basado en altura de la etiqueta
-    const barcodeHeight = Math.min(config.labelH * 0.35, 6); // 35% de altura, máx 6mm
+    // Tamaño del código de barras: balanceado entre legibilidad y espacio
+    // Para rollo/zebra3 (25mm): ~4-5mm de alto
+    // Para carta (59.4mm): ~10mm de alto
+    const barcodeHeight = config.labelH === 25 ? 4.5 : Math.min(config.labelH * 0.18, 10);
     const barcodeWidth = contentW;
 
     // NOMBRE (arriba)
-    doc.setFontSize(7);
+    doc.setFontSize(7.5);
     doc.setFont(undefined, "bold");
     doc.text(
-      (item.nombre || "").substring(0, 16),
+      (item.nombre || "").substring(0, 18),
       x + config.labelW / 2,
-      y + margin + 1.5,
+      y + margin + 1.2,
       { align: "center", maxWidth: contentW }
     );
 
     // VARIANTE (si existe)
-    let currentY = y + margin + 3;
+    let currentY = y + margin + 2.8;
     if (item.variante) {
-      doc.setFontSize(5);
+      doc.setFontSize(5.5);
       doc.setFont(undefined, "normal");
       doc.text(
         (item.variante || "").substring(0, 20),
@@ -431,11 +433,11 @@ export const electronAPI = {
         currentY,
         { align: "center", maxWidth: contentW }
       );
-      currentY += 1.8;
+      currentY += 1.5;
     }
 
-    // CÓDIGO DE BARRAS (GRANDE Y LEGIBLE)
-    currentY += 0.5;
+    // CÓDIGO DE BARRAS (LEGIBLE PERO BALANCEADO)
+    currentY += 0.3;
     this.renderizarCodigoBarrasEnPDF(
       doc,
       item.sku || item.id || "000000000000",
@@ -446,12 +448,12 @@ export const electronAPI = {
     );
 
     // PRECIO (abajo)
-    doc.setFontSize(8);
+    doc.setFontSize(8.5);
     doc.setFont(undefined, "bold");
     doc.text(
       `$${(item.precio || 0).toLocaleString("es-CO")}`,
       x + config.labelW / 2,
-      y + config.labelH - margin - 0.5,
+      y + config.labelH - margin - 0.3,
       { align: "center", maxWidth: contentW }
     );
   },
