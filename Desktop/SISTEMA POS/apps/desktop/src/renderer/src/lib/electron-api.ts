@@ -504,27 +504,28 @@ export const electronAPI = {
       // Espacios internos de la etiqueta (en puntos)
       const innerMargin = 8; // ~1mm
 
-      // POSICIONES VERTICALES - ZONAS INDEPENDIENTES EN PUNTOS (203 DPI)
-      // Etiqueta = 200 puntos (25mm), 4 zonas con márgenes
+      // POSICIONES VERTICALES - ZONAS PROPORCIONALES EN PUNTOS (203 DPI)
+      // Proporciones: Título 25%, Variantes 13%, Código 40%, Precio 15%, Margen 5%
+      // Etiqueta = 200 puntos (25mm), distribuir proporcionalmente
       const zonasZebra3 = {
-        nombre: { topPt: 8, altoPt: 64 }, // 0.8cm
-        sepAr1: { altoPt: 12 }, // 0.15cm
-        variante: { altoPt: 48 }, // 0.6cm
-        sep2: { altoPt: 12 }, // 0.15cm
-        codigo: { altoPt: 40 }, // 0.5cm (FIJO)
-        sep3: { altoPt: 16 }, // 0.2cm
-        precio: { altoPt: 48 }, // 0.6cm
+        nombre: { altoPt: 50 }, // 25% de 200
+        sep1: { altoPt: 6 },
+        variante: { altoPt: 26 }, // 13% de 200
+        sep2: { altoPt: 6 },
+        codigo: { altoPt: 80 }, // 40% de 200 (FIJO EN TAMAÑO 5mm)
+        sep3: { altoPt: 8 },
+        precio: { altoPt: 30 }, // 15% de 200
+        margenInf: { altoPt: 10 }, // 5% de 200
       };
 
       let currentYPt = labelY;
-      const nameY = currentYPt + zonasZebra3.nombre.topPt;
-      currentYPt += zonasZebra3.nombre.altoPt + zonasZebra3.sepAr1.altoPt;
+      const nameY = currentYPt + (zonasZebra3.nombre.altoPt / 2);
+      currentYPt += zonasZebra3.nombre.altoPt + zonasZebra3.sep1.altoPt;
       const variantY = currentYPt + (zonasZebra3.variante.altoPt / 2);
       currentYPt += zonasZebra3.variante.altoPt + zonasZebra3.sep2.altoPt;
       const codeTextY = currentYPt + 4;
-      currentYPt += zonasZebra3.codigo.altoPt + zonasZebra3.sep3.altoPt;
       const barcodeY = currentYPt + (zonasZebra3.codigo.altoPt / 2);
-      currentYPt += zonasZebra3.codigo.altoPt;
+      currentYPt += zonasZebra3.codigo.altoPt + zonasZebra3.sep3.altoPt;
       const priceY = currentYPt + (zonasZebra3.precio.altoPt / 2);
 
       // NOMBRE - Tamaño medio, bold
@@ -576,25 +577,29 @@ export const electronAPI = {
 
     if (config.labelH === 25) {
       // ZONAS PARA ETIQUETAS PEQUEÑAS (25mm = 2.5cm)
+      // Proporciones: Título 25%, Variantes 13%, Código 40%, Precio 15%, Margen 5%
       zones = {
-        nombre: { altoCm: 0.8, margenTopCm: 0.1 },
-        separador1: { altoCm: 0.15 },
-        variante: { altoCm: 0.6, margenTopCm: 0.05 },
-        separador2: { altoCm: 0.15 },
-        codigo: { altoCm: 0.5, margenTopCm: 0.05 }, // MANTENER TAMAÑO
-        separador3: { altoCm: 0.2 },
-        precio: { altoCm: 0.6, margenTopCm: 0.05 },
+        nombre: { altoCm: 0.625, margenTopCm: 0.05 }, // 25% de 2.5
+        separador1: { altoCm: 0.08 },
+        variante: { altoCm: 0.325, margenTopCm: 0.03 }, // 13% de 2.5
+        separador2: { altoCm: 0.08 },
+        codigo: { altoCm: 1.0, margenTopCm: 0.05 }, // 40% de 2.5 (FIJO EN TAMAÑO 5mm)
+        separador3: { altoCm: 0.1 },
+        precio: { altoCm: 0.375, margenTopCm: 0.03 }, // 15% de 2.5
+        margenInferior: { altoCm: 0.125 }, // 5% de 2.5
       };
     } else {
       // ZONAS PARA ETIQUETAS GRANDES (carta ~5.94cm)
+      // Mismas proporciones: Título 25%, Variantes 13%, Código 40%, Precio 15%, Margen 5%
       zones = {
-        nombre: { altoCm: 1.2, margenTopCm: 0.2 },
-        separador1: { altoCm: 0.2 },
-        variante: { altoCm: 0.9, margenTopCm: 0.1 },
-        separador2: { altoCm: 0.2 },
-        codigo: { altoCm: 1.0, margenTopCm: 0.1 }, // MANTENER TAMAÑO
-        separador3: { altoCm: 0.3 },
-        precio: { altoCm: 0.8, margenTopCm: 0.1 },
+        nombre: { altoCm: 1.485, margenTopCm: 0.1 }, // 25% de 5.94
+        separador1: { altoCm: 0.12 },
+        variante: { altoCm: 0.772, margenTopCm: 0.05 }, // 13% de 5.94
+        separador2: { altoCm: 0.12 },
+        codigo: { altoCm: 2.376, margenTopCm: 0.08 }, // 40% de 5.94 (FIJO EN TAMAÑO 10mm)
+        separador3: { altoCm: 0.15 },
+        precio: { altoCm: 0.891, margenTopCm: 0.05 }, // 15% de 5.94
+        margenInferior: { altoCm: 0.297 }, // 5% de 5.94
       };
     }
 
