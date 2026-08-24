@@ -518,17 +518,15 @@ export const electronAPI = {
         margenInf: { altoPt: 10 }, // 5% de 200
       };
 
-      const offsetSubirPt = 80; // Subir 1cm = 80 puntos (203 DPI)
-
       let currentYPt = labelY;
       const nameY = currentYPt + (zonasZebra3.nombre.altoPt / 2);
       currentYPt += zonasZebra3.nombre.altoPt + zonasZebra3.sep1.altoPt;
       const variantY = currentYPt + (zonasZebra3.variante.altoPt / 2);
       currentYPt += zonasZebra3.variante.altoPt + zonasZebra3.sep2.altoPt;
       const codeTextY = currentYPt + 4;
-      const barcodeY = (currentYPt + (zonasZebra3.codigo.altoPt / 2)) - offsetSubirPt; // SUBIR 1CM
+      const barcodeY = currentYPt + (zonasZebra3.codigo.altoPt / 2);
       currentYPt += zonasZebra3.codigo.altoPt + zonasZebra3.sep3.altoPt;
-      const priceY = (currentYPt + (zonasZebra3.precio.altoPt / 2)) - offsetSubirPt; // SUBIR 1CM
+      const priceY = currentYPt + (zonasZebra3.precio.altoPt / 2);
 
       // NOMBRE - Tamaño medio, bold
       zpl += `^CF0,18,12
@@ -614,8 +612,6 @@ export const electronAPI = {
     // Calcular posiciones Y absolutas
     let currentY = y;
     const contentW = config.labelW - 1; // Margen horizontal
-    const offsetSubirCm = 1.0; // Subir código y precio 1cm (10mm)
-    const offsetSubirMm = offsetSubirCm * 10;
 
     // ZONA 1: NOMBRE
     currentY += zones.nombre.margenTopMm || 0;
@@ -652,7 +648,7 @@ export const electronAPI = {
     currentY += zones.codigo.margenTopMm || 0;
     const barcodeHeight = config.labelH === 25 ? 5 : 10; // MANTENER
     const quietZone = 0.2;
-    const barcodeY = (currentY + (zones.codigo.altoMm / 2)) - offsetSubirMm; // SUBIR 1CM
+    const barcodeY = currentY + (zones.codigo.altoMm / 2);
 
     if (item.svgCodigoBarras) {
       await this.renderizarSVGEnPDF(
@@ -677,7 +673,7 @@ export const electronAPI = {
 
     // ZONA 4: PRECIO (SIEMPRE AL FINAL, NUNCA SOBRE CÓDIGO)
     currentY += zones.precio.margenTopMm || 0;
-    const precioY = (currentY + zones.precio.altoMm / 2) - offsetSubirMm; // SUBIR 1CM
+    const precioY = currentY + zones.precio.altoMm / 2;
     doc.setFontSize(config.labelH === 25 ? 7.5 : 9);
     doc.setFont(undefined, "bold");
     doc.text(
