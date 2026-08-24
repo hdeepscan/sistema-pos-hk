@@ -341,8 +341,10 @@ export const electronAPI = {
       );
 
       // Crear PDF con tamaño EXACTO (personalizado)
-      // Sintaxis correcta: new jsPDF(orientation, unit, [width, height])
-      const doc = new jsPDF("p", "mm", [config.pageW, config.pageH]);
+      // Para zebra3: landscape (100mm ancho × 25mm alto)
+      // Para otros: portrait
+      const orientation = formato === "zebra3" ? "l" : "p";
+      const doc = new jsPDF(orientation, "mm", [config.pageW, config.pageH]);
 
       // Para carta, calcular número de filas
       let pageNum = 0;
