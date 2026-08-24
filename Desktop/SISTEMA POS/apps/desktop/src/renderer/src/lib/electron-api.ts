@@ -678,8 +678,8 @@ export const electronAPI = {
           windowHeight: 75, // 25mm a píxeles aproximadamente
         });
 
-        // Crear PDF con dimensiones EXACTAS: 100mm × 25mm
-        const doc = new jsPDF("p", "mm", [100, 25]);
+        // Crear PDF con dimensiones EXACTAS: 100mm × 25mm en LANDSCAPE
+        const doc = new jsPDF("l", "mm", [100, 25]);
 
         // Convertir canvas a imagen
         const imgData = canvas.toDataURL("image/png");
