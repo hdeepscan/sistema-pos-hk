@@ -336,12 +336,27 @@ export const electronAPI = {
       if (!config) throw new Error(`Formato no soportado: ${formato}`);
 
       // Crear PDF con tamaño EXACTO y orientación correcta
-      // SOLO zebra3 usa landscape, los demás mantienen portrait
-      const isZebra3Landscape = formato === "zebra3";
+      // SOLO zebra3 usa landscape (100mm ancho x 25mm alto)
+      const isZebra3 = formato === "zebra3";
+      let pageWidth: number;
+      let pageHeight: number;
+      let orientation: "portrait" | "landscape" = "portrait";
+
+      if (isZebra3) {
+        // Zebra3: Landscape de 100x25mm
+        pageWidth = config.pageW; // 100mm
+        pageHeight = config.pageH; // 25mm
+        orientation = "landscape";
+      } else {
+        // Otros: mantienen portrait
+        pageWidth = config.pageW;
+        pageHeight = config.pageH;
+      }
+
       const doc = new jsPDF({
-        orientation: isZebra3Landscape ? "landscape" : "portrait",
+        orientation: orientation,
         unit: "mm",
-        format: isZebra3Landscape ? [config.pageW, config.pageH] : [config.pageW, config.pageH],
+        format: [pageWidth, pageHeight],
       });
 
       // Procesar etiquetas
