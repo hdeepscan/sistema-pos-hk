@@ -518,7 +518,7 @@ export const electronAPI = {
         margenInf: { altoPt: 10 }, // 5% de 200
       };
 
-      const offsetSubirPt = 16; // Subir 2mm = 16 puntos (203 DPI)
+      const offsetSubirPt = 40; // Subir 5mm = 40 puntos (203 DPI) (2mm + 3mm)
 
       let currentYPt = labelY;
       const nameY = currentYPt + (zonasZebra3.nombre.altoPt / 2);
@@ -614,7 +614,7 @@ export const electronAPI = {
     // Calcular posiciones Y absolutas
     let currentY = y;
     const contentW = config.labelW - 1; // Margen horizontal
-    const offsetSubirMm = 0.2; // Subir código y precio 2mm
+    const offsetSubirMm = 0.5; // Subir código y precio 5mm (2mm + 3mm)
 
     // ZONA 1: NOMBRE
     currentY += zones.nombre.margenTopMm || 0;
