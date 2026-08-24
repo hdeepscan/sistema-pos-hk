@@ -599,36 +599,37 @@ export const electronAPI = {
         labelDiv.style.flexDirection = "column";
         labelDiv.style.justifyContent = "space-between";
         labelDiv.style.alignItems = "center";
-        labelDiv.style.padding = "0.5mm";
+        labelDiv.style.padding = "0.5mm 1mm"; // Optimizado para máximo área útil
         labelDiv.style.boxSizing = "border-box";
         labelDiv.style.backgroundColor = "white";
         labelDiv.style.border = "0.5px solid #ccc";
 
-        // Nombre
+        // Nombre - AUMENTADO A 10.5pt
         const nombre = document.createElement("div");
         nombre.textContent = (item.nombre || "").substring(0, 20);
-        nombre.style.fontSize = "7px";
+        nombre.style.fontSize = "10.5pt";
         nombre.style.fontWeight = "bold";
+        nombre.style.color = "#000000"; // Negro puro para nitidez
         nombre.style.textAlign = "center";
         nombre.style.width = "100%";
-        nombre.style.lineHeight = "1.1";
+        nombre.style.lineHeight = "1.0";
 
-        // Variante
+        // Variante - AUMENTADO A 8.5pt
         let varianteDiv = null;
         if (item.variante && item.variante.trim().length > 0) {
           varianteDiv = document.createElement("div");
           varianteDiv.textContent = (item.variante || "").substring(0, 20);
-          varianteDiv.style.fontSize = "5px";
-          varianteDiv.style.color = "#666";
+          varianteDiv.style.fontSize = "8.5pt";
+          varianteDiv.style.color = "#000000"; // Negro puro
           varianteDiv.style.textAlign = "center";
           varianteDiv.style.width = "100%";
-          varianteDiv.style.lineHeight = "1";
+          varianteDiv.style.lineHeight = "1.0";
         }
 
-        // Código de barras (SVG si existe)
+        // Código de barras - AUMENTADO A 12mm
         const barcodeDiv = document.createElement("div");
         barcodeDiv.style.width = "28mm";
-        barcodeDiv.style.height = "6mm"; // Aumentado de 5mm a 6mm
+        barcodeDiv.style.height = "12mm"; // Aumentado de 6mm a 12mm
         barcodeDiv.style.display = "flex";
         barcodeDiv.style.alignItems = "center";
         barcodeDiv.style.justifyContent = "center";
@@ -640,21 +641,23 @@ export const electronAPI = {
             svg.style.width = "100%";
             svg.style.height = "100%";
             svg.style.maxWidth = "28mm";
-            svg.style.maxHeight = "5mm";
+            svg.style.maxHeight = "12mm";
           }
         } else {
           const skuText = document.createElement("div");
           skuText.textContent = item.sku || item.id || "---";
-          skuText.style.fontSize = "5px";
+          skuText.style.fontSize = "7pt";
+          skuText.style.color = "#000000"; // Negro puro
           skuText.style.textAlign = "center";
           barcodeDiv.appendChild(skuText);
         }
 
-        // Precio
+        // Precio - AUMENTADO A 14pt CON font-weight: 900
         const precio = document.createElement("div");
         precio.textContent = `$${(item.precio || 0).toLocaleString("es-CO")}`;
-        precio.style.fontSize = "7px";
-        precio.style.fontWeight = "bold";
+        precio.style.fontSize = "14pt";
+        precio.style.fontWeight = "900";
+        precio.style.color = "#000000"; // Negro puro
         precio.style.textAlign = "center";
         precio.style.width = "100%";
 
@@ -669,13 +672,14 @@ export const electronAPI = {
       document.body.appendChild(container);
 
       try {
-        // Renderizar HTML a canvas con alta resolución
+        // Renderizar HTML a canvas con MÁXIMA resolución (203 DPI)
         const canvas = await html2canvas(container, {
-          scale: 3, // Alta resolución
+          scale: 4, // 203 DPI thermal printer resolution
           backgroundColor: "#ffffff",
           useCORS: true,
-          windowWidth: 300, // 100mm a píxeles aproximadamente
-          windowHeight: 75, // 25mm a píxeles aproximadamente
+          windowWidth: 400, // 100mm a píxeles (mayor escala)
+          windowHeight: 100, // 25mm a píxeles (mayor escala)
+          logging: false,
         });
 
         // Crear PDF con dimensiones EXACTAS: 100mm × 25mm en LANDSCAPE
