@@ -335,34 +335,53 @@ export const electronAPI = {
       const config = configs[formato];
       if (!config) throw new Error(`Formato no soportado: ${formato}`);
 
-      // Crear PDF con tamaño EXACTO y orientación correcta
-      // SOLO zebra3 usa landscape (100mm ancho x 25mm alto)
-      const isZebra3 = formato === "zebra3";
-      let pageWidth: number;
-      let pageHeight: number;
-      let orientation: "portrait" | "landscape" = "portrait";
-
-      if (isZebra3) {
-        // Zebra3: Landscape de 100x25mm
-        pageWidth = config.pageW; // 100mm
-        pageHeight = config.pageH; // 25mm
-        orientation = "landscape";
-      } else {
-        // Otros: mantienen portrait
-        pageWidth = config.pageW;
-        pageHeight = config.pageH;
-      }
-
-      const doc = new jsPDF({
-        orientation: orientation,
-        unit: "mm",
-        format: [pageWidth, pageHeight],
-      });
-
       // Procesar etiquetas
       const etiquetas = items.flatMap((item: any) =>
         Array.from({ length: item.copias || 1 }, () => item)
       );
+
+      // ESPECIAL PARA ZEBRA3: 1 PÁGINA POR CADA ETIQUETA
+      if (formato === "zebra3") {
+        // Config para 1 etiqueta por página (30x25mm)
+        const configZebra3 = { ...config, pageW: 30, pageH: 25 };
+
+        // Crear primera página
+        const doc = new jsPDF({
+          orientation: "portrait",
+          unit: "mm",
+          format: [configZebra3.pageW, configZebra3.pageH],
+        });
+
+        // Dibujar todas las etiquetas, una por página
+        for (let idx = 0; idx < etiquetas.length; idx++) {
+          const item = etiquetas[idx];
+
+          // Agregar nueva página para cada etiqueta (excepto la primera)
+          if (idx > 0) {
+            doc.addPage([configZebra3.pageW, configZebra3.pageH]);
+          }
+
+          // Dibujar etiqueta en posición (0, 0) de su página
+          await this.renderizarEtiquetaEnPDF(doc, item, 0, 0, configZebra3);
+        }
+
+        // Descargar
+        const fecha = new Date().toISOString().slice(0, 10);
+        const hora = new Date().toTimeString().slice(0, 5);
+        doc.save(`etiquetas-${formato}-${fecha}-${hora}.pdf`);
+
+        return {
+          imprimio: false,
+          mensaje: `✅ PDF descargado: ${items.length} etiqueta${items.length === 1 ? "" : "s"} (${etiquetas.length} página${etiquetas.length === 1 ? "" : "s"})`,
+        };
+      }
+
+      // Crear PDF con tamaño EXACTO para otros formatos
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: [config.pageW, config.pageH],
+      });
 
       // Para carta, calcular número de filas
       let pageNum = 0;
@@ -398,11 +417,11 @@ export const electronAPI = {
           let x, y;
 
           if (config.gap !== undefined) {
-            // zebra3: 3 columnas con gaps - CON MÚLTIPLES FILAS
+            // rollo2 con gaps
             const col = idx % config.cols;
             const fila = Math.floor(idx / config.cols);
             x = config.margin + col * (config.labelW + config.gap);
-            y = fila * config.labelH; // Calcular fila para múltiples etiquetas
+            y = fila * config.labelH;
           } else {
             // rollo1/rollo2
             const col = idx % config.cols;
