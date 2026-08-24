@@ -335,11 +335,14 @@ export const electronAPI = {
       const config = configs[formato];
       if (!config) throw new Error(`Formato no soportado: ${formato}`);
 
-      // Crear PDF con tamaño EXACTO
+      // Crear PDF con tamaño EXACTO y orientación correcta
+      // Para formatos donde ancho > alto, usar landscape
+      // Pero SIEMPRE pasar [ancho, alto] en el orden correcto
+      const isLandscape = config.pageW > config.pageH;
       const doc = new jsPDF({
-        orientation: config.pageW > config.pageH ? "landscape" : "portrait",
+        orientation: isLandscape ? "landscape" : "portrait",
         unit: "mm",
-        format: [config.pageW, config.pageH],
+        format: isLandscape ? [config.pageW, config.pageH] : [config.pageH, config.pageW],
       });
 
       // Procesar etiquetas
