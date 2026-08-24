@@ -631,14 +631,14 @@ export const electronAPI = {
     container.style.width = "100mm";
     container.style.height = "25mm";
     container.style.display = "flex";
-    container.style.justifyContent = "space-between";
+    container.style.justifyContent = "flex-start"; // Permite control exacto con margin-left
     container.style.alignItems = "stretch";
     container.style.padding = "0";
     container.style.margin = "0";
     container.style.backgroundColor = "white";
     container.style.boxSizing = "border-box";
-    container.style.paddingLeft = "2mm"; // 2. Margen izquierdo
-    container.style.paddingRight = "1mm";
+    container.style.paddingLeft = "1.5mm"; // 2. Margen inicial reducido
+    container.style.paddingRight = "0";
 
     // Generar HTML para cada etiqueta de esta página
     for (let i = 0; i < 3; i++) {
@@ -650,6 +650,8 @@ export const electronAPI = {
         emptyDiv.style.width = "31mm";
         emptyDiv.style.height = "25mm";
         emptyDiv.style.visibility = "hidden";
+        if (i === 1) emptyDiv.style.marginLeft = "2.5mm";
+        if (i === 2) emptyDiv.style.marginLeft = "3.5mm";
         container.appendChild(emptyDiv);
         continue;
       }
@@ -669,6 +671,9 @@ export const electronAPI = {
       (labelDiv.style as any).fontSmooth = "never";
       labelDiv.style.textRendering = "geometricPrecision";
       labelDiv.style.imageRendering = "pixelated";
+      // AJUSTE PRECISO: Desplazar columnas 2 y 3 con margin-left
+      if (i === 1) labelDiv.style.marginLeft = "2.5mm"; // Columna central
+      if (i === 2) labelDiv.style.marginLeft = "3.5mm"; // Columna derecha
 
         // Nombre - AUMENTADO A 10.5pt
         const nombre = document.createElement("div");
