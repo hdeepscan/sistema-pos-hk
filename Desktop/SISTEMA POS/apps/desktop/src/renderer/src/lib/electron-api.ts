@@ -637,7 +637,7 @@ export const electronAPI = {
     container.style.margin = "0";
     container.style.backgroundColor = "white";
     container.style.boxSizing = "border-box";
-    container.style.paddingLeft = "2mm"; // 2. Margen izquierdo
+    container.style.paddingLeft = "3.5mm"; // 2. Margen izquierdo - AUMENTADO
     container.style.paddingRight = "1mm";
 
     // Generar HTML para cada etiqueta de esta página
