@@ -340,11 +340,14 @@ export const electronAPI = {
         Array.from({ length: item.copias || 1 }, () => item)
       );
 
-      // Crear PDF con tamaño EXACTO (personalizado)
-      // Para zebra3: landscape (100mm ancho × 25mm alto)
-      // Para otros: portrait
-      const orientation = formato === "zebra3" ? "l" : "p";
-      const doc = new jsPDF(orientation, "mm", [config.pageW, config.pageH]);
+      // SOLUCIÓN ESPECIAL PARA ZEBRA3: HTML/CSS + html2canvas
+      if (formato === "zebra3") {
+        return await this.descargarZebra3PDFConCSS(etiquetas, config);
+      }
+
+      // Crear PDF con tamaño EXACTO (personalizado) para otros formatos
+      // Portrait para rollo1/rollo2/carta
+      const doc = new jsPDF("p", "mm", [config.pageW, config.pageH]);
 
       // Para carta, calcular número de filas
       let pageNum = 0;
@@ -566,6 +569,144 @@ export const electronAPI = {
     zpl += `^XZ`;
 
     return zpl;
+  },
+
+  // ZEBRA3: Generar PDF con HTML/CSS correcto (100mm × 25mm)
+  async descargarZebra3PDFConCSS(etiquetas: any, config: any) {
+    try {
+      console.log(`[ZEBRA3-CSS] Generando ${etiquetas.length} etiqueta(s) con HTML/CSS`);
+
+      // Crear contenedor HTML con CSS @page correcto
+      const container = document.createElement("div");
+      container.style.position = "absolute";
+      container.style.left = "-9999px";
+      container.style.width = "100mm";
+      container.style.height = "25mm";
+      container.style.display = "flex";
+      container.style.justifyContent = "space-between";
+      container.style.alignItems = "stretch";
+      container.style.padding = "0";
+      container.style.margin = "0";
+      container.style.backgroundColor = "white";
+      container.style.boxSizing = "border-box";
+
+      // Generar HTML para cada etiqueta
+      etiquetas.forEach((item: any) => {
+        const labelDiv = document.createElement("div");
+        labelDiv.style.width = "31mm";
+        labelDiv.style.height = "25mm";
+        labelDiv.style.display = "flex";
+        labelDiv.style.flexDirection = "column";
+        labelDiv.style.justifyContent = "space-between";
+        labelDiv.style.alignItems = "center";
+        labelDiv.style.padding = "0.5mm";
+        labelDiv.style.boxSizing = "border-box";
+        labelDiv.style.backgroundColor = "white";
+        labelDiv.style.border = "0.5px solid #ccc";
+
+        // Nombre
+        const nombre = document.createElement("div");
+        nombre.textContent = (item.nombre || "").substring(0, 20);
+        nombre.style.fontSize = "7px";
+        nombre.style.fontWeight = "bold";
+        nombre.style.textAlign = "center";
+        nombre.style.width = "100%";
+        nombre.style.lineHeight = "1.1";
+
+        // Variante
+        let varianteDiv = null;
+        if (item.variante && item.variante.trim().length > 0) {
+          varianteDiv = document.createElement("div");
+          varianteDiv.textContent = (item.variante || "").substring(0, 20);
+          varianteDiv.style.fontSize = "5px";
+          varianteDiv.style.color = "#666";
+          varianteDiv.style.textAlign = "center";
+          varianteDiv.style.width = "100%";
+          varianteDiv.style.lineHeight = "1";
+        }
+
+        // Código de barras (SVG si existe)
+        const barcodeDiv = document.createElement("div");
+        barcodeDiv.style.width = "28mm";
+        barcodeDiv.style.height = "5mm";
+        barcodeDiv.style.display = "flex";
+        barcodeDiv.style.alignItems = "center";
+        barcodeDiv.style.justifyContent = "center";
+
+        if (item.svgCodigoBarras) {
+          barcodeDiv.innerHTML = item.svgCodigoBarras;
+          const svg = barcodeDiv.querySelector("svg");
+          if (svg) {
+            svg.style.width = "100%";
+            svg.style.height = "100%";
+            svg.style.maxWidth = "28mm";
+            svg.style.maxHeight = "5mm";
+          }
+        } else {
+          const skuText = document.createElement("div");
+          skuText.textContent = item.sku || item.id || "---";
+          skuText.style.fontSize = "5px";
+          skuText.style.textAlign = "center";
+          barcodeDiv.appendChild(skuText);
+        }
+
+        // Precio
+        const precio = document.createElement("div");
+        precio.textContent = `$${(item.precio || 0).toLocaleString("es-CO")}`;
+        precio.style.fontSize = "7px";
+        precio.style.fontWeight = "bold";
+        precio.style.textAlign = "center";
+        precio.style.width = "100%";
+
+        labelDiv.appendChild(nombre);
+        if (varianteDiv) labelDiv.appendChild(varianteDiv);
+        labelDiv.appendChild(barcodeDiv);
+        labelDiv.appendChild(precio);
+
+        container.appendChild(labelDiv);
+      });
+
+      document.body.appendChild(container);
+
+      try {
+        // Renderizar HTML a canvas con alta resolución
+        const canvas = await html2canvas(container, {
+          scale: 3, // Alta resolución
+          backgroundColor: "#ffffff",
+          useCORS: true,
+          windowWidth: 300, // 100mm a píxeles aproximadamente
+          windowHeight: 75, // 25mm a píxeles aproximadamente
+        });
+
+        // Crear PDF con dimensiones EXACTAS: 100mm × 25mm
+        const doc = new jsPDF("p", "mm", [100, 25]);
+
+        // Convertir canvas a imagen
+        const imgData = canvas.toDataURL("image/png");
+
+        // Agregar imagen al PDF ocupando toda la página
+        doc.addImage(imgData, "PNG", 0, 0, 100, 25);
+
+        // Descargar
+        const fecha = new Date().toISOString().slice(0, 10);
+        const hora = new Date().toTimeString().slice(0, 5);
+        doc.save(`etiquetas-zebra3-${fecha}-${hora}.pdf`);
+
+        console.log("[ZEBRA3-CSS] PDF generado exitosamente");
+        return {
+          imprimio: false,
+          mensaje: `✅ PDF descargado: ${etiquetas.length} etiqueta${etiquetas.length === 1 ? "" : "s"}`,
+        };
+      } finally {
+        document.body.removeChild(container);
+      }
+    } catch (err) {
+      console.error("[ZEBRA3-CSS] Error:", err);
+      return {
+        imprimio: false,
+        mensaje: `❌ Error generando Zebra3 PDF: ${err}`,
+      };
+    }
   },
 
   // Renderizar UNA etiqueta en el PDF con ZONAS FÍSICAS (cm)
