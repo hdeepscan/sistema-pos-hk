@@ -574,35 +574,101 @@ export const electronAPI = {
   // ZEBRA3: Generar PDF con HTML/CSS correcto (100mm × 25mm)
   async descargarZebra3PDFConCSS(etiquetas: any, config: any) {
     try {
-      console.log(`[ZEBRA3-CSS] Generando ${etiquetas.length} etiqueta(s) con HTML/CSS`);
+      console.log(`[ZEBRA3-CSS] Generando ${etiquetas.length} etiqueta(s) con HTML/CSS en filas de 3`);
 
-      // Crear contenedor HTML con CSS @page correcto
-      const container = document.createElement("div");
-      container.style.position = "absolute";
-      container.style.left = "-9999px";
-      container.style.width = "100mm";
-      container.style.height = "25mm";
-      container.style.display = "flex";
-      container.style.justifyContent = "space-between";
-      container.style.alignItems = "stretch";
-      container.style.padding = "0";
-      container.style.margin = "0";
-      container.style.backgroundColor = "white";
-      container.style.boxSizing = "border-box";
+      // 1. PAGINACIÓN: Agrupar etiquetas en chunks de máximo 3
+      const chunks: any[] = [];
+      for (let i = 0; i < etiquetas.length; i += 3) {
+        chunks.push(etiquetas.slice(i, i + 3));
+      }
 
-      // Generar HTML para cada etiqueta
-      etiquetas.forEach((item: any) => {
-        const labelDiv = document.createElement("div");
-        labelDiv.style.width = "31mm";
-        labelDiv.style.height = "25mm";
-        labelDiv.style.display = "flex";
-        labelDiv.style.flexDirection = "column";
-        labelDiv.style.justifyContent = "space-between";
-        labelDiv.style.alignItems = "center";
-        labelDiv.style.padding = "0.5mm 1mm"; // Optimizado para máximo área útil
-        labelDiv.style.boxSizing = "border-box";
-        labelDiv.style.backgroundColor = "white";
-        labelDiv.style.border = "0.5px solid #ccc";
+      console.log(`[ZEBRA3-CSS] Total de páginas: ${chunks.length}`);
+
+      // Crear PDF
+      const doc = new jsPDF("l", "mm", [100, 25]);
+
+      // Procesar cada chunk como una página
+      for (let pageIdx = 0; pageIdx < chunks.length; pageIdx++) {
+        const chunk = chunks[pageIdx];
+
+        // Agregar nueva página (excepto la primera)
+        if (pageIdx > 0) {
+          doc.addPage([100, 25]);
+        }
+
+        // Renderizar esta página y obtener imagen PNG
+        const imgData = await this.renderizarZebra3Pagina(chunk, config);
+
+        // Agregar imagen al PDF
+        doc.addImage(imgData, "PNG", 0, 0, 100, 25);
+      }
+
+      // Descargar
+      const fecha = new Date().toISOString().slice(0, 10);
+      const hora = new Date().toTimeString().slice(0, 5);
+      doc.save(`etiquetas-zebra3-${fecha}-${hora}.pdf`);
+
+      console.log("[ZEBRA3-CSS] PDF generado exitosamente");
+      return {
+        imprimio: false,
+        mensaje: `✅ PDF descargado: ${etiquetas.length} etiqueta${etiquetas.length === 1 ? "" : "s"} (${chunks.length} página${chunks.length === 1 ? "" : "s"})`,
+      };
+    } catch (err) {
+      console.error("[ZEBRA3-CSS] Error:", err);
+      return {
+        imprimio: false,
+        mensaje: `❌ Error generando Zebra3 PDF: ${err}`,
+      };
+    }
+  },
+
+  // Renderizar UNA PÁGINA de zebra3 (máximo 3 etiquetas horizontales)
+  async renderizarZebra3Pagina(etiquetasPagina: any, config: any) {
+    // Crear contenedor HTML con CSS @page correcto
+    const container = document.createElement("div");
+    container.style.position = "absolute";
+    container.style.left = "-9999px";
+    container.style.width = "100mm";
+    container.style.height = "25mm";
+    container.style.display = "flex";
+    container.style.justifyContent = "space-between";
+    container.style.alignItems = "stretch";
+    container.style.padding = "0";
+    container.style.margin = "0";
+    container.style.backgroundColor = "white";
+    container.style.boxSizing = "border-box";
+    container.style.paddingLeft = "2mm"; // 2. Margen izquierdo
+    container.style.paddingRight = "1mm";
+
+    // Generar HTML para cada etiqueta de esta página
+    for (let i = 0; i < 3; i++) {
+      const item = etiquetasPagina[i];
+
+      // Si no hay etiqueta, crear hueco vacío invisible
+      if (!item) {
+        const emptyDiv = document.createElement("div");
+        emptyDiv.style.width = "31mm";
+        emptyDiv.style.height = "25mm";
+        emptyDiv.style.visibility = "hidden";
+        container.appendChild(emptyDiv);
+        continue;
+      }
+      const labelDiv = document.createElement("div");
+      labelDiv.style.width = "31mm";
+      labelDiv.style.height = "25mm";
+      labelDiv.style.display = "flex";
+      labelDiv.style.flexDirection = "column";
+      labelDiv.style.justifyContent = "space-between";
+      labelDiv.style.alignItems = "center";
+      labelDiv.style.padding = "0.5mm 1mm"; // Optimizado para máximo área útil
+      labelDiv.style.boxSizing = "border-box";
+      labelDiv.style.backgroundColor = "white";
+      labelDiv.style.border = "0.5px solid #ccc";
+      // 3. NITIDEZ: Desactivar antialiasing para cabezal térmico
+      labelDiv.style.WebkitFontSmoothing = "none";
+      (labelDiv.style as any).fontSmooth = "never";
+      labelDiv.style.textRendering = "geometricPrecision";
+      labelDiv.style.imageRendering = "pixelated";
 
         // Nombre - AUMENTADO A 10.5pt
         const nombre = document.createElement("div");
@@ -661,55 +727,32 @@ export const electronAPI = {
         precio.style.textAlign = "center";
         precio.style.width = "100%";
 
-        labelDiv.appendChild(nombre);
-        if (varianteDiv) labelDiv.appendChild(varianteDiv);
-        labelDiv.appendChild(barcodeDiv);
-        labelDiv.appendChild(precio);
+      labelDiv.appendChild(nombre);
+      if (varianteDiv) labelDiv.appendChild(varianteDiv);
+      labelDiv.appendChild(barcodeDiv);
+      labelDiv.appendChild(precio);
 
-        container.appendChild(labelDiv);
+      container.appendChild(labelDiv);
+    }
+
+    document.body.appendChild(container);
+
+    try {
+      // Renderizar HTML a canvas con MÁXIMA resolución (203 DPI)
+      const canvas = await html2canvas(container, {
+        scale: 5, // Máxima resolución para 203 DPI thermal printer
+        backgroundColor: "#ffffff",
+        useCORS: true,
+        windowWidth: 500,
+        windowHeight: 125,
+        logging: false,
+        allowTaint: true,
       });
 
-      document.body.appendChild(container);
-
-      try {
-        // Renderizar HTML a canvas con MÁXIMA resolución (203 DPI)
-        const canvas = await html2canvas(container, {
-          scale: 4, // 203 DPI thermal printer resolution
-          backgroundColor: "#ffffff",
-          useCORS: true,
-          windowWidth: 400, // 100mm a píxeles (mayor escala)
-          windowHeight: 100, // 25mm a píxeles (mayor escala)
-          logging: false,
-        });
-
-        // Crear PDF con dimensiones EXACTAS: 100mm × 25mm en LANDSCAPE
-        const doc = new jsPDF("l", "mm", [100, 25]);
-
-        // Convertir canvas a imagen
-        const imgData = canvas.toDataURL("image/png");
-
-        // Agregar imagen al PDF ocupando toda la página
-        doc.addImage(imgData, "PNG", 0, 0, 100, 25);
-
-        // Descargar
-        const fecha = new Date().toISOString().slice(0, 10);
-        const hora = new Date().toTimeString().slice(0, 5);
-        doc.save(`etiquetas-zebra3-${fecha}-${hora}.pdf`);
-
-        console.log("[ZEBRA3-CSS] PDF generado exitosamente");
-        return {
-          imprimio: false,
-          mensaje: `✅ PDF descargado: ${etiquetas.length} etiqueta${etiquetas.length === 1 ? "" : "s"}`,
-        };
-      } finally {
-        document.body.removeChild(container);
-      }
-    } catch (err) {
-      console.error("[ZEBRA3-CSS] Error:", err);
-      return {
-        imprimio: false,
-        mensaje: `❌ Error generando Zebra3 PDF: ${err}`,
-      };
+      // Convertir canvas a imagen
+      return canvas.toDataURL("image/png");
+    } finally {
+      document.body.removeChild(container);
     }
   },
 
