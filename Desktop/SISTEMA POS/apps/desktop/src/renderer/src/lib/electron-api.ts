@@ -628,7 +628,7 @@ export const electronAPI = {
         // Código de barras (SVG si existe)
         const barcodeDiv = document.createElement("div");
         barcodeDiv.style.width = "28mm";
-        barcodeDiv.style.height = "5mm";
+        barcodeDiv.style.height = "6mm"; // Aumentado de 5mm a 6mm
         barcodeDiv.style.display = "flex";
         barcodeDiv.style.alignItems = "center";
         barcodeDiv.style.justifyContent = "center";
