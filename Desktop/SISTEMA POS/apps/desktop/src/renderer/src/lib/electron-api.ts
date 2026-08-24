@@ -504,13 +504,28 @@ export const electronAPI = {
       // Espacios internos de la etiqueta (en puntos)
       const innerMargin = 8; // ~1mm
 
-      // POSICIONES VERTICALES - BAJAR VARIANTE Y CÓDIGO (manteniendo TODO visible)
-      // Etiqueta = 200 puntos, distribuir inteligentemente para bajar elementos
-      const nameY = labelY + 4; // Nombre en top (SIN CAMBIOS)
-      const variantY = nameY + 50; // Variante: baja más que antes
-      const codeTextY = variantY + 45; // SKU pequeño
-      const barcodeY = codeTextY + 45; // Barcode más abajo pero VISIBLE
-      const priceY = barcodeY + 52; // Precio al final
+      // POSICIONES VERTICALES - ZONAS INDEPENDIENTES EN PUNTOS (203 DPI)
+      // Etiqueta = 200 puntos (25mm), 4 zonas con márgenes
+      const zonasZebra3 = {
+        nombre: { topPt: 8, altoPt: 64 }, // 0.8cm
+        sepAr1: { altoPt: 12 }, // 0.15cm
+        variante: { altoPt: 48 }, // 0.6cm
+        sep2: { altoPt: 12 }, // 0.15cm
+        codigo: { altoPt: 40 }, // 0.5cm (FIJO)
+        sep3: { altoPt: 16 }, // 0.2cm
+        precio: { altoPt: 48 }, // 0.6cm
+      };
+
+      let currentYPt = labelY;
+      const nameY = currentYPt + zonasZebra3.nombre.topPt;
+      currentYPt += zonasZebra3.nombre.altoPt + zonasZebra3.sepAr1.altoPt;
+      const variantY = currentYPt + (zonasZebra3.variante.altoPt / 2);
+      currentYPt += zonasZebra3.variante.altoPt + zonasZebra3.sep2.altoPt;
+      const codeTextY = currentYPt + 4;
+      currentYPt += zonasZebra3.codigo.altoPt + zonasZebra3.sep3.altoPt;
+      const barcodeY = currentYPt + (zonasZebra3.codigo.altoPt / 2);
+      currentYPt += zonasZebra3.codigo.altoPt;
+      const priceY = currentYPt + (zonasZebra3.precio.altoPt / 2);
 
       // NOMBRE - Tamaño medio, bold
       zpl += `^CF0,18,12
@@ -551,103 +566,115 @@ export const electronAPI = {
     return zpl;
   },
 
-  // Renderizar UNA etiqueta en el PDF con DISTRIBUCIÓN VERTICAL COMPACTA
+  // Renderizar UNA etiqueta en el PDF con ZONAS FÍSICAS (cm)
   async renderizarEtiquetaEnPDF(doc: any, item: any, x: number, y: number, config: any) {
-    const margin = 0.5; // Margen horizontal y vertical
-    const contentW = config.labelW - margin * 2;
+    // ===== DEFINIR ZONAS FÍSICAS EN CM (convertir a mm para jsPDF) =====
+    // Etiqueta de 25mm (2.5cm) de alto: rollo1, rollo2, zebra3
+    // Etiqueta de 59.4mm (~5.94cm) de alto: carta
 
-    // ===== TAMAÑOS DE FUENTE Y ESPACIOS PARA CADA ELEMENTO =====
-    const fontSize = {
-      nombre: config.labelH === 25 ? 7 : 8,
-      variante: config.labelH === 25 ? 5 : 6,
-      precio: config.labelH === 25 ? 7.5 : 9,
-    };
+    let zones: any = {};
 
-    // Altura aproximada de texto (línea base a línea base)
-    const lineHeights = {
-      nombre: fontSize.nombre * 0.32, // Reducido para ser más compacto
-      variante: fontSize.variante * 0.32,
-      precio: fontSize.precio * 0.32,
-    };
+    if (config.labelH === 25) {
+      // ZONAS PARA ETIQUETAS PEQUEÑAS (25mm = 2.5cm)
+      zones = {
+        nombre: { altoCm: 0.8, margenTopCm: 0.1 },
+        separador1: { altoCm: 0.15 },
+        variante: { altoCm: 0.6, margenTopCm: 0.05 },
+        separador2: { altoCm: 0.15 },
+        codigo: { altoCm: 0.5, margenTopCm: 0.05 }, // MANTENER TAMAÑO
+        separador3: { altoCm: 0.2 },
+        precio: { altoCm: 0.6, margenTopCm: 0.05 },
+      };
+    } else {
+      // ZONAS PARA ETIQUETAS GRANDES (carta ~5.94cm)
+      zones = {
+        nombre: { altoCm: 1.2, margenTopCm: 0.2 },
+        separador1: { altoCm: 0.2 },
+        variante: { altoCm: 0.9, margenTopCm: 0.1 },
+        separador2: { altoCm: 0.2 },
+        codigo: { altoCm: 1.0, margenTopCm: 0.1 }, // MANTENER TAMAÑO
+        separador3: { altoCm: 0.3 },
+        precio: { altoCm: 0.8, margenTopCm: 0.1 },
+      };
+    }
 
-    // CÓDIGO DE BARRAS (tamaño FIJO, NO MODIFICAR)
-    const quietZone = 0.2; // Margen blanco mínimo alrededor código
-    const barcodeHeight = config.labelH === 25 ? 5 : 10;
-    const barcodeHeightTotal = barcodeHeight + quietZone * 2;
+    // Convertir zonas a mm (jsPDF usa mm)
+    Object.keys(zones).forEach(key => {
+      zones[key].altoMm = zones[key].altoCm * 10;
+      if (zones[key].margenTopCm) zones[key].margenTopMm = zones[key].margenTopCm * 10;
+    });
 
-    // ===== ESPACIADOS FIJOS (NO VARIABLES) =====
-    // Bajar elementos pero manteniéndolos VISIBLES en la etiqueta (25mm = 200 puntos)
-    const smallGap = 6.2; // Entre nombre y variante (espaciado mayor)
-    const mediumGap = 5.6; // Entre variante y código (espaciado mayor)
-    const priceGap = 0.3; // Entre código y precio
+    // Calcular posiciones Y absolutas
+    let currentY = y;
+    const contentW = config.labelW - 1; // Margen horizontal
 
-    // ===== POSICIONAMIENTO VERTICAL COMPACTO =====
-    // Dejar margen superior más generoso para evitar recortes
-    const topMargin = config.labelH === 25 ? 4.2 : 4.5; // Baja 1cm más el nombre y variantes
-    let posY = y + topMargin;
-
-    // NOMBRE (arriba)
-    doc.setFontSize(fontSize.nombre);
+    // ZONA 1: NOMBRE
+    currentY += zones.nombre.margenTopMm || 0;
+    const nombreY = currentY + zones.nombre.altoMm / 2;
+    doc.setFontSize(config.labelH === 25 ? 7 : 8);
     doc.setFont(undefined, "bold");
     doc.text(
       (item.nombre || "").substring(0, 22),
       x + config.labelW / 2,
-      posY,
+      nombreY,
       { align: "center", maxWidth: contentW }
     );
-    posY += lineHeights.nombre + smallGap;
+    currentY += zones.nombre.altoMm + zones.separador1.altoMm;
 
-    // VARIANTE (si existe)
+    // ZONA 2: VARIANTE
     const hasVariante = item.variante && item.variante.trim().length > 0;
     if (hasVariante) {
-      doc.setFontSize(fontSize.variante);
+      currentY += zones.variante.margenTopMm || 0;
+      const varianteY = currentY + zones.variante.altoMm / 2;
+      doc.setFontSize(config.labelH === 25 ? 5 : 6);
       doc.setFont(undefined, "normal");
       doc.text(
         (item.variante || "").substring(0, 28),
         x + config.labelW / 2,
-        posY,
+        varianteY,
         { align: "center", maxWidth: contentW }
       );
-      posY += lineHeights.variante + mediumGap;
+      currentY += zones.variante.altoMm + zones.separador2.altoMm;
     } else {
-      // Si no hay variante, usar más espacio antes del código
-      posY += mediumGap;
+      currentY += zones.separador2.altoMm;
     }
 
-    // CÓDIGO DE BARRAS - USAR SVG REAL si existe
-    const barcodeY = posY + quietZone;
-    posY += barcodeHeightTotal + priceGap;
+    // ZONA 3: CÓDIGO DE BARRAS (TAMAÑO FIJO, NO MODIFICAR)
+    currentY += zones.codigo.margenTopMm || 0;
+    const barcodeHeight = config.labelH === 25 ? 5 : 10; // MANTENER
+    const quietZone = 0.2;
+    const barcodeY = currentY + (zones.codigo.altoMm / 2);
 
     if (item.svgCodigoBarras) {
-      // Usar SVG real del código de barras (MANTENER TAMAÑO EXACTO)
       await this.renderizarSVGEnPDF(
         doc,
         item.svgCodigoBarras,
-        x + margin,
-        barcodeY,
+        x + 0.5,
+        barcodeY - barcodeHeight / 2,
         contentW,
         barcodeHeight
       );
     } else {
-      // Fallback: usar SKU como texto si no hay SVG
       doc.setFontSize(5);
       doc.setFont(undefined, "normal");
       doc.text(
         item.sku || item.id || "---",
         x + config.labelW / 2,
-        barcodeY + barcodeHeight / 2,
+        barcodeY,
         { align: "center", maxWidth: contentW }
       );
     }
+    currentY += zones.codigo.altoMm + zones.separador3.altoMm;
 
-    // PRECIO (abajo - posición ABSOLUTA para garantizar que siempre esté visible)
-    doc.setFontSize(fontSize.precio);
+    // ZONA 4: PRECIO (SIEMPRE AL FINAL, NUNCA SOBRE CÓDIGO)
+    currentY += zones.precio.margenTopMm || 0;
+    const precioY = currentY + zones.precio.altoMm / 2;
+    doc.setFontSize(config.labelH === 25 ? 7.5 : 9);
     doc.setFont(undefined, "bold");
-    const priceY = y + config.labelH - margin - lineHeights.precio * 0.5;
     doc.text(
       `$${(item.precio || 0).toLocaleString("es-CO")}`,
       x + config.labelW / 2,
-      priceY,
+      precioY,
       { align: "center", maxWidth: contentW }
     );
   },
