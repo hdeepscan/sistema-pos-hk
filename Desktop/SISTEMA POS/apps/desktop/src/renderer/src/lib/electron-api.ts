@@ -340,13 +340,9 @@ export const electronAPI = {
         Array.from({ length: item.copias || 1 }, () => item)
       );
 
-      // Crear PDF con tamaño EXACTO
-      // TODOS en portrait (incluyendo zebra3)
-      const doc = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: [config.pageW, config.pageH],
-      });
+      // Crear PDF con tamaño EXACTO (personalizado)
+      // Sintaxis correcta: new jsPDF(orientation, unit, [width, height])
+      const doc = new jsPDF("p", "mm", [config.pageW, config.pageH]);
 
       // Para carta, calcular número de filas
       let pageNum = 0;
