@@ -675,32 +675,32 @@ export const electronAPI = {
       if (i === 1) labelDiv.style.marginLeft = "2.5mm"; // Columna central
       if (i === 2) labelDiv.style.marginLeft = "3.5mm"; // Columna derecha
 
-        // Nombre - AUMENTADO A 10.5pt
+        // Nombre - REDUCIDO A 9pt
         const nombre = document.createElement("div");
         nombre.textContent = (item.nombre || "").substring(0, 20);
-        nombre.style.fontSize = "10.5pt";
+        nombre.style.fontSize = "9pt";
         nombre.style.fontWeight = "bold";
         nombre.style.color = "#000000"; // Negro puro para nitidez
         nombre.style.textAlign = "center";
         nombre.style.width = "100%";
         nombre.style.lineHeight = "1.0";
 
-        // Variante - AUMENTADO A 8.5pt
+        // Variante - REDUCIDO A 7pt
         let varianteDiv = null;
         if (item.variante && item.variante.trim().length > 0) {
           varianteDiv = document.createElement("div");
           varianteDiv.textContent = (item.variante || "").substring(0, 20);
-          varianteDiv.style.fontSize = "8.5pt";
+          varianteDiv.style.fontSize = "7pt";
           varianteDiv.style.color = "#000000"; // Negro puro
           varianteDiv.style.textAlign = "center";
           varianteDiv.style.width = "100%";
           varianteDiv.style.lineHeight = "1.0";
         }
 
-        // Código de barras - AUMENTADO A 12mm
+        // Código de barras - REDUCIDO A 10mm
         const barcodeDiv = document.createElement("div");
         barcodeDiv.style.width = "28mm";
-        barcodeDiv.style.height = "12mm"; // Aumentado de 6mm a 12mm
+        barcodeDiv.style.height = "10mm"; // Reducido de 12mm a 10mm
         barcodeDiv.style.display = "flex";
         barcodeDiv.style.alignItems = "center";
         barcodeDiv.style.justifyContent = "center";
@@ -712,21 +712,21 @@ export const electronAPI = {
             svg.style.width = "100%";
             svg.style.height = "100%";
             svg.style.maxWidth = "28mm";
-            svg.style.maxHeight = "12mm";
+            svg.style.maxHeight = "10mm";
           }
         } else {
           const skuText = document.createElement("div");
           skuText.textContent = item.sku || item.id || "---";
-          skuText.style.fontSize = "7pt";
+          skuText.style.fontSize = "6pt";
           skuText.style.color = "#000000"; // Negro puro
           skuText.style.textAlign = "center";
           barcodeDiv.appendChild(skuText);
         }
 
-        // Precio - AUMENTADO A 14pt CON font-weight: 900
+        // Precio - REDUCIDO A 12pt CON font-weight: 900
         const precio = document.createElement("div");
         precio.textContent = `$${(item.precio || 0).toLocaleString("es-CO")}`;
-        precio.style.fontSize = "14pt";
+        precio.style.fontSize = "12pt";
         precio.style.fontWeight = "900";
         precio.style.color = "#000000"; // Negro puro
         precio.style.textAlign = "center";
