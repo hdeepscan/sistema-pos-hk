@@ -340,43 +340,8 @@ export const electronAPI = {
         Array.from({ length: item.copias || 1 }, () => item)
       );
 
-      // ESPECIAL PARA ZEBRA3: 1 PÁGINA POR CADA ETIQUETA
-      if (formato === "zebra3") {
-        // Config para 1 etiqueta por página (30x25mm)
-        const configZebra3 = { ...config, pageW: 30, pageH: 25 };
-
-        // Crear primera página
-        const doc = new jsPDF({
-          orientation: "portrait",
-          unit: "mm",
-          format: [configZebra3.pageW, configZebra3.pageH],
-        });
-
-        // Dibujar todas las etiquetas, una por página
-        for (let idx = 0; idx < etiquetas.length; idx++) {
-          const item = etiquetas[idx];
-
-          // Agregar nueva página para cada etiqueta (excepto la primera)
-          if (idx > 0) {
-            doc.addPage([configZebra3.pageW, configZebra3.pageH]);
-          }
-
-          // Dibujar etiqueta en posición (0, 0) de su página
-          await this.renderizarEtiquetaEnPDF(doc, item, 0, 0, configZebra3);
-        }
-
-        // Descargar
-        const fecha = new Date().toISOString().slice(0, 10);
-        const hora = new Date().toTimeString().slice(0, 5);
-        doc.save(`etiquetas-${formato}-${fecha}-${hora}.pdf`);
-
-        return {
-          imprimio: false,
-          mensaje: `✅ PDF descargado: ${items.length} etiqueta${items.length === 1 ? "" : "s"} (${etiquetas.length} página${etiquetas.length === 1 ? "" : "s"})`,
-        };
-      }
-
-      // Crear PDF con tamaño EXACTO para otros formatos
+      // Crear PDF con tamaño EXACTO
+      // TODOS en portrait (incluyendo zebra3)
       const doc = new jsPDF({
         orientation: "portrait",
         unit: "mm",
