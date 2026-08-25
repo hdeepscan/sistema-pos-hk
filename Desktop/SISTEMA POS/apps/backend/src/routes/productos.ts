@@ -25,18 +25,18 @@ import {
 import { registrarAuditoria } from "../lib/auditoria.js";
 import { mensajeDeValidacion } from "../lib/errores.js";
 
-// Genera un SKU corto aleatorio (8 caracteres: 4 letras + 4 números)
-// Mucho más compacto que EAN-13 - ideal para etiquetas térmicas
-// Ejemplo: "ABC12345", "XYZ98765"
+// Genera un SKU corto aleatorio (6 caracteres: 3 letras + 3 números)
+// Ultra compacto vs EAN-13 (13 dígitos) - máximo espacio en etiquetas
+// Ejemplo: "ABC123", "XYZ987"
 function generarSKUCorto(): string {
   const letras = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   let sku = "";
-  // 4 letras aleatorias
-  for (let i = 0; i < 4; i++) {
+  // 3 letras aleatorias
+  for (let i = 0; i < 3; i++) {
     sku += letras.charAt(Math.floor(Math.random() * letras.length));
   }
-  // 4 números aleatorios
-  for (let i = 0; i < 4; i++) {
+  // 3 números aleatorios
+  for (let i = 0; i < 3; i++) {
     sku += Math.floor(Math.random() * 10);
   }
   return sku;
