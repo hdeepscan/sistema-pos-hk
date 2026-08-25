@@ -25,6 +25,38 @@ import {
 import { registrarAuditoria } from "../lib/auditoria.js";
 import { mensajeDeValidacion } from "../lib/errores.js";
 
+// Genera un SKU corto aleatorio (8 caracteres: 4 letras + 4 números)
+// Mucho más compacto que EAN-13 - ideal para etiquetas térmicas
+// Ejemplo: "ABC12345", "XYZ98765"
+function generarSKUCorto(): string {
+  const letras = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  let sku = "";
+  // 4 letras aleatorias
+  for (let i = 0; i < 4; i++) {
+    sku += letras.charAt(Math.floor(Math.random() * letras.length));
+  }
+  // 4 números aleatorios
+  for (let i = 0; i < 4; i++) {
+    sku += Math.floor(Math.random() * 10);
+  }
+  return sku;
+}
+
+// Genera un SKU único aleatorio (garantiza que no exista en la base de datos)
+async function generarSKUUnico(tx: Prisma.TransactionClient, empresaId: string): Promise<string> {
+  let intento = 0;
+  const maxIntentos = 100;
+  while (intento < maxIntentos) {
+    const sku = generarSKUCorto();
+    const existe = await tx.producto.findUnique({
+      where: { empresaId_sku: { empresaId, sku } },
+    });
+    if (!existe) return sku;
+    intento++;
+  }
+  throw new Error("No se pudo generar un SKU único después de 100 intentos");
+}
+
 // Sin filas en ProductoSucursal = disponible en todas las sucursales.
 // sucursalIds=[] limpia la restriccion (vuelve a "disponible en todas").
 async function sincronizarDisponibilidad(
@@ -205,11 +237,19 @@ export async function productosRoutes(app: FastifyInstance) {
     }
     const { sucursalIds, ...datosProducto } = parsed.data;
 
-    const existente = await prisma.producto.findUnique({
-      where: { empresaId_sku: { empresaId, sku: parsed.data.sku } },
-    });
-    if (existente) {
-      return reply.code(409).send({ error: "Ya existe un producto con ese SKU" });
+    // Si no viene SKU, generar uno automáticamente (corto y único)
+    let sku = datosProducto.sku;
+    if (!sku) {
+      sku = await prisma.$transaction(async (tx) => generarSKUUnico(tx, empresaId));
+      datosProducto.sku = sku;
+    } else {
+      // Si viene SKU, validar que no exista
+      const existente = await prisma.producto.findUnique({
+        where: { empresaId_sku: { empresaId, sku: parsed.data.sku } },
+      });
+      if (existente) {
+        return reply.code(409).send({ error: "Ya existe un producto con ese SKU" });
+      }
     }
 
     const producto = await prisma.$transaction(async (tx) => {

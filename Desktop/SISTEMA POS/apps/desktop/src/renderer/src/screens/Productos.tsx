@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
 import { useSesionStore } from "../lib/store";
 import { leerArchivoComoDataUrl } from "../lib/files";
-import { generarSvgCodigoBarras, generarCodigoBarrasEan13 } from "../lib/barcode";
+import { generarSvgCodigoBarras, generarSKUCorto } from "../lib/barcode";
 import { BotonesExportar } from "../lib/BotonesExportar";
 import { ModalImportarProductos } from "../lib/ModalImportarProductos";
 import type { ColumnaExport } from "../lib/export";
@@ -954,7 +954,7 @@ function EtiquetaCard({ producto, onActualizado }: { producto: ProductoDetalle; 
     try {
       for (const u of unidades) {
         if (!u.codigoBarras) {
-          await api.patch(`/productos/${u.id}`, { codigoBarras: generarCodigoBarrasEan13() });
+          await api.patch(`/productos/${u.id}`, { codigoBarras: generarSKUCorto() });
         }
       }
       onActualizado();
@@ -1108,7 +1108,7 @@ function EtiquetaCard({ producto, onActualizado }: { producto: ProductoDetalle; 
                         <button
                           type="button"
                           style={{ padding: "2px 8px" }}
-                          onClick={() => guardarCodigo(u.id, generarCodigoBarrasEan13())}
+                          onClick={() => guardarCodigo(u.id, generarSKUCorto())}
                           disabled={ocupado}
                         >
                           Generar
