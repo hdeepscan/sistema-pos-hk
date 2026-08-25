@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { api } from "../lib/api";
 import { mensajeError } from "../lib/errores";
 
@@ -6,6 +6,8 @@ interface Producto {
   id: string;
   nombre: string;
   precio: number;
+  sku?: string;
+  codigoBarras?: string;
 }
 
 interface LineaCotizacion {
@@ -35,12 +37,30 @@ interface Cotizacion {
   lineas: LineaCotizacion[];
 }
 
+// Iconos SVG inline
+const Iconos = {
+  document: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>,
+  plus: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>,
+  search: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>,
+  barcode: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 5v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5M5 3v2M7 3v2M9 3v2M12 3v2M15 3v2M17 3v2M19 3v2M5 19v2M7 19v2M9 19v2M12 19v2M15 19v2M17 19v2M19 19v2"></path></svg>,
+  trash: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>,
+  download: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>,
+  user: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>,
+  mail: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22 6 12 13 2 6"></polyline></svg>,
+  phone: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>,
+  building: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="12 3 20 7.5 20 19.5 4 21 4 7.5 12 3"></polyline><polyline points="9 12 9 21"></polyline><polyline points="15 5.5 15 21"></polyline><polyline points="9 12 15 12"></polyline></svg>,
+  map: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>,
+  settings: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"></circle><path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m5.08 5.08l4.24 4.24M1 12h6m6 0h6M4.22 19.78l4.24-4.24m5.08-5.08l4.24-4.24"></path></svg>,
+  check: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"></polyline></svg>,
+};
+
 export default function Cotizaciones() {
   const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>([]);
   const [productos, setProductos] = useState<Producto[]>([]);
   const [busqueda, setBusqueda] = useState("");
   const [mostrarForm, setMostrarForm] = useState(false);
   const [cargando, setCargando] = useState(false);
+  const scanInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
     clienteNombre: "",
@@ -84,9 +104,41 @@ export default function Cotizaciones() {
     cargarProductos();
   }, [cargar, cargarProductos]);
 
+  // Buscar producto por código de barras o SKU
+  const buscarProductoPorCodigo = (codigo: string) => {
+    const producto = productos.find(
+      (p) =>
+        p.sku?.toLowerCase().includes(codigo.toLowerCase()) ||
+        p.codigoBarras?.toLowerCase().includes(codigo.toLowerCase()) ||
+        p.nombre.toLowerCase().includes(codigo.toLowerCase())
+    );
+    return producto;
+  };
+
+  const manejarEscaneoCodigoBarras = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      const codigo = (e.target as HTMLInputElement).value.trim();
+      if (codigo) {
+        const producto = buscarProductoPorCodigo(codigo);
+        if (producto) {
+          setLineaEnEdicion({
+            ...lineaEnEdicion,
+            productoId: producto.id,
+            precioUnitario: producto.precio,
+            cantidad: 1,
+          });
+          (e.target as HTMLInputElement).value = "";
+        } else {
+          alert("Producto no encontrado: " + codigo);
+          (e.target as HTMLInputElement).value = "";
+        }
+      }
+    }
+  };
+
   const agregarLinea = () => {
     if (!lineaEnEdicion.productoId) {
-      alert("⚠️ Por favor selecciona un producto");
+      alert("Selecciona un producto");
       return;
     }
 
@@ -125,13 +177,25 @@ export default function Cotizaciones() {
 
   const { subtotal, descuentoValor, impuestoValor, total } = calcularTotales();
 
-  const descargarPDFAutomatico = async (cotizacionId: string, numeroCotz: string) => {
+  const descargarPDFCorrectamente = async (cotizacionId: string, numeroCotz: string) => {
     try {
-      const response = await api.get(`/cotizaciones/${cotizacionId}/descargar/pdf`, {
-        responseType: "blob",
-      });
+      // Usar fetch en lugar de axios para blob
+      const response = await fetch(
+        `/cotizaciones/${cotizacionId}/descargar/pdf`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${(window as any).__token || ""}`,
+          },
+        }
+      );
 
-      const url = window.URL.createObjectURL(new Blob([response.data as any]));
+      if (!response.ok) {
+        throw new Error("Error descargando PDF");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
       link.setAttribute("download", `${numeroCotz}.pdf`);
@@ -141,17 +205,18 @@ export default function Cotizaciones() {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error("Error descargando PDF:", err);
+      alert("Error descargando PDF, pero la cotización fue creada correctamente.");
     }
   };
 
   const crearCotizacion = async () => {
     if (!form.clienteNombre.trim()) {
-      alert("⚠️ El nombre del cliente es obligatorio");
+      alert("El nombre del cliente es obligatorio");
       return;
     }
 
     if (form.lineas.length === 0) {
-      alert("⚠️ Debes agregar al menos un producto a la cotización");
+      alert("Debes agregar al menos un producto");
       return;
     }
 
@@ -170,15 +235,12 @@ export default function Cotizaciones() {
       });
 
       const cotizacionCreada = response.data;
+      alert(`Cotización ${cotizacionCreada.numero} creada. Descargando PDF...`);
 
-      alert(
-        `✅ Cotización ${cotizacionCreada.numero} creada exitosamente.\n\nDescargando PDF...`
-      );
-
-      // Descargar PDF automáticamente
+      // Descargar PDF después de crear
       setTimeout(() => {
-        descargarPDFAutomatico(cotizacionCreada.id, cotizacionCreada.numero);
-      }, 500);
+        descargarPDFCorrectamente(cotizacionCreada.id, cotizacionCreada.numero);
+      }, 800);
 
       // Limpiar formulario
       setForm({
@@ -194,8 +256,7 @@ export default function Cotizaciones() {
       });
       setMostrarForm(false);
 
-      // Recargar lista
-      setTimeout(() => cargar(), 1000);
+      setTimeout(() => cargar(), 1500);
     } catch (err) {
       console.error("Error creando cotización:", err);
       mensajeError(err);
@@ -206,11 +267,20 @@ export default function Cotizaciones() {
 
   const descargarCotizacion = async (id: string, formato: "pdf" | "word") => {
     try {
-      const response = await api.get(`/cotizaciones/${id}/descargar/${formato}`, {
-        responseType: "blob",
-      });
+      const response = await fetch(
+        `/cotizaciones/${id}/descargar/${formato}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${(window as any).__token || ""}`,
+          },
+        }
+      );
 
-      const url = window.URL.createObjectURL(new Blob([response.data as any]));
+      if (!response.ok) throw new Error("Error descargando");
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
       const cotizacion = cotizaciones.find((c) => c.id === id);
@@ -220,7 +290,7 @@ export default function Cotizaciones() {
       link.parentElement?.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      mensajeError(err);
+      alert("Error descargando archivo");
     }
   };
 
@@ -233,21 +303,21 @@ export default function Cotizaciones() {
     <div>
       <div className="page-header">
         <div>
-          <h2>💼 Cotizaciones</h2>
+          <h2>Cotizaciones</h2>
           <p>Gestión de presupuestos y cotizaciones a clientes</p>
         </div>
-        <button onClick={() => setMostrarForm(true)} style={{ backgroundColor: "#4CAF50" }}>
-          ➕ Nueva cotización
+        <button onClick={() => setMostrarForm(true)} style={{ backgroundColor: "#4CAF50", display: "flex", alignItems: "center", gap: "8px" }}>
+          {Iconos.plus} Nueva cotización
         </button>
       </div>
 
       <div className="stat-grid">
         <div className="stat-card">
-          <div className="label">📊 Total de cotizaciones</div>
+          <div className="label">Total de cotizaciones</div>
           <div className="value">{cotizaciones.length}</div>
         </div>
         <div className="stat-card">
-          <div className="label">💰 Valor total</div>
+          <div className="label">Valor total</div>
           <div className="value">
             ${cotizaciones.reduce((a, c) => a + c.total, 0).toLocaleString("es-CO")}
           </div>
@@ -255,15 +325,18 @@ export default function Cotizaciones() {
       </div>
 
       <div className="card">
-        <input
-          placeholder="🔍 Buscar por nombre de cliente o número de cotización..."
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          style={{ width: "100%", marginBottom: 12, padding: "10px", borderRadius: "4px" }}
-        />
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: 12 }}>
+          {Iconos.search}
+          <input
+            placeholder="Buscar por cliente o número..."
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            style={{ width: "100%", padding: "10px", borderRadius: "4px" }}
+          />
+        </div>
 
         {cotizacionesFiltradas.length === 0 ? (
-          <p className="empty-state">📋 No hay cotizaciones registradas</p>
+          <p className="empty-state">No hay cotizaciones</p>
         ) : (
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%" }}>
@@ -294,15 +367,15 @@ export default function Cotizaciones() {
                     <td>
                       <button
                         onClick={() => descargarCotizacion(cot.id, "pdf")}
-                        style={{ marginRight: 4, backgroundColor: "#d32f2f" }}
+                        style={{ marginRight: 4, backgroundColor: "#d32f2f", display: "flex", alignItems: "center", gap: "4px" }}
                       >
-                        📄 PDF
+                        {Iconos.download} PDF
                       </button>
                       <button
                         onClick={() => descargarCotizacion(cot.id, "word")}
-                        style={{ backgroundColor: "#1976d2" }}
+                        style={{ backgroundColor: "#1976d2", display: "flex", alignItems: "center", gap: "4px" }}
                       >
-                        📝 Word
+                        {Iconos.download} Word
                       </button>
                     </td>
                   </tr>
@@ -317,7 +390,18 @@ export default function Cotizaciones() {
         <div
           className="modal-overlay"
           onClick={() => !cargando && setMostrarForm(false)}
-          style={{ backgroundColor: "rgba(0, 0, 0, 0.5)", position: "fixed", top: 0, left: 0, width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
+          style={{
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
         >
           <div
             className="modal-content"
@@ -333,22 +417,22 @@ export default function Cotizaciones() {
               boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
             }}
           >
-            <h3>📋 Nueva Cotización</h3>
-            <p style={{ color: "#666", marginBottom: "16px" }}>
-              Completa todos los datos del cliente y agrega los productos que deseas cotizar.
-            </p>
+            <h3>Nueva Cotización</h3>
 
-            <div style={{ backgroundColor: "#f5f5f5", padding: "12px", borderRadius: "4px", marginBottom: "16px" }}>
-              <strong>📌 Datos del Cliente</strong>
-              <p style={{ fontSize: "0.9em", color: "#666", margin: "8px 0 0 0" }}>
-                Información de quién recibirá la cotización
-              </p>
+            <div style={{ backgroundColor: "#f5f5f5", padding: "12px", borderRadius: "4px", marginBottom: "16px", display: "flex", alignItems: "flex-start", gap: "8px" }}>
+              <div style={{ color: "#1976d2", marginTop: "4px" }}>{Iconos.user}</div>
+              <div>
+                <strong>Datos del Cliente</strong>
+                <p style={{ fontSize: "0.85em", color: "#666", margin: "4px 0 0 0" }}>
+                  Información de quién recibirá la cotización
+                </p>
+              </div>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
               <div>
-                <label style={{ display: "block", fontWeight: "bold", marginBottom: 4 }}>
-                  👤 Nombre del cliente *
+                <label style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: "bold", marginBottom: 4 }}>
+                  {Iconos.user} Nombre del cliente
                 </label>
                 <input
                   placeholder="Ej: Juan Pérez"
@@ -356,74 +440,87 @@ export default function Cotizaciones() {
                   onChange={(e) => setForm({ ...form, clienteNombre: e.target.value })}
                   style={{ width: "100%", padding: "8px" }}
                 />
-                <small style={{ color: "#999" }}>Campo obligatorio</small>
+                <small style={{ color: "#999" }}>Obligatorio</small>
               </div>
 
               <div>
-                <label style={{ display: "block", fontWeight: "bold", marginBottom: 4 }}>
-                  📧 Email
+                <label style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: "bold", marginBottom: 4 }}>
+                  {Iconos.mail} Email
                 </label>
                 <input
-                  placeholder="Ej: juan@example.com"
+                  placeholder="juan@example.com"
                   type="email"
                   value={form.clienteEmail}
                   onChange={(e) => setForm({ ...form, clienteEmail: e.target.value })}
                   style={{ width: "100%", padding: "8px" }}
                 />
-                <small style={{ color: "#999" }}>Para enviar la cotización por correo</small>
               </div>
 
               <div>
-                <label style={{ display: "block", fontWeight: "bold", marginBottom: 4 }}>
-                  📱 Teléfono
+                <label style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: "bold", marginBottom: 4 }}>
+                  {Iconos.phone} Teléfono
                 </label>
                 <input
-                  placeholder="Ej: +57 300 123 4567"
+                  placeholder="+57 300 123 4567"
                   value={form.clienteTelefono}
                   onChange={(e) => setForm({ ...form, clienteTelefono: e.target.value })}
                   style={{ width: "100%", padding: "8px" }}
                 />
-                <small style={{ color: "#999" }}>Número de contacto</small>
               </div>
 
               <div>
-                <label style={{ display: "block", fontWeight: "bold", marginBottom: 4 }}>
-                  🏢 Empresa
+                <label style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: "bold", marginBottom: 4 }}>
+                  {Iconos.building} Empresa
                 </label>
                 <input
-                  placeholder="Ej: Acme Corp"
+                  placeholder="Acme Corp"
                   value={form.clienteEmpresa}
                   onChange={(e) => setForm({ ...form, clienteEmpresa: e.target.value })}
                   style={{ width: "100%", padding: "8px" }}
                 />
-                <small style={{ color: "#999" }}>Nombre de la empresa (opcional)</small>
               </div>
 
               <div style={{ gridColumn: "1 / -1" }}>
-                <label style={{ display: "block", fontWeight: "bold", marginBottom: 4 }}>
-                  📍 Dirección
+                <label style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: "bold", marginBottom: 4 }}>
+                  {Iconos.map} Dirección
                 </label>
                 <input
-                  placeholder="Ej: Calle 123 #45-67, Apto 8B"
+                  placeholder="Calle 123 #45-67"
                   value={form.clienteDireccion}
                   onChange={(e) => setForm({ ...form, clienteDireccion: e.target.value })}
                   style={{ width: "100%", padding: "8px" }}
                 />
-                <small style={{ color: "#999" }}>Dirección de entrega o envío</small>
               </div>
             </div>
 
-            <div style={{ backgroundColor: "#f5f5f5", padding: "12px", borderRadius: "4px", marginBottom: "16px" }}>
-              <strong>🛒 Productos a Cotizar</strong>
-              <p style={{ fontSize: "0.9em", color: "#666", margin: "8px 0 0 0" }}>
-                Selecciona los productos que deseas incluir en la cotización
-              </p>
+            <div style={{ backgroundColor: "#f5f5f5", padding: "12px", borderRadius: "4px", marginBottom: "16px", display: "flex", alignItems: "flex-start", gap: "8px" }}>
+              <div style={{ color: "#1976d2", marginTop: "4px" }}>{Iconos.barcode}</div>
+              <div>
+                <strong>Agregar Productos</strong>
+                <p style={{ fontSize: "0.85em", color: "#666", margin: "4px 0 0 0" }}>
+                  Escanea código de barras o selecciona manualmente
+                </p>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: "bold", marginBottom: 4 }}>
+                {Iconos.barcode} Escanear Código de Barras
+              </label>
+              <input
+                ref={scanInputRef}
+                placeholder="Escanea aquí con la pistola..."
+                onKeyDown={manejarEscaneoCodigoBarras}
+                style={{ width: "100%", padding: "10px", borderRadius: "4px", border: "2px solid #4CAF50" }}
+                autoFocus
+              />
+              <small style={{ color: "#999" }}>Presiona Enter después de escanear</small>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr auto", gap: 8, marginBottom: 16 }}>
               <div>
-                <label style={{ display: "block", fontWeight: "bold", marginBottom: 4 }}>
-                  Producto *
+                <label style={{ fontWeight: "bold", marginBottom: 4, display: "block" }}>
+                  Producto
                 </label>
                 <select
                   value={lineaEnEdicion.productoId}
@@ -437,7 +534,7 @@ export default function Cotizaciones() {
                   }}
                   style={{ width: "100%", padding: "8px" }}
                 >
-                  <option value="">-- Selecciona un producto --</option>
+                  <option value="">Selecciona...</option>
                   {productos.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.nombre}
@@ -447,12 +544,11 @@ export default function Cotizaciones() {
               </div>
 
               <div>
-                <label style={{ display: "block", fontWeight: "bold", marginBottom: 4 }}>
+                <label style={{ fontWeight: "bold", marginBottom: 4, display: "block" }}>
                   Cantidad
                 </label>
                 <input
                   type="number"
-                  placeholder="1"
                   min="1"
                   value={lineaEnEdicion.cantidad}
                   onChange={(e) =>
@@ -463,12 +559,11 @@ export default function Cotizaciones() {
               </div>
 
               <div>
-                <label style={{ display: "block", fontWeight: "bold", marginBottom: 4 }}>
-                  Precio Unit.
+                <label style={{ fontWeight: "bold", marginBottom: 4, display: "block" }}>
+                  Precio
                 </label>
                 <input
                   type="number"
-                  placeholder="0"
                   value={lineaEnEdicion.precioUnitario}
                   onChange={(e) =>
                     setLineaEnEdicion({
@@ -481,12 +576,11 @@ export default function Cotizaciones() {
               </div>
 
               <div>
-                <label style={{ display: "block", fontWeight: "bold", marginBottom: 4 }}>
+                <label style={{ fontWeight: "bold", marginBottom: 4, display: "block" }}>
                   Desc %
                 </label>
                 <input
                   type="number"
-                  placeholder="0"
                   value={lineaEnEdicion.descuentoPorcentaje}
                   onChange={(e) =>
                     setLineaEnEdicion({
@@ -507,16 +601,19 @@ export default function Cotizaciones() {
                   borderRadius: "4px",
                   cursor: "pointer",
                   marginTop: "20px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                 }}
               >
-                ➕
+                {Iconos.plus}
               </button>
             </div>
 
             {form.lineas.length > 0 && (
               <div style={{ marginBottom: 16 }}>
-                <label style={{ display: "block", fontWeight: "bold", marginBottom: 8 }}>
-                  Productos agregados:
+                <label style={{ fontWeight: "bold", marginBottom: 8, display: "block" }}>
+                  Productos agregados
                 </label>
                 <table style={{ width: "100%", fontSize: "0.9em" }}>
                   <thead>
@@ -555,9 +652,12 @@ export default function Cotizaciones() {
                               borderRadius: "4px",
                               cursor: "pointer",
                               padding: "4px 8px",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
                             }}
                           >
-                            ✕
+                            {Iconos.trash}
                           </button>
                         </td>
                       </tr>
@@ -567,17 +667,17 @@ export default function Cotizaciones() {
               </div>
             )}
 
-            <div style={{ backgroundColor: "#f5f5f5", padding: "12px", borderRadius: "4px", marginBottom: "16px" }}>
-              <strong>💵 Cálculos y Condiciones</strong>
-              <p style={{ fontSize: "0.9em", color: "#666", margin: "8px 0 0 0" }}>
-                Configura descuentos, impuestos y términos de pago
-              </p>
+            <div style={{ backgroundColor: "#f5f5f5", padding: "12px", borderRadius: "4px", marginBottom: "16px", display: "flex", alignItems: "flex-start", gap: "8px" }}>
+              <div style={{ color: "#1976d2", marginTop: "4px" }}>{Iconos.settings}</div>
+              <div>
+                <strong>Cálculos y Condiciones</strong>
+              </div>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
               <div>
-                <label style={{ display: "block", fontWeight: "bold", marginBottom: 4 }}>
-                  💳 Descuento Global (%)
+                <label style={{ fontWeight: "bold", marginBottom: 4, display: "block" }}>
+                  Descuento Global (%)
                 </label>
                 <input
                   type="number"
@@ -585,12 +685,11 @@ export default function Cotizaciones() {
                   onChange={(e) => setForm({ ...form, descuentoPorcentaje: Number(e.target.value) })}
                   style={{ width: "100%", padding: "8px" }}
                 />
-                <small style={{ color: "#999" }}>Se aplica sobre el subtotal</small>
               </div>
 
               <div>
-                <label style={{ display: "block", fontWeight: "bold", marginBottom: 4 }}>
-                  📊 IVA (%)
+                <label style={{ fontWeight: "bold", marginBottom: 4, display: "block" }}>
+                  IVA (%)
                 </label>
                 <input
                   type="number"
@@ -598,22 +697,20 @@ export default function Cotizaciones() {
                   onChange={(e) => setForm({ ...form, impuestoPorcentaje: Number(e.target.value) })}
                   style={{ width: "100%", padding: "8px" }}
                 />
-                <small style={{ color: "#999" }}>Impuesto sobre valor agregado (19% estándar)</small>
               </div>
             </div>
 
             <div>
-              <label style={{ display: "block", fontWeight: "bold", marginBottom: 4 }}>
-                📝 Comentarios o Notas
+              <label style={{ fontWeight: "bold", marginBottom: 4, display: "block" }}>
+                Comentarios o Notas
               </label>
               <textarea
                 value={form.comentarios}
                 onChange={(e) => setForm({ ...form, comentarios: e.target.value })}
-                placeholder="Ej: Válido por 15 días, entrega a 5 días, contáctanos para pedidos mayores..."
+                placeholder="Términos de pago, vigencia, etc..."
                 rows={3}
                 style={{ width: "100%", padding: "8px", fontFamily: "inherit" }}
               />
-              <small style={{ color: "#999" }}>Incluye términos de pago, vigencia, etc.</small>
             </div>
 
             <div
@@ -626,39 +723,38 @@ export default function Cotizaciones() {
               }}
             >
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, fontSize: "0.95em" }}>
-                <div>
-                  <span style={{ color: "#666" }}>Subtotal:</span>
-                </div>
-                <div style={{ textAlign: "right", fontWeight: "bold" }}>
-                  ${subtotal.toLocaleString("es-CO")}
-                </div>
+                <span>Subtotal:</span>
+                <span style={{ textAlign: "right" }}>${subtotal.toLocaleString("es-CO")}</span>
 
-                <div>
-                  <span style={{ color: "#666" }}>Descuento:</span>
-                </div>
-                <div style={{ textAlign: "right", color: "#d32f2f", fontWeight: "bold" }}>
+                <span>Descuento:</span>
+                <span style={{ textAlign: "right", color: "#d32f2f" }}>
                   -${descuentoValor.toLocaleString("es-CO")}
-                </div>
+                </span>
 
-                <div>
-                  <span style={{ color: "#666" }}>IVA ({form.impuestoPorcentaje}%):</span>
-                </div>
-                <div style={{ textAlign: "right", color: "#2e7d32", fontWeight: "bold" }}>
+                <span>IVA ({form.impuestoPorcentaje}%):</span>
+                <span style={{ textAlign: "right", color: "#2e7d32" }}>
                   +${impuestoValor.toLocaleString("es-CO")}
-                </div>
+                </span>
 
-                <div style={{ borderTop: "2px solid #1976d2", paddingTop: 8 }}>
-                  <span style={{ fontWeight: "bold", fontSize: "1.1em" }}>💰 TOTAL:</span>
-                </div>
-                <div style={{ textAlign: "right", fontWeight: "bold", fontSize: "1.1em", color: "#1976d2" }}>
+                <span style={{ borderTop: "2px solid #1976d2", paddingTop: 8, fontWeight: "bold" }}>
+                  TOTAL:
+                </span>
+                <span
+                  style={{
+                    textAlign: "right",
+                    borderTop: "2px solid #1976d2",
+                    paddingTop: 8,
+                    fontWeight: "bold",
+                    color: "#1976d2",
+                    fontSize: "1.1em",
+                  }}
+                >
                   ${total.toLocaleString("es-CO")}
-                </div>
+                </span>
               </div>
             </div>
 
-            <div
-              style={{ marginTop: 16, display: "flex", gap: 12, justifyContent: "flex-end" }}
-            >
+            <div style={{ marginTop: 16, display: "flex", gap: 12, justifyContent: "flex-end" }}>
               <button
                 onClick={() => !cargando && setMostrarForm(false)}
                 disabled={cargando}
@@ -686,10 +782,13 @@ export default function Cotizaciones() {
                   cursor: cargando || form.lineas.length === 0 ? "not-allowed" : "pointer",
                   fontWeight: "bold",
                   fontSize: "1em",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
                   opacity: cargando || form.lineas.length === 0 ? 0.5 : 1,
                 }}
               >
-                {cargando ? "⏳ Creando cotización..." : "✅ Crear cotización y descargar PDF"}
+                {Iconos.check} {cargando ? "Creando..." : "Crear y descargar PDF"}
               </button>
             </div>
           </div>
