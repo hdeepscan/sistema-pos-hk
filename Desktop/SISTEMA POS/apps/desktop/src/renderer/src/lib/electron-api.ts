@@ -654,7 +654,19 @@ export const electronAPI = {
       labelDiv.style.flexDirection = "column";
       labelDiv.style.justifyContent = "space-between";
       labelDiv.style.alignItems = "center";
-      labelDiv.style.padding = `${formato === "carta" ? "2mm" : "0.5mm"} ${formato === "carta" ? "2mm" : "1mm"}`;
+
+      // Padding según formato - optimizado para zebra3 (32×25mm)
+      let paddingTop = "0.5mm";
+      let paddingHorizontal = "1mm";
+      if (formato === "carta") {
+        paddingTop = "2mm";
+        paddingHorizontal = "2mm";
+      } else if (formato === "zebra3") {
+        paddingTop = "1mm";
+        paddingHorizontal = "1.5mm";
+      }
+      labelDiv.style.padding = `${paddingTop} ${paddingHorizontal}`;
+
       labelDiv.style.boxSizing = "border-box";
       labelDiv.style.backgroundColor = "white";
       labelDiv.style.border = "0.5px solid #ccc";
@@ -665,9 +677,9 @@ export const electronAPI = {
       labelDiv.style.textRendering = "geometricPrecision";
       labelDiv.style.imageRendering = "pixelated";
 
-      // Tamaños de fuente según formato
+      // Tamaños de fuente según formato - optimizado para zebra3 (32×25mm)
       const fontsizes = {
-        zebra3: { nombre: "8pt", variante: "7pt", sku: "6pt", precio: "12pt", barcodeH: "13mm" },
+        zebra3: { nombre: "7.5pt", variante: "6.5pt", sku: "5pt", precio: "11pt", barcodeH: "11mm" },
         carta: { nombre: "11pt", variante: "8pt", sku: "7pt", precio: "14pt", barcodeH: "12mm" },
         rollo2: { nombre: "9pt", variante: "7pt", sku: "6pt", precio: "12pt", barcodeH: "10mm" },
         rollo1: { nombre: "9pt", variante: "7pt", sku: "6pt", precio: "12pt", barcodeH: "10mm" },
@@ -698,7 +710,7 @@ export const electronAPI = {
 
       // Código de barras
       const barcodeDiv = document.createElement("div");
-      barcodeDiv.style.width = "95%";
+      barcodeDiv.style.width = formato === "zebra3" ? "90%" : "95%";
       barcodeDiv.style.height = fs.barcodeH;
       barcodeDiv.style.display = "flex";
       barcodeDiv.style.alignItems = "center";
