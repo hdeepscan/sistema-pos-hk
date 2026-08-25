@@ -742,9 +742,10 @@ export const electronAPI = {
     document.body.appendChild(container);
 
     try {
-      // Calcular viewport correcto (1mm = 3.78px aprox, luego × scale)
-      const pxPerMm = 3.78;
-      const windowWidth = Math.round(config.pageW * pxPerMm * 5); // escala × 5
+      // Calcular viewport correcto basado en 203 DPI de Zebra ZT230
+      const DPI_ZEBRA = 203;
+      const pxPerMm = DPI_ZEBRA / 25.4; // 203 DPI = 7.99 px/mm ≈ 8 px/mm
+      const windowWidth = Math.round(config.pageW * pxPerMm * 5); // escala × 5 para máxima nitidez
       const windowHeight = Math.round(config.pageH * pxPerMm * 5);
 
       // Renderizar HTML a canvas con MÁXIMA resolución
