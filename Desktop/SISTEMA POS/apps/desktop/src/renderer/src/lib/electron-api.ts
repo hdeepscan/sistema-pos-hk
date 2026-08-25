@@ -665,7 +665,7 @@ export const electronAPI = {
 
       // Tamaños de fuente según formato
       const fontsizes = {
-        zebra3: { nombre: "9pt", variante: "7pt", sku: "6pt", precio: "12pt", barcodeH: "10mm" },
+        zebra3: { nombre: "8pt", variante: "7pt", sku: "6pt", precio: "12pt", barcodeH: "13mm" },
         carta: { nombre: "11pt", variante: "8pt", sku: "7pt", precio: "14pt", barcodeH: "12mm" },
         rollo2: { nombre: "9pt", variante: "7pt", sku: "6pt", precio: "12pt", barcodeH: "10mm" },
         rollo1: { nombre: "9pt", variante: "7pt", sku: "6pt", precio: "12pt", barcodeH: "10mm" },
