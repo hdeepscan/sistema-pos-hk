@@ -41,6 +41,7 @@ export function construirReciboHtml(data: ReciboData): string {
             font-size: 11px;
             line-height: 1.3;
             color: #000000;
+            font-weight: 700;
             /* NITIDEZ TÉRMICA: Desactivar antialiasing */
             -webkit-font-smoothing: none;
             font-smooth: never;
@@ -77,7 +78,7 @@ export function construirReciboHtml(data: ReciboData): string {
             word-break: break-word;
             overflow-wrap: break-word;
             color: #000000;
-            font-weight: 600;
+            font-weight: 900;
             -webkit-font-smoothing: none;
           }
 
@@ -137,16 +138,20 @@ export function construirReciboHtml(data: ReciboData): string {
             padding: 3px;
             text-align: center;
             margin: 3px 0;
-            font-weight: bold;
+            font-weight: 900;
             font-size: 10px;
             word-break: break-word;
+            color: #000000;
+            -webkit-font-smoothing: none;
           }
 
           .footer {
             font-size: 9px;
             text-align: center;
             margin: 3px 0;
-            color: #666;
+            color: #000000;
+            font-weight: 700;
+            -webkit-font-smoothing: none;
           }
 
           .valor {
@@ -177,6 +182,7 @@ export function construirReciboHtml(data: ReciboData): string {
               padding: 0;
               font-size: 10px;
               line-height: 1.25;
+              font-weight: 700;
             }
 
             h2 {
@@ -195,6 +201,7 @@ export function construirReciboHtml(data: ReciboData): string {
               padding: 1px 0;
               font-size: 10px;
               word-break: break-word;
+              font-weight: 900;
             }
 
             td:first-child {
@@ -238,12 +245,14 @@ export function construirReciboHtml(data: ReciboData): string {
             .footer {
               font-size: 8px;
               margin: 2px 0;
+              font-weight: 700;
             }
 
             .cupon {
               font-size: 9px;
               padding: 2px;
               margin: 2px 0;
+              font-weight: 900;
             }
 
             /* Estilos para distribución de líneas */
