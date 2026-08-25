@@ -340,75 +340,8 @@ export const electronAPI = {
         Array.from({ length: item.copias || 1 }, () => item)
       );
 
-      // SOLUCIÓN ESPECIAL PARA ZEBRA3: HTML/CSS + html2canvas
-      if (formato === "zebra3") {
-        return await this.descargarZebra3PDFConCSS(etiquetas, config);
-      }
-
-      // Crear PDF con tamaño EXACTO (personalizado) para otros formatos
-      // Portrait para rollo1/rollo2/carta
-      const doc = new jsPDF("p", "mm", [config.pageW, config.pageH]);
-
-      // Para carta, calcular número de filas
-      let pageNum = 0;
-      let etiquetaEnPagina = 0;
-
-      if (formato === "carta") {
-        const etiquetasPerFila = config.cols;
-        const filasPerPagina = 5; // 297mm / 59.4mm ≈ 5 filas
-        const totalEtiquetasPerPagina = etiquetasPerFila * filasPerPagina;
-
-        for (let idx = 0; idx < etiquetas.length; idx++) {
-          const item = etiquetas[idx];
-          if (etiquetaEnPagina > 0 && etiquetaEnPagina % totalEtiquetasPerPagina === 0) {
-            doc.addPage();
-            pageNum++;
-            etiquetaEnPagina = 0;
-          }
-
-          const posEnPagina = etiquetaEnPagina;
-          const fila = Math.floor(posEnPagina / etiquetasPerFila);
-          const col = posEnPagina % etiquetasPerFila;
-
-          const x = col * 52.5; // 210 / 4
-          const y = fila * 59.4; // 297 / 5
-
-          await this.renderizarEtiquetaEnPDF(doc, item, x, y, config);
-          etiquetaEnPagina++;
-        }
-      } else {
-        // Para rollo (todos en una página)
-        for (let idx = 0; idx < etiquetas.length; idx++) {
-          const item = etiquetas[idx];
-          let x, y;
-
-          if (config.gap !== undefined) {
-            // rollo2 con gaps
-            const col = idx % config.cols;
-            const fila = Math.floor(idx / config.cols);
-            x = config.margin + col * (config.labelW + config.gap);
-            y = fila * config.labelH;
-          } else {
-            // rollo1/rollo2
-            const col = idx % config.cols;
-            const fila = Math.floor(idx / config.cols);
-            x = col * config.labelW;
-            y = fila * config.labelH;
-          }
-
-          await this.renderizarEtiquetaEnPDF(doc, item, x, y, config);
-        }
-      }
-
-      // Descargar
-      const fecha = new Date().toISOString().slice(0, 10);
-      const hora = new Date().toTimeString().slice(0, 5);
-      doc.save(`etiquetas-${formato}-${fecha}-${hora}.pdf`);
-
-      return {
-        imprimio: false,
-        mensaje: `✅ PDF descargado: ${items.length} etiqueta${items.length === 1 ? "" : "s"}`,
-      };
+      // SOLUCIÓN HTML/CSS + html2canvas PARA TODOS LOS FORMATOS (máxima nitidez)
+      return await this.descargarPDFConCSS(etiquetas, config, formato);
     } catch (err) {
       console.error("[WEB-PDF] Error:", err);
       return {
@@ -571,21 +504,39 @@ export const electronAPI = {
     return zpl;
   },
 
-  // ZEBRA3: Generar PDF con HTML/CSS correcto (100mm × 25mm)
-  async descargarZebra3PDFConCSS(etiquetas: any, config: any) {
+  // GENÉRICO: Generar PDF con HTML/CSS + html2canvas para TODOS los formatos
+  async descargarPDFConCSS(etiquetas: any, config: any, formato: string) {
     try {
-      console.log(`[ZEBRA3-CSS] Generando ${etiquetas.length} etiqueta(s) con HTML/CSS en filas de 3`);
+      console.log(`[PDF-CSS] Generando ${etiquetas.length} etiqueta(s) - Formato: ${formato}`);
 
-      // 1. PAGINACIÓN: Agrupar etiquetas en chunks de máximo 3
+      // 1. PAGINACIÓN: Calcular chunks según el formato
       const chunks: any[] = [];
-      for (let i = 0; i < etiquetas.length; i += 3) {
-        chunks.push(etiquetas.slice(i, i + 3));
+      let etiquetasPerPagina = config.cols; // Por defecto: todas en una fila
+
+      if (formato === "carta") {
+        // Carta: 4 columnas × 5 filas = 20 etiquetas por página
+        etiquetasPerPagina = config.cols * 5;
+      } else if (formato === "zebra3") {
+        // Zebra3: máximo 3 etiquetas por página
+        etiquetasPerPagina = 3;
+      } else if (formato === "rollo2") {
+        // Rollo2: 2 etiquetas en una fila = 1 página
+        etiquetasPerPagina = 2;
+      } else if (formato === "rollo1") {
+        // Rollo1: 1 etiqueta = 1 página
+        etiquetasPerPagina = 1;
       }
 
-      console.log(`[ZEBRA3-CSS] Total de páginas: ${chunks.length}`);
+      for (let i = 0; i < etiquetas.length; i += etiquetasPerPagina) {
+        chunks.push(etiquetas.slice(i, i + etiquetasPerPagina));
+      }
 
-      // Crear PDF
-      const doc = new jsPDF("l", "mm", [100, 25]);
+      console.log(`[PDF-CSS] Total de páginas: ${chunks.length}`);
+
+      // Crear PDF con tamaño exacto
+      const isPortrait = formato !== "zebra3";
+      const orientation = isPortrait ? "p" : "l";
+      const doc = new jsPDF(orientation, "mm", [config.pageW, config.pageH]);
 
       // Procesar cada chunk como una página
       for (let pageIdx = 0; pageIdx < chunks.length; pageIdx++) {
@@ -593,144 +544,189 @@ export const electronAPI = {
 
         // Agregar nueva página (excepto la primera)
         if (pageIdx > 0) {
-          doc.addPage([100, 25]);
+          doc.addPage([config.pageW, config.pageH]);
         }
 
         // Renderizar esta página y obtener imagen PNG
-        const imgData = await this.renderizarZebra3Pagina(chunk, config);
+        const imgData = await this.renderizarPaginaHTML(chunk, config, formato);
 
         // Agregar imagen al PDF
-        doc.addImage(imgData, "PNG", 0, 0, 100, 25);
+        doc.addImage(imgData, "PNG", 0, 0, config.pageW, config.pageH);
       }
 
       // Descargar
       const fecha = new Date().toISOString().slice(0, 10);
       const hora = new Date().toTimeString().slice(0, 5);
-      doc.save(`etiquetas-zebra3-${fecha}-${hora}.pdf`);
+      doc.save(`etiquetas-${formato}-${fecha}-${hora}.pdf`);
 
-      console.log("[ZEBRA3-CSS] PDF generado exitosamente");
+      console.log(`[PDF-CSS] PDF generado exitosamente`);
       return {
         imprimio: false,
         mensaje: `✅ PDF descargado: ${etiquetas.length} etiqueta${etiquetas.length === 1 ? "" : "s"} (${chunks.length} página${chunks.length === 1 ? "" : "s"})`,
       };
     } catch (err) {
-      console.error("[ZEBRA3-CSS] Error:", err);
+      console.error("[PDF-CSS] Error:", err);
       return {
         imprimio: false,
-        mensaje: `❌ Error generando Zebra3 PDF: ${err}`,
+        mensaje: `❌ Error generando PDF: ${err}`,
       };
     }
   },
 
-  // Renderizar UNA PÁGINA de zebra3 (máximo 3 etiquetas horizontales)
-  async renderizarZebra3Pagina(etiquetasPagina: any, config: any) {
-    // Crear contenedor HTML con CSS @page correcto
+  // ZEBRA3: Generar PDF con HTML/CSS correcto (100mm × 25mm)
+  async descargarZebra3PDFConCSS(etiquetas: any, config: any) {
+    // Alias para compatibilidad (ahora usa la función genérica)
+    return this.descargarPDFConCSS(etiquetas, config, "zebra3");
+  },
+
+  // GENÉRICO: Renderizar una página HTML para cualquier formato
+  async renderizarPaginaHTML(etiquetasPagina: any, config: any, formato: string) {
+    // Crear contenedor HTML con CSS correcto
     const container = document.createElement("div");
     container.style.position = "absolute";
     container.style.left = "-9999px";
-    container.style.width = "100mm";
-    container.style.height = "25mm";
-    container.style.display = "flex";
-    container.style.justifyContent = "flex-start"; // Permite control exacto con margin-left
-    container.style.alignItems = "stretch";
+    container.style.width = `${config.pageW}mm`;
+    container.style.height = `${config.pageH}mm`;
     container.style.padding = "0";
     container.style.margin = "0";
     container.style.backgroundColor = "white";
     container.style.boxSizing = "border-box";
-    container.style.paddingLeft = "1.5mm"; // 2. Margen inicial reducido
-    container.style.paddingRight = "0";
+
+    // Configurar layout según formato
+    if (formato === "carta") {
+      // Carta: grid de 4 columnas × 5 filas
+      container.style.display = "grid";
+      container.style.gridTemplateColumns = "repeat(4, 1fr)";
+      container.style.gridTemplateRows = "repeat(5, 59.4mm)";
+      container.style.gap = "0";
+    } else {
+      // Rollo: flexbox horizontal
+      container.style.display = "flex";
+      container.style.justifyContent = "flex-start";
+      container.style.alignItems = "stretch";
+      container.style.flexDirection = "row";
+      container.style.paddingLeft = formato === "zebra3" ? "1.5mm" : "0";
+      container.style.paddingRight = "0";
+    }
 
     // Generar HTML para cada etiqueta de esta página
-    for (let i = 0; i < 3; i++) {
+    const maxEtiquetas = formato === "carta" ? 20 : config.cols;
+    for (let i = 0; i < maxEtiquetas; i++) {
       const item = etiquetasPagina[i];
+
+      // Calcular tamaño del label según formato
+      let labelWidth = config.labelW;
+      let labelHeight = config.labelH;
+
+      if (formato === "carta") {
+        // Carta: 210 / 4 = 52.5mm ancho, 297 / 5 = 59.4mm alto
+        labelWidth = 52.5;
+        labelHeight = 59.4;
+      }
 
       // Si no hay etiqueta, crear hueco vacío invisible
       if (!item) {
         const emptyDiv = document.createElement("div");
-        emptyDiv.style.width = "31mm";
-        emptyDiv.style.height = "25mm";
+        emptyDiv.style.width = `${labelWidth}mm`;
+        emptyDiv.style.height = `${labelHeight}mm`;
         emptyDiv.style.visibility = "hidden";
-        if (i === 1) emptyDiv.style.marginLeft = "2.5mm";
-        if (i === 2) emptyDiv.style.marginLeft = "3.5mm";
+        if (formato === "zebra3") {
+          if (i === 1) emptyDiv.style.marginLeft = "2.5mm";
+          if (i === 2) emptyDiv.style.marginLeft = "3.5mm";
+        }
         container.appendChild(emptyDiv);
         continue;
       }
+
       const labelDiv = document.createElement("div");
-      labelDiv.style.width = "31mm";
-      labelDiv.style.height = "25mm";
+      labelDiv.style.width = `${labelWidth}mm`;
+      labelDiv.style.height = `${labelHeight}mm`;
       labelDiv.style.display = "flex";
       labelDiv.style.flexDirection = "column";
       labelDiv.style.justifyContent = "space-between";
       labelDiv.style.alignItems = "center";
-      labelDiv.style.padding = "0.5mm 1mm"; // Optimizado para máximo área útil
+      labelDiv.style.padding = `${formato === "carta" ? "2mm" : "0.5mm"} ${formato === "carta" ? "2mm" : "1mm"}`;
       labelDiv.style.boxSizing = "border-box";
       labelDiv.style.backgroundColor = "white";
       labelDiv.style.border = "0.5px solid #ccc";
-      // 3. NITIDEZ: Desactivar antialiasing para cabezal térmico
+
+      // NITIDEZ: Desactivar antialiasing para máxima claridad
       labelDiv.style.WebkitFontSmoothing = "none";
       (labelDiv.style as any).fontSmooth = "never";
       labelDiv.style.textRendering = "geometricPrecision";
       labelDiv.style.imageRendering = "pixelated";
-      // AJUSTE PRECISO: Desplazar columnas 2 y 3 con margin-left
-      if (i === 1) labelDiv.style.marginLeft = "2.5mm"; // Columna central
-      if (i === 2) labelDiv.style.marginLeft = "3.5mm"; // Columna derecha
 
-        // Nombre - REDUCIDO A 9pt
-        const nombre = document.createElement("div");
-        nombre.textContent = (item.nombre || "").substring(0, 20);
-        nombre.style.fontSize = "9pt";
-        nombre.style.fontWeight = "bold";
-        nombre.style.color = "#000000"; // Negro puro para nitidez
-        nombre.style.textAlign = "center";
-        nombre.style.width = "100%";
-        nombre.style.lineHeight = "1.0";
+      // AJUSTE PRECISO: Desplazar columnas en zebra3
+      if (formato === "zebra3") {
+        if (i === 1) labelDiv.style.marginLeft = "2.5mm";
+        if (i === 2) labelDiv.style.marginLeft = "3.5mm";
+      }
 
-        // Variante - REDUCIDO A 7pt
-        let varianteDiv = null;
-        if (item.variante && item.variante.trim().length > 0) {
-          varianteDiv = document.createElement("div");
-          varianteDiv.textContent = (item.variante || "").substring(0, 20);
-          varianteDiv.style.fontSize = "7pt";
-          varianteDiv.style.color = "#000000"; // Negro puro
-          varianteDiv.style.textAlign = "center";
-          varianteDiv.style.width = "100%";
-          varianteDiv.style.lineHeight = "1.0";
+      // Tamaños de fuente según formato
+      const fontsizes = {
+        zebra3: { nombre: "9pt", variante: "7pt", sku: "6pt", precio: "12pt", barcodeH: "10mm" },
+        carta: { nombre: "11pt", variante: "8pt", sku: "7pt", precio: "14pt", barcodeH: "12mm" },
+        rollo2: { nombre: "9pt", variante: "7pt", sku: "6pt", precio: "12pt", barcodeH: "10mm" },
+        rollo1: { nombre: "9pt", variante: "7pt", sku: "6pt", precio: "12pt", barcodeH: "10mm" },
+      };
+      const fs = fontsizes[formato as keyof typeof fontsizes] || fontsizes.zebra3;
+
+      // Nombre
+      const nombre = document.createElement("div");
+      nombre.textContent = (item.nombre || "").substring(0, 20);
+      nombre.style.fontSize = fs.nombre;
+      nombre.style.fontWeight = "bold";
+      nombre.style.color = "#000000";
+      nombre.style.textAlign = "center";
+      nombre.style.width = "100%";
+      nombre.style.lineHeight = "1.0";
+
+      // Variante
+      let varianteDiv = null;
+      if (item.variante && item.variante.trim().length > 0) {
+        varianteDiv = document.createElement("div");
+        varianteDiv.textContent = (item.variante || "").substring(0, 20);
+        varianteDiv.style.fontSize = fs.variante;
+        varianteDiv.style.color = "#000000";
+        varianteDiv.style.textAlign = "center";
+        varianteDiv.style.width = "100%";
+        varianteDiv.style.lineHeight = "1.0";
+      }
+
+      // Código de barras
+      const barcodeDiv = document.createElement("div");
+      barcodeDiv.style.width = "95%";
+      barcodeDiv.style.height = fs.barcodeH;
+      barcodeDiv.style.display = "flex";
+      barcodeDiv.style.alignItems = "center";
+      barcodeDiv.style.justifyContent = "center";
+
+      if (item.svgCodigoBarras) {
+        barcodeDiv.innerHTML = item.svgCodigoBarras;
+        const svg = barcodeDiv.querySelector("svg");
+        if (svg) {
+          svg.style.width = "100%";
+          svg.style.height = "100%";
+          svg.style.maxWidth = "95%";
+          svg.style.maxHeight = fs.barcodeH;
         }
+      } else {
+        const skuText = document.createElement("div");
+        skuText.textContent = item.sku || item.id || "---";
+        skuText.style.fontSize = fs.sku;
+        skuText.style.color = "#000000";
+        skuText.style.textAlign = "center";
+        barcodeDiv.appendChild(skuText);
+      }
 
-        // Código de barras - REDUCIDO A 10mm
-        const barcodeDiv = document.createElement("div");
-        barcodeDiv.style.width = "28mm";
-        barcodeDiv.style.height = "10mm"; // Reducido de 12mm a 10mm
-        barcodeDiv.style.display = "flex";
-        barcodeDiv.style.alignItems = "center";
-        barcodeDiv.style.justifyContent = "center";
-
-        if (item.svgCodigoBarras) {
-          barcodeDiv.innerHTML = item.svgCodigoBarras;
-          const svg = barcodeDiv.querySelector("svg");
-          if (svg) {
-            svg.style.width = "100%";
-            svg.style.height = "100%";
-            svg.style.maxWidth = "28mm";
-            svg.style.maxHeight = "10mm";
-          }
-        } else {
-          const skuText = document.createElement("div");
-          skuText.textContent = item.sku || item.id || "---";
-          skuText.style.fontSize = "6pt";
-          skuText.style.color = "#000000"; // Negro puro
-          skuText.style.textAlign = "center";
-          barcodeDiv.appendChild(skuText);
-        }
-
-        // Precio - REDUCIDO A 12pt CON font-weight: 900
-        const precio = document.createElement("div");
-        precio.textContent = `$${(item.precio || 0).toLocaleString("es-CO")}`;
-        precio.style.fontSize = "12pt";
-        precio.style.fontWeight = "900";
-        precio.style.color = "#000000"; // Negro puro
-        precio.style.textAlign = "center";
-        precio.style.width = "100%";
+      // Precio
+      const precio = document.createElement("div");
+      precio.textContent = `$${(item.precio || 0).toLocaleString("es-CO")}`;
+      precio.style.fontSize = fs.precio;
+      precio.style.fontWeight = "900";
+      precio.style.color = "#000000";
+      precio.style.textAlign = "center";
+      precio.style.width = "100%";
 
       labelDiv.appendChild(nombre);
       if (varianteDiv) labelDiv.appendChild(varianteDiv);
@@ -743,22 +739,24 @@ export const electronAPI = {
     document.body.appendChild(container);
 
     try {
-      // Renderizar HTML a canvas con MÁXIMA resolución (203 DPI)
+      // Renderizar HTML a canvas con MÁXIMA resolución
       const canvas = await html2canvas(container, {
-        scale: 5, // Máxima resolución para 203 DPI thermal printer
+        scale: 5,
         backgroundColor: "#ffffff",
         useCORS: true,
-        windowWidth: 500,
-        windowHeight: 125,
         logging: false,
         allowTaint: true,
       });
 
-      // Convertir canvas a imagen
       return canvas.toDataURL("image/png");
     } finally {
       document.body.removeChild(container);
     }
+  },
+
+  // Renderizar UNA PÁGINA de zebra3 (máximo 3 etiquetas horizontales) - ALIAS PARA COMPATIBILIDAD
+  async renderizarZebra3Pagina(etiquetasPagina: any, config: any) {
+    return this.renderizarPaginaHTML(etiquetasPagina, config, "zebra3");
   },
 
   // Renderizar UNA etiqueta en el PDF con ZONAS FÍSICAS (cm)
