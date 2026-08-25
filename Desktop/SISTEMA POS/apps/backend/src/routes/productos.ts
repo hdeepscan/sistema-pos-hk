@@ -1209,4 +1209,63 @@ export async function productosRoutes(app: FastifyInstance) {
       });
     }
   });
+
+  // Regenerar SKUs cortos para productos que tengan SKU largos (EAN-13)
+  app.post("/productos/regenerar-skus", async (request, reply) => {
+    const { empresaId } = request.user;
+    if (!request.user.permisos.includes("productos.administrar")) {
+      return reply.code(403).send({ error: "No tienes permiso" });
+    }
+
+    try {
+      // Encontrar todos los productos (luego filtrar por SKU de 13 dígitos)
+      const todos = await prisma.producto.findMany({
+        where: { empresaId },
+        select: { id: true, sku: true, nombre: true },
+      });
+
+      // Filtrar solo los que tienen SKU de 13 dígitos (EAN-13 antiguo)
+      const productosAntiguos = todos.filter((p) => /^\d{13}$/.test(p.sku));
+
+      if (productosAntiguos.length === 0) {
+        return reply.code(200).send({
+          mensaje: "No hay productos con SKU antiguos para regenerar",
+          regenerados: 0,
+        });
+      }
+
+      const regenerados = await prisma.$transaction(async (tx) => {
+        let contador = 0;
+        for (const producto of productosAntiguos) {
+          const nuevoSKU = await generarSKUUnico(tx, empresaId);
+          await tx.producto.update({
+            where: { id: producto.id },
+            data: { sku: nuevoSKU },
+          });
+          contador++;
+        }
+        return contador;
+      });
+
+      registrarAuditoria({
+        empresaId,
+        usuarioId: request.user.usuarioId,
+        accion: "REGENERAR_SKUS",
+        entidad: "Producto",
+        entidadId: "",
+        detalle: `Regenerados ${regenerados} SKUs de productos`,
+      });
+
+      return reply.code(200).send({
+        mensaje: `✅ SKUs regenerados correctamente`,
+        regenerados,
+      });
+    } catch (err) {
+      request.log.error(err, "Error regenerando SKUs");
+      return reply.code(500).send({
+        error: "Error regenerando SKUs",
+        detalles: process.env.NODE_ENV === "development" ? String(err) : undefined,
+      });
+    }
+  });
 }
