@@ -608,6 +608,16 @@ export const electronAPI = {
       container.style.gridTemplateColumns = "repeat(4, 1fr)";
       container.style.gridTemplateRows = "repeat(5, 59.4mm)";
       container.style.gap = "0";
+    } else if (formato === "zebra3") {
+      // Zebra3: Grid de 3 columnas de 32mm cada una, con gap de 1mm
+      container.style.display = "grid";
+      container.style.gridTemplateColumns = "32mm 32mm 32mm";
+      container.style.gridTemplateRows = "25mm";
+      container.style.gap = "1mm";
+      container.style.width = "98mm";
+      container.style.height = "25mm";
+      container.style.margin = "0";
+      container.style.padding = "0";
     } else {
       // Rollo: flexbox horizontal
       container.style.display = "flex";
@@ -616,10 +626,7 @@ export const electronAPI = {
       container.style.flexDirection = "row";
       container.style.paddingLeft = "0";
       container.style.paddingRight = "0";
-      // Para zebra3: gap exacto de 1mm entre etiquetas
-      if (formato === "zebra3") {
-        container.style.gap = `${config.gap}mm`;
-      }
+      container.style.gap = "0";
     }
 
     // Generar HTML para cada etiqueta de esta página
@@ -676,6 +683,8 @@ export const electronAPI = {
       (labelDiv.style as any).fontSmooth = "never";
       labelDiv.style.textRendering = "geometricPrecision";
       labelDiv.style.imageRendering = "pixelated";
+
+      // Con grid de zebra3, los gaps se manejan automáticamente
 
       // Tamaños de fuente según formato - optimizado para zebra3 (32×25mm)
       const fontsizes = {
