@@ -1,3 +1,6 @@
+-- CreateEnum "EstadoCotizacion"
+CREATE TYPE "EstadoCotizacion" AS ENUM ('BORRADOR', 'ENVIADA', 'ACEPTADA', 'RECHAZADA', 'VENCIDA');
+
 -- CreateTable "cotizaciones"
 CREATE TABLE "cotizaciones" (
     "id" TEXT NOT NULL,
