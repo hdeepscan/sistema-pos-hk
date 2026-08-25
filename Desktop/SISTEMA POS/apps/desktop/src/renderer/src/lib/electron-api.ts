@@ -704,12 +704,8 @@ export const electronAPI = {
 
       // Código de barras
       const barcodeDiv = document.createElement("div");
-      // Para zebra3: código más compacto (85% ancho, 11mm alto)
-      // Para otros: código estándar (95% ancho, altura original)
-      const barcodeWidth = formato === "zebra3" ? "85%" : "95%";
-      const barcodeHeight = formato === "zebra3" ? "11mm" : fs.barcodeH;
-      barcodeDiv.style.width = barcodeWidth;
-      barcodeDiv.style.height = barcodeHeight;
+      barcodeDiv.style.width = "95%";
+      barcodeDiv.style.height = fs.barcodeH;
       barcodeDiv.style.display = "flex";
       barcodeDiv.style.alignItems = "center";
       barcodeDiv.style.justifyContent = "center";
@@ -720,8 +716,8 @@ export const electronAPI = {
         if (svg) {
           svg.style.width = "100%";
           svg.style.height = "100%";
-          svg.style.maxWidth = barcodeWidth;
-          svg.style.maxHeight = barcodeHeight;
+          svg.style.maxWidth = "95%";
+          svg.style.maxHeight = fs.barcodeH;
         }
       } else {
         const skuText = document.createElement("div");
