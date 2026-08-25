@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, useRef } from "react";
 import { api } from "../lib/api";
 import { mensajeError } from "../lib/errores";
+import { useSesionStore } from "../lib/store";
 
 interface Producto {
   id: string;
@@ -179,33 +180,57 @@ export default function Cotizaciones() {
 
   const descargarPDFCorrectamente = async (cotizacionId: string, numeroCotz: string) => {
     try {
-      // Usar fetch en lugar de axios para blob
-      const response = await fetch(
-        `/cotizaciones/${cotizacionId}/descargar/pdf`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${(window as any).__token || ""}`,
-          },
-        }
-      );
+      const { apiBaseUrl, token } = useSesionStore.getState();
+
+      if (!token) {
+        throw new Error("No hay sesión activa");
+      }
+
+      const urlCompleta = `${apiBaseUrl}/cotizaciones/${cotizacionId}/descargar/pdf`;
+      console.log("Descargando PDF desde:", urlCompleta);
+
+      const response = await fetch(urlCompleta, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/pdf",
+        },
+      });
+
+      console.log("Respuesta:", response.status, response.statusText);
 
       if (!response.ok) {
-        throw new Error("Error descargando PDF");
+        const errorText = await response.text();
+        console.error("Error del servidor:", errorText);
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       const blob = await response.blob();
+      console.log("Blob recibido:", blob.size, "bytes");
+
+      if (blob.size === 0) {
+        throw new Error("El PDF está vacío");
+      }
+
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
       link.setAttribute("download", `${numeroCotz}.pdf`);
       document.body.appendChild(link);
+
+      console.log("Iniciando descarga...");
       link.click();
-      link.parentElement?.removeChild(link);
-      window.URL.revokeObjectURL(url);
+
+      // Esperar a que se descargue antes de limpiar
+      setTimeout(() => {
+        link.parentElement?.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }, 100);
+
+      console.log("PDF descargado exitosamente");
     } catch (err) {
       console.error("Error descargando PDF:", err);
-      alert("Error descargando PDF, pero la cotización fue creada correctamente.");
+      alert(`Error descargando PDF: ${err}. La cotización fue creada correctamente.`);
     }
   };
 
@@ -267,30 +292,50 @@ export default function Cotizaciones() {
 
   const descargarCotizacion = async (id: string, formato: "pdf" | "word") => {
     try {
-      const response = await fetch(
-        `/cotizaciones/${id}/descargar/${formato}`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${(window as any).__token || ""}`,
-          },
-        }
-      );
+      const { apiBaseUrl, token } = useSesionStore.getState();
 
-      if (!response.ok) throw new Error("Error descargando");
+      if (!token) {
+        throw new Error("No hay sesión activa");
+      }
+
+      const urlCompleta = `${apiBaseUrl}/cotizaciones/${id}/descargar/${formato}`;
+      console.log("Descargando desde:", urlCompleta);
+
+      const response = await fetch(urlCompleta, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
 
       const blob = await response.blob();
+
+      if (blob.size === 0) {
+        throw new Error("El archivo está vacío");
+      }
+
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
       const cotizacion = cotizaciones.find((c) => c.id === id);
-      link.setAttribute("download", `${cotizacion?.numero}.${formato === "pdf" ? "pdf" : "docx"}`);
+      const extension = formato === "pdf" ? "pdf" : "docx";
+      link.setAttribute("download", `${cotizacion?.numero}.${extension}`);
       document.body.appendChild(link);
       link.click();
-      link.parentElement?.removeChild(link);
-      window.URL.revokeObjectURL(url);
+
+      setTimeout(() => {
+        link.parentElement?.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }, 100);
+
+      console.log("Descarga completada");
     } catch (err) {
-      alert("Error descargando archivo");
+      console.error("Error:", err);
+      alert(`Error descargando archivo: ${err}`);
     }
   };
 
