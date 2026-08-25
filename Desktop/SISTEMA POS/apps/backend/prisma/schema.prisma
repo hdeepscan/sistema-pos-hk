@@ -91,6 +91,7 @@ model Empresa {
   shopifyWebhookEvents ShopifyWebhookEvent[]
   cuentasContables CuentaContable[]
   asientosContables AsientoContable[]
+  cotizaciones     Cotizacion[]
 
   @@map("empresas")
 }
@@ -196,6 +197,7 @@ model Producto {
   sucursalesDisponibles ProductoSucursal[]
   shopifyInventoryItems ShopifyInventoryItem[]
   shopifySyncQueue ShopifySyncQueue[]
+  lineaCotizaciones LineaCotizacion[]
 
   @@unique([empresaId, sku])
   @@index([empresaId, codigoBarras])
@@ -981,4 +983,79 @@ model LineaAsiento {
   @@index([asientoId])
   @@index([cuentaId])
   @@map("lineas_asiento")
+}
+
+// MODELO: COTIZACIONES
+enum EstadoCotizacion {
+  BORRADOR
+  ENVIADA
+  ACEPTADA
+  RECHAZADA
+  VENCIDA
+}
+
+model Cotizacion {
+  id                  String    @id @default(uuid())
+  empresaId           String
+  empresa             Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  numero              String    @unique // Ej: COT-001
+  secuencial          Int       // Para generar próximo número
+
+  // Cliente
+  clienteNombre       String
+  clienteEmail        String?
+  clienteTelefono     String?
+  clienteEmpresa      String?
+  clienteDireccion    String?
+
+  // Datos comerciales
+  estado              EstadoCotizacion @default(BORRADOR)
+  fechaCreacion       DateTime  @default(now())
+  fechaVigencia       DateTime? // Hasta cuándo es válida
+
+  // Montos
+  subtotal            Decimal   @db.Decimal(14, 2) @default(0)
+  descuentoPorcentaje Decimal   @db.Decimal(5, 2)  @default(0) // %
+  descuentoValor      Decimal   @db.Decimal(14, 2) @default(0) // Valor fijo
+  impuestoPorcentaje  Decimal   @db.Decimal(5, 2)  @default(0) // % (IVA)
+  impuestoValor       Decimal   @db.Decimal(14, 2) @default(0) // Valor calculado
+  total               Decimal   @db.Decimal(14, 2) @default(0)
+
+  // Notas
+  comentarios         String?
+  condicionesPago     String?   // Contado, crédito, plazos
+
+  // Auditoría
+  creadoPor           String?
+  actualizadoEn       DateTime  @updatedAt
+
+  lineas              LineaCotizacion[]
+
+  @@index([empresaId, numero])
+  @@index([empresaId, estado])
+  @@index([empresaId, fechaCreacion])
+  @@map("cotizaciones")
+}
+
+// Líneas de cotización (productos)
+model LineaCotizacion {
+  id                  String    @id @default(uuid())
+  cotizacionId        String
+  cotizacion          Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+
+  productoId          String
+  producto            Producto  @relation(fields: [productoId], references: [id], onDelete: Restrict)
+
+  cantidad            Decimal   @db.Decimal(12, 4) @default(1)
+  precioUnitario      Decimal   @db.Decimal(14, 2)
+  descuentoPorcentaje Decimal   @db.Decimal(5, 2)  @default(0)
+  descuentoValor      Decimal   @db.Decimal(14, 2) @default(0)
+  subtotal            Decimal   @db.Decimal(14, 2) // cantidad * precio - descuento
+
+  orden               Int       @default(0)
+
+  @@index([cotizacionId])
+  @@index([productoId])
+  @@map("lineas_cotizacion")
 }
