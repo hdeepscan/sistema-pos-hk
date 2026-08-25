@@ -337,7 +337,7 @@ export const electronAPI = {
         rollo2: { labelW: 50, labelH: 25, cols: 2, pageW: 100, pageH: 25 },
         rollo1: { labelW: 50, labelH: 25, cols: 1, pageW: 50, pageH: 25 },
         carta: { labelW: 50, labelH: 25, cols: 4, pageW: 210, pageH: 297 }, // A4: 4 cols x filas variables
-        zebra3: { labelW: 30, labelH: 25, cols: 3, pageW: 100, pageH: 25, gap: 2.5, margin: 2.5 },
+        zebra3: { labelW: 32, labelH: 25, cols: 3, pageW: 98, pageH: 25, gap: 1, margin: 0 },
       };
 
       const config = configs[formato];
@@ -372,11 +372,11 @@ export const electronAPI = {
       console.log(`[ZPL] Generando ZPL: ${formato} con ${items.length} etiqueta(s)`);
 
       // Configuración para zebra3: 32x25mm, 3 columnas
-      const labelW = 32; // mm
-      const labelH = 25; // mm
+      const labelW = 32; // mm (3.2 cm)
+      const labelH = 25; // mm (2.5 cm)
       const cols = 3;
-      const gap = 2.5; // mm entre etiquetas
-      const margin = 2.5; // mm margen lateral
+      const gap = 1; // mm entre etiquetas (0.1 cm) - EXACTO
+      const margin = 0; // mm margen lateral - SIN MARGEN AL INICIO
 
       // Resolver SVG a texto si es necesario (fallback a SKU)
       const etiquetasConSKU = items.flatMap((item: any) =>
@@ -614,8 +614,12 @@ export const electronAPI = {
       container.style.justifyContent = "flex-start";
       container.style.alignItems = "stretch";
       container.style.flexDirection = "row";
-      container.style.paddingLeft = formato === "zebra3" ? "1.5mm" : "0";
+      container.style.paddingLeft = "0";
       container.style.paddingRight = "0";
+      // Para zebra3: gap exacto de 1mm entre etiquetas
+      if (formato === "zebra3") {
+        container.style.gap = `${config.gap}mm`;
+      }
     }
 
     // Generar HTML para cada etiqueta de esta página
@@ -639,10 +643,6 @@ export const electronAPI = {
         emptyDiv.style.width = `${labelWidth}mm`;
         emptyDiv.style.height = `${labelHeight}mm`;
         emptyDiv.style.visibility = "hidden";
-        if (formato === "zebra3") {
-          if (i === 1) emptyDiv.style.marginLeft = "2.5mm";
-          if (i === 2) emptyDiv.style.marginLeft = "3.5mm";
-        }
         container.appendChild(emptyDiv);
         continue;
       }
@@ -664,12 +664,6 @@ export const electronAPI = {
       (labelDiv.style as any).fontSmooth = "never";
       labelDiv.style.textRendering = "geometricPrecision";
       labelDiv.style.imageRendering = "pixelated";
-
-      // AJUSTE PRECISO: Desplazar columnas en zebra3
-      if (formato === "zebra3") {
-        if (i === 1) labelDiv.style.marginLeft = "2.5mm";
-        if (i === 2) labelDiv.style.marginLeft = "3.5mm";
-      }
 
       // Tamaños de fuente según formato
       const fontsizes = {
