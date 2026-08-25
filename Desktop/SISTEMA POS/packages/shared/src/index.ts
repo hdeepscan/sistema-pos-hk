@@ -28,6 +28,9 @@ export const PERMISOS = [
   "caja.administrar",
   "contabilidad.ver",
   "contabilidad.administrar",
+  "cotizaciones.crear",
+  "cotizaciones.editar",
+  "cotizaciones.eliminar",
 ] as const;
 export type Permiso = (typeof PERMISOS)[number];
 
@@ -52,6 +55,9 @@ export const ETIQUETAS_PERMISOS: Record<Permiso, string> = {
   "caja.administrar": "Abrir y cerrar caja",
   "contabilidad.ver": "Ver contabilidad",
   "contabilidad.administrar": "Administrar contabilidad",
+  "cotizaciones.crear": "Crear cotizaciones",
+  "cotizaciones.editar": "Editar cotizaciones",
+  "cotizaciones.eliminar": "Eliminar cotizaciones",
 };
 
 // Roles predefinidos con sus permisos por defecto. "GERENTE" se mantiene solo
@@ -75,6 +81,9 @@ export const PERMISOS_POR_ROL: Record<RolUsuario, Permiso[]> = {
     "ventas.sin_stock",
     "contabilidad.ver",
     "contabilidad.administrar",
+    "cotizaciones.crear",
+    "cotizaciones.editar",
+    "cotizaciones.eliminar",
   ],
   SUPERVISOR: [
     "ventas.ver",
@@ -92,6 +101,9 @@ export const PERMISOS_POR_ROL: Record<RolUsuario, Permiso[]> = {
     "ventas.sin_stock",
     "contabilidad.ver",
     "contabilidad.administrar",
+    "cotizaciones.crear",
+    "cotizaciones.editar",
+    "cotizaciones.eliminar",
   ],
   CAJERO: [
     "ventas.ver",
