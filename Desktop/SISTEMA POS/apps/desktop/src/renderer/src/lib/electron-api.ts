@@ -187,9 +187,13 @@ export const electronAPI = {
 
         try {
           const canvas = await html2canvas(container, {
-            scale: 2,
+            scale: 5,
             useCORS: true,
             backgroundColor: "#ffffff",
+            logging: false,
+            allowTaint: true,
+            windowWidth: 304, // 80mm * 3.78 px/mm * 1
+            windowHeight: 756, // 200mm * 3.78 px/mm * 1
           });
 
           const imgData = canvas.toDataURL("image/png");
@@ -249,9 +253,13 @@ export const electronAPI = {
 
           try {
             const canvas = await html2canvas(container, {
-              scale: 2,
+              scale: 5,
               useCORS: true,
               backgroundColor: "#ffffff",
+              logging: false,
+              allowTaint: true,
+              windowWidth: 304,
+              windowHeight: 756,
             });
 
             const imgData = canvas.toDataURL("image/png");

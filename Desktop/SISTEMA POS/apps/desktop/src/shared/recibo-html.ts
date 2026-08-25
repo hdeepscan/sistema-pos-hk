@@ -40,7 +40,12 @@ export function construirReciboHtml(data: ReciboData): string {
             background: white;
             font-size: 11px;
             line-height: 1.3;
-            color: #000;
+            color: #000000;
+            /* NITIDEZ TÉRMICA: Desactivar antialiasing */
+            -webkit-font-smoothing: none;
+            font-smooth: never;
+            text-rendering: geometricPrecision;
+            image-rendering: pixelated;
           }
 
           /* Estilos para pantalla */
@@ -51,6 +56,8 @@ export function construirReciboHtml(data: ReciboData): string {
             font-weight: 900;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            color: #000000;
+            -webkit-font-smoothing: none;
           }
 
           .center {
@@ -69,6 +76,9 @@ export function construirReciboHtml(data: ReciboData): string {
             padding: 2px 0;
             word-break: break-word;
             overflow-wrap: break-word;
+            color: #000000;
+            font-weight: 600;
+            -webkit-font-smoothing: none;
           }
 
           td:first-child {
