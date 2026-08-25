@@ -12,7 +12,7 @@ CREATE TABLE "cotizaciones" (
     "clienteTelefono" TEXT,
     "clienteEmpresa" TEXT,
     "clienteDireccion" TEXT,
-    "estado" TEXT NOT NULL DEFAULT 'BORRADOR',
+    "estado" "EstadoCotizacion" NOT NULL DEFAULT 'BORRADOR',
     "fechaCreacion" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "fechaVigencia" TIMESTAMP(3),
     "subtotal" DECIMAL(14,2) NOT NULL DEFAULT 0,
@@ -24,7 +24,7 @@ CREATE TABLE "cotizaciones" (
     "comentarios" TEXT,
     "condicionesPago" TEXT,
     "creadoPor" TEXT,
-    "actualizadoEn" TIMESTAMP(3) NOT NULL,
+    "actualizadoEn" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "cotizaciones_pkey" PRIMARY KEY ("id")
 );
