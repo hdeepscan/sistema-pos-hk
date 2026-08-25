@@ -534,8 +534,9 @@ export const electronAPI = {
       console.log(`[PDF-CSS] Total de páginas: ${chunks.length}`);
 
       // Crear PDF con tamaño exacto
-      const isPortrait = formato !== "zebra3";
-      const orientation = isPortrait ? "p" : "l";
+      // Usar LANDSCAPE para rollo1/rollo2/zebra3 (ancho > alto)
+      // Usar PORTRAIT para carta (alto > ancho)
+      const orientation = formato === "carta" ? "p" : "l";
       const doc = new jsPDF(orientation, "mm", [config.pageW, config.pageH]);
 
       // Procesar cada chunk como una página
@@ -739,6 +740,11 @@ export const electronAPI = {
     document.body.appendChild(container);
 
     try {
+      // Calcular viewport correcto (1mm = 3.78px aprox, luego × scale)
+      const pxPerMm = 3.78;
+      const windowWidth = Math.round(config.pageW * pxPerMm * 5); // escala × 5
+      const windowHeight = Math.round(config.pageH * pxPerMm * 5);
+
       // Renderizar HTML a canvas con MÁXIMA resolución
       const canvas = await html2canvas(container, {
         scale: 5,
@@ -746,6 +752,8 @@ export const electronAPI = {
         useCORS: true,
         logging: false,
         allowTaint: true,
+        windowWidth: windowWidth,
+        windowHeight: windowHeight,
       });
 
       return canvas.toDataURL("image/png");
