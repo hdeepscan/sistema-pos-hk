@@ -164,6 +164,7 @@ export default function Layout({ children }: PropsWithChildren) {
             Creditos{creditosVencidos > 0 && <span className="badge danger" style={{ marginLeft: 6 }}>{creditosVencidos}</span>}
           </NavLink>
         )}
+        <NavLink to="/cotizaciones">Cotizaciones</NavLink>
         <NavLink to="/proveedores">Proveedores</NavLink>
         {puedeAdministrarGastos && <NavLink to="/gastos">Gastos</NavLink>}
         <NavLink to="/cuentas-bancarias">Cuentas bancarias</NavLink>
