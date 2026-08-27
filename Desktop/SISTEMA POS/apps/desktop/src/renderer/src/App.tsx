@@ -119,9 +119,9 @@ export default function App() {
     <Layout isMobile={isMobile} setIsMobile={setIsMobile}>
       <ErrorBoundary key={location.pathname}>
       <Routes>
-        <Route path="/" element={<Navigate to={isMobile ? "/pos-mobile" : "/pos"} replace />} />
-        <Route path="/pos" element={<Pos />} />
-        <Route path="/pos-mobile" element={<PosMobile />} />
+        <Route path="/" element={<Navigate to="/pos" replace />} />
+        {/* /pos detecta automáticamente si es mobile y renderiza el componente correcto */}
+        <Route path="/pos" element={isMobile ? <PosMobile /> : <Pos />} />
         <Route path="/ventas" element={<Ventas />} />
         <Route path="/productos" element={<Productos />} />
         <Route path="/colecciones" element={<Colecciones />} />
