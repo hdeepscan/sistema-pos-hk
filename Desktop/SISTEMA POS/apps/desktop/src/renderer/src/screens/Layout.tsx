@@ -363,11 +363,14 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      gap: "6px",
+                      gap: "8px",
                     }}
                     title="Ver en vista de escritorio"
                   >
-                    <span style={{ fontSize: "16px" }}>🖥️</span>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="2" y="3" width="20" height="14" rx="2" />
+                      <path d="M8 21h8M12 17v4" />
+                    </svg>
                     Desktop
                   </button>
 
@@ -392,11 +395,14 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      gap: "6px",
+                      gap: "8px",
                     }}
                     title="Ver en vista móvil"
                   >
-                    <span style={{ fontSize: "16px" }}>📱</span>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                      <path d="M12 18h.01" />
+                    </svg>
                     Móvil
                   </button>
                 </div>
@@ -436,9 +442,17 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
               }}
               title="Cambiar entre vista Desktop y Móvil"
             >
-              <span style={{ fontSize: "24px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                {isMobile ? "🖥️" : "📱"}
-              </span>
+              {isMobile ? (
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <rect x="2" y="3" width="20" height="14" rx="2" />
+                  <path d="M8 21h8M12 17v4" />
+                </svg>
+              ) : (
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                  <path d="M12 18h.01" />
+                </svg>
+              )}
             </button>
           </div>
 
