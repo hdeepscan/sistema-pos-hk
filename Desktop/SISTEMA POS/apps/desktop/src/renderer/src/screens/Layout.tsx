@@ -147,10 +147,10 @@ export default function Layout({ children }: PropsWithChildren) {
         </div>
 
         <div className="sidebar-section-label">Operacion</div>
-        <NavLink to="/pos">Punto de venta</NavLink>
-        {puedeVerVentas && <NavLink to="/ventas">Ventas</NavLink>}
-        <NavLink to="/caja">Caja</NavLink>
-        <NavLink to="/notificaciones">
+        <NavLink to="/pos" data-module="pos">Punto de venta</NavLink>
+        {puedeVerVentas && <NavLink to="/ventas" data-module="ventas">Ventas</NavLink>}
+        <NavLink to="/caja" data-module="caja">Caja</NavLink>
+        <NavLink to="/notificaciones" data-module="notificaciones">
           Notificaciones
           {alertasCobro > 0 && (
             <span className="badge warning" style={{ marginLeft: 6 }}>
@@ -162,36 +162,36 @@ export default function Layout({ children }: PropsWithChildren) {
         <div className="sidebar-section-label">Catalogo</div>
         {puedeAdministrarProductos && (
           <>
-            <NavLink to="/productos">Productos</NavLink>
-            <NavLink to="/colecciones">Colecciones</NavLink>
+            <NavLink to="/productos" data-module="productos">Productos</NavLink>
+            <NavLink to="/colecciones" data-module="colecciones">Colecciones</NavLink>
           </>
         )}
 
         <div className="sidebar-section-label">Negocio</div>
-        {puedeAdministrarClientes && <NavLink to="/clientes">Clientes</NavLink>}
+        {puedeAdministrarClientes && <NavLink to="/clientes" data-module="clientes">Clientes</NavLink>}
         {puedeVerCreditos && (
-          <NavLink to="/creditos">
+          <NavLink to="/creditos" data-module="creditos">
             Creditos{creditosVencidos > 0 && <span className="badge danger" style={{ marginLeft: 6 }}>{creditosVencidos}</span>}
           </NavLink>
         )}
-        <NavLink to="/cotizaciones">Cotizaciones</NavLink>
-        <NavLink to="/proveedores">Proveedores</NavLink>
-        {puedeAdministrarGastos && <NavLink to="/gastos">Gastos</NavLink>}
-        <NavLink to="/cuentas-bancarias">Cuentas bancarias</NavLink>
-        <NavLink to="/calendario">
+        <NavLink to="/cotizaciones" data-module="cotizaciones">Cotizaciones</NavLink>
+        <NavLink to="/proveedores" data-module="proveedores">Proveedores</NavLink>
+        {puedeAdministrarGastos && <NavLink to="/gastos" data-module="gastos">Gastos</NavLink>}
+        <NavLink to="/cuentas-bancarias" data-module="cuentas">Cuentas bancarias</NavLink>
+        <NavLink to="/calendario" data-module="calendario">
           Calendario
           {eventosHoy > 0 && <span className="badge warning" style={{ marginLeft: 6 }}>{eventosHoy}</span>}
         </NavLink>
-        {puedeVerReportes && <NavLink to="/reportes">Reportes</NavLink>}
+        {puedeVerReportes && <NavLink to="/reportes" data-module="reportes">Reportes</NavLink>}
 
         <div className="sidebar-section-label">Sistema</div>
-        {puedeAdministrarUsuarios && <NavLink to="/usuarios">Usuarios</NavLink>}
-        {(puedeAdministrarUsuarios || puedeAdministrarConfiguracion) && <NavLink to="/auditoria">Auditoria</NavLink>}
-        <NavLink to="/configuracion">Configuracion</NavLink>
-        {puedeAdministrarConfiguracion && <NavLink to="/plantilla-recibo">Plantilla del recibo</NavLink>}
-        {puedeAdministrarConfiguracion && <NavLink to="/backups">Copias de seguridad</NavLink>}
-        <NavLink to="/shopify">Shopify</NavLink>
-        <NavLink to="/meta-ads">Meta Ads</NavLink>
+        {puedeAdministrarUsuarios && <NavLink to="/usuarios" data-module="usuarios">Usuarios</NavLink>}
+        {(puedeAdministrarUsuarios || puedeAdministrarConfiguracion) && <NavLink to="/auditoria" data-module="auditoria">Auditoria</NavLink>}
+        <NavLink to="/configuracion" data-module="configuracion">Configuracion</NavLink>
+        {puedeAdministrarConfiguracion && <NavLink to="/plantilla-recibo" data-module="plantilla">Plantilla del recibo</NavLink>}
+        {puedeAdministrarConfiguracion && <NavLink to="/backups" data-module="backups">Copias de seguridad</NavLink>}
+        <NavLink to="/shopify" data-module="shopify">Shopify</NavLink>
+        <NavLink to="/meta-ads" data-module="metaads">Meta Ads</NavLink>
 
         {puedeVerContabilidad && (
           <>
