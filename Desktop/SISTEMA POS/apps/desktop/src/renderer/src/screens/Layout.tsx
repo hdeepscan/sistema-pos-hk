@@ -128,13 +128,41 @@ export default function Layout({ children }: PropsWithChildren) {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="sidebar-brand" style={{ padding: "20px 0", borderBottom: "2px solid rgba(34, 197, 94, 0.1)" }}>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-            <div style={{ background: "linear-gradient(135deg, var(--brand) 0%, var(--accent) 100%)", borderRadius: 16, padding: 12, filter: "drop-shadow(0 8px 16px rgba(34, 197, 94, 0.2))" }}>
-              <img src={logo} alt="Sistema POS HK" style={{ height: 60, width: 60, objectFit: "contain" }} />
+        <div className="sidebar-brand" style={{ padding: "24px 0", borderBottom: "1px solid rgba(34, 197, 94, 0.08)", display: "flex", flexDirection: "column", alignItems: "center" }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 12,
+              width: "100%",
+              padding: "0 16px",
+              transition: "all 300ms cubic-bezier(0.4, 0, 0.2, 1)",
+              cursor: "pointer",
+              borderRadius: 12,
+              padding: "16px"
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "perspective(1000px) rotateY(-5deg) rotateX(5deg) translateZ(10px)";
+              e.currentTarget.style.filter = "drop-shadow(0 12px 24px rgba(34, 197, 94, 0.15))";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "perspective(1000px) rotateY(0) rotateX(0) translateZ(0)";
+              e.currentTarget.style.filter = "drop-shadow(0 4px 8px rgba(34, 197, 94, 0.08))";
+            }}
+          >
+            <div style={{
+              borderRadius: 16,
+              padding: 12,
+              filter: "drop-shadow(0 4px 8px rgba(34, 197, 94, 0.08))",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center"
+            }}>
+              <img src={logo} alt="Sistema POS HK" style={{ height: 64, width: 64, objectFit: "contain" }} />
             </div>
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 14, fontWeight: 700, background: "linear-gradient(90deg, var(--brand) 0%, var(--accent) 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>
                 SISTEMA POS
               </div>
               <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>Gestión de Ventas</div>
