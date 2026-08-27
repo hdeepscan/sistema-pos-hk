@@ -248,21 +248,9 @@ export async function webhookPago(
       `📨 Webhook PayU recibido: ${reference_sale} - Estado: ${state}`
     );
 
-    // Validar firma (opcional pero recomendado)
-    if (signature) {
-      const esValido = payuService.validarSignatureWebhook(
-        signature,
-        reference_sale,
-        value,
-        state,
-        currency
-      );
-
-      if (!esValido) {
-        console.warn("⚠️ Signature inválido en webhook");
-        // Continuar de todas formas pero logged
-      }
-    }
+    // Validar firma Wompi (opcional pero recomendado)
+    // Wompi usa HMAC-SHA256 con timestamp y body
+    // Por ahora confiamos en HTTPS y procesamos
 
     // Procesar webhook
     const esAprobado = await wompiService.procesarWebhook(request.body);
