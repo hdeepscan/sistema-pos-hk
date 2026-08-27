@@ -80,9 +80,9 @@
 
 /* ===== CUSTOM CURSORS - RETAIL/POS FOCUSED ===== */
 
-/* Cursor default - Manito Verde */
+/* Cursor default - Mano Abierta Verde */
 body {
-  cursor: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="rgb(34,197,94)"><path d="M9 3v8h2v-8H9m4 0v10h2V3h-2m4 0v12h2V3h-2m4 0v14h2V3h-2M2 11v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/></svg>') 8 2, pointer;
+  cursor: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="rgb(34,197,94)"><path d="M8 3c-1.1 0-2 .9-2 2v7c0 1.1.9 2 2 2h1v4c0 1.1.9 2 2 2s2-.9 2-2v-4h1v5c0 1.1.9 2 2 2s2-.9 2-2v-5h1v3c0 1.1.9 2 2 2s2-.9 2-2v-3c0-2.2-1.8-4-4-4h-1V5c0-1.1-.9-2-2-2s-2 .9-2 2v3H9V5c0-1.1-.9-2-2-2z"/></svg>') 10 2, auto;
 }
 
 /* Cursor para acciones de venta - Carrito de compra */
