@@ -6,6 +6,7 @@ import { reproducir } from "../lib/sonidos";
 import type { MetodoPago } from "@sistema-pos/shared";
 import { mensajeError } from "../lib/errores";
 import { CarritoMobile } from "../components/CarritoMobile";
+import { ScannerCamera } from "../components/ScannerCamera";
 
 interface Producto {
   id: string;
@@ -51,6 +52,8 @@ export default function PosMobile() {
   const [mostrarCheckout, setMostrarCheckout] = useState(false);
   const [cargandoVenta, setCargandoVenta] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mostrarScanner, setMostrarScanner] = useState(false);
+  const [buscandoPorScanner, setBuscandoPorScanner] = useState(false);
 
   // Cargar clientes al montar
   useEffect(() => {
@@ -86,6 +89,32 @@ export default function PosMobile() {
     return () => clearTimeout(timer);
   }, [busqueda, buscarProductos]);
 
+  // Buscar producto por código de barras (desde scanner)
+  const buscarPorBarcode = useCallback(
+    async (codigo: string) => {
+      setBuscandoPorScanner(true);
+      setError(null);
+      try {
+        const { data: producto } = await api.get<Producto>("/productos/buscar", {
+          params: { codigo, sucursalId: sucursalActivaId },
+        });
+
+        // Agregar directamente al carrito
+        agregarAlCarrito(producto);
+        void reproducir("sonido_exito");
+        setMostrarScanner(false); // Cerrar scanner después de escanear
+      } catch (err) {
+        setError(
+          mensajeError(err, `Código no encontrado: ${codigo}`)
+        );
+        void reproducir("sonido_error");
+      } finally {
+        setBuscandoPorScanner(false);
+      }
+    },
+    [sucursalActivaId]
+  );
+
   // Agregar producto al carrito
   const agregarAlCarrito = (producto: Producto) => {
     const itemExistente = carrito.find((i) => i.productoId === producto.id);
@@ -108,9 +137,6 @@ export default function PosMobile() {
         },
       ]);
     }
-    void reproducir("sonido_exito");
-    setResultados([]);
-    setBusqueda("");
   };
 
   // Modificar cantidad
@@ -198,24 +224,58 @@ export default function PosMobile() {
         </div>
       </div>
 
-      {/* Búsqueda */}
-      <div className="pos-mobile-search">
-        <input
-          type="text"
-          placeholder="Buscar producto o escanear..."
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          autoFocus
-          className="pos-mobile-search-input"
-        />
-      </div>
+      {/* Búsqueda o Scanner */}
+      {!mostrarScanner ? (
+        <div className="pos-mobile-search">
+          <div style={{ display: "flex", gap: "8px" }}>
+            <input
+              type="text"
+              placeholder="Buscar producto..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              autoFocus
+              className="pos-mobile-search-input"
+              style={{ flex: 1 }}
+            />
+            <button
+              className="pos-mobile-btn-scanner"
+              onClick={() => setMostrarScanner(true)}
+              title="Escanear código de barras"
+            >
+              📷
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="pos-mobile-search">
+          <button
+            className="pos-mobile-btn-secondary"
+            onClick={() => setMostrarScanner(false)}
+            style={{ width: "100%" }}
+          >
+            ← Volver a búsqueda manual
+          </button>
+        </div>
+      )}
 
-      {/* Resultados o Carrito */}
+      {/* Resultados o Carrito o Scanner */}
       <div className="pos-mobile-content">
         {!mostrarCheckout ? (
           <>
+            {/* Scanner */}
+            {mostrarScanner ? (
+              <ScannerCamera
+                onScan={(codigo) => {
+                  if (!buscandoPorScanner) {
+                    void buscarPorBarcode(codigo);
+                  }
+                }}
+                onError={(err) => setError(err)}
+              />
+            ) : null}
+
             {/* Resultados de búsqueda */}
-            {resultados.length > 0 && (
+            {!mostrarScanner && resultados.length > 0 && (
               <div className="pos-mobile-resultados">
                 {resultados.map((prod) => (
                   <div

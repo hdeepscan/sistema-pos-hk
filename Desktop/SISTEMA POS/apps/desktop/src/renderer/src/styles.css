@@ -934,7 +934,6 @@ tbody tr:hover {
 }
 
 .pos-mobile-search-input {
-  width: 100%;
   padding: 12px;
   font-size: 16px;
   border: 1px solid var(--border);
@@ -946,6 +945,28 @@ tbody tr:hover {
 .pos-mobile-search-input:focus {
   border-color: var(--brand);
   box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+}
+
+.pos-mobile-btn-scanner {
+  padding: 12px 16px;
+  font-size: 18px;
+  border: 1px solid var(--border);
+  background: var(--surface-secondary);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  outline: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.pos-mobile-btn-scanner:active {
+  background: var(--brand);
+  border-color: var(--brand);
+  transform: scale(0.95);
 }
 
 /* Content */
@@ -1296,5 +1317,181 @@ tbody tr:hover {
   .pos-mobile-btn-secondary {
     min-height: 44px; /* Touch target recomendado */
   }
+}
+
+/* ========== SCANNER CAMERA ========== */
+
+.scanner-camera {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: #000;
+}
+
+.scanner-camera-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  background: #000;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.scanner-camera-video,
+.scanner-camera-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.scanner-camera-canvas {
+  display: none;
+}
+
+/* Overlay con reticle de escaneo */
+.scanner-camera-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.scanner-camera-reticle {
+  width: 280px;
+  height: 180px;
+  border: 3px solid var(--brand);
+  border-radius: 8px;
+  position: relative;
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.3), inset 0 0 20px rgba(34, 197, 94, 0.1);
+  animation: pulse-reticle 2s ease-in-out infinite;
+}
+
+.scanner-camera-reticle::before,
+.scanner-camera-reticle::after {
+  content: "";
+  position: absolute;
+  background: var(--brand);
+}
+
+.scanner-camera-reticle::before {
+  width: 40px;
+  height: 3px;
+  top: -3px;
+  left: -3px;
+}
+
+.scanner-camera-reticle::after {
+  width: 40px;
+  height: 3px;
+  top: -3px;
+  right: -3px;
+}
+
+@keyframes pulse-reticle {
+  0%, 100% { box-shadow: 0 0 20px rgba(34, 197, 94, 0.3), inset 0 0 20px rgba(34, 197, 94, 0.1); }
+  50% { box-shadow: 0 0 40px rgba(34, 197, 94, 0.6), inset 0 0 30px rgba(34, 197, 94, 0.2); }
+}
+
+.scanner-camera-hint {
+  color: var(--brand);
+  font-size: 14px;
+  font-weight: 600;
+  text-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
+  margin: 0;
+  text-align: center;
+}
+
+/* Código detectado */
+.scanner-camera-detected {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  right: 16px;
+  padding: 12px;
+  background: var(--success-bg);
+  border-left: 3px solid var(--success);
+  border-radius: 6px;
+  color: var(--success);
+  font-size: 12px;
+  font-weight: 600;
+  z-index: 20;
+  animation: slide-in-up 0.3s ease;
+}
+
+@keyframes slide-in-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Mensajes */
+.scanner-camera-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: white;
+  text-align: center;
+  padding: 24px;
+}
+
+.scanner-camera-message p {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.scanner-camera-message.error {
+  color: var(--danger);
+}
+
+.scanner-camera-submessage {
+  font-size: 12px !important;
+  color: var(--text-muted) !important;
+  font-weight: 400 !important;
+  margin-top: 4px !important;
+}
+
+.scanner-camera-message.error .scanner-camera-submessage {
+  color: #999 !important;
+}
+
+/* Spinner de carga */
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  border-top-color: var(--brand);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Info del método */
+.scanner-camera-info {
+  padding: 8px 12px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--surface-secondary);
+  border-top: 1px solid var(--border-light);
 }
 .estado-punto.mal { background: var(--danger); box-shadow: 0 0 0 3px var(--danger-bg); }
