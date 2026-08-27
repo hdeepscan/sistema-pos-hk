@@ -179,29 +179,44 @@ export default function Reportes() {
       </div>
 
       {/* FILTROS */}
-      <div className="card" style={{ marginBottom: 24, padding: "16px 20px" }}>
-        <h4 style={{ margin: "0 0 12px", fontSize: "12px", fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)", letterSpacing: 0.5 }}>
+      <div className="card" style={{ marginBottom: 24, padding: "20px", background: "linear-gradient(135deg, rgba(34, 197, 94, 0.02) 0%, rgba(20, 184, 166, 0.01) 100%)", borderTop: "2px solid rgba(34, 197, 94, 0.1)" }}>
+        <h4 style={{ margin: "0 0 16px", fontSize: "12px", fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)", letterSpacing: 0.5 }}>
           Filtros y Período
         </h4>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
-          <div>
-            <label style={{ gap: 6 }}>
-              <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: 6 }}>Período Rápido</span>
-              <div style={{ display: "flex", gap: 6 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 16 }}>
+          {/* PERÍODO RÁPIDO */}
+          <div style={{ gridColumn: "1 / -1" }}>
+            <label style={{ display: "flex", flexDirection: "column" }}>
+              <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                {Iconos.grafico}
+                Período Rápido
+              </span>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
                 {RANGOS.map((r) => (
                   <button
                     key={r.dias}
                     type="button"
                     onClick={() => aplicarRango(r.dias)}
                     style={{
-                      padding: "6px 12px",
-                      fontSize: "12px",
-                      fontWeight: 500,
-                      background: "var(--surface-secondary)",
-                      border: "1px solid var(--border)",
-                      borderRadius: 6,
+                      padding: "10px 16px",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      background: "linear-gradient(135deg, var(--brand) 0%, #10B981 100%)",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: 8,
                       cursor: "pointer",
-                      transition: "all 150ms ease",
+                      transition: "all 200ms cubic-bezier(0.4, 0, 0.2, 1)",
+                      filter: "drop-shadow(0 4px 12px rgba(34, 197, 94, 0.2))",
+                      boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.2)",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = "translateY(-2px)";
+                      e.currentTarget.style.filter = "drop-shadow(0 6px 16px rgba(34, 197, 94, 0.3))";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.filter = "drop-shadow(0 4px 12px rgba(34, 197, 94, 0.2))";
                     }}
                   >
                     {r.label}
@@ -210,17 +225,86 @@ export default function Reportes() {
               </div>
             </label>
           </div>
+
+          {/* DESDE */}
           <label style={{ display: "flex", flexDirection: "column" }}>
-            <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", marginBottom: 6 }}>Desde</span>
-            <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} style={{ padding: "8px 12px" }} />
+            <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", marginBottom: 8 }}>Desde</span>
+            <input
+              type="date"
+              value={desde}
+              onChange={(e) => setDesde(e.target.value)}
+              style={{
+                padding: "10px 12px",
+                borderRadius: 8,
+                border: "1px solid var(--border-light)",
+                background: "var(--surface-secondary)",
+                fontSize: "13px",
+                fontWeight: 500,
+                transition: "all 200ms ease",
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = "var(--brand)";
+                e.currentTarget.style.boxShadow = "0 0 0 3px rgba(34, 197, 94, 0.1)";
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = "var(--border-light)";
+                e.currentTarget.style.boxShadow = "none";
+              }}
+            />
           </label>
+
+          {/* HASTA */}
           <label style={{ display: "flex", flexDirection: "column" }}>
-            <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", marginBottom: 6 }}>Hasta</span>
-            <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} style={{ padding: "8px 12px" }} />
+            <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", marginBottom: 8 }}>Hasta</span>
+            <input
+              type="date"
+              value={hasta}
+              onChange={(e) => setHasta(e.target.value)}
+              style={{
+                padding: "10px 12px",
+                borderRadius: 8,
+                border: "1px solid var(--border-light)",
+                background: "var(--surface-secondary)",
+                fontSize: "13px",
+                fontWeight: 500,
+                transition: "all 200ms ease",
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = "var(--brand)";
+                e.currentTarget.style.boxShadow = "0 0 0 3px rgba(34, 197, 94, 0.1)";
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = "var(--border-light)";
+                e.currentTarget.style.boxShadow = "none";
+              }}
+            />
           </label>
+
+          {/* SUCURSAL */}
           <label style={{ display: "flex", flexDirection: "column" }}>
-            <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", marginBottom: 6 }}>Sucursal</span>
-            <select value={sucursalId} onChange={(e) => setSucursalId(e.target.value)} style={{ padding: "8px 12px" }}>
+            <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", marginBottom: 8 }}>Sucursal</span>
+            <select
+              value={sucursalId}
+              onChange={(e) => setSucursalId(e.target.value)}
+              style={{
+                padding: "10px 12px",
+                borderRadius: 8,
+                border: "1px solid var(--border-light)",
+                background: "var(--surface-secondary)",
+                fontSize: "13px",
+                fontWeight: 500,
+                cursor: "pointer",
+                transition: "all 200ms ease",
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = "var(--brand)";
+                e.currentTarget.style.boxShadow = "0 0 0 3px rgba(34, 197, 94, 0.1)";
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = "var(--border-light)";
+                e.currentTarget.style.boxShadow = "none";
+              }}
+            >
               <option value="">Todas las sucursales</option>
               {sucursales.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -229,9 +313,32 @@ export default function Reportes() {
               ))}
             </select>
           </label>
+
+          {/* CANAL */}
           <label style={{ display: "flex", flexDirection: "column" }}>
-            <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", marginBottom: 6 }}>Canal de Venta</span>
-            <select value={canal} onChange={(e) => setCanal(e.target.value)} style={{ padding: "8px 12px" }}>
+            <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", marginBottom: 8 }}>Canal de Venta</span>
+            <select
+              value={canal}
+              onChange={(e) => setCanal(e.target.value)}
+              style={{
+                padding: "10px 12px",
+                borderRadius: 8,
+                border: "1px solid var(--border-light)",
+                background: "var(--surface-secondary)",
+                fontSize: "13px",
+                fontWeight: 500,
+                cursor: "pointer",
+                transition: "all 200ms ease",
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = "var(--accent)";
+                e.currentTarget.style.boxShadow = "0 0 0 3px rgba(20, 184, 166, 0.1)";
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = "var(--border-light)";
+                e.currentTarget.style.boxShadow = "none";
+              }}
+            >
               <option value="">Todos los canales</option>
               <option value="POS">Punto de Venta (POS)</option>
               <option value="SHOPIFY">Shopify</option>
