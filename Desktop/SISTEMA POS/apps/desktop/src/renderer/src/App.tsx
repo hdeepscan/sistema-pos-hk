@@ -6,6 +6,7 @@ import { api } from "./lib/api";
 import { electronAPI } from "./lib/electron-api";
 import { ErrorBoundary } from "./lib/ErrorBoundary";
 import { isMobileDevice, getMobilePreference, setMobilePreference } from "./lib/mobile-detect";
+import { notif } from "./lib/notificationService";
 import Login from "./screens/Login";
 import SeleccionSucursal from "./screens/SeleccionSucursal";
 import Layout from "./screens/Layout";
@@ -97,7 +98,65 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (token) connectSocket();
+    if (token) {
+      const socket = connectSocket();
+
+      // Escuchar eventos en tiempo real
+      if (socket) {
+        // Eventos de ventas
+        socket.on("venta:creada", (data: any) => {
+          notif.exito(
+            `📊 Nueva venta: ${data.consecutivo || "Venta"} - $${(data.total || 0).toLocaleString("es-CO")}`
+          );
+        });
+
+        // Eventos de productos
+        socket.on("producto:creado", (data: any) => {
+          notif.info(`✨ Nuevo producto: ${data.nombre || "Producto"}`);
+        });
+
+        socket.on("producto:editado", (data: any) => {
+          notif.info(`📝 Producto actualizado: ${data.nombre || "Producto"}`);
+        });
+
+        // Eventos de stock bajo
+        socket.on("stock:bajo", (data: any) => {
+          notif.warning(
+            `⚠️ Stock bajo: ${data.nombre || "Producto"} (${data.stock || 0} disponibles)`
+          );
+        });
+
+        // Eventos de caja
+        socket.on("caja:abierta", () => {
+          notif.info("🏦 Caja abierta");
+        });
+
+        socket.on("caja:cerrada", (data: any) => {
+          notif.exito(`🏦 Caja cerrada - Total: $${(data.total || 0).toLocaleString("es-CO")}`);
+        });
+
+        // Eventos de sincronización
+        socket.on("inventario:actualizado", () => {
+          notif.info("🔄 Inventario actualizado");
+        });
+
+        // Errores
+        socket.on("error", (data: any) => {
+          notif.error(`Error: ${data.mensaje || "Error desconocido"}`);
+        });
+
+        return () => {
+          socket.off("venta:creada");
+          socket.off("producto:creado");
+          socket.off("producto:editado");
+          socket.off("stock:bajo");
+          socket.off("caja:abierta");
+          socket.off("caja:cerrada");
+          socket.off("inventario:actualizado");
+          socket.off("error");
+        };
+      }
+    }
   }, [token]);
 
   if (!hidratado || !mobileInitialized) return null;

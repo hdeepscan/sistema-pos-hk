@@ -8,6 +8,7 @@ import { mensajeError } from "../lib/errores";
 import { CarritoMobile } from "../components/CarritoMobile";
 import { ScannerCamera } from "../components/ScannerCamera";
 import CreateProductMobile from "./CreateProductMobile";
+import { notif } from "../lib/notificationService";
 
 interface Producto {
   id: string;
@@ -197,7 +198,9 @@ export default function PosMobile({ onToggleMobile }: { onToggleMobile?: () => v
 
       // Éxito
       void reproducir("sonido_venta_exitosa");
-      alert(`✅ Venta registrada #${venta.consecutivo}\nTotal: $${total.toLocaleString("es-CO")}`);
+      notif.exito(
+        `✅ Venta #${venta.consecutivo} - $${total.toLocaleString("es-CO")}`
+      );
 
       // Limpiar
       setCarrito([]);
