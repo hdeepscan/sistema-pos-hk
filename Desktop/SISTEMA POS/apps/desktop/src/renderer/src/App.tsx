@@ -185,6 +185,15 @@ export default function App() {
     setMobilePreference(newValue);
   };
 
+  // Mostrar CheckoutPage sin Layout
+  if (location.pathname === "/checkout") {
+    return (
+      <Routes>
+        <Route path="/checkout" element={<CheckoutPage />} />
+      </Routes>
+    );
+  }
+
   return (
     <Layout isMobile={isMobile} setIsMobile={toggleMobilePreference}>
       <ErrorBoundary key={location.pathname}>
