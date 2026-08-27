@@ -39,17 +39,18 @@ export default function Reportes() {
   const [desde, setDesde] = useState(haceDias(30));
   const [hasta, setHasta] = useState(haceDias(0));
   const [sucursalId, setSucursalId] = useState("");
+  const [canal, setCanal] = useState("");
   const [resumen, setResumen] = useState<Resumen | null>(null);
   const [cargando, setCargando] = useState(true);
 
   const cargar = useCallback(async () => {
     setCargando(true);
     const { data } = await api.get<Resumen>("/reportes/resumen", {
-      params: { desde, hasta, sucursalId: sucursalId || undefined },
+      params: { desde, hasta, sucursalId: sucursalId || undefined, canal: canal || undefined },
     });
     setResumen(data);
     setCargando(false);
-  }, [desde, hasta, sucursalId]);
+  }, [desde, hasta, sucursalId, canal]);
 
   useEffect(() => {
     cargar();
@@ -93,6 +94,16 @@ export default function Reportes() {
                   {s.nombre}
                 </option>
               ))}
+            </select>
+          </label>
+          <label>
+            Canal de venta
+            <select value={canal} onChange={(e) => setCanal(e.target.value)}>
+              <option value="">Todos</option>
+              <option value="POS">Punto de venta</option>
+              <option value="SHOPIFY">Shopify</option>
+              <option value="WHATSAPP">WhatsApp</option>
+              <option value="OTRO">Otro</option>
             </select>
           </label>
         </div>

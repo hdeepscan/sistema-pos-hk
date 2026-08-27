@@ -7,10 +7,10 @@ function rangoFechas(desde?: string, hasta?: string) {
   return { inicio, fin };
 }
 
-async function totalesEnRango(empresaId: string, sucursalId: string | undefined, inicio: Date, fin: Date) {
+async function totalesEnRango(empresaId: string, sucursalId: string | undefined, inicio: Date, fin: Date, canal?: string) {
   const [ventas, gastos] = await Promise.all([
     prisma.venta.aggregate({
-      where: { empresaId, ...(sucursalId ? { sucursalId } : {}), fecha: { gte: inicio, lte: fin } },
+      where: { empresaId, ...(sucursalId ? { sucursalId } : {}), ...(canal ? { canal: canal as any } : {}), fecha: { gte: inicio, lte: fin } },
       _sum: { total: true },
       _count: true,
     }),
@@ -39,10 +39,11 @@ export async function reportesRoutes(app: FastifyInstance) {
       return reply.code(403).send({ error: "No tienes permiso para ver reportes" });
     }
     const { empresaId } = request.user;
-    const { desde, hasta, sucursalId } = request.query as {
+    const { desde, hasta, sucursalId, canal } = request.query as {
       desde?: string;
       hasta?: string;
       sucursalId?: string;
+      canal?: string;
     };
     const { inicio, fin } = rangoFechas(desde, hasta);
     const duracionMs = fin.getTime() - inicio.getTime();
@@ -54,6 +55,7 @@ export async function reportesRoutes(app: FastifyInstance) {
         where: {
           empresaId,
           ...(sucursalId ? { sucursalId } : {}),
+          ...(canal ? { canal: canal as any } : {}),
           fecha: { gte: inicio, lte: fin },
         },
         include: { items: { include: { producto: true } } },
@@ -66,7 +68,7 @@ export async function reportesRoutes(app: FastifyInstance) {
         },
       }),
       prisma.sucursal.findMany({ where: { empresaId, activo: true } }),
-      totalesEnRango(empresaId, sucursalId, inicioAnterior, finAnterior),
+      totalesEnRango(empresaId, sucursalId, inicioAnterior, finAnterior, canal),
       prisma.gastoPauta.aggregate({
         where: { empresaId, fecha: { gte: inicio, lte: fin } },
         _sum: { gasto: true },
