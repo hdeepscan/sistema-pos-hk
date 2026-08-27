@@ -49,13 +49,18 @@ export default function Reportes() {
   const [canal, setCanal] = useState("");
   const [resumen, setResumen] = useState<Resumen | null>(null);
   const [cargando, setCargando] = useState(true);
+  const [activeTab, setActiveTab] = useState<"overview" | "canales" | "productos" | "analisis">("overview");
 
   const cargar = useCallback(async () => {
     setCargando(true);
-    const { data } = await api.get<Resumen>("/reportes/resumen", {
-      params: { desde, hasta, sucursalId: sucursalId || undefined, canal: canal || undefined },
-    });
-    setResumen(data);
+    try {
+      const { data } = await api.get<Resumen>("/reportes/resumen", {
+        params: { desde, hasta, sucursalId: sucursalId || undefined, canal: canal || undefined },
+      });
+      setResumen(data);
+    } catch (err) {
+      console.error("Error cargando reportes:", err);
+    }
     setCargando(false);
   }, [desde, hasta, sucursalId, canal]);
 
@@ -76,9 +81,43 @@ export default function Reportes() {
     <div>
       <div className="page-header">
         <div>
-          <h2>📊 Reportes Avanzados</h2>
-          <p>Análisis detallado de ventas, canales, productos y rendimiento por período</p>
+          <h2 style={{ display: "flex", alignItems: "center", gap: 12, margin: 0 }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" strokeWidth="2">
+              <line x1="12" y1="2" x2="12" y2="22"></line>
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h.5M7 12a3 3 0 0 1 3-3h8"></path>
+            </svg>
+            Análisis Detallado
+          </h2>
+          <p>Ventas, canales, productos y rendimiento empresarial</p>
         </div>
+      </div>
+
+      {/* TABS */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 20, borderBottom: "1px solid var(--border-light)", paddingBottom: 12 }}>
+        {[
+          { id: "overview", label: "Resumen Ejecutivo", icon: "📊" },
+          { id: "canales", label: "Análisis por Canal", icon: "🔀" },
+          { id: "productos", label: "Top Productos", icon: "📦" },
+          { id: "analisis", label: "Análisis Avanzado", icon: "📈" },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            className={`secondary`}
+            onClick={() => setActiveTab(tab.id as any)}
+            style={{
+              padding: "8px 16px",
+              background: activeTab === tab.id ? "var(--brand)" : "transparent",
+              color: activeTab === tab.id ? "#fff" : "var(--text-muted)",
+              border: "none",
+              borderRadius: 8,
+              cursor: "pointer",
+              fontWeight: activeTab === tab.id ? 600 : 500,
+              transition: "all 200ms ease",
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {/* Filtros */}
