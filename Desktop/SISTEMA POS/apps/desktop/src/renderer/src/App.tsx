@@ -33,6 +33,7 @@ import CuentasBancarias from "./screens/CuentasBancarias";
 import Calendario from "./screens/Calendario";
 import Contabilidad from "./screens/Contabilidad";
 import Cotizaciones from "./screens/Cotizaciones";
+import CheckoutPage from "./screens/CheckoutPage";
 
 export default function App() {
   const { token, sucursalActivaId, hidratado, setApiBaseUrl, setSesion, setSucursalActiva, setHidratado } =
@@ -210,6 +211,7 @@ export default function App() {
           <Route path="/calendario" element={<Calendario />} />
           <Route path="/contabilidad" element={<Contabilidad />} />
           <Route path="/cotizaciones" element={<Cotizaciones />} />
+          <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="*" element={<Navigate to="/pos" replace />} />
         </Routes>
       </ErrorBoundary>
