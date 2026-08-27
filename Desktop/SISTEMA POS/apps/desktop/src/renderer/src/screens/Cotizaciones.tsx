@@ -186,7 +186,8 @@ export default function Cotizaciones() {
         throw new Error("No hay sesión activa");
       }
 
-      const urlCompleta = `${apiBaseUrl}/cotizaciones/${cotizacionId}/descargar/pdf`;
+      const baseUrl = apiBaseUrl && apiBaseUrl !== "/" ? apiBaseUrl : window.location.origin;
+      const urlCompleta = `${baseUrl}/cotizaciones/${cotizacionId}/descargar/pdf`;
       console.log("Descargando PDF desde:", urlCompleta);
 
       const response = await fetch(urlCompleta, {
@@ -298,7 +299,8 @@ export default function Cotizaciones() {
         throw new Error("No hay sesión activa");
       }
 
-      const urlCompleta = `${apiBaseUrl}/cotizaciones/${id}/descargar/${formato}`;
+      const baseUrl = apiBaseUrl && apiBaseUrl !== "/" ? apiBaseUrl : window.location.origin;
+      const urlCompleta = `${baseUrl}/cotizaciones/${id}/descargar/${formato}`;
       console.log("Descargando desde:", urlCompleta);
 
       const response = await fetch(urlCompleta, {
