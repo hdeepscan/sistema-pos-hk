@@ -128,8 +128,18 @@ export default function Layout({ children }: PropsWithChildren) {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="sidebar-brand">
-          <img src={logo} alt="Sistema POS HK" style={{ height: 40, background: "#fff", borderRadius: 8, padding: 4 }} />
+        <div className="sidebar-brand" style={{ padding: "20px 0", borderBottom: "2px solid rgba(34, 197, 94, 0.1)" }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+            <div style={{ background: "linear-gradient(135deg, var(--brand) 0%, var(--accent) 100%)", borderRadius: 16, padding: 12, filter: "drop-shadow(0 8px 16px rgba(34, 197, 94, 0.2))" }}>
+              <img src={logo} alt="Sistema POS HK" style={{ height: 60, width: 60, objectFit: "contain" }} />
+            </div>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 14, fontWeight: 700, background: "linear-gradient(90deg, var(--brand) 0%, var(--accent) 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
+                SISTEMA POS
+              </div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>Gestión de Ventas</div>
+            </div>
+          </div>
         </div>
         <div className="sidebar-context">
           <strong>{empresa?.nombre}</strong>
