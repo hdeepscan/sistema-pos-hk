@@ -24,13 +24,10 @@ export async function rutasPagos(fastify: FastifyInstance) {
   });
 
   // Rutas protegidas (requieren autenticación)
-  fastify.post(
-    "/checkout/crear",
-    { preHandler: authMiddleware },
-    async (request, reply) => {
-      return crearCheckout(request, reply);
-    }
-  );
+  // NOTA: Por ahora /checkout/crear es público para testear Wompi
+  fastify.post("/checkout/crear", async (request, reply) => {
+    return crearCheckout(request, reply);
+  });
 
   fastify.post(
     "/checkout/confirmar",

@@ -65,6 +65,9 @@ export default function CheckoutPage() {
         {
           tipoPlan: planSeleccionado,
           usuariosAdicionales,
+          empresaId,
+          email: usuario?.email,
+          nombre: usuario?.nombre,
         }
       );
 
