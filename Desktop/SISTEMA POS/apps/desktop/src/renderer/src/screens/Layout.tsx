@@ -11,7 +11,12 @@ import { electronAPI } from "../lib/electron-api";
 
 const INTERVALO_CREDITOS_MS = 5 * 60 * 1000;
 
-export default function Layout({ children }: PropsWithChildren) {
+interface LayoutProps extends PropsWithChildren {
+  isMobile?: boolean;
+  setIsMobile?: (value: boolean | null) => void;
+}
+
+export default function Layout({ children, isMobile = false, setIsMobile }: LayoutProps) {
   const { empresa, sucursales, sucursalActivaId, usuario, logout } = useSesionStore();
   const puedeVerCreditos = usePermiso("creditos.administrar");
   const puedeAdministrarUsuarios = usePermiso("usuarios.administrar");
@@ -127,7 +132,7 @@ export default function Layout({ children }: PropsWithChildren) {
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
+      {!isMobile && <aside className="sidebar">
         <div className="sidebar-brand" style={{ padding: "28px 16px", borderBottom: "1px solid rgba(34, 197, 94, 0.08)", display: "flex", flexDirection: "column", alignItems: "center" }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, width: "100%" }}>
             <div style={{ borderRadius: 20, padding: 16, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px rgba(34, 197, 94, 0.1)" }}>
@@ -204,7 +209,8 @@ export default function Layout({ children }: PropsWithChildren) {
         <button className="secondary" onClick={cerrarSesion} type="button" style={{ marginTop: 12 }}>
           Cerrar sesion
         </button>
-      </aside>
+      </aside>}
+      {/* Si está en mobile, no mostrar sidebar */}
       <main className="main-content">
         {update && (update.estado === "disponible" || update.estado === "descargando" || update.estado === "listo-para-instalar") && (
           <div className="card" style={{ marginBottom: 16, borderLeft: "4px solid var(--brand, #4f46e5)" }}>

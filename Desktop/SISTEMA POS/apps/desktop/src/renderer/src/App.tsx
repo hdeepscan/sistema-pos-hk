@@ -1,14 +1,16 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useSesionStore } from "./lib/store";
 import { connectSocket } from "./lib/socket";
 import { api } from "./lib/api";
 import { electronAPI } from "./lib/electron-api";
 import { ErrorBoundary } from "./lib/ErrorBoundary";
+import { isMobileDevice, getMobilePreference, setMobilePreference } from "./lib/mobile-detect";
 import Login from "./screens/Login";
 import SeleccionSucursal from "./screens/SeleccionSucursal";
 import Layout from "./screens/Layout";
 import Pos from "./screens/Pos";
+import PosMobile from "./screens/PosMobile";
 import Ventas from "./screens/Ventas";
 import Productos from "./screens/Productos";
 import Colecciones from "./screens/Colecciones";
@@ -37,6 +39,12 @@ export default function App() {
   // La key por ruta hace que el ErrorBoundary se "resetee" al navegar a otra
   // pantalla, en vez de quedarse trabado mostrando el error anterior.
   const location = useLocation();
+
+  // Detección automática de mobile (o override manual del usuario)
+  const [isMobile, setIsMobile] = useState(() => {
+    const userPreference = getMobilePreference();
+    return userPreference !== null ? userPreference : isMobileDevice();
+  });
 
   useEffect(() => {
     const initConfig = async () => {
@@ -95,12 +103,25 @@ export default function App() {
     );
   }
 
+  // Cambiar a mobile si se redimensiona la ventana
+  useEffect(() => {
+    const handleResize = () => {
+      const userPreference = getMobilePreference();
+      if (userPreference === null) {
+        setIsMobile(isMobileDevice());
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   return (
-    <Layout>
+    <Layout isMobile={isMobile} setIsMobile={setIsMobile}>
       <ErrorBoundary key={location.pathname}>
       <Routes>
-        <Route path="/" element={<Navigate to="/pos" replace />} />
+        <Route path="/" element={<Navigate to={isMobile ? "/pos-mobile" : "/pos"} replace />} />
         <Route path="/pos" element={<Pos />} />
+        <Route path="/pos-mobile" element={<PosMobile />} />
         <Route path="/ventas" element={<Ventas />} />
         <Route path="/productos" element={<Productos />} />
         <Route path="/colecciones" element={<Colecciones />} />
