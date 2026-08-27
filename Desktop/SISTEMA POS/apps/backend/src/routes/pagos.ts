@@ -10,6 +10,7 @@ import {
   webhookPago,
   obtenerEstadoPago,
 } from "../controllers/checkoutController.js";
+import { authMiddleware } from "../middleware/authMiddleware.js";
 
 export async function rutasPagos(fastify: FastifyInstance) {
   // Rutas públicas (sin autenticación)
@@ -23,16 +24,27 @@ export async function rutasPagos(fastify: FastifyInstance) {
   });
 
   // Rutas protegidas (requieren autenticación)
-  // Nota: La autenticación debe ser manejada a nivel del servidor principal
-  fastify.post("/checkout/crear", async (request, reply) => {
-    return crearCheckout(request, reply);
-  });
+  fastify.post(
+    "/checkout/crear",
+    { preHandler: authMiddleware },
+    async (request, reply) => {
+      return crearCheckout(request, reply);
+    }
+  );
 
-  fastify.post("/checkout/confirmar", async (request, reply) => {
-    return confirmarPago(request, reply);
-  });
+  fastify.post(
+    "/checkout/confirmar",
+    { preHandler: authMiddleware },
+    async (request, reply) => {
+      return confirmarPago(request, reply);
+    }
+  );
 
-  fastify.get("/pagos/estado/:referenciaPago", async (request, reply) => {
-    return obtenerEstadoPago(request, reply);
-  });
+  fastify.get(
+    "/pagos/estado/:referenciaPago",
+    { preHandler: authMiddleware },
+    async (request, reply) => {
+      return obtenerEstadoPago(request, reply);
+    }
+  );
 }
