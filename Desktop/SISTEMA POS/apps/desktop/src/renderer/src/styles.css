@@ -80,9 +80,9 @@
 
 /* ===== CUSTOM CURSORS - RETAIL/POS FOCUSED ===== */
 
-/* Cursor default - Flecha minimalista */
+/* Cursor default - Manito Verde */
 body {
-  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="%231F2937" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5l0 10M5 5l-3 3M5 5l3 3"></path></svg>') 5 2, auto;
+  cursor: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="rgb(34,197,94)"><path d="M9 3v8h2v-8H9m4 0v10h2V3h-2m4 0v12h2V3h-2m4 0v14h2V3h-2M2 11v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/></svg>') 8 2, pointer;
 }
 
 /* Cursor para acciones de venta - Carrito de compra */
@@ -129,7 +129,7 @@ select {
 
 /* POS/Punto de venta - Carrito */
 [data-module="pos"], [data-module="ventas"] {
-  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="%2322C55E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>') 8 4, pointer;
+  cursor: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="rgb(34,197,94)"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>') 8 4, pointer;
 }
 
 /* Caja - Dinero/Caja registradora */
