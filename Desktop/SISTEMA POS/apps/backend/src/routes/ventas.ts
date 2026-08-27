@@ -738,7 +738,14 @@ export async function ventasRoutes(app: FastifyInstance) {
       });
 
       // Registrar en auditoría
-      await registrarAuditoria(empresaId, request.user.usuarioId, "ACTUALIZAR", "ventas", id, { canal });
+      registrarAuditoria({
+        empresaId,
+        usuarioId: request.user.usuarioId,
+        accion: "ACTUALIZAR",
+        entidad: "ventas",
+        entidadId: id,
+        detalle: `Canal cambiado a: ${canal}`,
+      });
 
       reply.send({ id: actualizada.id, canal: actualizada.canal });
     } catch (err: any) {
