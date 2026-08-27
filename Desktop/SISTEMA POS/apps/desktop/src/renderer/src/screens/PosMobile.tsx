@@ -8,6 +8,7 @@ import { mensajeError } from "../lib/errores";
 import { CarritoMobile } from "../components/CarritoMobile";
 import { ScannerCamera } from "../components/ScannerCamera";
 import CreateProductMobile from "./CreateProductMobile";
+import { MobileMenu } from "../components/MobileMenu";
 
 interface Producto {
   id: string;
@@ -219,6 +220,11 @@ export default function PosMobile({ onToggleMobile }: { onToggleMobile?: () => v
         <CreateProductMobile onClose={() => setMostrarCrearProducto(false)} />
       )}
 
+      {/* Menú Hamburguesa */}
+      <div style={{ position: "fixed", top: 16, left: 16, zIndex: 1000 }}>
+        <MobileMenu />
+      </div>
+
       {/* Header minimalista */}
       <div className="pos-mobile-header">
         <div>
@@ -245,7 +251,7 @@ export default function PosMobile({ onToggleMobile }: { onToggleMobile?: () => v
               title="Cambiar a vista Desktop"
               style={{ padding: "6px 8px", fontSize: "14px", minHeight: "auto", minWidth: "auto" }}
             >
-              💻
+              🖥️
             </button>
           )}
           <div style={{ fontSize: 14, fontWeight: 700 }}>
