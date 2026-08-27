@@ -112,12 +112,18 @@ export default function App() {
     );
   }
 
+  const toggleMobilePreference = () => {
+    const newValue = !isMobile;
+    setIsMobileState(newValue);
+    setMobilePreference(newValue);
+  };
+
   return (
-    <Layout isMobile={isMobile} setIsMobile={setIsMobileState}>
+    <Layout isMobile={isMobile} setIsMobile={toggleMobilePreference}>
       <ErrorBoundary key={location.pathname}>
         <Routes>
           <Route path="/" element={<Navigate to="/pos" replace />} />
-          <Route path="/pos" element={isMobile ? <PosMobile /> : <Pos />} />
+          <Route path="/pos" element={isMobile ? <PosMobile onToggleMobile={toggleMobilePreference} /> : <Pos />} />
           <Route path="/ventas" element={<Ventas />} />
           <Route path="/productos" element={<Productos />} />
           <Route path="/colecciones" element={<Colecciones />} />

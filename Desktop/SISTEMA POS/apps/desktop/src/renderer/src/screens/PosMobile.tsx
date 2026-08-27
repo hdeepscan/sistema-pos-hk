@@ -38,7 +38,7 @@ interface Cliente {
 const DIAS = ["domingo", "lunes", "martes", "miercoles", "jueves", "viernes", "sabado"];
 const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 
-export default function PosMobile() {
+export default function PosMobile({ onToggleMobile }: { onToggleMobile?: () => void } = {}) {
   const { sucursalActivaId, sucursales, empresa, usuario } = useSesionStore();
   const puedeDescuentos = usePermiso("descuentos.aplicar");
   const puedeCrearProductos = usePermiso("productos.administrar");
@@ -236,6 +236,16 @@ export default function PosMobile() {
               style={{ padding: "6px 12px", fontSize: "12px", minHeight: "auto" }}
             >
               + Producto
+            </button>
+          )}
+          {onToggleMobile && (
+            <button
+              onClick={onToggleMobile}
+              className="pos-mobile-btn-secondary"
+              title="Cambiar a vista Desktop"
+              style={{ padding: "6px 8px", fontSize: "14px", minHeight: "auto", minWidth: "auto" }}
+            >
+              💻
             </button>
           )}
           <div style={{ fontSize: 14, fontWeight: 700 }}>
