@@ -46,6 +46,23 @@ interface Cliente {
   nombre: string;
 }
 
+// Iconos SVG inline
+const Iconos = {
+  print: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <polyline points="6 9 6 2 18 2 18 9"></polyline>
+      <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+      <rect x="6" y="14" width="12" height="8"></rect>
+    </svg>
+  ),
+  tag: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+      <line x1="7" y1="7" x2="7.01" y2="7"></line>
+    </svg>
+  ),
+};
+
 const ESTADOS_CREDITO: Record<string, string> = {
   VIGENTE: "Vigente",
   PROXIMO_A_VENCER: "Proximo a vencer",
@@ -699,11 +716,11 @@ function DetalleVenta({
           <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
             {!confirmando ? (
               <div className="toolbar">
-                <button type="button" onClick={() => onReimprimir(venta, sucursalNombre)}>
-                  🖨️ Reimprimir recibo
+                <button type="button" onClick={() => onReimprimir(venta, sucursalNombre)} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  {Iconos.print} Reimprimir recibo
                 </button>
-                <button type="button" onClick={() => onImprimirEtiquetas(venta)}>
-                  🏷️ Imprimir etiquetas
+                <button type="button" onClick={() => onImprimirEtiquetas(venta)} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  {Iconos.tag} Imprimir etiquetas
                 </button>
                 {puedeDevolver && (
                   <button className="secondary" type="button" onClick={() => setModoDevolucion(true)}>
