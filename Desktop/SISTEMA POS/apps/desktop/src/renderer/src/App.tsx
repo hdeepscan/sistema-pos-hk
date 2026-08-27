@@ -36,19 +36,15 @@ import Cotizaciones from "./screens/Cotizaciones";
 export default function App() {
   const { token, sucursalActivaId, hidratado, setApiBaseUrl, setSesion, setSucursalActiva, setHidratado } =
     useSesionStore();
-  // La key por ruta hace que el ErrorBoundary se "resetee" al navegar a otra
-  // pantalla, en vez de quedarse trabado mostrando el error anterior.
   const location = useLocation();
 
-  // Detección automática de mobile (o override manual del usuario)
-  const [isMobile, setIsMobile] = useState(() => {
-    const userPreference = getMobilePreference();
-    return userPreference !== null ? userPreference : isMobileDevice();
-  });
+  // Estado simple para mobile (sin inicializador que podría causar error)
+  const [isMobile, setIsMobileState] = useState(false);
+  const [mobileInitialized, setMobileInitialized] = useState(false);
 
   useEffect(() => {
     const initConfig = async () => {
-      let apiBaseUrl = "/"; // Default to current origin for web
+      let apiBaseUrl = "/";
       let token = null;
       let sucursalId = null;
 
@@ -79,13 +75,26 @@ export default function App() {
     };
 
     initConfig();
+  }, [setApiBaseUrl, setSesion, setSucursalActiva, setHidratado]);
+
+  // Inicializar detección de mobile después de que se cargue todo
+  useEffect(() => {
+    try {
+      const userPreference = getMobilePreference();
+      const detected = userPreference !== null ? userPreference : isMobileDevice();
+      setIsMobileState(detected);
+    } catch (err) {
+      console.error("Error initializing mobile detection:", err);
+      setIsMobileState(false);
+    }
+    setMobileInitialized(true);
   }, []);
 
   useEffect(() => {
     if (token) connectSocket();
   }, [token]);
 
-  if (!hidratado) return null;
+  if (!hidratado || !mobileInitialized) return null;
 
   if (!token) {
     return (
@@ -103,48 +112,35 @@ export default function App() {
     );
   }
 
-  // Cambiar a mobile si se redimensiona la ventana
-  useEffect(() => {
-    const handleResize = () => {
-      const userPreference = getMobilePreference();
-      if (userPreference === null) {
-        setIsMobile(isMobileDevice());
-      }
-    };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
   return (
-    <Layout isMobile={isMobile} setIsMobile={setIsMobile}>
+    <Layout isMobile={isMobile} setIsMobile={setIsMobileState}>
       <ErrorBoundary key={location.pathname}>
-      <Routes>
-        <Route path="/" element={<Navigate to="/pos" replace />} />
-        {/* /pos detecta automáticamente si es mobile y renderiza el componente correcto */}
-        <Route path="/pos" element={isMobile ? <PosMobile /> : <Pos />} />
-        <Route path="/ventas" element={<Ventas />} />
-        <Route path="/productos" element={<Productos />} />
-        <Route path="/colecciones" element={<Colecciones />} />
-        <Route path="/clientes" element={<Clientes />} />
-        <Route path="/creditos" element={<Creditos />} />
-        <Route path="/proveedores" element={<Proveedores />} />
-        <Route path="/gastos" element={<Gastos />} />
-        <Route path="/reportes" element={<Reportes />} />
-        <Route path="/configuracion" element={<Configuracion />} />
-        <Route path="/usuarios" element={<Usuarios />} />
-        <Route path="/plantilla-recibo" element={<PlantillaRecibo />} />
-        <Route path="/notificaciones" element={<Notificaciones />} />
-        <Route path="/backups" element={<Backups />} />
-        <Route path="/caja" element={<Caja />} />
-        <Route path="/auditoria" element={<Auditoria />} />
-        <Route path="/shopify" element={<Shopify />} />
-        <Route path="/meta-ads" element={<MetaAds />} />
-        <Route path="/cuentas-bancarias" element={<CuentasBancarias />} />
-        <Route path="/calendario" element={<Calendario />} />
-        <Route path="/contabilidad" element={<Contabilidad />} />
-        <Route path="/cotizaciones" element={<Cotizaciones />} />
-        <Route path="*" element={<Navigate to="/pos" replace />} />
-      </Routes>
+        <Routes>
+          <Route path="/" element={<Navigate to="/pos" replace />} />
+          <Route path="/pos" element={isMobile ? <PosMobile /> : <Pos />} />
+          <Route path="/ventas" element={<Ventas />} />
+          <Route path="/productos" element={<Productos />} />
+          <Route path="/colecciones" element={<Colecciones />} />
+          <Route path="/clientes" element={<Clientes />} />
+          <Route path="/creditos" element={<Creditos />} />
+          <Route path="/proveedores" element={<Proveedores />} />
+          <Route path="/gastos" element={<Gastos />} />
+          <Route path="/reportes" element={<Reportes />} />
+          <Route path="/configuracion" element={<Configuracion />} />
+          <Route path="/usuarios" element={<Usuarios />} />
+          <Route path="/plantilla-recibo" element={<PlantillaRecibo />} />
+          <Route path="/notificaciones" element={<Notificaciones />} />
+          <Route path="/backups" element={<Backups />} />
+          <Route path="/caja" element={<Caja />} />
+          <Route path="/auditoria" element={<Auditoria />} />
+          <Route path="/shopify" element={<Shopify />} />
+          <Route path="/meta-ads" element={<MetaAds />} />
+          <Route path="/cuentas-bancarias" element={<CuentasBancarias />} />
+          <Route path="/calendario" element={<Calendario />} />
+          <Route path="/contabilidad" element={<Contabilidad />} />
+          <Route path="/cotizaciones" element={<Cotizaciones />} />
+          <Route path="*" element={<Navigate to="/pos" replace />} />
+        </Routes>
       </ErrorBoundary>
     </Layout>
   );
