@@ -173,6 +173,7 @@ export default function App() {
   if (!sucursalActivaId) {
     return (
       <Routes>
+        <Route path="/checkout" element={<CheckoutPage />} />
         <Route path="*" element={<SeleccionSucursal />} />
       </Routes>
     );
@@ -211,7 +212,6 @@ export default function App() {
           <Route path="/calendario" element={<Calendario />} />
           <Route path="/contabilidad" element={<Contabilidad />} />
           <Route path="/cotizaciones" element={<Cotizaciones />} />
-          <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="*" element={<Navigate to="/pos" replace />} />
         </Routes>
       </ErrorBoundary>
