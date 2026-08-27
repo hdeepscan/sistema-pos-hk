@@ -128,37 +128,9 @@ export default function Layout({ children }: PropsWithChildren) {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="sidebar-brand" style={{ padding: "28px 0", borderBottom: "1px solid rgba(34, 197, 94, 0.08)", display: "flex", flexDirection: "column", alignItems: "center" }}>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 14,
-              width: "100%",
-              padding: "0 16px",
-              transition: "all 250ms cubic-bezier(0.4, 0, 0.2, 1)",
-              cursor: "pointer",
-              borderRadius: 14,
-              padding: "20px 16px"
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = "scale(1.06) translateY(-4px)";
-              e.currentTarget.style.boxShadow = "0 16px 32px rgba(34, 197, 94, 0.2)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = "scale(1) translateY(0)";
-              e.currentTarget.style.boxShadow = "0 4px 12px rgba(34, 197, 94, 0.1)";
-            }}
-          >
-            <div style={{
-              borderRadius: 20,
-              padding: 16,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 4px 12px rgba(34, 197, 94, 0.1)"
-            }}>
+        <div className="sidebar-brand" style={{ padding: "28px 16px", borderBottom: "1px solid rgba(34, 197, 94, 0.08)", display: "flex", flexDirection: "column", alignItems: "center" }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, width: "100%" }}>
+            <div style={{ borderRadius: 20, padding: 16, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px rgba(34, 197, 94, 0.1)" }}>
               <img src={logo} alt="Sistema POS HK" style={{ height: 88, width: 88, objectFit: "contain" }} />
             </div>
             <div style={{ textAlign: "center" }}>
