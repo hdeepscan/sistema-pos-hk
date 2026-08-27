@@ -5,6 +5,7 @@ import { useVentaCreada } from "../lib/socket";
 import { BotonesExportar } from "../lib/BotonesExportar";
 import type { ColumnaExport } from "../lib/export";
 import { mensajeError } from "../lib/errores";
+import { electronAPI } from "../lib/electron-api";
 
 interface VentaItem {
   id: string;
@@ -165,6 +166,35 @@ export default function Ventas() {
       setCargando(false);
     }
   }, [filtroSucursal, sucursalActivaId, desde, hasta, montoMin, montoMax, filtroClienteId, filtroUsuarioId, filtroMetodoPago, filtroCanal]);
+
+  const reimprimir = useCallback(async (venta: Venta) => {
+    try {
+      // Construir datos del recibo como en Pos.tsx
+      const reciboData = {
+        numero: venta.consecutivo,
+        fecha: new Date(venta.fecha).toLocaleString("es-CO"),
+        cliente: venta.cliente?.nombre || "Cliente General",
+        clienteId: venta.cliente?.id || venta.clienteId,
+        productos: venta.items.map((item) => ({
+          nombre: item.producto.nombre,
+          cantidad: item.cantidad,
+          precio: item.producto.precio,
+          total: item.cantidad * Number(item.producto.precio),
+        })),
+        total: Number(venta.total),
+        metodoPago: venta.metodoPago,
+        descuento: Number(venta.descuento) || undefined,
+        observaciones: venta.observaciones || undefined,
+      };
+
+      const config = await electronAPI.getConfig();
+      console.log(`[REPRINT] Reimprimir recibo #${venta.consecutivo} con impresora: ${config.printerName || "default"}`);
+      await electronAPI.generarReciboPDF(reciboData, config.printerName);
+    } catch (err) {
+      console.error("Error al reimprimir recibo:", err);
+      mensajeError("No se pudo reimprimir el recibo");
+    }
+  }, []);
 
   useEffect(() => {
     cargar();
@@ -594,6 +624,9 @@ function DetalleVenta({
           <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
             {!confirmando ? (
               <div className="toolbar">
+                <button type="button" onClick={() => reimprimir(seleccionada)}>
+                  🖨️ Reimprimir recibo
+                </button>
                 {puedeDevolver && (
                   <button className="secondary" type="button" onClick={() => setModoDevolucion(true)}>
                     Devolucion parcial
