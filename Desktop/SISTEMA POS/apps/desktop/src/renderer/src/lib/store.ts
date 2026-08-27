@@ -53,3 +53,34 @@ export const useSesionStore = create<SesionState>((set) => ({
 export function usePermiso(permiso: string): boolean {
   return useSesionStore((s) => s.usuario?.permisos.includes(permiso) ?? false);
 }
+
+// ========== THEME STORE ==========
+
+interface TemaState {
+  tema: "light" | "dark" | "auto";
+  setTema: (tema: "light" | "dark" | "auto") => void;
+}
+
+export const useTemaStore = create<TemaState>((set) => {
+  // Cargar preferencia de localStorage
+  const temaGuardado = (typeof window !== "undefined" ? localStorage.getItem("pos-tema") : null) as "light" | "dark" | "auto" | null;
+
+  return {
+    tema: temaGuardado || "auto",
+    setTema: (tema: "light" | "dark" | "auto") => {
+      if (typeof window !== "undefined") {
+        localStorage.setItem("pos-tema", tema);
+        // Aplicar tema al elemento raíz
+        const html = document.documentElement;
+        if (tema === "dark") {
+          html.setAttribute("data-theme", "dark");
+        } else if (tema === "light") {
+          html.setAttribute("data-theme", "light");
+        } else {
+          html.removeAttribute("data-theme");
+        }
+      }
+      set({ tema });
+    },
+  };
+});

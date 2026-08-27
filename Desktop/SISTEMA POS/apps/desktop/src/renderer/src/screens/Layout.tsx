@@ -1,13 +1,14 @@
 import type { PropsWithChildren } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { useSesionStore, usePermiso } from "../lib/store";
+import { useSesionStore, usePermiso, useTemaStore } from "../lib/store";
 import { usePedidoShopify } from "../lib/socket";
 import { api } from "../lib/api";
 import { reproducir } from "../lib/sonidos";
 import type { PedidoShopifyEvent } from "@sistema-pos/shared";
 import logo from "../assets/logo.png";
 import { electronAPI } from "../lib/electron-api";
+import { ThemeToggle } from "../components/ThemeToggle";
 
 const INTERVALO_CREDITOS_MS = 5 * 60 * 1000;
 
@@ -207,7 +208,13 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
         )}
 
         <div style={{ flex: 1 }} />
-        <button className="secondary" onClick={cerrarSesion} type="button" style={{ marginTop: 12 }}>
+
+        {/* Theme Toggle */}
+        <div style={{ marginBottom: 12 }}>
+          <ThemeToggle />
+        </div>
+
+        <button className="secondary" onClick={cerrarSesion} type="button" style={{ marginTop: 0, width: "100%" }}>
           Cerrar sesion
         </button>
       </aside>}

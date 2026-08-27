@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { useSesionStore } from "./lib/store";
+import { useSesionStore, useTemaStore } from "./lib/store";
 import { connectSocket } from "./lib/socket";
 import { api } from "./lib/api";
 import { electronAPI } from "./lib/electron-api";
@@ -36,11 +36,17 @@ import Cotizaciones from "./screens/Cotizaciones";
 export default function App() {
   const { token, sucursalActivaId, hidratado, setApiBaseUrl, setSesion, setSucursalActiva, setHidratado } =
     useSesionStore();
+  const { tema, setTema } = useTemaStore();
   const location = useLocation();
 
   // Estado simple para mobile (sin inicializador que podría causar error)
   const [isMobile, setIsMobileState] = useState(false);
   const [mobileInitialized, setMobileInitialized] = useState(false);
+
+  // Inicializar tema
+  useEffect(() => {
+    setTema(tema); // Aplica el tema guardado
+  }, []);
 
   useEffect(() => {
     const initConfig = async () => {
