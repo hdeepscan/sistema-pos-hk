@@ -608,18 +608,36 @@ export default function Pos() {
               type="button"
               onClick={() => setMostrarVentaLibre(true)}
               style={{
-                background: "#f5a623",
+                background: "linear-gradient(135deg, #f5a623 0%, #f97316 100%)",
                 color: "#fff",
                 border: "none",
-                borderRadius: 6,
-                padding: "7px 16px",
+                borderRadius: 8,
+                padding: "10px 20px",
                 fontWeight: 700,
-                fontSize: 13.5,
+                fontSize: 14,
                 cursor: "pointer",
-                letterSpacing: 0.2,
+                letterSpacing: 0.3,
+                transition: "all 200ms cubic-bezier(0.4, 0, 0.2, 1)",
+                filter: "drop-shadow(0 4px 12px rgba(245, 166, 35, 0.25))",
+                boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 4px 12px rgba(245, 166, 35, 0.2)",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.filter = "drop-shadow(0 8px 20px rgba(245, 166, 35, 0.35))";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.filter = "drop-shadow(0 4px 12px rgba(245, 166, 35, 0.25))";
               }}
             >
-              + Venta libre
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              Venta libre
             </button>
           </div>
 
@@ -652,7 +670,7 @@ export default function Pos() {
                           <div>
                             {i.nombre}
                             {i.esLibre && (
-                              <span className="badge neutral" style={{ marginLeft: 6 }}>
+                              <span style={{ marginLeft: 6, display: "inline-block", background: "linear-gradient(135deg, #f5a623 0%, #f97316 100%)", color: "#fff", borderRadius: 6, padding: "4px 10px", fontSize: 11, fontWeight: 600, filter: "drop-shadow(0 2px 4px rgba(245, 166, 35, 0.2))" }}>
                                 Venta libre
                               </span>
                             )}
@@ -894,7 +912,7 @@ export default function Pos() {
         <div className="modal-backdrop">
           <div className="card" style={{ width: 460, maxWidth: "94vw" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-              <span style={{ background: "#f5a623", color: "#fff", borderRadius: 5, padding: "3px 10px", fontWeight: 700, fontSize: 13 }}>Venta libre</span>
+              <span style={{ background: "linear-gradient(135deg, #f5a623 0%, #f97316 100%)", color: "#fff", borderRadius: 8, padding: "6px 14px", fontWeight: 700, fontSize: 13, filter: "drop-shadow(0 4px 12px rgba(245, 166, 35, 0.25))", boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.2)" }}>Venta libre</span>
               <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Producto express · sin inventario</span>
             </div>
             <p style={{ marginTop: 0, marginBottom: 14, fontSize: 12.5, color: "var(--text-muted)" }}>
