@@ -82,7 +82,7 @@
 
 /* Cursor default - Mano Abierta Verde */
 body {
-  cursor: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="rgb(34,197,94)"><path d="M8 3c-1.1 0-2 .9-2 2v7c0 1.1.9 2 2 2h1v4c0 1.1.9 2 2 2s2-.9 2-2v-4h1v5c0 1.1.9 2 2 2s2-.9 2-2v-5h1v3c0 1.1.9 2 2 2s2-.9 2-2v-3c0-2.2-1.8-4-4-4h-1V5c0-1.1-.9-2-2-2s-2 .9-2 2v3H9V5c0-1.1-.9-2-2-2z"/></svg>') 10 2, auto;
+  cursor: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="rgb(34,197,94)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4v10m4-10v12m4-12v14m4-14v12M6 14l6-10c1-1.5 3-2 4.5-1s2 3 1 4.5L10 18"/><path d="M6 14l-2 12c-.5 3 2 5 5 4s4-3 4-6l-1-10"/></svg>') 8 3, auto;
 }
 
 /* Cursor para acciones de venta - Carrito de compra */
