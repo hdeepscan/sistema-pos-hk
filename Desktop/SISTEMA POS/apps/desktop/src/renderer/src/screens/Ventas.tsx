@@ -6,6 +6,8 @@ import { BotonesExportar } from "../lib/BotonesExportar";
 import type { ColumnaExport } from "../lib/export";
 import { mensajeError } from "../lib/errores";
 import { electronAPI } from "../lib/electron-api";
+import { generarSvgCodigoBarras } from "../lib/barcode";
+import type { ReciboData } from "../../../shared/api-types";
 
 interface VentaItem {
   id: string;
@@ -167,24 +169,25 @@ export default function Ventas() {
     }
   }, [filtroSucursal, sucursalActivaId, desde, hasta, montoMin, montoMax, filtroClienteId, filtroUsuarioId, filtroMetodoPago, filtroCanal]);
 
-  const reimprimir = useCallback(async (venta: Venta) => {
+  const { empresa, sucursales } = useSesionStore();
+
+  const reimprimir = useCallback(async (venta: Venta, sucursalNombre: string) => {
     try {
       // Construir datos del recibo como en Pos.tsx
-      const reciboData = {
-        numero: venta.consecutivo,
+      const reciboData: ReciboData = {
+        empresaNombre: empresa?.nombre ?? "",
+        sucursalNombre: sucursalNombre,
+        consecutivo: venta.consecutivo,
         fecha: new Date(venta.fecha).toLocaleString("es-CO"),
-        cliente: venta.cliente?.nombre || "Cliente General",
-        clienteId: venta.cliente?.id || venta.clienteId,
-        productos: venta.items.map((item) => ({
-          nombre: item.producto.nombre,
+        cajero: venta.usuario?.nombre ?? "Desconocido",
+        items: venta.items.map((item) => ({
+          nombre: item.producto?.nombre || item.descripcionLibre || "Venta libre",
           cantidad: item.cantidad,
-          precio: item.producto.precio,
-          total: item.cantidad * Number(item.producto.precio),
+          precioUnitario: Number(item.precioUnitario),
         })),
         total: Number(venta.total),
         metodoPago: venta.metodoPago,
         descuento: Number(venta.descuento) || undefined,
-        observaciones: venta.observaciones || undefined,
       };
 
       const config = await electronAPI.getConfig();
@@ -194,7 +197,7 @@ export default function Ventas() {
       console.error("Error al reimprimir recibo:", err);
       mensajeError("No se pudo reimprimir el recibo");
     }
-  }, []);
+  }, [empresa]);
 
   const imprimirEtiquetas = useCallback(async (venta: Venta) => {
     try {
@@ -206,6 +209,7 @@ export default function Ventas() {
           sku: item.producto!.sku,
           precio: Number(item.producto!.precio || item.precioUnitario),
           copias: item.cantidad,
+          svgCodigoBarras: generarSvgCodigoBarras(item.producto!.codigoBarras || item.producto!.sku),
         }));
 
       if (items.length === 0) {
@@ -482,7 +486,7 @@ export default function Ventas() {
             setSeleccionada(null);
             cargar();
           }}
-          onReimprimir={reimprimir}
+          onReimprimir={(v, nombre) => reimprimir(v, nombre)}
           onImprimirEtiquetas={imprimirEtiquetas}
           onCambiarCanal={cambiarCanal}
         />
@@ -506,7 +510,7 @@ function DetalleVenta({
   onClose: () => void;
   onEliminada: () => void;
   onDevuelta: () => void;
-  onReimprimir: (v: Venta) => Promise<void>;
+  onReimprimir: (v: Venta, nombre: string) => Promise<void>;
   onImprimirEtiquetas: (v: Venta) => Promise<void>;
   onCambiarCanal: (ventaId: string, canal: string) => Promise<void>;
 }) {
@@ -697,7 +701,7 @@ function DetalleVenta({
           <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
             {!confirmando ? (
               <div className="toolbar">
-                <button type="button" onClick={() => onReimprimir(venta)}>
+                <button type="button" onClick={() => onReimprimir(venta, sucursalNombre)}>
                   🖨️ Reimprimir recibo
                 </button>
                 <button type="button" onClick={() => onImprimirEtiquetas(venta)}>
