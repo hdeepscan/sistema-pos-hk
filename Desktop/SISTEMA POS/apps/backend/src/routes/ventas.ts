@@ -712,4 +712,38 @@ export async function ventasRoutes(app: FastifyInstance) {
 
     return reply.code(204).send();
   });
+
+  // Actualizar canal de una venta
+  app.put("/ventas/:id/canal", async (request: any, reply) => {
+    const { id } = request.params;
+    const { canal } = request.body;
+    const empresaId = request.user.empresaId;
+
+    if (!canal || !["POS", "SHOPIFY", "WHATSAPP", "OTRO"].includes(canal)) {
+      return reply.code(400).send({ error: "Canal inválido" });
+    }
+
+    try {
+      const venta = await prisma.venta.findUnique({
+        where: { id },
+      });
+
+      if (!venta || venta.empresaId !== empresaId) {
+        return reply.code(404).send({ error: "Venta no encontrada" });
+      }
+
+      const actualizada = await prisma.venta.update({
+        where: { id },
+        data: { canal: canal as CanalVenta },
+      });
+
+      // Registrar en auditoría
+      await registrarAuditoria(empresaId, request.user.usuarioId, "ACTUALIZAR", "ventas", id, { canal });
+
+      reply.send({ id: actualizada.id, canal: actualizada.canal });
+    } catch (err: any) {
+      console.error("Error actualizando canal:", err);
+      reply.code(500).send({ error: mensajeDeValidacion(err) });
+    }
+  });
 }

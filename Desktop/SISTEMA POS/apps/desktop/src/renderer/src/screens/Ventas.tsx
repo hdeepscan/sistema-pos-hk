@@ -196,6 +196,47 @@ export default function Ventas() {
     }
   }, []);
 
+  const imprimirEtiquetas = useCallback(async (venta: Venta) => {
+    try {
+      // Construir items de etiquetas a partir de los productos de la venta
+      const items = venta.items
+        .filter((item) => item.producto) // Solo productos, no ventas libres
+        .map((item) => ({
+          nombre: item.producto!.nombre,
+          sku: item.producto!.sku,
+          precio: Number(item.producto!.precio || item.precioUnitario),
+          copias: item.cantidad,
+        }));
+
+      if (items.length === 0) {
+        mensajeError("No hay productos para imprimir etiquetas");
+        return;
+      }
+
+      const config = await electronAPI.getConfig();
+      console.log(`[LABELS] Imprimiendo ${items.length} etiqueta(s) para venta #${venta.consecutivo}`);
+
+      const resultado = await electronAPI.printODescargarEtiquetas(items, config.printerName || null, "THERMAL");
+
+      if (resultado.imprimio) {
+        console.log(`[LABELS] ${items.length} etiqueta(s) impresa(s) correctamente`);
+      }
+    } catch (err) {
+      console.error("Error al imprimir etiquetas:", err);
+      mensajeError("No se pudieron imprimir las etiquetas");
+    }
+  }, []);
+
+  const cambiarCanal = useCallback(async (ventaId: string, nuevoCanal: string) => {
+    try {
+      await api.put(`/ventas/${ventaId}/canal`, { canal: nuevoCanal });
+      cargar(); // Recargar lista de ventas
+    } catch (err) {
+      console.error("Error al cambiar canal:", err);
+      mensajeError("No se pudo cambiar el canal");
+    }
+  }, [cargar]);
+
   useEffect(() => {
     cargar();
   }, [cargar]);
@@ -441,6 +482,9 @@ export default function Ventas() {
             setSeleccionada(null);
             cargar();
           }}
+          onReimprimir={reimprimir}
+          onImprimirEtiquetas={imprimirEtiquetas}
+          onCambiarCanal={cambiarCanal}
         />
       )}
     </div>
@@ -453,12 +497,18 @@ function DetalleVenta({
   onClose,
   onEliminada,
   onDevuelta,
+  onReimprimir,
+  onImprimirEtiquetas,
+  onCambiarCanal,
 }: {
   venta: Venta;
   sucursalNombre: string;
   onClose: () => void;
   onEliminada: () => void;
   onDevuelta: () => void;
+  onReimprimir: (v: Venta) => Promise<void>;
+  onImprimirEtiquetas: (v: Venta) => Promise<void>;
+  onCambiarCanal: (ventaId: string, canal: string) => Promise<void>;
 }) {
   const puedeDevolver = usePermiso("devoluciones.realizar");
   const [confirmando, setConfirmando] = useState(false);
@@ -468,6 +518,7 @@ function DetalleVenta({
   const [motivo, setMotivo] = useState("");
   const [procesandoDev, setProcesandoDev] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [canalEditando, setCanalEditando] = useState(venta.canal);
 
   async function eliminar() {
     setEliminando(true);
@@ -518,9 +569,31 @@ function DetalleVenta({
         <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "0 0 12px" }}>
           {new Date(venta.fecha).toLocaleString("es-CO")} · {sucursalNombre}
           {venta.usuario && <> · Cajero: {venta.usuario.nombre}</>}
-          {" · "}
-          <span className={`badge ${badgeCanal[venta.canal] ?? "neutral"}`}>{ETIQUETAS_CANAL[venta.canal] ?? venta.canal}</span>
         </p>
+
+        {/* Canal selector */}
+        <div style={{ marginBottom: 12, display: "flex", gap: 8, alignItems: "center" }}>
+          <label style={{ fontSize: 12, minWidth: 60 }}>Canal:</label>
+          <select
+            value={canalEditando}
+            onChange={(e) => setCanalEditando(e.target.value)}
+            style={{ flex: 1, padding: "4px 6px", fontSize: 13 }}
+          >
+            <option value="POS">Punto de venta</option>
+            <option value="SHOPIFY">Shopify</option>
+            <option value="WHATSAPP">WhatsApp</option>
+            <option value="OTRO">Otro</option>
+          </select>
+          {canalEditando !== venta.canal && (
+            <button
+              type="button"
+              onClick={() => onCambiarCanal(venta.id, canalEditando)}
+              style={{ padding: "4px 12px", fontSize: 12 }}
+            >
+              Guardar
+            </button>
+          )}
+        </div>
 
         <table>
           <thead>
@@ -624,8 +697,11 @@ function DetalleVenta({
           <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
             {!confirmando ? (
               <div className="toolbar">
-                <button type="button" onClick={() => reimprimir(seleccionada)}>
+                <button type="button" onClick={() => onReimprimir(venta)}>
                   🖨️ Reimprimir recibo
+                </button>
+                <button type="button" onClick={() => onImprimirEtiquetas(venta)}>
+                  🏷️ Imprimir etiquetas
                 </button>
                 {puedeDevolver && (
                   <button className="secondary" type="button" onClick={() => setModoDevolucion(true)}>
