@@ -11,6 +11,10 @@ export default defineConfig({
   build: {
     outDir: rendererOutDir,
     emptyOutDir: true,
+    rollupOptions: {
+      // Marcar quagga como external para que no intente resolverlo en build
+      external: ["quagga"],
+    },
   },
   server: {
     port: 3000,
