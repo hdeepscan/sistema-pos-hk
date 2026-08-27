@@ -7,6 +7,7 @@ import type { MetodoPago } from "@sistema-pos/shared";
 import { mensajeError } from "../lib/errores";
 import { CarritoMobile } from "../components/CarritoMobile";
 import { ScannerCamera } from "../components/ScannerCamera";
+import CreateProductMobile from "./CreateProductMobile";
 
 interface Producto {
   id: string;
@@ -40,6 +41,7 @@ const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "
 export default function PosMobile() {
   const { sucursalActivaId, sucursales, empresa, usuario } = useSesionStore();
   const puedeDescuentos = usePermiso("descuentos.aplicar");
+  const puedeCrearProductos = usePermiso("productos.administrar");
   const sucursalActiva = sucursales.find((s) => s.id === sucursalActivaId);
 
   const [busqueda, setBusqueda] = useState("");
@@ -54,6 +56,7 @@ export default function PosMobile() {
   const [error, setError] = useState<string | null>(null);
   const [mostrarScanner, setMostrarScanner] = useState(false);
   const [buscandoPorScanner, setBuscandoPorScanner] = useState(false);
+  const [mostrarCrearProducto, setMostrarCrearProducto] = useState(false);
 
   // Cargar clientes al montar
   useEffect(() => {
@@ -211,6 +214,11 @@ export default function PosMobile() {
 
   return (
     <div className="pos-mobile">
+      {/* Modal de Crear Producto */}
+      {mostrarCrearProducto && (
+        <CreateProductMobile onClose={() => setMostrarCrearProducto(false)} />
+      )}
+
       {/* Header minimalista */}
       <div className="pos-mobile-header">
         <div>
@@ -219,8 +227,20 @@ export default function PosMobile() {
             {sucursalActiva?.nombre}
           </p>
         </div>
-        <div style={{ fontSize: 14, fontWeight: 700 }}>
-          Items: <strong>{carrito.length}</strong>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          {puedeCrearProductos && (
+            <button
+              onClick={() => setMostrarCrearProducto(true)}
+              className="pos-mobile-btn-secondary"
+              title="Crear nuevo producto"
+              style={{ padding: "6px 12px", fontSize: "12px", minHeight: "auto" }}
+            >
+              + Producto
+            </button>
+          )}
+          <div style={{ fontSize: 14, fontWeight: 700 }}>
+            Items: <strong>{carrito.length}</strong>
+          </div>
         </div>
       </div>
 
