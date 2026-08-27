@@ -133,6 +133,32 @@ export async function reportesRoutes(app: FastifyInstance) {
       .filter((s) => s.total > 0)
       .sort((a, b) => b.total - a.total);
 
+    // ANÁLISIS POR CANAL DE VENTA
+    const porCanal = new Map<string, { total: number; cantidad: number; unidades: number }>();
+    const canalesDisponibles = ["POS", "SHOPIFY", "WHATSAPP", "OTRO"];
+    for (const canalNombre of canalesDisponibles) {
+      porCanal.set(canalNombre, { total: 0, cantidad: 0, unidades: 0 });
+    }
+    for (const venta of ventas) {
+      const canalNombre = venta.canal || "OTRO";
+      const actual = porCanal.get(canalNombre) || { total: 0, cantidad: 0, unidades: 0 };
+      actual.total += Number(venta.total);
+      actual.cantidad += 1;
+      actual.unidades += venta.items.reduce((acc, i) => acc + i.cantidad, 0);
+      porCanal.set(canalNombre, actual);
+    }
+    const ventasPorCanal = canalesDisponibles.map((canal) => {
+      const data = porCanal.get(canal) || { total: 0, cantidad: 0, unidades: 0 };
+      return {
+        canal,
+        total: data.total,
+        cantidad: data.cantidad,
+        unidades: data.unidades,
+        ticketPromedio: data.cantidad > 0 ? data.total / data.cantidad : 0,
+        porcentajeVentas: totalVentas > 0 ? (data.total / totalVentas) * 100 : 0,
+      };
+    });
+
     const gastoPauta = Number(gastoPautaAgg._sum.gasto ?? 0);
     const roas = gastoPauta > 0 ? totalVentas / gastoPauta : null;
 
@@ -151,6 +177,7 @@ export async function reportesRoutes(app: FastifyInstance) {
       ventasPorDia,
       ventasPorMetodoPago,
       ventasPorSucursal,
+      ventasPorCanal,
       comparacion: {
         totalVentasAnterior: periodoAnterior.totalVentas,
         variacionVentas: variacionPorcentual(totalVentas, periodoAnterior.totalVentas),
