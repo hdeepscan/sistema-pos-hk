@@ -4,7 +4,7 @@
 
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { PrismaClient } from "@prisma/client";
-import { payuService } from "../services/payuService.js";
+import { wompiService } from "../services/wompiService.js";
 import { crearLicenciaPagada, registrarPago } from "../services/licenseService.js";
 
 const prisma = new PrismaClient();
@@ -100,7 +100,7 @@ export async function crearCheckout(
     // Crear orden de pago
     const referenciaPago = `POS-${empresaId}-${Date.now()}`;
 
-    const checkoutData = await payuService.crearOrdenPago({
+    const checkoutData = await wompiService.crearOrdenPago({
       empresaId,
       referenciaPago,
       tipoPlan,
@@ -162,7 +162,7 @@ export async function confirmarPago(
     console.log(`📨 Confirmación de pago: ${reference_sale} - Estado: ${state}`);
 
     // Procesar webhook
-    const esAprobado = await payuService.procesarWebhook(request.body);
+    const esAprobado = await wompiService.procesarWebhook(request.body);
 
     if (!esAprobado) {
       return reply.status(400).send({
@@ -265,7 +265,7 @@ export async function webhookPago(
     }
 
     // Procesar webhook
-    const esAprobado = await payuService.procesarWebhook(request.body);
+    const esAprobado = await wompiService.procesarWebhook(request.body);
 
     // Buscar el pago
     const pago = await prisma.pago.findUnique({
