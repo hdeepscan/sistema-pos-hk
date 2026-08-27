@@ -131,9 +131,9 @@ export default function Reportes() {
   return (
     <div>
       {/* HEADER */}
-      <div className="page-header" style={{ marginBottom: 24 }}>
+      <div className="page-header" style={{ marginBottom: 24, background: "linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, rgba(20, 184, 166, 0.08) 100%)", borderRadius: 12, padding: 24 }}>
         <div>
-          <h2 style={{ display: "flex", alignItems: "center", gap: 12, margin: 0, color: "var(--text-primary)" }}>
+          <h2 style={{ display: "flex", alignItems: "center", gap: 12, margin: 0, background: "linear-gradient(90deg, var(--brand) 0%, var(--accent) 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
             {Iconos.analizar}
             Análisis Detallado
           </h2>
@@ -157,19 +157,23 @@ export default function Reportes() {
               alignItems: "center",
               gap: 8,
               padding: "10px 16px",
-              background: activeTab === tab.id ? "var(--brand)" : "transparent",
+              background: activeTab === tab.id
+                ? "linear-gradient(90deg, var(--brand) 0%, var(--accent) 100%)"
+                : "transparent",
               color: activeTab === tab.id ? "#fff" : "var(--text-muted)",
-              border: "none",
+              border: activeTab === tab.id ? "none" : "1px solid var(--border-light)",
               borderRadius: 8,
               cursor: "pointer",
               fontWeight: activeTab === tab.id ? 600 : 500,
               fontSize: 14,
               transition: "all 200ms cubic-bezier(0.4, 0, 0.2, 1)",
-              filter: activeTab === tab.id ? "drop-shadow(0 4px 12px rgba(34, 197, 94, 0.2))" : "none",
+              filter: activeTab === tab.id ? "drop-shadow(0 8px 16px rgba(34, 197, 94, 0.25))" : "none",
+              position: "relative",
+              overflow: "hidden",
             }}
           >
-            <span style={{ opacity: 0.9 }}>{tab.icon}</span>
-            {tab.label}
+            <span style={{ position: "relative", zIndex: 1, opacity: 0.9 }}>{tab.icon}</span>
+            <span style={{ position: "relative", zIndex: 1 }}>{tab.label}</span>
           </button>
         ))}
       </div>
@@ -249,7 +253,7 @@ export default function Reportes() {
             <>
               {/* KPIs PRINCIPALES */}
               <div className="stat-grid" style={{ marginBottom: 24 }}>
-                <div className="stat-card" style={{ borderLeft: "4px solid var(--brand)", animation: "fadeIn 0.6s ease" }}>
+                <div className="stat-card" style={{ borderLeft: "4px solid var(--brand)", animation: "fadeIn 0.6s ease", background: "linear-gradient(135deg, rgba(34, 197, 94, 0.05) 0%, rgba(34, 197, 94, 0.02) 100%)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, color: "var(--brand)" }}>
                     {Iconos.trending}
                     <div className="label">Total de Ventas</div>
@@ -258,7 +262,7 @@ export default function Reportes() {
                   {resumen.comparacion.variacionVentas !== null && <VariacionBadge valor={resumen.comparacion.variacionVentas} />}
                 </div>
 
-                <div className="stat-card" style={{ borderLeft: "4px solid #10B981", animation: "fadeIn 0.6s ease 0.1s both" }}>
+                <div className="stat-card" style={{ borderLeft: "4px solid #10B981", animation: "fadeIn 0.6s ease 0.1s both", background: "linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(16, 185, 129, 0.02) 100%)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, color: "#10B981" }}>
                     {Iconos.dinero}
                     <div className="label">Utilidad Bruta</div>
@@ -271,7 +275,7 @@ export default function Reportes() {
                   </div>
                 </div>
 
-                <div className="stat-card" style={{ borderLeft: "4px solid #F59E0B", animation: "fadeIn 0.6s ease 0.2s both" }}>
+                <div className="stat-card" style={{ borderLeft: "4px solid #F59E0B", animation: "fadeIn 0.6s ease 0.2s both", background: "linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, rgba(245, 158, 11, 0.02) 100%)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, color: "#F59E0B" }}>
                     {Iconos.moneda}
                     <div className="label">Margen Neto</div>
@@ -282,7 +286,7 @@ export default function Reportes() {
                   </div>
                 </div>
 
-                <div className="stat-card" style={{ borderLeft: "4px solid var(--accent)", animation: "fadeIn 0.6s ease 0.3s both" }}>
+                <div className="stat-card" style={{ borderLeft: "4px solid var(--accent)", animation: "fadeIn 0.6s ease 0.3s both", background: "linear-gradient(135deg, rgba(20, 184, 166, 0.05) 0%, rgba(20, 184, 166, 0.02) 100%)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, color: "var(--accent)" }}>
                     {Iconos.usuarios}
                     <div className="label">Número de Ventas</div>
@@ -291,7 +295,7 @@ export default function Reportes() {
                   {resumen.comparacion.variacionNumeroVentas !== null && <VariacionBadge valor={resumen.comparacion.variacionNumeroVentas} />}
                 </div>
 
-                <div className="stat-card" style={{ borderLeft: "4px solid #8B5CF6", animation: "fadeIn 0.6s ease 0.4s both" }}>
+                <div className="stat-card" style={{ borderLeft: "4px solid #8B5CF6", animation: "fadeIn 0.6s ease 0.4s both", background: "linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(139, 92, 246, 0.02) 100%)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, color: "#8B5CF6" }}>
                     {Iconos.paquete}
                     <div className="label">Ticket Promedio</div>
@@ -302,7 +306,7 @@ export default function Reportes() {
                   </div>
                 </div>
 
-                <div className="stat-card" style={{ borderLeft: "4px solid #EF4444", animation: "fadeIn 0.6s ease 0.5s both" }}>
+                <div className="stat-card" style={{ borderLeft: "4px solid #EF4444", animation: "fadeIn 0.6s ease 0.5s both", background: "linear-gradient(135deg, rgba(239, 68, 68, 0.05) 0%, rgba(239, 68, 68, 0.02) 100%)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, color: "#EF4444" }}>
                     {Iconos.dinero}
                     <div className="label">Costo de Ventas</div>
@@ -313,7 +317,7 @@ export default function Reportes() {
                   </div>
                 </div>
 
-                <div className="stat-card" style={{ borderLeft: "4px solid #06B6D4", animation: "fadeIn 0.6s ease 0.6s both" }}>
+                <div className="stat-card" style={{ borderLeft: "4px solid #06B6D4", animation: "fadeIn 0.6s ease 0.6s both", background: "linear-gradient(135deg, rgba(6, 182, 212, 0.05) 0%, rgba(6, 182, 212, 0.02) 100%)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, color: "#06B6D4" }}>
                     {Iconos.grafico}
                     <div className="label">Gastos Operacionales</div>
@@ -324,7 +328,7 @@ export default function Reportes() {
                   </div>
                 </div>
 
-                <div className="stat-card" style={{ borderLeft: "4px solid #14B8A6", animation: "fadeIn 0.6s ease 0.7s both" }}>
+                <div className="stat-card" style={{ borderLeft: "4px solid #14B8A6", animation: "fadeIn 0.6s ease 0.7s both", background: "linear-gradient(135deg, rgba(20, 184, 166, 0.05) 0%, rgba(20, 184, 166, 0.02) 100%)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, color: "#14B8A6" }}>
                     {Iconos.trending}
                     <div className="label">ROAS (Meta Ads)</div>
@@ -337,7 +341,7 @@ export default function Reportes() {
               </div>
 
               {/* GRÁFICOS */}
-              <div className="card" style={{ marginBottom: 24, animation: "fadeIn 0.8s ease" }}>
+              <div className="card" style={{ marginBottom: 24, animation: "fadeIn 0.8s ease", background: "linear-gradient(180deg, rgba(34, 197, 94, 0.03) 0%, rgba(20, 184, 166, 0.02) 100%)", borderTop: "2px solid rgba(34, 197, 94, 0.1)" }}>
                 <div style={{ marginBottom: 16 }}>
                   <h4 style={{ margin: "0 0 4px", display: "flex", alignItems: "center", gap: 8 }}>
                     {Iconos.grafico}
@@ -350,7 +354,7 @@ export default function Reportes() {
 
               {/* ANÁLISIS POR MÉTODO Y SUCURSAL */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
-                <div className="card" style={{ animation: "fadeIn 0.8s ease 0.1s both" }}>
+                <div className="card" style={{ animation: "fadeIn 0.8s ease 0.1s both", background: "linear-gradient(135deg, rgba(139, 92, 246, 0.03) 0%, rgba(34, 197, 94, 0.02) 100%)", borderTop: "2px solid rgba(139, 92, 246, 0.1)" }}>
                   <div style={{ marginBottom: 16 }}>
                     <h4 style={{ margin: "0 0 4px", display: "flex", alignItems: "center", gap: 8 }}>
                       {Iconos.dinero}
@@ -361,7 +365,7 @@ export default function Reportes() {
                   <DonutChart datos={resumen.ventasPorMetodoPago.map((m) => ({ etiqueta: m.metodoPago, valor: m.total }))} />
                 </div>
 
-                <div className="card" style={{ animation: "fadeIn 0.8s ease 0.2s both" }}>
+                <div className="card" style={{ animation: "fadeIn 0.8s ease 0.2s both", background: "linear-gradient(135deg, rgba(249, 115, 22, 0.03) 0%, rgba(20, 184, 166, 0.02) 100%)", borderTop: "2px solid rgba(249, 115, 22, 0.1)" }}>
                   <div style={{ marginBottom: 16 }}>
                     <h4 style={{ margin: "0 0 4px", display: "flex", alignItems: "center", gap: 8 }}>
                       {Iconos.paquete}
@@ -379,24 +383,24 @@ export default function Reportes() {
           {activeTab === "canales" && resumen.ventasPorCanal && (
             <>
               <div style={{ marginBottom: 24 }}>
-                <h3 style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+                <h3 style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 8, background: "linear-gradient(90deg, var(--brand) 0%, var(--accent) 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
                   {Iconos.canales}
                   Análisis Detallado por Canal de Venta
                 </h3>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16 }}>
-                  {resumen.ventasPorCanal.map((c) => (
-                    <div key={c.canal} className="stat-card" style={{ animation: "fadeIn 0.6s ease" }}>
+                  {resumen.ventasPorCanal.map((c, idx) => (
+                    <div key={c.canal} className="stat-card" style={{ animation: `fadeIn 0.6s ease ${idx * 0.1}s both`, background: "linear-gradient(135deg, rgba(34, 197, 94, 0.04) 0%, rgba(20, 184, 166, 0.02) 100%)", borderTop: "2px solid rgba(34, 197, 94, 0.15)" }}>
                       <div style={{ marginBottom: 12 }}>
-                        <h4 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{c.canal}</h4>
+                        <h4 style={{ margin: 0, fontSize: 14, fontWeight: 600, background: "linear-gradient(90deg, var(--brand) 0%, var(--accent) 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>{c.canal}</h4>
                       </div>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                         <div>
                           <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: 4 }}>Total Ventas</div>
-                          <div style={{ fontSize: 16, fontWeight: 700, color: "var(--brand)" }}>{formatoMoneda(c.total)}</div>
+                          <div style={{ fontSize: 16, fontWeight: 700, background: "linear-gradient(90deg, var(--brand) 0%, #10B981 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>{formatoMoneda(c.total)}</div>
                         </div>
                         <div>
                           <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: 4 }}>% Total</div>
-                          <div style={{ fontSize: 16, fontWeight: 700, color: "var(--accent)" }}>{c.porcentajeVentas.toFixed(1)}%</div>
+                          <div style={{ fontSize: 16, fontWeight: 700, background: "linear-gradient(90deg, var(--accent) 0%, #06B6D4 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>{c.porcentajeVentas.toFixed(1)}%</div>
                         </div>
                         <div>
                           <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: 4 }}>Número de Ventas</div>
@@ -408,7 +412,7 @@ export default function Reportes() {
                         </div>
                         <div style={{ gridColumn: "1 / -1" }}>
                           <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: 4 }}>Ticket Promedio</div>
-                          <div style={{ fontSize: 16, fontWeight: 700, color: "var(--success)" }}>{formatoMoneda(c.ticketPromedio)}</div>
+                          <div style={{ fontSize: 16, fontWeight: 700, background: "linear-gradient(90deg, #10B981 0%, var(--accent) 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>{formatoMoneda(c.ticketPromedio)}</div>
                         </div>
                       </div>
                     </div>
@@ -417,7 +421,7 @@ export default function Reportes() {
               </div>
 
               {resumen.ventasPorCanal && resumen.ventasPorCanal.length > 0 && (
-                <div className="card" style={{ animation: "fadeIn 0.8s ease" }}>
+                <div className="card" style={{ animation: "fadeIn 0.8s ease", background: "linear-gradient(180deg, rgba(34, 197, 94, 0.03) 0%, rgba(20, 184, 166, 0.02) 100%)", borderTop: "2px solid rgba(34, 197, 94, 0.1)" }}>
                   <h4 style={{ margin: "0 0 16px", display: "flex", alignItems: "center", gap: 8 }}>
                     {Iconos.grafico}
                     Comparativa de Canales
@@ -430,7 +434,7 @@ export default function Reportes() {
 
           {/* TAB: PRODUCTOS */}
           {activeTab === "productos" && (
-            <div className="card" style={{ animation: "fadeIn 0.6s ease" }}>
+            <div className="card" style={{ animation: "fadeIn 0.6s ease", background: "linear-gradient(135deg, rgba(34, 197, 94, 0.03) 0%, rgba(139, 92, 246, 0.02) 100%)", borderTop: "2px solid rgba(34, 197, 94, 0.1)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
                 <div>
                   <h4 style={{ margin: "0 0 4px", display: "flex", alignItems: "center", gap: 8 }}>
@@ -450,7 +454,7 @@ export default function Reportes() {
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
-                    <tr style={{ borderBottom: "2px solid var(--border)", background: "var(--surface-secondary)" }}>
+                    <tr style={{ borderBottom: "2px solid var(--border)", background: "linear-gradient(90deg, rgba(34, 197, 94, 0.05) 0%, rgba(20, 184, 166, 0.03) 100%)" }}>
                       <th style={{ textAlign: "left", padding: "12px", fontWeight: 700, fontSize: "12px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 0.5 }}>
                         Rank
                       </th>
@@ -470,9 +474,9 @@ export default function Reportes() {
                   </thead>
                   <tbody>
                     {resumen.productosMasVendidos.slice(0, 10).map((p, i) => (
-                      <tr key={p.productoId} style={{ borderBottom: "1px solid var(--border)", transition: "all 150ms ease" }}>
+                      <tr key={p.productoId} style={{ borderBottom: "1px solid var(--border)", transition: "all 150ms ease", background: i % 2 === 0 ? "rgba(34, 197, 94, 0.02)" : "transparent" }}>
                         <td style={{ padding: "12px" }}>
-                          <div style={{ width: 28, height: 28, borderRadius: 6, background: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: 700, color: "#fff" }}>
+                          <div style={{ width: 28, height: 28, borderRadius: 6, background: `linear-gradient(135deg, var(--brand) 0%, #10B981 100%)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: 700, color: "#fff" }}>
                             {i + 1}
                           </div>
                         </td>
@@ -480,7 +484,7 @@ export default function Reportes() {
                         <td style={{ textAlign: "right", padding: "12px", fontWeight: 600, color: "var(--text-primary)" }}>
                           {p.cantidad} u.
                         </td>
-                        <td style={{ textAlign: "right", padding: "12px", fontWeight: 600, color: "var(--success)" }}>
+                        <td style={{ textAlign: "right", padding: "12px", fontWeight: 600, background: "linear-gradient(90deg, var(--success) 0%, #10B981 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
                           {formatoMoneda(p.total)}
                         </td>
                         <td style={{ textAlign: "right", padding: "12px", color: "var(--text-muted)" }}>
@@ -498,7 +502,7 @@ export default function Reportes() {
           {activeTab === "analisis" && (
             <>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
-                <div className="card" style={{ animation: "fadeIn 0.6s ease" }}>
+                <div className="card" style={{ animation: "fadeIn 0.6s ease", background: "linear-gradient(135deg, rgba(139, 92, 246, 0.03) 0%, rgba(34, 197, 94, 0.02) 100%)", borderTop: "2px solid rgba(139, 92, 246, 0.1)" }}>
                   <h4 style={{ margin: "0 0 16px", display: "flex", alignItems: "center", gap: 8 }}>
                     {Iconos.dinero}
                     Métodos de Pago
@@ -506,7 +510,7 @@ export default function Reportes() {
                   <DonutChart datos={resumen.ventasPorMetodoPago.map((m) => ({ etiqueta: m.metodoPago, valor: m.total }))} />
                 </div>
 
-                <div className="card" style={{ animation: "fadeIn 0.6s ease 0.1s both" }}>
+                <div className="card" style={{ animation: "fadeIn 0.6s ease 0.1s both", background: "linear-gradient(135deg, rgba(249, 115, 22, 0.03) 0%, rgba(20, 184, 166, 0.02) 100%)", borderTop: "2px solid rgba(249, 115, 22, 0.1)" }}>
                   <h4 style={{ margin: "0 0 16px", display: "flex", alignItems: "center", gap: 8 }}>
                     {Iconos.paquete}
                     Sucursales
@@ -515,7 +519,7 @@ export default function Reportes() {
                 </div>
               </div>
 
-              <div className="card" style={{ animation: "fadeIn 0.8s ease 0.2s both" }}>
+              <div className="card" style={{ animation: "fadeIn 0.8s ease 0.2s both", background: "linear-gradient(180deg, rgba(34, 197, 94, 0.03) 0%, rgba(20, 184, 166, 0.02) 100%)", borderTop: "2px solid rgba(34, 197, 94, 0.1)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
                   <div>
                     <h4 style={{ margin: "0 0 4px", display: "flex", alignItems: "center", gap: 8 }}>
