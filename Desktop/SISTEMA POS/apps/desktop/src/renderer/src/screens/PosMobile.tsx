@@ -8,7 +8,6 @@ import { mensajeError } from "../lib/errores";
 import { CarritoMobile } from "../components/CarritoMobile";
 import { ScannerCamera } from "../components/ScannerCamera";
 import CreateProductMobile from "./CreateProductMobile";
-import { MobileMenu } from "../components/MobileMenu";
 
 interface Producto {
   id: string;
@@ -219,11 +218,6 @@ export default function PosMobile({ onToggleMobile }: { onToggleMobile?: () => v
       {mostrarCrearProducto && (
         <CreateProductMobile onClose={() => setMostrarCrearProducto(false)} />
       )}
-
-      {/* Menú Hamburguesa */}
-      <div style={{ position: "fixed", top: 16, left: 16, zIndex: 1000 }}>
-        <MobileMenu />
-      </div>
 
       {/* Header minimalista */}
       <div className="pos-mobile-header">

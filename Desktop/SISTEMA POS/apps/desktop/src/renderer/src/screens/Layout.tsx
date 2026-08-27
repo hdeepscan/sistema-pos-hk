@@ -9,6 +9,7 @@ import type { PedidoShopifyEvent } from "@sistema-pos/shared";
 import logo from "../assets/logo.png";
 import { electronAPI } from "../lib/electron-api";
 import { ThemeToggle } from "../components/ThemeToggle";
+import { MobileMenu } from "../components/MobileMenu";
 
 const INTERVALO_CREDITOS_MS = 5 * 60 * 1000;
 
@@ -134,6 +135,13 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
 
   return (
     <div className="app-shell">
+      {/* Menú Hamburguesa para Mobile */}
+      {isMobile && (
+        <div style={{ position: "fixed", top: 16, left: 16, zIndex: 1000 }}>
+          <MobileMenu />
+        </div>
+      )}
+
       {!isMobile && <aside className="sidebar">
         <div className="sidebar-brand" style={{ padding: "28px 16px", borderBottom: "1px solid rgba(34, 197, 94, 0.08)", display: "flex", flexDirection: "column", alignItems: "center" }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, width: "100%" }}>
