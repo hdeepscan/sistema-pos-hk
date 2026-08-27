@@ -1,12 +1,15 @@
 /**
  * Módulo de scanning de códigos de barras desde cámara del dispositivo.
- * Estrategia en 2 capas:
- * 1. BarcodeDetector API (nativa en Chrome/Android)
- * 2. quagga2 (fallback para Safari/Firefox) - cargado dinámicamente
+ *
+ * Utiliza BarcodeDetector API nativa (Chrome/Android).
+ * Para Safari/Firefox, fallback a búsqueda manual.
+ *
+ * BarcodeDetector es superior a quagga:
+ * - Nativa del navegador (sin dependencias)
+ * - Ultra-rápida (usa aceleración de hardware)
+ * - Mejor detección
+ * - Menor consumo de batería
  */
-
-// Lazy load quagga (solo cuando se necesite, evita problemas con Vite build)
-let Quagga: any = null;
 
 export interface ScannerConfig {
   videoElement?: HTMLVideoElement;
@@ -37,10 +40,10 @@ declare global {
 
 let scanner: ScannerConfig | null = null;
 let streamActivo: MediaStream | null = null;
-let usandoQuagga = false;
 let usandoBarcodeDetector = false;
+let frameId: number | null = null;
 
-// Formatos soportados
+// Formatos soportados por BarcodeDetector
 const FORMATOS_BARCODE_DETECTOR = [
   "ean_13",
   "ean_8",
@@ -49,30 +52,6 @@ const FORMATOS_BARCODE_DETECTOR = [
   "code_128",
   "code_39",
 ];
-
-const FORMATOS_QUAGGA = [
-  "code_128",
-  "code_39",
-  "ean_13",
-  "ean_8",
-  "upc_a",
-  "upc_e",
-];
-
-/**
- * Cargar quagga dinámicamente (lazy load para evitar problemas con Vite build)
- */
-async function cargarQuagga() {
-  if (Quagga) return Quagga;
-
-  try {
-    Quagga = (await import("quagga")).default;
-    return Quagga;
-  } catch (err) {
-    console.error("No se pudo cargar quagga:", err);
-    return null;
-  }
-}
 
 /**
  * Verificar si el navegador soporta BarcodeDetector.
@@ -103,7 +82,7 @@ export async function solicitarPermisoCamara(): Promise<boolean> {
 
 /**
  * Inicializar el scanner con la cámara del dispositivo.
- * Usa BarcodeDetector si está disponible, fallback a quagga2.
+ * Usa BarcodeDetector nativo (Chrome/Android).
  */
 export async function inicializarScanner(
   config: ScannerConfig
@@ -111,49 +90,38 @@ export async function inicializarScanner(
   scanner = config;
 
   try {
-    // Intenta usar BarcodeDetector primero (Chrome/Android)
-    if (soportaBarcodeDetector() && config.videoElement) {
-      try {
-        const formatosSoportados =
-          await window.BarcodeDetector!.getSupportedFormats();
-        console.log("BarcodeDetector soporta:", formatosSoportados);
-
-        // Obtener stream de cámara
-        streamActivo = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: "environment",
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          },
-        });
-
-        config.videoElement.srcObject = streamActivo;
-        config.videoElement.play().catch(() => {
-          throw new Error("No se pudo reproducir video");
-        });
-
-        usandoBarcodeDetector = true;
-        iniciarEscaneoConBarcodeDetector();
-
-        return {
-          disponible: true,
-          metodo: "BarcodeDetector (nativa)",
-        };
-      } catch (err) {
-        console.warn("BarcodeDetector no disponible, usando fallback quagga2");
-        usandoBarcodeDetector = false;
-      }
+    // Verificar si el navegador soporta BarcodeDetector
+    if (!soportaBarcodeDetector() || !config.videoElement) {
+      return {
+        disponible: false,
+        metodo: "ninguno",
+        error: "BarcodeDetector no disponible en este navegador. Usa búsqueda manual.",
+      };
     }
 
-    // Fallback a quagga2
-    if (config.videoElement && config.canvasElement) {
-      return await inicializarQuagga();
-    }
+    // Obtener stream de cámara
+    streamActivo = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: "environment",
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+      },
+    });
 
-    throw new Error("No hay elementos video/canvas para inicializar scanner");
+    config.videoElement.srcObject = streamActivo;
+    config.videoElement.play().catch(() => {
+      throw new Error("No se pudo reproducir video");
+    });
+
+    usandoBarcodeDetector = true;
+    iniciarEscaneoConBarcodeDetector();
+
+    return {
+      disponible: true,
+      metodo: "BarcodeDetector (nativa)",
+    };
   } catch (err) {
-    const mensaje =
-      err instanceof Error ? err.message : "Error desconocido";
+    const mensaje = err instanceof Error ? err.message : "Error desconocido";
     config.onError?.(mensaje);
     return {
       disponible: false,
@@ -174,7 +142,7 @@ function iniciarEscaneoConBarcodeDetector(): void {
 
   const escanear = async () => {
     try {
-      if (!video || video.paused) return;
+      if (!video || video.paused || !usandoBarcodeDetector) return;
 
       const codigos = await detector.detect(video);
 
@@ -186,15 +154,14 @@ function iniciarEscaneoConBarcodeDetector(): void {
           primerCodigo.rawValue
         );
         scanner?.onScan(primerCodigo.rawValue);
-        // Parar después de detectar (opcional: cambiar para multi-escaneo)
-        return;
+        // Continuar escaneando (no parar después del primer código)
       }
 
       // Seguir escaneando
-      requestAnimationFrame(escanear);
+      frameId = requestAnimationFrame(escanear);
     } catch (err) {
       console.error("Error en escaneo BarcodeDetector:", err);
-      requestAnimationFrame(escanear);
+      frameId = requestAnimationFrame(escanear);
     }
   };
 
@@ -202,98 +169,14 @@ function iniciarEscaneoConBarcodeDetector(): void {
 }
 
 /**
- * Inicializar quagga2 como fallback.
- */
-async function inicializarQuagga(): Promise<{
-  disponible: boolean;
-  metodo: string;
-  error?: string;
-}> {
-  return new Promise(async (resolve) => {
-    if (!scanner?.videoElement) {
-      resolve({
-        disponible: false,
-        metodo: "quagga",
-        error: "No hay elemento video",
-      });
-      return;
-    }
-
-    // Cargar quagga dinámicamente
-    const QuaggaLib = await cargarQuagga();
-    if (!QuaggaLib) {
-      resolve({
-        disponible: false,
-        metodo: "quagga",
-        error: "No se pudo cargar librería de scanning",
-      });
-      return;
-    }
-
-    QuaggaLib.init(
-      {
-        inputStream: {
-          name: "Live",
-          type: "LiveStream",
-          target: scanner.videoElement,
-          constraints: {
-            facingMode: "environment",
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          },
-        },
-        decoder: {
-          readers: FORMATOS_QUAGGA,
-          debug: {
-            showPattern: false,
-            showCanvas: false,
-            showCandidates: false,
-          },
-        },
-        locate: true,
-        frequency: 10,
-        multiple: false,
-      },
-      (err) => {
-        if (err) {
-          console.error("Error inicializando quagga:", err);
-          scanner?.onError?.(
-            "Error inicializando cámara: " + (err as Error).message
-          );
-          resolve({
-            disponible: false,
-            metodo: "quagga",
-            error: (err as Error).message,
-          });
-          return;
-        }
-
-        QuaggaLib.start();
-
-        QuaggaLib.onDetected((result: any) => {
-          if (result.codeResult && result.codeResult.code) {
-            console.log("Código detectado (quagga):", result.codeResult.code);
-            scanner?.onScan(result.codeResult.code);
-            // Parar después de detectar (opcional)
-            // QuaggaLib.stop();
-          }
-        });
-
-        usandoQuagga = true;
-        resolve({
-          disponible: true,
-          metodo: "quagga2",
-        });
-      }
-    );
-  });
-}
-
-/**
  * Detener el scanner y liberar recursos.
  */
 export function detenerScanner(): void {
   if (usandoBarcodeDetector) {
+    if (frameId !== null) {
+      cancelAnimationFrame(frameId);
+      frameId = null;
+    }
     if (streamActivo) {
       streamActivo.getTracks().forEach((track) => track.stop());
       streamActivo = null;
@@ -304,11 +187,6 @@ export function detenerScanner(): void {
     usandoBarcodeDetector = false;
   }
 
-  if (usandoQuagga && Quagga) {
-    Quagga.stop();
-    usandoQuagga = false;
-  }
-
   scanner = null;
 }
 
@@ -316,12 +194,12 @@ export function detenerScanner(): void {
  * Reanudar escaneo después de pausa.
  */
 export function reanudarScanner(): void {
-  if (usandoQuagga && Quagga) {
-    Quagga.start();
-  } else if (usandoBarcodeDetector && scanner?.videoElement) {
+  if (usandoBarcodeDetector && scanner?.videoElement) {
     scanner.videoElement.play().catch(() => {
       console.error("No se pudo reanudar video");
     });
+    // Reiniciar el escaneo
+    iniciarEscaneoConBarcodeDetector();
   }
 }
 
@@ -329,10 +207,14 @@ export function reanudarScanner(): void {
  * Pausar escaneo sin liberar recursos.
  */
 export function pausarScanner(): void {
-  if (usandoQuagga && Quagga) {
-    Quagga.stop();
-  } else if (usandoBarcodeDetector && scanner?.videoElement) {
-    scanner.videoElement.pause();
+  if (usandoBarcodeDetector) {
+    if (frameId !== null) {
+      cancelAnimationFrame(frameId);
+      frameId = null;
+    }
+    if (scanner?.videoElement) {
+      scanner.videoElement.pause();
+    }
   }
 }
 
@@ -345,12 +227,8 @@ export function obtenerEstadoScanner(): {
   tienePermiso: boolean;
 } {
   return {
-    activo: usandoQuagga || usandoBarcodeDetector,
-    metodo: usandoBarcodeDetector
-      ? "BarcodeDetector"
-      : usandoQuagga
-        ? "quagga2"
-        : null,
+    activo: usandoBarcodeDetector,
+    metodo: usandoBarcodeDetector ? "BarcodeDetector" : null,
     tienePermiso: streamActivo !== null,
   };
 }
