@@ -113,7 +113,7 @@ function columnasExportVentas(
 }
 
 export default function Ventas() {
-  const { sucursales, sucursalActivaId } = useSesionStore();
+  const { sucursales, sucursalActivaId, empresa } = useSesionStore();
   const [ventas, setVentas] = useState<Venta[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [estadoPorVenta, setEstadoPorVenta] = useState<Map<string, string>>(new Map());
@@ -168,8 +168,6 @@ export default function Ventas() {
       setCargando(false);
     }
   }, [filtroSucursal, sucursalActivaId, desde, hasta, montoMin, montoMax, filtroClienteId, filtroUsuarioId, filtroMetodoPago, filtroCanal]);
-
-  const { empresa, sucursales } = useSesionStore();
 
   const reimprimir = useCallback(async (venta: Venta, sucursalNombre: string) => {
     try {
