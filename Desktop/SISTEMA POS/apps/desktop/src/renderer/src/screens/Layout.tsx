@@ -128,44 +128,44 @@ export default function Layout({ children }: PropsWithChildren) {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="sidebar-brand" style={{ padding: "24px 0", borderBottom: "1px solid rgba(34, 197, 94, 0.08)", display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <div className="sidebar-brand" style={{ padding: "28px 0", borderBottom: "1px solid rgba(34, 197, 94, 0.08)", display: "flex", flexDirection: "column", alignItems: "center" }}>
           <div
             style={{
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              gap: 12,
+              gap: 14,
               width: "100%",
               padding: "0 16px",
-              transition: "all 300ms cubic-bezier(0.4, 0, 0.2, 1)",
+              transition: "all 250ms cubic-bezier(0.4, 0, 0.2, 1)",
               cursor: "pointer",
-              borderRadius: 12,
-              padding: "16px"
+              borderRadius: 14,
+              padding: "20px 16px"
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.transform = "perspective(1000px) rotateY(-5deg) rotateX(5deg) translateZ(10px)";
-              e.currentTarget.style.filter = "drop-shadow(0 12px 24px rgba(34, 197, 94, 0.15))";
+              e.currentTarget.style.transform = "scale(1.06) translateY(-4px)";
+              e.currentTarget.style.boxShadow = "0 16px 32px rgba(34, 197, 94, 0.2)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.transform = "perspective(1000px) rotateY(0) rotateX(0) translateZ(0)";
-              e.currentTarget.style.filter = "drop-shadow(0 4px 8px rgba(34, 197, 94, 0.08))";
+              e.currentTarget.style.transform = "scale(1) translateY(0)";
+              e.currentTarget.style.boxShadow = "0 4px 12px rgba(34, 197, 94, 0.1)";
             }}
           >
             <div style={{
-              borderRadius: 16,
-              padding: 12,
-              filter: "drop-shadow(0 4px 8px rgba(34, 197, 94, 0.08))",
+              borderRadius: 20,
+              padding: 16,
               display: "flex",
               alignItems: "center",
-              justifyContent: "center"
+              justifyContent: "center",
+              boxShadow: "0 4px 12px rgba(34, 197, 94, 0.1)"
             }}>
-              <img src={logo} alt="Sistema POS HK" style={{ height: 64, width: 64, objectFit: "contain" }} />
+              <img src={logo} alt="Sistema POS HK" style={{ height: 88, width: 88, objectFit: "contain" }} />
             </div>
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)", letterSpacing: "-0.5px" }}>
                 SISTEMA POS
               </div>
-              <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>Gestión de Ventas</div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 3 }}>Gestión de Ventas</div>
             </div>
           </div>
         </div>
