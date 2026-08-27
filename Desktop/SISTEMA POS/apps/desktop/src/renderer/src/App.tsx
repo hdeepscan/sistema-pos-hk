@@ -185,15 +185,6 @@ export default function App() {
     setMobilePreference(newValue);
   };
 
-  // Mostrar CheckoutPage sin Layout
-  if (location.pathname === "/checkout") {
-    return (
-      <Routes>
-        <Route path="/checkout" element={<CheckoutPage />} />
-      </Routes>
-    );
-  }
-
   return (
     <Layout isMobile={isMobile} setIsMobile={toggleMobilePreference}>
       <ErrorBoundary key={location.pathname}>
@@ -221,6 +212,7 @@ export default function App() {
           <Route path="/calendario" element={<Calendario />} />
           <Route path="/contabilidad" element={<Contabilidad />} />
           <Route path="/cotizaciones" element={<Cotizaciones />} />
+          <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="*" element={<Navigate to="/pos" replace />} />
         </Routes>
       </ErrorBoundary>
