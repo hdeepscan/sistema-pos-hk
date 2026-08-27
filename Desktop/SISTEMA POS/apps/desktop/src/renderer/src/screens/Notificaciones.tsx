@@ -101,7 +101,10 @@ export default function Notificaciones() {
   }
 
   function verPedido(ordenId: string) {
-    if (!shopDomain) return;
+    if (!shopDomain) {
+      alert("Shopify no está conectado. Configura tu conexión a Shopify en el módulo de Shopify.");
+      return;
+    }
     window.pos.abrirEnlaceExterno(`https://${shopDomain}/admin/orders/${ordenId}`);
   }
 
@@ -244,11 +247,15 @@ export default function Notificaciones() {
                   </td>
                   <td>
                     <div className="toolbar">
-                      {shopDomain && (
-                        <button className="secondary" type="button" onClick={() => verPedido(p.ordenId)}>
-                          Ver pedido
-                        </button>
-                      )}
+                      <button
+                        className="secondary"
+                        type="button"
+                        onClick={() => verPedido(p.ordenId)}
+                        style={{ opacity: shopDomain ? 1 : 0.6 }}
+                        title={shopDomain ? "Ver en Shopify" : "Shopify no conectado"}
+                      >
+                        Ver pedido
+                      </button>
                       {!p.atendido && (
                         <button type="button" onClick={() => atender(p.id)}>
                           Preparar pedido
