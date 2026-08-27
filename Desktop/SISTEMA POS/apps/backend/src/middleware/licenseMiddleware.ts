@@ -1,14 +1,13 @@
-import { Request, Response, NextFunction } from "fastify";
-import { validarLicencia } from "../services/licenseService";
+import type { FastifyRequest, FastifyReply } from "fastify";
+import { validarLicencia } from "../services/licenseService.js";
 
 /**
  * Middleware para validar que la empresa tenga licencia activa
  * Se debe usar después del middleware de autenticación
  */
 export async function validarLicensiaMiddleware(
-  request: Request,
-  reply: Response,
-  done: NextFunction
+  request: FastifyRequest,
+  reply: FastifyReply
 ) {
   try {
     // El usuario debe estar autenticado
@@ -49,8 +48,6 @@ export async function validarLicensiaMiddleware(
     // Licencia válida, pasar al siguiente middleware
     (request as any).licencia = validacion.licencia;
     (request as any).suscripcion = validacion.suscripcion;
-
-    done();
   } catch (error) {
     console.error("Error en middleware de licencia:", error);
     return reply.status(500).send({
@@ -63,9 +60,8 @@ export async function validarLicensiaMiddleware(
  * Middleware opcional: solo alerta si licencia está próxima a vencer
  */
 export async function verificarVencimientoProximo(
-  request: Request,
-  reply: Response,
-  next: NextFunction
+  request: FastifyRequest,
+  reply: FastifyReply
 ) {
   try {
     const empresaId = (request as any).empresaId;
@@ -82,10 +78,7 @@ export async function verificarVencimientoProximo(
         reply.header("X-License-Warning", `Tu licencia vence en ${diasRestantes} días`);
       }
     }
-
-    next();
   } catch (error) {
     console.error("Error verificando vencimiento:", error);
-    next();
   }
 }

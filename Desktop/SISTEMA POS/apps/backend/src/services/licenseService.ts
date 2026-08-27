@@ -201,7 +201,13 @@ export async function crearLicenciaPagada(
     });
 
     // Crear suscripción
-    const precioTotal = precioPlan.precioFinal + (usuariosAdicionales * precioPlan.precioXUsuarioAdicional);
+    const precioFinal = typeof precioPlan.precioFinal === 'number'
+      ? precioPlan.precioFinal
+      : Number(precioPlan.precioFinal);
+    const precioXUsuario = typeof precioPlan.precioXUsuarioAdicional === 'number'
+      ? precioPlan.precioXUsuarioAdicional
+      : Number(precioPlan.precioXUsuarioAdicional);
+    const precioTotal = precioFinal + (usuariosAdicionales * precioXUsuario);
 
     const suscripcion = await prisma.suscripcion.create({
       data: {
