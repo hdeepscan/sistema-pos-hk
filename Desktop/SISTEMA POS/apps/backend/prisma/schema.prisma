@@ -43,6 +43,27 @@ enum CanalVenta {
   OTRO
 }
 
+enum TipoPlan {
+  MENSUAL
+  TRIMESTRAL
+  ANUAL
+}
+
+enum EstadoLicencia {
+  ACTIVA
+  VENCIDA
+  CANCELADA
+  SUSPENDIDA
+  PRUEBA
+}
+
+enum EstadoPago {
+  PENDIENTE
+  COMPLETADO
+  FALLIDO
+  REEMBOLSADO
+}
+
 model Empresa {
   id             String   @id @default(uuid())
   nombre         String
@@ -92,6 +113,8 @@ model Empresa {
   cuentasContables CuentaContable[]
   asientosContables AsientoContable[]
   cotizaciones     Cotizacion[]
+  licencia         Licencia?
+  pagos            Pago[]
 
   @@map("empresas")
 }
@@ -1058,4 +1081,99 @@ model LineaCotizacion {
   @@index([cotizacionId])
   @@index([productoId])
   @@map("lineas_cotizacion")
+}
+
+// ========== LICENCIAS Y PAGOS ==========
+
+model Licencia {
+  id                String         @id @default(uuid())
+  empresa           Empresa        @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empresaId         String         @unique
+
+  estado            EstadoLicencia @default(ACTIVA)
+  usuariosIncluidos Int            @default(2)
+  usuariosActuales  Int            @default(1)
+
+  fechaActivacion   DateTime       @default(now())
+  fechaVencimiento  DateTime
+
+  suscripcion       Suscripcion?
+
+  creado            DateTime       @default(now())
+  actualizado       DateTime       @updatedAt
+
+  @@index([empresaId])
+  @@index([estado])
+  @@index([fechaVencimiento])
+  @@map("licencias")
+}
+
+model Suscripcion {
+  id                String         @id @default(uuid())
+  licencia          Licencia       @relation(fields: [licenciaId], references: [id], onDelete: Cascade)
+  licenciaId        String         @unique
+
+  tipoPlan          TipoPlan
+  precioBase        Decimal        @db.Decimal(14, 2)
+  precioTotal       Decimal        @db.Decimal(14, 2)
+
+  fechaInicio       DateTime       @default(now())
+  fechaProxiamRenovacion DateTime
+
+  activa            Boolean        @default(true)
+  renovacionAutomatica Boolean     @default(true)
+
+  creado            DateTime       @default(now())
+  actualizado       DateTime       @updatedAt
+
+  @@index([licenciaId])
+  @@map("suscripciones")
+}
+
+model Pago {
+  id                String         @id @default(uuid())
+  empresa           Empresa        @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empresaId         String
+
+  referenciaPago    String         @unique
+  estado            EstadoPago     @default(PENDIENTE)
+
+  moneda            String         @default("COP")
+  monto             Decimal        @db.Decimal(14, 2)
+
+  tipoPlan          TipoPlan
+  usuariosAdicionales Int          @default(0)
+
+  metodoPago        String         @default("PayU")
+  transaccionId     String?
+
+  fechaPago         DateTime?
+  respuestaPayU     String?
+
+  creado            DateTime       @default(now())
+  actualizado       DateTime       @updatedAt
+
+  @@index([empresaId])
+  @@index([estado])
+  @@index([referenciaPago])
+  @@map("pagos")
+}
+
+model PrecioPlan {
+  id                String         @id @default(uuid())
+  tipoPlan          TipoPlan       @unique
+
+  precio            Decimal        @db.Decimal(14, 2)
+  descuento         Decimal        @db.Decimal(14, 2) @default(0)
+  precioFinal       Decimal        @db.Decimal(14, 2)
+
+  diasDuracion      Int            // 30 para mensual, 90 para trimestral, 365 para anual
+  precioXUsuarioAdicional Decimal  @db.Decimal(14, 2) @default(5000)
+
+  activo            Boolean        @default(true)
+
+  creado            DateTime       @default(now())
+  actualizado       DateTime       @updatedAt
+
+  @@map("precios_planes")
 }
