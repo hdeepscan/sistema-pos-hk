@@ -19,14 +19,65 @@ interface Resumen {
   ventasPorDia: { fecha: string; total: number }[];
   ventasPorMetodoPago: { metodoPago: string; total: number }[];
   ventasPorSucursal: { sucursalId: string; sucursalNombre: string; total: number }[];
+  ventasPorCanal?: { canal: string; total: number; cantidad: number; unidades: number; ticketPromedio: number; porcentajeVentas: number }[];
   comparacion: { totalVentasAnterior: number; variacionVentas: number | null; variacionNumeroVentas: number | null };
 }
 
-// Iconos SVG
+// SVG Icons sin emojis
 const Iconos = {
-  trending: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>,
-  users: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>,
-  package: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"></line><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>,
+  analizar: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <line x1="12" y1="2" x2="12" y2="22"></line>
+      <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h.5M7 12a3 3 0 0 1 3-3h8"></path>
+    </svg>
+  ),
+  trending: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+      <polyline points="17 6 23 6 23 12"></polyline>
+    </svg>
+  ),
+  dinero: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+      <line x1="1" y1="10" x2="23" y2="10"></line>
+    </svg>
+  ),
+  usuarios: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+      <circle cx="9" cy="7" r="4"></circle>
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+      <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+    </svg>
+  ),
+  paquete: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <line x1="16.5" y1="9.4" x2="7.5" y2="4.21"></line>
+      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+      <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+      <line x1="12" y1="22.08" x2="12" y2="12"></line>
+    </svg>
+  ),
+  canales: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M6 9l6-6 6 6"></path>
+      <path d="M6 15l6 6 6-6"></path>
+    </svg>
+  ),
+  moneda: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="12" cy="12" r="8"></circle>
+      <path d="M8 12h8"></path>
+      <path d="M12 8v8"></path>
+    </svg>
+  ),
+  grafico: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <line x1="12" y1="2" x2="12" y2="22"></line>
+      <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h.5M7 12a3 3 0 0 1 3-3h8"></path>
+    </svg>
+  ),
 };
 
 function haceDias(dias: number) {
@@ -79,76 +130,93 @@ export default function Reportes() {
 
   return (
     <div>
-      <div className="page-header">
+      {/* HEADER */}
+      <div className="page-header" style={{ marginBottom: 24 }}>
         <div>
-          <h2 style={{ display: "flex", alignItems: "center", gap: 12, margin: 0 }}>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" strokeWidth="2">
-              <line x1="12" y1="2" x2="12" y2="22"></line>
-              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h.5M7 12a3 3 0 0 1 3-3h8"></path>
-            </svg>
+          <h2 style={{ display: "flex", alignItems: "center", gap: 12, margin: 0, color: "var(--text-primary)" }}>
+            {Iconos.analizar}
             Análisis Detallado
           </h2>
-          <p>Ventas, canales, productos y rendimiento empresarial</p>
+          <p style={{ margin: "4px 0 0", color: "var(--text-muted)", fontSize: 14 }}>Ventas, canales, productos y rendimiento empresarial</p>
         </div>
       </div>
 
       {/* TABS */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 20, borderBottom: "1px solid var(--border-light)", paddingBottom: 12 }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 24, borderBottom: "2px solid var(--border)", paddingBottom: 16 }}>
         {[
-          { id: "overview", label: "Resumen Ejecutivo", icon: "📊" },
-          { id: "canales", label: "Análisis por Canal", icon: "🔀" },
-          { id: "productos", label: "Top Productos", icon: "📦" },
-          { id: "analisis", label: "Análisis Avanzado", icon: "📈" },
+          { id: "overview", label: "Resumen Ejecutivo", icon: Iconos.dinero },
+          { id: "canales", label: "Análisis por Canal", icon: Iconos.canales },
+          { id: "productos", label: "Top Productos", icon: Iconos.paquete },
+          { id: "analisis", label: "Análisis Avanzado", icon: Iconos.grafico },
         ].map((tab) => (
           <button
             key={tab.id}
-            className={`secondary`}
             onClick={() => setActiveTab(tab.id as any)}
             style={{
-              padding: "8px 16px",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "10px 16px",
               background: activeTab === tab.id ? "var(--brand)" : "transparent",
               color: activeTab === tab.id ? "#fff" : "var(--text-muted)",
               border: "none",
               borderRadius: 8,
               cursor: "pointer",
               fontWeight: activeTab === tab.id ? 600 : 500,
-              transition: "all 200ms ease",
+              fontSize: 14,
+              transition: "all 200ms cubic-bezier(0.4, 0, 0.2, 1)",
+              filter: activeTab === tab.id ? "drop-shadow(0 4px 12px rgba(34, 197, 94, 0.2))" : "none",
             }}
           >
+            <span style={{ opacity: 0.9 }}>{tab.icon}</span>
             {tab.label}
           </button>
         ))}
       </div>
 
-      {/* Filtros */}
-      <div className="card" style={{ marginBottom: 16, padding: "16px 20px" }}>
-        <h4 style={{ margin: "0 0 12px", fontSize: "13px", fontWeight: 600, textTransform: "uppercase", color: "var(--text-muted)" }}>
-          Filtros
+      {/* FILTROS */}
+      <div className="card" style={{ marginBottom: 24, padding: "16px 20px" }}>
+        <h4 style={{ margin: "0 0 12px", fontSize: "12px", fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)", letterSpacing: 0.5 }}>
+          Filtros y Período
         </h4>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
           <div>
             <label style={{ gap: 6 }}>
-              <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Período Rápido</span>
-              <div style={{ display: "flex", gap: 8 }}>
+              <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: 6 }}>Período Rápido</span>
+              <div style={{ display: "flex", gap: 6 }}>
                 {RANGOS.map((r) => (
-                  <button key={r.dias} className="secondary" type="button" onClick={() => aplicarRango(r.dias)} style={{ padding: "6px 12px", fontSize: "12px" }}>
+                  <button
+                    key={r.dias}
+                    type="button"
+                    onClick={() => aplicarRango(r.dias)}
+                    style={{
+                      padding: "6px 12px",
+                      fontSize: "12px",
+                      fontWeight: 500,
+                      background: "var(--surface-secondary)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 6,
+                      cursor: "pointer",
+                      transition: "all 150ms ease",
+                    }}
+                  >
                     {r.label}
                   </button>
                 ))}
               </div>
             </label>
           </div>
-          <label>
-            <span style={{ fontSize: "12px" }}>Desde</span>
-            <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} />
+          <label style={{ display: "flex", flexDirection: "column" }}>
+            <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", marginBottom: 6 }}>Desde</span>
+            <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} style={{ padding: "8px 12px" }} />
           </label>
-          <label>
-            <span style={{ fontSize: "12px" }}>Hasta</span>
-            <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} />
+          <label style={{ display: "flex", flexDirection: "column" }}>
+            <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", marginBottom: 6 }}>Hasta</span>
+            <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} style={{ padding: "8px 12px" }} />
           </label>
-          <label>
-            <span style={{ fontSize: "12px" }}>Sucursal</span>
-            <select value={sucursalId} onChange={(e) => setSucursalId(e.target.value)}>
+          <label style={{ display: "flex", flexDirection: "column" }}>
+            <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", marginBottom: 6 }}>Sucursal</span>
+            <select value={sucursalId} onChange={(e) => setSucursalId(e.target.value)} style={{ padding: "8px 12px" }}>
               <option value="">Todas las sucursales</option>
               {sucursales.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -157,9 +225,9 @@ export default function Reportes() {
               ))}
             </select>
           </label>
-          <label>
-            <span style={{ fontSize: "12px" }}>Canal de Venta</span>
-            <select value={canal} onChange={(e) => setCanal(e.target.value)}>
+          <label style={{ display: "flex", flexDirection: "column" }}>
+            <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", marginBottom: 6 }}>Canal de Venta</span>
+            <select value={canal} onChange={(e) => setCanal(e.target.value)} style={{ padding: "8px 12px" }}>
               <option value="">Todos los canales</option>
               <option value="POS">Punto de Venta (POS)</option>
               <option value="SHOPIFY">Shopify</option>
@@ -171,194 +239,302 @@ export default function Reportes() {
       </div>
 
       {cargando || !resumen ? (
-        <p className="empty-state">Cargando datos...</p>
+        <div style={{ textAlign: "center", padding: 40, color: "var(--text-muted)" }}>
+          <p>Cargando datos...</p>
+        </div>
       ) : (
         <>
-          {/* KPIs PRINCIPALES */}
-          <div className="stat-grid">
-            <div className="stat-card" style={{ borderLeft: "3px solid var(--brand)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                <span style={{ opacity: 0.7 }}>{Iconos.trending}</span>
-                <div className="label">Total de Ventas</div>
-              </div>
-              <div className="value positive">{formatoMoneda(resumen.totalVentas)}</div>
-              <VariacionBadge valor={resumen.comparacion.variacionVentas} />
-            </div>
+          {/* TAB: OVERVIEW */}
+          {activeTab === "overview" && (
+            <>
+              {/* KPIs PRINCIPALES */}
+              <div className="stat-grid" style={{ marginBottom: 24 }}>
+                <div className="stat-card" style={{ borderLeft: "4px solid var(--brand)", animation: "fadeIn 0.6s ease" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, color: "var(--brand)" }}>
+                    {Iconos.trending}
+                    <div className="label">Total de Ventas</div>
+                  </div>
+                  <div className="value positive">{formatoMoneda(resumen.totalVentas)}</div>
+                  {resumen.comparacion.variacionVentas !== null && <VariacionBadge valor={resumen.comparacion.variacionVentas} />}
+                </div>
 
-            <div className="stat-card" style={{ borderLeft: "3px solid var(--success)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                <span style={{ opacity: 0.7 }}>💰</span>
-                <div className="label">Utilidad Bruta</div>
-              </div>
-              <div className={`value ${resumen.utilidadBruta >= 0 ? "positive" : "negative"}`}>
-                {formatoMoneda(resumen.utilidadBruta)}
-              </div>
-              <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: 4 }}>
-                Margen: {margenBruto.toFixed(1)}%
-              </div>
-            </div>
+                <div className="stat-card" style={{ borderLeft: "4px solid #10B981", animation: "fadeIn 0.6s ease 0.1s both" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, color: "#10B981" }}>
+                    {Iconos.dinero}
+                    <div className="label">Utilidad Bruta</div>
+                  </div>
+                  <div className={`value ${resumen.utilidadBruta >= 0 ? "positive" : "negative"}`}>
+                    {formatoMoneda(resumen.utilidadBruta)}
+                  </div>
+                  <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: 8 }}>
+                    Margen: <span style={{ fontWeight: 600, color: resumen.utilidadBruta >= 0 ? "var(--brand)" : "var(--danger)" }}>{margenBruto.toFixed(1)}%</span>
+                  </div>
+                </div>
 
-            <div className="stat-card" style={{ borderLeft: "3px solid var(--warning)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                <span style={{ opacity: 0.7 }}>📊</span>
-                <div className="label">Margen Neto</div>
-              </div>
-              <div className={`value ${margenNeto >= 0 ? "positive" : "negative"}`}>
-                {margenNeto.toFixed(1)}%
-              </div>
-              <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: 4 }}>
-                {formatoMoneda(resumen.utilidadBruta - resumen.totalGastos)}
-              </div>
-            </div>
+                <div className="stat-card" style={{ borderLeft: "4px solid #F59E0B", animation: "fadeIn 0.6s ease 0.2s both" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, color: "#F59E0B" }}>
+                    {Iconos.moneda}
+                    <div className="label">Margen Neto</div>
+                  </div>
+                  <div className={`value ${margenNeto >= 0 ? "positive" : "negative"}`}>{margenNeto.toFixed(1)}%</div>
+                  <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: 8 }}>
+                    Utilidad neta: <span style={{ fontWeight: 600 }}>{formatoMoneda(resumen.utilidadBruta - resumen.totalGastos)}</span>
+                  </div>
+                </div>
 
-            <div className="stat-card" style={{ borderLeft: "3px solid var(--accent)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                <span style={{ opacity: 0.7 }}>{Iconos.users}</span>
-                <div className="label">Número de Ventas</div>
-              </div>
-              <div className="value">{resumen.numeroVentas}</div>
-              <VariacionBadge valor={resumen.comparacion.variacionNumeroVentas} />
-            </div>
+                <div className="stat-card" style={{ borderLeft: "4px solid var(--accent)", animation: "fadeIn 0.6s ease 0.3s both" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, color: "var(--accent)" }}>
+                    {Iconos.usuarios}
+                    <div className="label">Número de Ventas</div>
+                  </div>
+                  <div className="value">{resumen.numeroVentas}</div>
+                  {resumen.comparacion.variacionNumeroVentas !== null && <VariacionBadge valor={resumen.comparacion.variacionNumeroVentas} />}
+                </div>
 
-            <div className="stat-card" style={{ borderLeft: "3px solid #F59E0B" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                <span style={{ opacity: 0.7 }}>💳</span>
-                <div className="label">Ticket Promedio</div>
-              </div>
-              <div className="value">{formatoMoneda(resumen.ticketPromedio)}</div>
-              <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: 4 }}>
-                ({resumen.unidadesVendidas} unidades)
-              </div>
-            </div>
+                <div className="stat-card" style={{ borderLeft: "4px solid #8B5CF6", animation: "fadeIn 0.6s ease 0.4s both" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, color: "#8B5CF6" }}>
+                    {Iconos.paquete}
+                    <div className="label">Ticket Promedio</div>
+                  </div>
+                  <div className="value">{formatoMoneda(resumen.ticketPromedio)}</div>
+                  <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: 8 }}>
+                    {resumen.unidadesVendidas} unidades vendidas
+                  </div>
+                </div>
 
-            <div className="stat-card" style={{ borderLeft: "3px solid #EF4444" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                <span style={{ opacity: 0.7 }}>📦</span>
-                <div className="label">Costo de Ventas</div>
-              </div>
-              <div className="value negative">{formatoMoneda(resumen.costoVentas)}</div>
-              <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: 4 }}>
-                {costoVentasPct.toFixed(1)}% del total
-              </div>
-            </div>
+                <div className="stat-card" style={{ borderLeft: "4px solid #EF4444", animation: "fadeIn 0.6s ease 0.5s both" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, color: "#EF4444" }}>
+                    {Iconos.dinero}
+                    <div className="label">Costo de Ventas</div>
+                  </div>
+                  <div className="value negative">{formatoMoneda(resumen.costoVentas)}</div>
+                  <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: 8 }}>
+                    {costoVentasPct.toFixed(1)}% del total
+                  </div>
+                </div>
 
-            <div className="stat-card" style={{ borderLeft: "3px solid #8B5CF6" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                <span style={{ opacity: 0.7 }}>💰</span>
-                <div className="label">Gastos Operacionales</div>
-              </div>
-              <div className="value negative">{formatoMoneda(resumen.totalGastos)}</div>
-              <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: 4 }}>
-                + Meta Ads: {formatoMoneda(resumen.gastoPauta)}
-              </div>
-            </div>
+                <div className="stat-card" style={{ borderLeft: "4px solid #06B6D4", animation: "fadeIn 0.6s ease 0.6s both" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, color: "#06B6D4" }}>
+                    {Iconos.grafico}
+                    <div className="label">Gastos Operacionales</div>
+                  </div>
+                  <div className="value negative">{formatoMoneda(resumen.totalGastos)}</div>
+                  <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: 8 }}>
+                    + Meta Ads: {formatoMoneda(resumen.gastoPauta)}
+                  </div>
+                </div>
 
-            <div className="stat-card" style={{ borderLeft: "3px solid #06B6D4" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                <span style={{ opacity: 0.7 }}>📈</span>
-                <div className="label">ROAS (Meta Ads)</div>
+                <div className="stat-card" style={{ borderLeft: "4px solid #14B8A6", animation: "fadeIn 0.6s ease 0.7s both" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, color: "#14B8A6" }}>
+                    {Iconos.trending}
+                    <div className="label">ROAS (Meta Ads)</div>
+                  </div>
+                  <div className="value">{resumen.roas != null ? `${resumen.roas.toFixed(2)}x` : "N/A"}</div>
+                  <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: 8 }}>
+                    Retorno de inversión
+                  </div>
+                </div>
               </div>
-              <div className="value">{resumen.roas != null ? `${resumen.roas.toFixed(2)}x` : "N/A"}</div>
-              <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: 4 }}>
-                Retorno de inversión
-              </div>
-            </div>
-          </div>
 
-          {/* GRÁFICOS DE TENDENCIA */}
-          <div className="card" style={{ marginTop: 20 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <div>
-                <h4 style={{ margin: "0 0 4px" }}>📈 Ventas por Día</h4>
-                <p style={{ margin: 0, fontSize: "12px", color: "var(--text-muted)" }}>Tendencia de ventas diarias en el período</p>
+              {/* GRÁFICOS */}
+              <div className="card" style={{ marginBottom: 24, animation: "fadeIn 0.8s ease" }}>
+                <div style={{ marginBottom: 16 }}>
+                  <h4 style={{ margin: "0 0 4px", display: "flex", alignItems: "center", gap: 8 }}>
+                    {Iconos.grafico}
+                    Ventas por Día
+                  </h4>
+                  <p style={{ margin: 0, fontSize: "12px", color: "var(--text-muted)" }}>Tendencia de ventas diarias en el período</p>
+                </div>
+                <LineChart datos={resumen.ventasPorDia.map((d) => ({ etiqueta: d.fecha, valor: d.total }))} />
               </div>
-              <BotonesExportar
-                nombreArchivo="ventas-por-dia"
-                titulo="Ventas por día"
-                columnas={COLUMNAS_VENTAS_DIA}
-                filas={resumen.ventasPorDia}
-              />
-            </div>
-            <LineChart datos={resumen.ventasPorDia.map((d) => ({ etiqueta: d.fecha, valor: d.total }))} />
-          </div>
 
-          {/* ANÁLISIS POR MÉTODO Y SUCURSAL */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 20 }}>
-            <div className="card">
-              <div>
-                <h4 style={{ margin: "0 0 4px" }}>💳 Ventas por Método de Pago</h4>
-                <p style={{ margin: 0, fontSize: "12px", color: "var(--text-muted)" }}>Distribución de pagos</p>
-              </div>
-              <div style={{ marginTop: 12 }}>
-                <DonutChart datos={resumen.ventasPorMetodoPago.map((m) => ({ etiqueta: m.metodoPago, valor: m.total }))} />
-              </div>
-            </div>
+              {/* ANÁLISIS POR MÉTODO Y SUCURSAL */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
+                <div className="card" style={{ animation: "fadeIn 0.8s ease 0.1s both" }}>
+                  <div style={{ marginBottom: 16 }}>
+                    <h4 style={{ margin: "0 0 4px", display: "flex", alignItems: "center", gap: 8 }}>
+                      {Iconos.dinero}
+                      Ventas por Método de Pago
+                    </h4>
+                    <p style={{ margin: 0, fontSize: "12px", color: "var(--text-muted)" }}>Distribución de pagos</p>
+                  </div>
+                  <DonutChart datos={resumen.ventasPorMetodoPago.map((m) => ({ etiqueta: m.metodoPago, valor: m.total }))} />
+                </div>
 
-            <div className="card">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                <div className="card" style={{ animation: "fadeIn 0.8s ease 0.2s both" }}>
+                  <div style={{ marginBottom: 16 }}>
+                    <h4 style={{ margin: "0 0 4px", display: "flex", alignItems: "center", gap: 8 }}>
+                      {Iconos.paquete}
+                      Ventas por Sucursal
+                    </h4>
+                    <p style={{ margin: 0, fontSize: "12px", color: "var(--text-muted)" }}>Rendimiento de cada sucursal</p>
+                  </div>
+                  <BarraHorizontal datos={resumen.ventasPorSucursal.map((s) => ({ etiqueta: s.sucursalNombre, valor: s.total }))} />
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* TAB: CANALES */}
+          {activeTab === "canales" && resumen.ventasPorCanal && (
+            <>
+              <div style={{ marginBottom: 24 }}>
+                <h3 style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+                  {Iconos.canales}
+                  Análisis Detallado por Canal de Venta
+                </h3>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16 }}>
+                  {resumen.ventasPorCanal.map((c) => (
+                    <div key={c.canal} className="stat-card" style={{ animation: "fadeIn 0.6s ease" }}>
+                      <div style={{ marginBottom: 12 }}>
+                        <h4 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{c.canal}</h4>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                        <div>
+                          <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: 4 }}>Total Ventas</div>
+                          <div style={{ fontSize: 16, fontWeight: 700, color: "var(--brand)" }}>{formatoMoneda(c.total)}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: 4 }}>% Total</div>
+                          <div style={{ fontSize: 16, fontWeight: 700, color: "var(--accent)" }}>{c.porcentajeVentas.toFixed(1)}%</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: 4 }}>Número de Ventas</div>
+                          <div style={{ fontSize: 16, fontWeight: 700 }}>{c.cantidad}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: 4 }}>Unidades</div>
+                          <div style={{ fontSize: 16, fontWeight: 700 }}>{c.unidades}</div>
+                        </div>
+                        <div style={{ gridColumn: "1 / -1" }}>
+                          <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: 4 }}>Ticket Promedio</div>
+                          <div style={{ fontSize: 16, fontWeight: 700, color: "var(--success)" }}>{formatoMoneda(c.ticketPromedio)}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {resumen.ventasPorCanal && resumen.ventasPorCanal.length > 0 && (
+                <div className="card" style={{ animation: "fadeIn 0.8s ease" }}>
+                  <h4 style={{ margin: "0 0 16px", display: "flex", alignItems: "center", gap: 8 }}>
+                    {Iconos.grafico}
+                    Comparativa de Canales
+                  </h4>
+                  <DonutChart datos={resumen.ventasPorCanal.map((c) => ({ etiqueta: c.canal, valor: c.total }))} />
+                </div>
+              )}
+            </>
+          )}
+
+          {/* TAB: PRODUCTOS */}
+          {activeTab === "productos" && (
+            <div className="card" style={{ animation: "fadeIn 0.6s ease" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
                 <div>
-                  <h4 style={{ margin: "0 0 4px" }}>🏪 Ventas por Sucursal</h4>
-                  <p style={{ margin: 0, fontSize: "12px", color: "var(--text-muted)" }}>Rendimiento de cada sucursal</p>
+                  <h4 style={{ margin: "0 0 4px", display: "flex", alignItems: "center", gap: 8 }}>
+                    {Iconos.paquete}
+                    Top 10 Productos Más Vendidos
+                  </h4>
+                  <p style={{ margin: 0, fontSize: "12px", color: "var(--text-muted)" }}>Ranking por unidades vendidas y revenue</p>
                 </div>
                 <BotonesExportar
-                  nombreArchivo="ventas-por-sucursal"
-                  titulo="Ventas por sucursal"
-                  columnas={COLUMNAS_VENTAS_SUCURSAL}
-                  filas={resumen.ventasPorSucursal}
+                  nombreArchivo="productos-mas-vendidos"
+                  titulo="Productos más vendidos"
+                  columnas={COLUMNAS_PRODUCTOS_VENDIDOS}
+                  filas={resumen.productosMasVendidos}
                 />
               </div>
-              <BarraHorizontal datos={resumen.ventasPorSucursal.map((s) => ({ etiqueta: s.sucursalNombre, valor: s.total }))} />
-            </div>
-          </div>
 
-          {/* PRODUCTOS MÁS VENDIDOS */}
-          <div className="card" style={{ marginTop: 20 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <div>
-                <h4 style={{ margin: "0 0 4px" }}>🏆 Top 10 Productos Más Vendidos</h4>
-                <p style={{ margin: 0, fontSize: "12px", color: "var(--text-muted)" }}>Ranking por unidades vendidas</p>
-              </div>
-              <BotonesExportar
-                nombreArchivo="productos-mas-vendidos"
-                titulo="Productos más vendidos"
-                columnas={COLUMNAS_PRODUCTOS_VENDIDOS}
-                filas={resumen.productosMasVendidos}
-              />
-            </div>
-
-            {/* Tabla detallada de productos */}
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%" }}>
-                <thead>
-                  <tr style={{ borderBottom: "2px solid var(--border)" }}>
-                    <th style={{ textAlign: "left", padding: "10px 12px", fontWeight: 600, fontSize: "12px", color: "var(--text-muted)", textTransform: "uppercase" }}>Producto</th>
-                    <th style={{ textAlign: "right", padding: "10px 12px", fontWeight: 600, fontSize: "12px", color: "var(--text-muted)", textTransform: "uppercase" }}>Unidades</th>
-                    <th style={{ textAlign: "right", padding: "10px 12px", fontWeight: 600, fontSize: "12px", color: "var(--text-muted)", textTransform: "uppercase" }}>Ingresos</th>
-                    <th style={{ textAlign: "right", padding: "10px 12px", fontWeight: 600, fontSize: "12px", color: "var(--text-muted)", textTransform: "uppercase" }}>% Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {resumen.productosMasVendidos.slice(0, 10).map((p, i) => (
-                    <tr key={p.productoId} style={{ borderBottom: "1px solid var(--border)" }}>
-                      <td style={{ padding: "12px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <div style={{ width: 24, height: 24, borderRadius: 6, background: "var(--brand-light)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: 600, color: "var(--brand)" }}>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ borderBottom: "2px solid var(--border)", background: "var(--surface-secondary)" }}>
+                      <th style={{ textAlign: "left", padding: "12px", fontWeight: 700, fontSize: "12px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                        Rank
+                      </th>
+                      <th style={{ textAlign: "left", padding: "12px", fontWeight: 700, fontSize: "12px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                        Producto
+                      </th>
+                      <th style={{ textAlign: "right", padding: "12px", fontWeight: 700, fontSize: "12px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                        Unidades
+                      </th>
+                      <th style={{ textAlign: "right", padding: "12px", fontWeight: 700, fontSize: "12px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                        Ingresos
+                      </th>
+                      <th style={{ textAlign: "right", padding: "12px", fontWeight: 700, fontSize: "12px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                        % Total
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {resumen.productosMasVendidos.slice(0, 10).map((p, i) => (
+                      <tr key={p.productoId} style={{ borderBottom: "1px solid var(--border)", transition: "all 150ms ease" }}>
+                        <td style={{ padding: "12px" }}>
+                          <div style={{ width: 28, height: 28, borderRadius: 6, background: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: 700, color: "#fff" }}>
                             {i + 1}
                           </div>
-                          <span>{p.nombre}</span>
-                        </div>
-                      </td>
-                      <td style={{ textAlign: "right", padding: "12px", fontWeight: 600 }}>{p.cantidad} u.</td>
-                      <td style={{ textAlign: "right", padding: "12px", fontWeight: 600, color: "var(--success)" }}>{formatoMoneda(p.total)}</td>
-                      <td style={{ textAlign: "right", padding: "12px", color: "var(--text-muted)" }}>
-                        {((p.total / resumen.totalVentas) * 100).toFixed(1)}%
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        </td>
+                        <td style={{ padding: "12px", fontWeight: 500 }}>{p.nombre}</td>
+                        <td style={{ textAlign: "right", padding: "12px", fontWeight: 600, color: "var(--text-primary)" }}>
+                          {p.cantidad} u.
+                        </td>
+                        <td style={{ textAlign: "right", padding: "12px", fontWeight: 600, color: "var(--success)" }}>
+                          {formatoMoneda(p.total)}
+                        </td>
+                        <td style={{ textAlign: "right", padding: "12px", color: "var(--text-muted)" }}>
+                          {((p.total / resumen.totalVentas) * 100).toFixed(1)}%
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* TAB: ANÁLISIS */}
+          {activeTab === "analisis" && (
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
+                <div className="card" style={{ animation: "fadeIn 0.6s ease" }}>
+                  <h4 style={{ margin: "0 0 16px", display: "flex", alignItems: "center", gap: 8 }}>
+                    {Iconos.dinero}
+                    Métodos de Pago
+                  </h4>
+                  <DonutChart datos={resumen.ventasPorMetodoPago.map((m) => ({ etiqueta: m.metodoPago, valor: m.total }))} />
+                </div>
+
+                <div className="card" style={{ animation: "fadeIn 0.6s ease 0.1s both" }}>
+                  <h4 style={{ margin: "0 0 16px", display: "flex", alignItems: "center", gap: 8 }}>
+                    {Iconos.paquete}
+                    Sucursales
+                  </h4>
+                  <BarraHorizontal datos={resumen.ventasPorSucursal.map((s) => ({ etiqueta: s.sucursalNombre, valor: s.total }))} />
+                </div>
+              </div>
+
+              <div className="card" style={{ animation: "fadeIn 0.8s ease 0.2s both" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                  <div>
+                    <h4 style={{ margin: "0 0 4px", display: "flex", alignItems: "center", gap: 8 }}>
+                      {Iconos.grafico}
+                      Línea de Tendencia
+                    </h4>
+                    <p style={{ margin: 0, fontSize: "12px", color: "var(--text-muted)" }}>Evolución de ventas diarias</p>
+                  </div>
+                  <BotonesExportar
+                    nombreArchivo="ventas-por-dia"
+                    titulo="Ventas por día"
+                    columnas={COLUMNAS_VENTAS_DIA}
+                    filas={resumen.ventasPorDia}
+                  />
+                </div>
+                <LineChart datos={resumen.ventasPorDia.map((d) => ({ etiqueta: d.fecha, valor: d.total }))} />
+              </div>
+            </>
+          )}
         </>
       )}
     </div>
