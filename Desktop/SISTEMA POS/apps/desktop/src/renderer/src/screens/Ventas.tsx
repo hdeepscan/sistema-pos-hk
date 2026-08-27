@@ -216,7 +216,7 @@ export default function Ventas() {
       const config = await electronAPI.getConfig();
       console.log(`[LABELS] Imprimiendo ${items.length} etiqueta(s) para venta #${venta.consecutivo}`);
 
-      const resultado = await electronAPI.printODescargarEtiquetas(items, config.printerName || null, "THERMAL");
+      const resultado = await electronAPI.printODescargarEtiquetas(items, config.printerName || null, "rollo2");
 
       if (resultado.imprimio) {
         console.log(`[LABELS] ${items.length} etiqueta(s) impresa(s) correctamente`);
