@@ -80,9 +80,9 @@
 
 /* ===== CUSTOM CURSORS - RETAIL/POS FOCUSED ===== */
 
-/* Cursor default - Mano Play Verde */
+/* Cursor default - Pointer Hand Outline */
 body {
-  cursor: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="rgb(34,197,94)"><path d="M6 4c-1.1 0-2 .9-2 2v20c0 1.1.9 2 2 2c.4 0 .8-.1 1.1-.3l18-10c.7-.4 1.1-1.1 1.1-2s-.4-1.6-1.1-2l-18-10C6.8 4.1 6.4 4 6 4z"/></svg>') 5 3, auto;
+  cursor: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="rgb(34,197,94)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6L24 16L5 26V6Z"/><path d="M5 6L24 16" stroke-width="2.2"/></svg>') 5 3, auto;
 }
 
 /* Cursor para acciones de venta - Carrito de compra */
