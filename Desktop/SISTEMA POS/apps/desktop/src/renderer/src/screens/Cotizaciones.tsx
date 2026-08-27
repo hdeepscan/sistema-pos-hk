@@ -69,6 +69,9 @@ export default function Cotizaciones() {
     clienteTelefono: "",
     clienteEmpresa: "",
     clienteDireccion: "",
+    tipoDocumento: "NIT",
+    numeroDocumento: "",
+    firmaBase64: "",
     descuentoPorcentaje: 0,
     impuestoPorcentaje: 19,
     comentarios: "",
@@ -254,6 +257,9 @@ export default function Cotizaciones() {
         clienteTelefono: form.clienteTelefono || undefined,
         clienteEmpresa: form.clienteEmpresa || undefined,
         clienteDireccion: form.clienteDireccion || undefined,
+        tipoDocumento: form.tipoDocumento,
+        numeroDocumento: form.numeroDocumento || undefined,
+        firmaBase64: form.firmaBase64 || undefined,
         descuentoPorcentaje: form.descuentoPorcentaje,
         impuestoPorcentaje: form.impuestoPorcentaje,
         comentarios: form.comentarios || undefined,
@@ -275,6 +281,9 @@ export default function Cotizaciones() {
         clienteTelefono: "",
         clienteEmpresa: "",
         clienteDireccion: "",
+        tipoDocumento: "NIT",
+        numeroDocumento: "",
+        firmaBase64: "",
         descuentoPorcentaje: 0,
         impuestoPorcentaje: 19,
         comentarios: "",
@@ -537,6 +546,61 @@ export default function Cotizaciones() {
                   onChange={(e) => setForm({ ...form, clienteDireccion: e.target.value })}
                   style={{ width: "100%", padding: "8px" }}
                 />
+              </div>
+
+              <div>
+                <label style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: "bold", marginBottom: 4 }}>
+                  Tipo de Documento
+                </label>
+                <select
+                  value={form.tipoDocumento}
+                  onChange={(e) => setForm({ ...form, tipoDocumento: e.target.value })}
+                  style={{ width: "100%", padding: "8px" }}
+                >
+                  <option value="NIT">NIT</option>
+                  <option value="CC">Cédula (CC)</option>
+                  <option value="CE">Cédula de Extranjería (CE)</option>
+                  <option value="PASAPORTE">Pasaporte</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: "bold", marginBottom: 4 }}>
+                  Número de Documento
+                </label>
+                <input
+                  placeholder="Ej: 123456789"
+                  value={form.numeroDocumento}
+                  onChange={(e) => setForm({ ...form, numeroDocumento: e.target.value })}
+                  style={{ width: "100%", padding: "8px" }}
+                />
+              </div>
+
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: "bold", marginBottom: 4 }}>
+                  📝 Firma (Foto PNG con fondo transparente)
+                </label>
+                <input
+                  type="file"
+                  accept="image/png"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = (event) => {
+                        setForm({ ...form, firmaBase64: event.target?.result as string });
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                  style={{ width: "100%", padding: "8px" }}
+                />
+                <small style={{ color: "#999" }}>Sube una imagen PNG con fondo transparente</small>
+                {form.firmaBase64 && (
+                  <div style={{ marginTop: "8px" }}>
+                    <img src={form.firmaBase64} alt="Firma" style={{ maxHeight: "60px", maxWidth: "150px" }} />
+                  </div>
+                )}
               </div>
             </div>
 

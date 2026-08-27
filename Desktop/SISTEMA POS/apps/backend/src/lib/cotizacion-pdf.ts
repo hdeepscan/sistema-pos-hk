@@ -1,199 +1,244 @@
 import PDFDocument from "pdfkit";
 
 type CotizacionConLineas = any;
-type Producto = any;
 
 export async function generarPDFCotizacion(
   cotizacion: CotizacionConLineas,
-  datosEmpresa: {
-    nombre: string;
-    nit?: string;
-    telefono?: string;
-    email?: string;
-    direccion?: string;
-    logo?: string;
-  }
+  datosEmpresa: any
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const buffers: Buffer[] = [];
-    const doc = new PDFDocument({
-      size: "A4",
-      margin: 40,
-    });
+    try {
+      const buffers: Buffer[] = [];
+      const doc = new PDFDocument({ margin: 40, size: "letter" });
 
-    doc.on("data", (chunk) => buffers.push(chunk));
-    doc.on("end", () => resolve(Buffer.concat(buffers)));
-    doc.on("error", reject);
+      doc.on("data", (chunk) => buffers.push(chunk));
+      doc.on("end", () => resolve(Buffer.concat(buffers)));
+      doc.on("error", reject);
 
-    // Encabezado
-    doc.fontSize(24).font("Helvetica-Bold").text(datosEmpresa.nombre, { align: "center" });
-    doc.fontSize(10)
-      .font("Helvetica")
-      .text(`NIT: ${datosEmpresa.nit || "N/A"}`, { align: "center" });
-    doc.text(`${datosEmpresa.telefono || ""} | ${datosEmpresa.email || ""}`, { align: "center" });
-    doc.text(datosEmpresa.direccion || "", { align: "center" });
+      const pageWidth = doc.page.width;
+      const pageHeight = doc.page.height;
+      const margin = 40;
+      const contentWidth = pageWidth - margin * 2;
 
-    doc.moveTo(40, doc.y + 10).lineTo(555, doc.y + 10).stroke();
-    doc.moveDown(2);
-
-    // Título
-    doc.fontSize(18).font("Helvetica-Bold").text("COTIZACIÓN", { align: "center" });
-    doc.moveDown(1);
-
-    // Datos de cotización
-    const y1 = doc.y;
-    doc.fontSize(10).font("Helvetica-Bold").text("Número:", 50);
-    doc.font("Helvetica").text(cotizacion.numero, 150);
-
-    doc.fontSize(10).font("Helvetica-Bold").text("Fecha:", 50, y1);
-    doc.font("Helvetica").text(cotizacion.fechaCreacion.toLocaleDateString("es-CO"), 150, y1);
-
-    if (cotizacion.fechaVigencia) {
-      doc.fontSize(10).font("Helvetica-Bold").text("Vigencia hasta:", 300, y1);
-      doc.font("Helvetica").text(cotizacion.fechaVigencia.toLocaleDateString("es-CO"), 400, y1);
-    }
-
-    doc.moveDown(2);
-    doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
-    doc.moveDown(1);
-
-    // Datos del cliente
-    doc.fontSize(10).font("Helvetica-Bold").text("INFORMACIÓN DEL CLIENTE");
-    doc.fontSize(9).font("Helvetica");
-    doc.text(`Nombre: ${cotizacion.clienteNombre}`);
-    doc.text(`Empresa: ${cotizacion.clienteEmpresa || "N/A"}`);
-    doc.text(`Teléfono: ${cotizacion.clienteTelefono || "N/A"}`);
-    doc.text(`Email: ${cotizacion.clienteEmail || "N/A"}`);
-    if (cotizacion.clienteDireccion) {
-      doc.text(`Dirección: ${cotizacion.clienteDireccion}`);
-    }
-
-    doc.moveDown(1.5);
-    doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
-    doc.moveDown(1);
-
-    // Tabla de productos
-    const tableTop = doc.y;
-    const col1 = 50;
-    const col2 = 250;
-    const col3 = 350;
-    const col4 = 430;
-    const col5 = 520;
-
-    // Encabezados
-    doc.fontSize(9).font("Helvetica-Bold");
-    doc.text("Cantidad", col1, tableTop);
-    doc.text("Descripción", col2, tableTop);
-    doc.text("Precio Unit.", col3, tableTop);
-    doc.text("Descuento", col4, tableTop);
-    doc.text("Total", col5, tableTop, { align: "right" });
-
-    doc.moveTo(40, tableTop + 15).lineTo(555, tableTop + 15).stroke();
-
-    // Líneas
-    let y = tableTop + 25;
-    doc.fontSize(8).font("Helvetica");
-
-    cotizacion.lineas.forEach((linea) => {
-      const cantidad = Number(linea.cantidad).toFixed(2);
-      const precio = Number(linea.precioUnitario).toLocaleString("es-CO", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
+      // ===== ENCABEZADO EMPRESA =====
+      doc.fontSize(20).font("Helvetica-Bold").text(datosEmpresa.nombre, { align: "center" });
+      doc.fontSize(10).font("Helvetica");
+      doc.text(`NIT: ${datosEmpresa.nit}`, { align: "center" });
+      doc.text(`Tel: ${datosEmpresa.telefono} | Email: ${datosEmpresa.email}`, {
+        align: "center",
       });
-      const descuento =
-        Number(linea.descuentoPorcentaje) > 0
-          ? `${Number(linea.descuentoPorcentaje).toFixed(1)}%`
-          : `$${Number(linea.descuentoValor).toLocaleString("es-CO", {
-              minimumFractionDigits: 2,
-            })}`;
-      const total = Number(linea.subtotal).toLocaleString("es-CO", {
-        minimumFractionDigits: 2,
+      doc.text(`${datosEmpresa.direccion}`, { align: "center" });
+
+      doc.moveTo(margin, doc.y + 10).lineTo(pageWidth - margin, doc.y + 10).stroke();
+      doc.moveDown(0.5);
+
+      // ===== TÍTULO Y NÚMERO =====
+      doc.fontSize(16).font("Helvetica-Bold").text("COTIZACIÓN", { align: "center" });
+      doc.moveDown(0.3);
+      doc
+        .fontSize(11)
+        .font("Helvetica")
+        .text(`No. ${cotizacion.numero}`, { align: "center" });
+      doc.moveTo(margin, doc.y + 5).lineTo(pageWidth - margin, doc.y + 5).stroke();
+      doc.moveDown(0.5);
+
+      // ===== FILA: FECHA Y VIGENCIA =====
+      const leftColX = margin;
+      const rightColX = pageWidth / 2;
+
+      doc.fontSize(10).font("Helvetica-Bold").text("Fecha:", leftColX, doc.y);
+      doc
+        .font("Helvetica")
+        .text(new Date(cotizacion.fechaCreacion).toLocaleDateString("es-CO"), leftColX + 50);
+
+      if (cotizacion.fechaVigencia) {
+        doc
+          .fontSize(10)
+          .font("Helvetica-Bold")
+          .text("Válida hasta:", rightColX, doc.y - 14);
+        doc
+          .font("Helvetica")
+          .text(
+            new Date(cotizacion.fechaVigencia).toLocaleDateString("es-CO"),
+            rightColX + 65
+          );
+      }
+
+      doc.moveDown(1);
+
+      // ===== INFORMACIÓN DEL CLIENTE =====
+      doc.fontSize(11).font("Helvetica-Bold").text("INFORMACIÓN DEL CLIENTE");
+      doc.moveTo(margin, doc.y + 2).lineTo(pageWidth - margin, doc.y + 2).stroke();
+      doc.moveDown(0.3);
+
+      doc.fontSize(9).font("Helvetica");
+      const labelWidth = 100;
+      const valueX = margin + labelWidth;
+
+      doc.font("Helvetica-Bold").text("Nombre:", margin, doc.y);
+      doc.font("Helvetica").text(cotizacion.clienteNombre, valueX, doc.y - 14);
+
+      doc.moveDown(0.25);
+      doc.font("Helvetica-Bold").text("Empresa:", margin, doc.y);
+      doc.font("Helvetica").text(cotizacion.clienteEmpresa || "N/A", valueX, doc.y - 14);
+
+      doc.moveDown(0.25);
+      const docType = cotizacion.tipoDocumento || "NIT";
+      const docNum = cotizacion.numeroDocumento || "N/A";
+      doc.font("Helvetica-Bold").text(`${docType}:`, margin, doc.y);
+      doc.font("Helvetica").text(docNum, valueX, doc.y - 14);
+
+      doc.moveDown(0.25);
+      doc.font("Helvetica-Bold").text("Teléfono:", margin, doc.y);
+      doc.font("Helvetica").text(cotizacion.clienteTelefono || "N/A", valueX, doc.y - 14);
+
+      doc.moveDown(0.25);
+      doc.font("Helvetica-Bold").text("Email:", margin, doc.y);
+      doc.font("Helvetica").text(cotizacion.clienteEmail || "N/A", valueX, doc.y - 14);
+
+      doc.moveDown(0.25);
+      doc.font("Helvetica-Bold").text("Dirección:", margin, doc.y);
+      doc.font("Helvetica").text(cotizacion.clienteDireccion || "N/A", valueX, doc.y - 14);
+
+      doc.moveDown(0.8);
+
+      // ===== TABLA DE PRODUCTOS =====
+      doc.fontSize(11).font("Helvetica-Bold").text("DETALLE DE PRODUCTOS");
+      doc.moveTo(margin, doc.y + 2).lineTo(pageWidth - margin, doc.y + 2).stroke();
+      doc.moveDown(0.3);
+
+      // Encabezado tabla
+      const tableHeaderY = doc.y;
+      const col1 = margin;
+      const col2 = margin + 60;
+      const col3 = margin + 220;
+      const col4 = margin + 300;
+      const col5 = pageWidth - margin - 50;
+
+      doc.fontSize(9).font("Helvetica-Bold");
+      doc.text("Cant.", col1, tableHeaderY);
+      doc.text("Descripción", col2, tableHeaderY);
+      doc.text("P. Unitario", col3, tableHeaderY);
+      doc.text("Descuento", col4, tableHeaderY);
+      doc.text("Total", col5, tableHeaderY);
+
+      doc.moveTo(margin, doc.y + 2).lineTo(pageWidth - margin, doc.y + 2).stroke();
+      doc.moveDown(0.4);
+
+      // Filas de productos
+      doc.font("Helvetica").fontSize(9);
+      cotizacion.lineas.forEach((linea: any) => {
+        const cant = Number(linea.cantidad).toFixed(2);
+        const precio = `$${Number(linea.precioUnitario).toLocaleString("es-CO")}`;
+        const descuento = linea.descuentoPorcentaje
+          ? `${linea.descuentoPorcentaje}%`
+          : `$${Number(linea.descuentoValor).toLocaleString("es-CO")}`;
+        const total = `$${Number(linea.subtotal).toLocaleString("es-CO")}`;
+
+        doc.text(cant, col1, doc.y);
+        doc.text(linea.producto.nombre, col2, doc.y - 14, { width: 150 });
+        doc.text(precio, col3, doc.y + 14);
+        doc.text(descuento, col4, doc.y);
+        doc.text(total, col5, doc.y);
+
+        doc.moveDown(0.6);
       });
 
-      doc.text(cantidad, col1, y);
-      doc.text(linea.producto.nombre, col2, y, { width: 80 });
-      doc.text(precio, col3, y);
-      doc.text(descuento, col4, y);
-      doc.text(`$${total}`, col5, y, { align: "right" });
+      doc.moveTo(margin, doc.y).lineTo(pageWidth - margin, doc.y).stroke();
+      doc.moveDown(0.4);
 
-      y += 20;
-    });
+      // ===== TOTALES =====
+      const totalsX = pageWidth - margin - 150;
+      doc.fontSize(9).font("Helvetica");
 
-    doc.moveTo(40, y).lineTo(555, y).stroke();
-    y += 10;
-
-    // Totales
-    doc.fontSize(9).font("Helvetica");
-    doc.text("Subtotal:", 350, y);
-    doc.text(
-      `$${Number(cotizacion.subtotal).toLocaleString("es-CO", {
-        minimumFractionDigits: 2,
-      })}`,
-      520,
-      y,
-      { align: "right" }
-    );
-
-    if (Number(cotizacion.descuentoValor) > 0) {
-      y += 15;
-      doc.text("Descuento:", 350, y);
+      doc.text("Subtotal:", totalsX, doc.y);
       doc.text(
-        `$${Number(cotizacion.descuentoValor).toLocaleString("es-CO", {
-          minimumFractionDigits: 2,
-        })}`,
-        520,
-        y,
-        { align: "right" }
+        `$${Number(cotizacion.subtotal).toLocaleString("es-CO")}`,
+        totalsX + 80,
+        doc.y - 14
       );
-    }
 
-    if (Number(cotizacion.impuestoValor) > 0) {
-      y += 15;
-      doc.text(`IVA (${cotizacion.impuestoPorcentaje}%):`, 350, y);
+      doc.moveDown(0.25);
+      if (Number(cotizacion.descuentoValor) > 0) {
+        doc.text("Descuento:", totalsX, doc.y);
+        doc.text(
+          `-$${Number(cotizacion.descuentoValor).toLocaleString("es-CO")}`,
+          totalsX + 80,
+          doc.y - 14
+        );
+        doc.moveDown(0.25);
+      }
+
+      if (Number(cotizacion.impuestoValor) > 0) {
+        doc.text(`IVA (${cotizacion.impuestoPorcentaje}%):`, totalsX, doc.y);
+        doc.text(
+          `$${Number(cotizacion.impuestoValor).toLocaleString("es-CO")}`,
+          totalsX + 80,
+          doc.y - 14
+        );
+        doc.moveDown(0.25);
+      }
+
+      doc.fontSize(12).font("Helvetica-Bold");
+      doc.text("TOTAL:", totalsX, doc.y);
       doc.text(
-        `$${Number(cotizacion.impuestoValor).toLocaleString("es-CO", {
-          minimumFractionDigits: 2,
-        })}`,
-        520,
-        y,
-        { align: "right" }
+        `$${Number(cotizacion.total).toLocaleString("es-CO")}`,
+        totalsX + 80,
+        doc.y - 16
       );
-    }
 
-    y += 15;
-    doc.fontSize(11).font("Helvetica-Bold");
-    doc.text("TOTAL:", 350, y);
-    doc.text(
-      `$${Number(cotizacion.total).toLocaleString("es-CO", {
-        minimumFractionDigits: 2,
-      })}`,
-      520,
-      y,
-      { align: "right" }
-    );
+      doc.moveDown(1.5);
 
-    doc.moveDown(3);
+      // ===== NOTAS Y CONDICIONES =====
+      if (cotizacion.comentarios || cotizacion.condicionesPago) {
+        doc.fontSize(10).font("Helvetica-Bold").text("NOTAS Y CONDICIONES");
+        doc.moveTo(margin, doc.y + 2).lineTo(pageWidth - margin, doc.y + 2).stroke();
+        doc.moveDown(0.3);
 
-    // Notas y condiciones
-    if (cotizacion.comentarios || cotizacion.condicionesPago) {
-      doc.fontSize(9).font("Helvetica-Bold").text("NOTAS Y CONDICIONES");
-      doc.fontSize(8).font("Helvetica");
-      if (cotizacion.comentarios) {
-        doc.text(cotizacion.comentarios);
+        doc.fontSize(9).font("Helvetica");
+        if (cotizacion.comentarios) {
+          doc.text(cotizacion.comentarios);
+          doc.moveDown(0.2);
+        }
+        if (cotizacion.condicionesPago) {
+          doc.text(cotizacion.condicionesPago);
+          doc.moveDown(0.2);
+        }
       }
-      if (cotizacion.condicionesPago) {
-        doc.text(cotizacion.condicionesPago);
+
+      // ===== FIRMA =====
+      if (cotizacion.firmaBase64) {
+        doc.moveDown(0.5);
+        const imgX = pageWidth / 2 - 50;
+        const imgY = doc.y;
+        try {
+          doc.image(cotizacion.firmaBase64, imgX, imgY, { width: 100, height: 50 });
+          doc.moveDown(2.5);
+          doc
+            .fontSize(8)
+            .font("Helvetica")
+            .text("_________________________", imgX - 20, doc.y + 20, {
+              width: 140,
+              align: "center",
+            });
+          doc.text("Firma Autorizado", imgX - 20, doc.y, { width: 140, align: "center" });
+        } catch (e) {
+          // Ignore image errors
+        }
       }
+
+      // ===== PIE DE PÁGINA =====
+      doc.fontSize(8).font("Helvetica").fillColor("#999");
+      doc.text(
+        `Generado el ${new Date().toLocaleString("es-CO")} | Cotización ${cotizacion.numero}`,
+        margin,
+        pageHeight - 30,
+        { align: "center" }
+      );
+
+      doc.end();
+    } catch (err) {
+      reject(err);
     }
-
-    doc.moveDown(2);
-    doc.fontSize(7).font("Helvetica").text("Generado automáticamente por Sistema POS", {
-      align: "center",
-    });
-    doc.text(`Cotización ${cotizacion.numero} - ${new Date().toLocaleString("es-CO")}`, {
-      align: "center",
-    });
-
-    doc.end();
   });
 }
