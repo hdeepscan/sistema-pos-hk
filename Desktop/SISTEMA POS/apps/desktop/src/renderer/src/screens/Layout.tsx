@@ -310,83 +310,159 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
         </div>
       )}
 
-      {/* Botón flotante para cambiar vista Desktop/Móvil */}
+      {/* Botón flotante mejorado para cambiar vista Desktop/Móvil */}
       {setIsMobile && (
         <div
           style={{
             position: "fixed",
-            bottom: 24,
-            right: 24,
+            bottom: 32,
+            right: 32,
             zIndex: 999,
           }}
         >
-          <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 12 }}>
+            {/* Menú desplegable */}
             {mostrarMenuVistaToggle && (
               <div
                 style={{
                   display: "flex",
-                  alignItems: "center",
+                  flexDirection: "column",
                   gap: 8,
-                  padding: "8px 12px",
+                  padding: "16px",
                   background: "var(--surface)",
                   border: "1px solid var(--border-light)",
-                  borderRadius: "var(--radius-sm)",
-                  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
-                  fontSize: "12px",
+                  borderRadius: "12px",
+                  boxShadow: "0 8px 24px rgba(0, 0, 0, 0.15)",
+                  animation: "slideInUp 0.3s ease-out",
+                  minWidth: "240px",
                 }}
               >
-                <span style={{ color: "var(--text-muted)" }}>
-                  Vista: <strong>{isMobile ? "Móvil" : "Desktop"}</strong>
-                </span>
-                <button
-                  onClick={() => {
-                    setIsMobile();
-                    setMostrarMenuVistaToggle(false);
-                  }}
-                  style={{
-                    background: "var(--brand)",
-                    color: "#fff",
-                    border: "none",
-                    padding: "4px 8px",
-                    borderRadius: "4px",
-                    cursor: "pointer",
-                    fontSize: "11px",
-                    fontWeight: "600",
-                  }}
-                  title="Cambiar vista"
-                >
-                  {isMobile ? "Ver Desktop" : "Ver Móvil"}
-                </button>
+                <div style={{ fontSize: "12px", fontWeight: "600", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Modo de Visualización
+                </div>
+
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    onClick={() => {
+                      if (isMobile) {
+                        setIsMobile();
+                        setMostrarMenuVistaToggle(false);
+                      }
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: "10px 12px",
+                      background: !isMobile ? "var(--brand)" : "var(--surface-secondary)",
+                      color: !isMobile ? "#fff" : "var(--text)",
+                      border: !isMobile ? "none" : "1px solid var(--border-light)",
+                      borderRadius: "8px",
+                      cursor: "pointer",
+                      fontSize: "13px",
+                      fontWeight: "600",
+                      transition: "all 0.2s ease",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "6px",
+                    }}
+                    title="Ver en vista de escritorio"
+                  >
+                    <span style={{ fontSize: "16px" }}>🖥️</span>
+                    Desktop
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      if (!isMobile) {
+                        setIsMobile();
+                        setMostrarMenuVistaToggle(false);
+                      }
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: "10px 12px",
+                      background: isMobile ? "var(--brand)" : "var(--surface-secondary)",
+                      color: isMobile ? "#fff" : "var(--text)",
+                      border: isMobile ? "none" : "1px solid var(--border-light)",
+                      borderRadius: "8px",
+                      cursor: "pointer",
+                      fontSize: "13px",
+                      fontWeight: "600",
+                      transition: "all 0.2s ease",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "6px",
+                    }}
+                    title="Ver en vista móvil"
+                  >
+                    <span style={{ fontSize: "16px" }}>📱</span>
+                    Móvil
+                  </button>
+                </div>
+
+                <div style={{ fontSize: "11px", color: "var(--text-muted)", textAlign: "center", marginTop: "4px", lineHeight: "1.4" }}>
+                  Tu preferencia será guardada
+                </div>
               </div>
             )}
+
+            {/* Botón principal flotante */}
             <button
               onClick={() => setMostrarMenuVistaToggle(!mostrarMenuVistaToggle)}
               style={{
-                background: "var(--brand)",
-                color: "#fff",
-                border: "none",
-                width: 48,
-                height: 48,
+                width: 56,
+                height: 56,
                 borderRadius: "50%",
+                border: "none",
+                background: "linear-gradient(135deg, var(--brand) 0%, #1ea94e 100%)",
+                color: "#fff",
                 cursor: "pointer",
-                fontSize: "20px",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                boxShadow: "0 4px 12px rgba(34, 197, 94, 0.25)",
-                transition: "all 0.3s ease",
+                boxShadow: "0 6px 20px rgba(34, 197, 94, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)",
+                transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
+                position: "relative",
+                overflow: "hidden",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = "0 8px 20px rgba(34, 197, 94, 0.35)";
+                e.currentTarget.style.transform = "scale(1.12) translateY(-2px)";
+                e.currentTarget.style.boxShadow = "0 10px 28px rgba(34, 197, 94, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2)";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = "0 4px 12px rgba(34, 197, 94, 0.25)";
+                e.currentTarget.style.transform = "scale(1) translateY(0)";
+                e.currentTarget.style.boxShadow = "0 6px 20px rgba(34, 197, 94, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)";
               }}
               title="Cambiar entre vista Desktop y Móvil"
             >
-              {isMobile ? "💻" : "📱"}
+              <span style={{ fontSize: "24px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {isMobile ? "🖥️" : "📱"}
+              </span>
             </button>
           </div>
+
+          {/* Indicador de vista actual cuando el menú está cerrado */}
+          {!mostrarMenuVistaToggle && (
+            <div
+              style={{
+                position: "absolute",
+                bottom: 72,
+                right: 0,
+                background: "var(--surface)",
+                padding: "6px 12px",
+                borderRadius: "8px",
+                fontSize: "11px",
+                fontWeight: "600",
+                color: "var(--text-muted)",
+                whiteSpace: "nowrap",
+                boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
+                opacity: 0.8,
+              }}
+            >
+              Vista: <strong style={{ color: "var(--brand)" }}>{isMobile ? "Móvil" : "Desktop"}</strong>
+            </div>
+          )}
         </div>
       )}
     </div>
