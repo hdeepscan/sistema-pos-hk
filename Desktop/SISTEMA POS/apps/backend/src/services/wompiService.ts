@@ -72,24 +72,44 @@ export class WompiService {
   }
 
   /**
+   * Generar firma de integridad de Wompi
+   * Wompi requiere: SHA256(referencia + monto_centavos + moneda + INTEGRITY_SECRET)
+   */
+  private generarFirmaIntegridad(referencia: string, montoCentavos: number, moneda: string): string {
+    if (!this.integritySecret) {
+      console.warn("⚠️ WOMPI_INTEGRITY_SECRET no configurada");
+      return "";
+    }
+
+    const datos = `${referencia}${montoCentavos}${moneda}${this.integritySecret}`;
+    const firma = crypto.createHash("sha256").update(datos).digest("hex");
+    console.log("🔐 Firma de integridad generada correctamente");
+    return firma;
+  }
+
+  /**
    * Crear transacción en Wompi
    */
   async crearOrdenPago(datos: WompiOrderData): Promise<WompiCheckoutResponse> {
     try {
       const referenciaPago = datos.referenciaPago || this.generarReferenciaPago();
       const monto = Math.round(datos.monto * 100); // Wompi usa centavos
+      const moneda = "COP";
 
       // Debug: Log datos exactos
       console.log("📊 Datos para Wompi Link:");
       console.log("  Public Key:", this.publicKey?.substring(0, 10) + "...");
       console.log("  Monto (centavos):", monto);
       console.log("  Referencia:", referenciaPago);
-      console.log("  Moneda: COP");
+      console.log("  Moneda:", moneda);
 
-      // Usar Wompi Web Checkout dinámico (/p/ con parámetros)
-      const checkoutUrl = `https://checkout.wompi.co/p/?public-key=${this.publicKey}&currency=COP&amount-in-cents=${monto}&reference=${referenciaPago}`;
+      // Generar firma de integridad
+      const firma = this.generarFirmaIntegridad(referenciaPago, monto, moneda);
 
-      console.log("🔗 Checkout URL:", checkoutUrl);
+      // Usar Wompi Web Checkout dinámico (/p/ con parámetros + firma)
+      const checkoutUrl = `https://checkout.wompi.co/p/?public-key=${this.publicKey}&currency=${moneda}&amount-in-cents=${monto}&reference=${referenciaPago}&signature=${firma}`;
+
+      console.log("🔗 Checkout URL generada con firma");
       console.log(`✓ Checkout Wompi creado: ${referenciaPago}`);
 
       return {
