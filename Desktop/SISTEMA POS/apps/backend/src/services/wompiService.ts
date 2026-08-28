@@ -73,25 +73,24 @@ export class WompiService {
 
   /**
    * Generar firma de integridad de Wompi
-   * Wompi requiere: SHA256(referencia + monto_centavos + moneda + INTEGRITY_SECRET)
+   * Wompi requiere: SHA256(${referencia}${montoEnCentavos}COP${WOMPI_INTEGRITY_SECRET})
    */
-  private generarFirmaIntegridad(referencia: string, montoCentavos: number, moneda: string): string {
+  private generarFirmaIntegridad(referencia: string, montoCentavos: number): string {
     if (!this.integritySecret) {
       console.warn("⚠️ WOMPI_INTEGRITY_SECRET no configurada");
       return "";
     }
 
-    // Concatenar exactamente: referencia + monto + moneda + secret
-    const datos = `${referencia}${montoCentavos}${moneda}${this.integritySecret}`;
+    // Concatenar EXACTAMENTE como Wompi lo espera: referencia + monto + "COP" + secret
+    const datos = `${referencia}${montoCentavos}COP${this.integritySecret}`;
     const firma = crypto.createHash("sha256").update(datos).digest("hex");
 
-    console.log("🔐 Datos para firma:", {
+    console.log("🔐 Firma de integridad generada:", {
       referencia,
       montoCentavos,
-      moneda,
-      secretLength: this.integritySecret.length,
-      datosLongitud: datos.length,
-      firmaGenerada: firma.substring(0, 10) + "...",
+      moneda: "COP",
+      datosParaHash: datos.substring(0, 50) + "...",
+      firmaGenerada: firma,
     });
 
     return firma;
@@ -104,24 +103,22 @@ export class WompiService {
     try {
       const referenciaPago = datos.referenciaPago || this.generarReferenciaPago();
       const monto = Math.round(datos.monto * 100); // Wompi usa centavos
-      const moneda = "COP";
 
       // Debug: Log datos exactos
-      console.log("📊 Datos para Wompi Link:");
+      console.log("📊 Datos para Wompi Web Checkout:");
       console.log("  Public Key:", this.publicKey?.substring(0, 10) + "...");
       console.log("  Monto (centavos):", monto);
       console.log("  Referencia:", referenciaPago);
-      console.log("  Moneda:", moneda);
+      console.log("  Moneda: COP");
 
-      // Nota: La firma de integridad NO se incluye en los parámetros de URL
-      // Wompi calcula internamente la validación en su servidor
-      // (El Widget de Wompi hace POST desde el cliente y no puede acceder a parámetros de URL)
+      // Generar firma de integridad con parámetro signature:integrity
+      const firma = this.generarFirmaIntegridad(referenciaPago, monto);
 
-      // Usar Wompi Web Checkout dinámico (/p/ con parámetros)
-      const checkoutUrl = `https://checkout.wompi.co/p/?public-key=${this.publicKey}&currency=${moneda}&amount-in-cents=${monto}&reference=${referenciaPago}`;
+      // Usar Wompi Web Checkout dinámico (/p/ con parámetros + signature:integrity)
+      const checkoutUrl = `https://checkout.wompi.co/p/?public-key=${this.publicKey}&currency=COP&amount-in-cents=${monto}&reference=${referenciaPago}&signature:integrity=${firma}`;
 
-      console.log("🔗 Checkout URL generada con firma");
-      console.log(`✓ Checkout Wompi creado: ${referenciaPago}`);
+      console.log("🔗 Checkout URL lista");
+      console.log(`✓ Checkout creado: ${referenciaPago}`);
 
       return {
         url: checkoutUrl,
