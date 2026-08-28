@@ -32,6 +32,7 @@ import { fidelizacionRoutes } from "./routes/fidelizacion.js";
 import { contabilidadRoutes } from "./routes/contabilidad.js";
 import { cotizacionesRoutes } from "./routes/cotizaciones.js";
 import { rutasPagos } from "./routes/pagos.js";
+import { rutasValidar } from "./routes/validar.js";
 import { iniciarPollerShopify } from "./lib/poller.js";
 import { iniciarBackupAutomatico } from "./lib/auto-backup.js";
 import { iniciarShopifyQueueWorker } from "./lib/shopify-queue-worker.js";
@@ -72,6 +73,7 @@ await app.register(fidelizacionRoutes);
 await app.register(contabilidadRoutes);
 await app.register(cotizacionesRoutes);
 await app.register(rutasPagos);
+await app.register(rutasValidar);
 
 app.get("/health", async () => ({ ok: true }));
 
