@@ -93,6 +93,7 @@ async function procesarPagoAprobado(transaccion: any) {
     if (datosRegistro?.tipoCompra === "USUARIOS_ADICIONALES") {
       console.log(`👥 Procesando compra de usuarios adicionales`);
       const cantidadUsuarios = datosRegistro?.cantidadUsuarios || 0;
+      const datosUsuario = datosRegistro?.datosUsuario; // Datos del nuevo usuario (si viene del formulario)
 
       if (cantidadUsuarios > 0 && pago.empresaId) {
         // Incrementar límite de usuarios de la empresa
@@ -106,6 +107,35 @@ async function procesarPagoAprobado(transaccion: any) {
         });
 
         console.log(`✅ Límite de usuarios incrementado: +${cantidadUsuarios} (nuevo total: ${empresa.limiteUsuarios})`);
+
+        // Si hay datos de usuario en el registro, crear el usuario automáticamente
+        if (datosUsuario && datosUsuario.nombre && datosUsuario.email && datosUsuario.password) {
+          try {
+            console.log(`👤 Creando usuario automáticamente: ${datosUsuario.nombre} (${datosUsuario.email})`);
+
+            const passwordHash = await bcrypt.hash(datosUsuario.password, 10);
+
+            const nuevoUsuario = await prisma.usuario.create({
+              data: {
+                empresaId: pago.empresaId,
+                nombre: datosUsuario.nombre,
+                email: datosUsuario.email,
+                passwordHash,
+                rol: datosUsuario.rol || "CAJERO",
+                permisos: datosUsuario.permisos || [],
+                activo: true,
+              },
+            });
+
+            console.log(`✅ Usuario creado automáticamente: ${nuevoUsuario.id} (${nuevoUsuario.email})`);
+          } catch (userError: any) {
+            console.error("⚠️ Error creando usuario automáticamente (pago completado):", {
+              email: datosUsuario?.email,
+              mensaje: userError?.message,
+            });
+            // No revertir el pago, solo loguear el error
+          }
+        }
       }
 
       // Marcar pago como completado

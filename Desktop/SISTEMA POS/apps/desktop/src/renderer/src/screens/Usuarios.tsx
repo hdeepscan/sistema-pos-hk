@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
+import { useSesionStore } from "../lib/store";
 import { PERMISOS, ETIQUETAS_PERMISOS, PERMISOS_POR_ROL } from "@sistema-pos/shared";
 import type { Permiso, RolUsuario } from "@sistema-pos/shared";
 import { mensajeError } from "../lib/errores";
@@ -14,6 +15,12 @@ interface Usuario {
   activo: boolean;
 }
 
+interface Empresa {
+  id: string;
+  nombre: string;
+  limiteUsuarios: number;
+}
+
 const ROLES_DISPONIBLES: { valor: RolUsuario; etiqueta: string }[] = [
   { valor: "ADMIN", etiqueta: "Administrador" },
   { valor: "SUPERVISOR", etiqueta: "Supervisor" },
@@ -22,25 +29,48 @@ const ROLES_DISPONIBLES: { valor: RolUsuario; etiqueta: string }[] = [
 ];
 
 export default function Usuarios() {
+  const sesion = useSesionStore();
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [empresa, setEmpresa] = useState<Empresa | null>(null);
   const [mostrarNuevo, setMostrarNuevo] = useState(false);
+  const [mostrarPago, setMostrarPago] = useState(false);
   const [editar, setEditar] = useState<Usuario | null>(null);
   const [cargando, setCargando] = useState(true);
-  const [limitePendiente, setLimitePendiente] = useState<{
-    usuariosActuales: number;
-    limiteUsuarios: number;
-  } | null>(null);
 
   const cargar = useCallback(async () => {
     setCargando(true);
-    const { data } = await api.get<Usuario[]>("/usuarios");
-    setUsuarios(data);
-    setCargando(false);
-  }, []);
+    try {
+      const { data: usuariosData } = await api.get<Usuario[]>("/usuarios");
+      setUsuarios(usuariosData);
+      // Obtener datos de la empresa (limiteUsuarios) desde sesión
+      if (sesion.empresa) {
+        setEmpresa({
+          id: sesion.empresa.id,
+          nombre: sesion.empresa.nombre,
+          limiteUsuarios: sesion.empresa.limiteUsuarios || 2,
+        });
+      }
+    } catch (err) {
+      console.error("Error cargando usuarios:", err);
+    } finally {
+      setCargando(false);
+    }
+  }, [sesion.empresa]);
 
   useEffect(() => {
     cargar();
   }, [cargar]);
+
+  const handleNuevoUsuario = () => {
+    // Verificar si hay slots disponibles
+    if (usuarios.length >= (empresa?.limiteUsuarios || 2)) {
+      // No hay slots: mostrar modal de pago + formulario
+      setMostrarPago(true);
+    } else {
+      // Hay slots: mostrar formulario normal
+      setMostrarNuevo(true);
+    }
+  };
 
   return (
     <div>
@@ -49,7 +79,7 @@ export default function Usuarios() {
           <h2>Usuarios y permisos</h2>
           <p>Cuentas secundarias, roles y control de acceso por permiso</p>
         </div>
-        <button onClick={() => setMostrarNuevo(true)} type="button">
+        <button onClick={handleNuevoUsuario} type="button">
           Nuevo usuario
         </button>
       </div>
@@ -93,34 +123,13 @@ export default function Usuarios() {
         El historial de acciones de los usuarios ahora esta en la seccion "Auditoria".
       </p>
 
-      {mostrarNuevo && (
-        <FormularioUsuario
-          onClose={() => setMostrarNuevo(false)}
-          onGuardado={cargar}
-          onLimitePendiente={(data) => {
-            setMostrarNuevo(false);
-            setLimitePendiente(data);
-          }}
-        />
-      )}
-      {editar && (
-        <FormularioUsuario
-          usuario={editar}
-          onClose={() => setEditar(null)}
-          onGuardado={cargar}
-          onLimitePendiente={(data) => {
-            setEditar(null);
-            setLimitePendiente(data);
-          }}
-        />
-      )}
-      {limitePendiente && (
-        <ModalComprarUsuarios
-          usuariosActuales={limitePendiente.usuariosActuales}
-          limiteUsuarios={limitePendiente.limiteUsuarios}
-          onClose={() => setLimitePendiente(null)}
+      {mostrarNuevo && <FormularioUsuario onClose={() => setMostrarNuevo(false)} onGuardado={cargar} />}
+      {editar && <FormularioUsuario usuario={editar} onClose={() => setEditar(null)} onGuardado={cargar} />}
+      {mostrarPago && (
+        <FormularioPagoYUsuario
+          onClose={() => setMostrarPago(false)}
           onComprado={() => {
-            setLimitePendiente(null);
+            setMostrarPago(false);
             cargar();
           }}
         />
@@ -133,12 +142,10 @@ function FormularioUsuario({
   usuario,
   onClose,
   onGuardado,
-  onLimitePendiente,
 }: {
   usuario?: Usuario;
   onClose: () => void;
   onGuardado: () => void;
-  onLimitePendiente?: (data: { usuariosActuales: number; limiteUsuarios: number }) => void;
 }) {
   const [nombre, setNombre] = useState(usuario?.nombre ?? "");
   const [email, setEmail] = useState(usuario?.email ?? "");
@@ -177,15 +184,7 @@ function FormularioUsuario({
       onGuardado();
       onClose();
     } catch (err: any) {
-      // Capturar error de límite de usuarios
-      if (err?.response?.data?.codigo === "LIMITE_USUARIOS_ALCANZADO") {
-        const { usuariosActuales, limiteUsuarios } = err.response.data;
-        if (onLimitePendiente) {
-          onLimitePendiente({ usuariosActuales, limiteUsuarios });
-        }
-      } else {
-        setError(mensajeError(err, "No se pudo guardar el usuario"));
-      }
+      setError(mensajeError(err, "No se pudo guardar el usuario"));
     } finally {
       setGuardando(false);
     }
@@ -266,32 +265,64 @@ function FormularioUsuario({
 }
 
 /**
- * Modal para comprar usuarios adicionales ($10,000 COP c/u)
+ * Formulario para crear nuevo usuario cuando el límite está alcanzado.
+ * COMBINA: Datos del usuario + Pago ($10,000 COP) en UN SOLO FLUJO
  */
-function ModalComprarUsuarios({
-  usuariosActuales,
-  limiteUsuarios,
+function FormularioPagoYUsuario({
   onClose,
   onComprado,
 }: {
-  usuariosActuales: number;
-  limiteUsuarios: number;
   onClose: () => void;
   onComprado: () => void;
 }) {
-  const [cantidadUsuarios, setCantidadUsuarios] = useState(1);
-  const [cargando, setCargando] = useState(false);
+  const [nombre, setNombre] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [rol, setRol] = useState<RolUsuario>("CAJERO");
+  const [permisos, setPermisos] = useState<Permiso[]>(PERMISOS_POR_ROL["CAJERO"]);
   const [error, setError] = useState<string | null>(null);
+  const [procesando, setProcesando] = useState(false);
 
-  const precioUnitario = 10000; // $10,000 COP
-  const precioTotal = cantidadUsuarios * precioUnitario;
+  const PRECIO = 10000; // $10,000 COP
 
-  async function comprar() {
-    setCargando(true);
+  function cambiarRol(nuevoRol: RolUsuario) {
+    setRol(nuevoRol);
+    setPermisos(PERMISOS_POR_ROL[nuevoRol]);
+  }
+
+  function alternarPermiso(p: Permiso) {
+    setPermisos((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
+  }
+
+  async function pagarYCrear(e: React.FormEvent) {
+    e.preventDefault();
+    setProcesando(true);
     setError(null);
+
     try {
+      // Validaciones básicas
+      if (!nombre || !email || !password) {
+        throw new Error("Todos los campos son requeridos");
+      }
+
+      if (password.length < 8) {
+        throw new Error("La contraseña debe tener al menos 8 caracteres");
+      }
+
+      // Guardar datos del usuario en localStorage (serán usados después del pago)
+      const datosUsuarioNuevo = {
+        nombre,
+        email,
+        password,
+        rol,
+        permisos,
+      };
+      localStorage.setItem("usuarioPreregistrado", JSON.stringify(datosUsuarioNuevo));
+
+      // Crear checkout en Wompi
       const response = await api.post("/checkout/usuarios-adicionales", {
-        cantidadUsuarios,
+        cantidadUsuarios: 1, // Siempre es 1 usuario al crearlo directamente
+        datosUsuario: datosUsuarioNuevo, // Enviar datos del usuario
       });
 
       // Redirigir a Wompi
@@ -301,63 +332,91 @@ function ModalComprarUsuarios({
         setError("No se pudo generar el checkout");
       }
     } catch (err: any) {
-      setError(mensajeError(err, "Error al crear el checkout"));
+      setError(mensajeError(err, "Error al procesar el pago"));
     } finally {
-      setCargando(false);
+      setProcesando(false);
     }
   }
 
   return (
     <div className="modal-backdrop">
-      <div className="card" style={{ width: 480 }}>
-        <h4 style={{ marginBottom: 16 }}>Comprar usuarios adicionales</h4>
+      <div className="card" style={{ width: 520 }}>
+        <h4 style={{ marginBottom: 16 }}>Nuevo Usuario (Pago incluido)</h4>
 
-        <div style={{ marginBottom: 20, padding: "12px 16px", background: "var(--bg-tertiary)", borderRadius: "6px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-            <span style={{ fontSize: 13, opacity: 0.8 }}>Usuarios actuales</span>
-            <span style={{ fontWeight: "600" }}>{usuariosActuales} / {limiteUsuarios}</span>
+        {/* Banner de costo */}
+        <div style={{ marginBottom: 20, padding: "12px 16px", background: "#0066FF20", borderRadius: "6px", border: "1px solid #0066FF40" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 13, fontWeight: "500" }}>Slot de usuario adicional</span>
+            <span style={{ fontSize: 16, fontWeight: "700", color: "#0066FF" }}>$10,000 COP</span>
           </div>
-          <div style={{ fontSize: 12, opacity: 0.7 }}>
-            Necesitas comprar más slots para crear nuevos usuarios
+          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
+            Se procesará el pago en Wompi al completar este formulario
           </div>
         </div>
 
-        <div className="grid-form" style={{ marginBottom: 20 }}>
+        <form className="grid-form" onSubmit={pagarYCrear}>
           <label>
-            Cantidad de usuarios a comprar
+            Nombre completo
+            <input value={nombre} onChange={(e) => setNombre(e.target.value)} required />
+          </label>
+
+          <label>
+            Correo electrónico
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          </label>
+
+          <label>
+            Contraseña (mínimo 8 caracteres)
             <input
-              type="number"
-              min="1"
-              max="100"
-              value={cantidadUsuarios}
-              onChange={(e) => setCantidadUsuarios(Math.max(1, parseInt(e.target.value) || 1))}
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={8}
             />
           </label>
-        </div>
 
-        <div style={{ marginBottom: 20, padding: "12px 16px", background: "var(--bg-secondary)", borderRadius: "6px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: 13 }}>Precio unitario</span>
-            <span style={{ fontSize: 13 }}>$10,000 COP</span>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border)" }}>
-            <span style={{ fontWeight: "600", fontSize: 14 }}>Total</span>
-            <span style={{ fontWeight: "700", fontSize: 16, color: "#0066FF" }}>
-              ${precioTotal.toLocaleString("es-CO")} COP
+          <label>
+            Rol
+            <select value={rol} onChange={(e) => cambiarRol(e.target.value as RolUsuario)}>
+              {ROLES_DISPONIBLES.map((r) => (
+                <option key={r.valor} value={r.valor}>
+                  {r.etiqueta}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div>
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-muted)" }}>
+              Permisos (se cargan los del rol por defecto; puedes personalizarlos)
             </span>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 8, maxHeight: 180, overflowY: "auto" }}>
+              {PERMISOS.map((p) => (
+                <label key={p} style={{ flexDirection: "row", alignItems: "center", gap: 6, fontSize: 12.5 }}>
+                  <input
+                    type="checkbox"
+                    checked={permisos.includes(p)}
+                    onChange={() => alternarPermiso(p)}
+                    style={{ width: "auto" }}
+                  />
+                  {ETIQUETAS_PERMISOS[p]}
+                </label>
+              ))}
+            </div>
           </div>
-        </div>
 
-        {error && <span className="error-text" style={{ display: "block", marginBottom: 16 }}>{error}</span>}
+          {error && <span className="error-text">{error}</span>}
 
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={comprar} disabled={cargando} style={{ flex: 1 }}>
-            {cargando ? "Procesando..." : "Proceder al pago"}
-          </button>
-          <button className="secondary" type="button" onClick={onClose} disabled={cargando}>
-            Cancelar
-          </button>
-        </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button type="submit" disabled={procesando} style={{ flex: 1 }}>
+              {procesando ? "Procesando..." : `Pagar $${PRECIO.toLocaleString("es-CO")} y crear usuario`}
+            </button>
+            <button className="secondary" type="button" onClick={onClose} disabled={procesando}>
+              Cancelar
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

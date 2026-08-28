@@ -53,7 +53,7 @@ export async function crearCheckoutUsuarios(
   try {
     const usuario = (request as any).usuario;
     const empresaId = (request as any).empresaId;
-    const { cantidadUsuarios } = request.body as any;
+    const { cantidadUsuarios, datosUsuario } = request.body as any;
 
     // Validar autenticación
     if (!usuario || !empresaId) {
@@ -92,7 +92,13 @@ export async function crearCheckoutUsuarios(
       telefono: "",
     });
 
-    // Guardar transacción pendiente
+    // Guardar transacción pendiente + datos del usuario si se proporciona
+    const datosRegistroObj = {
+      tipoCompra: "USUARIOS_ADICIONALES",
+      cantidadUsuarios,
+      datosUsuario: datosUsuario || null, // Si viene el formulario de creación de usuario
+    };
+
     const pago = await prisma.pago.create({
       data: {
         empresaId,
@@ -101,12 +107,14 @@ export async function crearCheckoutUsuarios(
         monto: montoTotal,
         tipoPlan: "USUARIOS_ADICIONALES",
         usuariosAdicionales: cantidadUsuarios,
-        datosRegistro: JSON.stringify({
-          tipoCompra: "USUARIOS_ADICIONALES",
-          cantidadUsuarios,
-        }),
+        datosRegistro: JSON.stringify(datosRegistroObj),
       },
     });
+
+    console.log(`📝 Pago de usuarios creado: ${referenciaPago}`);
+    console.log(`  Cantidad: ${cantidadUsuarios}`);
+    console.log(`  Monto: $${montoTotal} COP`);
+    console.log(`  Con datos de usuario: ${datosUsuario ? "SÍ" : "NO"}`);
 
     return reply.send({
       success: true,
