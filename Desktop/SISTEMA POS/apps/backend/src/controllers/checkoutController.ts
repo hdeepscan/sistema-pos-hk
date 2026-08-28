@@ -125,10 +125,10 @@ export async function crearCheckout(
     });
 
     // Guardar referencia de pago en base de datos (estado PENDIENTE)
-    // En modo registro, usar null para empresaId (se asociará después)
+    // En modo registro, usar empresaId temporal (será reemplazado después de crear la empresa)
     const pago = await prisma.pago.create({
       data: {
-        empresaId: isRegistration ? null : actualEmpresaId,
+        empresaId: actualEmpresaId, // temp-xxxxx en modo registro, será actualizado después
         referenciaPago,
         estado: "PENDIENTE",
         monto: montoTotal,
