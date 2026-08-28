@@ -59,6 +59,9 @@ export const useNotificacionStore = create<NotificacionState>((set) => ({
 export const notif = {
   exito: (mensaje: string, duracion?: number) =>
     useNotificacionStore.getState().agregar(mensaje, "success", duracion),
+  // Alias en inglés para compatibilidad
+  success: (mensaje: string, duracion?: number) =>
+    useNotificacionStore.getState().agregar(mensaje, "success", duracion),
   error: (mensaje: string, duracion?: number) =>
     useNotificacionStore.getState().agregar(mensaje, "error", duracion),
   info: (mensaje: string, duracion?: number) =>
