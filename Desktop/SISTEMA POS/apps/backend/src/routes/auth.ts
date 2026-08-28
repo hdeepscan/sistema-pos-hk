@@ -96,7 +96,12 @@ export async function authRoutes(app: FastifyInstance) {
         rol: usuario.rol,
         permisos: permisosDe(usuario),
       },
-      empresa: { id: usuario.empresa.id, nombre: usuario.empresa.nombre },
+      empresa: {
+        id: usuario.empresa.id,
+        nombre: usuario.empresa.nombre,
+        fechaVencimiento: usuario.empresa.fechaVencimiento,
+        planSuscripcion: usuario.empresa.planSuscripcion,
+      },
       sucursales,
     });
   });
@@ -145,7 +150,12 @@ export async function authRoutes(app: FastifyInstance) {
         rol: usuario.rol,
         permisos: permisosDe(usuario),
       },
-      empresa: { id: empresa.id, nombre: empresa.nombre },
+      empresa: {
+        id: empresa.id,
+        nombre: empresa.nombre,
+        fechaVencimiento: empresa.fechaVencimiento,
+        planSuscripcion: empresa.planSuscripcion,
+      },
       sucursales,
     };
   });
