@@ -12,6 +12,7 @@ import { ThemeToggle } from "../components/ThemeToggle";
 import { MobileMenu } from "../components/MobileMenu";
 import { ToastContainer } from "../components/ToastContainer";
 import { SubscriptionCard } from "../components/SubscriptionCard";
+import { SubscriptionGuard } from "../components/SubscriptionGuard";
 
 const INTERVALO_CREDITOS_MS = 5 * 60 * 1000;
 
@@ -149,9 +150,10 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
   }
 
   return (
-    <div className="app-shell">
-      {/* Toast Container - Notificaciones Globales */}
-      <ToastContainer />
+    <SubscriptionGuard>
+      <div className="app-shell">
+        {/* Toast Container - Notificaciones Globales */}
+        <ToastContainer />
 
       {/* Menú Hamburguesa para Mobile */}
       {isMobile && (
@@ -522,6 +524,7 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
           )}
         </div>
       )}
-    </div>
+      </div>
+    </SubscriptionGuard>
   );
 }

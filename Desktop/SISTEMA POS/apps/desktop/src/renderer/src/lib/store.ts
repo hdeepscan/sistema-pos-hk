@@ -63,8 +63,29 @@ export const useSesionStore = create<SesionState>((set) => ({
     set({ token: null, usuario: null, empresa: null, sucursales: [], sucursalActivaId: null, registroDatos: null }),
 }));
 
+/**
+ * Verificar permiso: ADMIN tiene acceso total a todo
+ * Otros roles verifican el arreglo de permisos específicos
+ */
 export function usePermiso(permiso: string): boolean {
-  return useSesionStore((s) => s.usuario?.permisos.includes(permiso) ?? false);
+  return useSesionStore((s) => {
+    // Si es ADMIN, tiene acceso total a TODO
+    if (s.usuario?.rol === "ADMIN") return true;
+    // Otros roles: verificar permiso específico
+    return s.usuario?.permisos.includes(permiso) ?? false;
+  });
+}
+
+/**
+ * Verificar si la suscripción está activa
+ */
+export function useSuscripcionActiva(): boolean {
+  return useSesionStore((s) => {
+    if (!s.empresa?.fechaVencimiento) return true; // Sin fecha = activa
+    const ahora = new Date();
+    const vencimiento = new Date(s.empresa.fechaVencimiento);
+    return vencimiento > ahora;
+  });
 }
 
 // ========== THEME STORE ==========
