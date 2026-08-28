@@ -17,25 +17,30 @@ export async function webhookWompi(request: FastifyRequest, reply: FastifyReply)
     const body = request.body as any;
     const { event, data, timestamp, signature } = body;
 
+    // IMPORTANTE: Wompi anida los datos de transacción dentro de data.transaction
+    const transaction = data?.transaction || data;
+
     console.log("📨 Webhook Wompi recibido:", event);
-    console.log("📊 Data status:", data?.status);
-    console.log("📊 Data reference:", data?.reference);
+    console.log("📊 Transaction status:", transaction?.status);
+    console.log("📊 Transaction reference:", transaction?.reference);
+    console.log("📊 Transaction ID:", transaction?.id);
     console.log("🔐 Signature info:", { checksum: signature?.checksum?.substring(0, 20) + "...", properties: signature?.properties });
 
     // Validar firma del webhook con el estándar de Wompi
     const firmaValida = validarSignatureWebhook(body, signature);
 
     if (!firmaValida) {
-      console.warn("⚠️ Signature inválida en webhook - pero continuamos si status es APPROVED");
+      console.warn("⚠️ Checksum inválido - pero continuamos si status es APPROVED");
     } else {
-      console.log("✅ Firma de webhook validada correctamente");
+      console.log("✅ Checksum validado correctamente");
     }
 
     // Solo procesar transacciones aprobadas
-    console.log(`🔍 Condición check: event=${event}, status=${data?.status}`);
-    if (event === "transaction.updated" && data?.status === "APPROVED") {
+    const status = transaction?.status;
+    console.log(`🔍 Condición check: event=${event}, status=${status}`);
+    if (event === "transaction.updated" && status === "APPROVED") {
       console.log("✅ Ejecutando procesarPagoAprobado...");
-      await procesarPagoAprobado(data);
+      await procesarPagoAprobado(transaction);
     } else {
       console.log(`⏭️ No procesa: event no es transaction.updated O status no es APPROVED`);
     }
@@ -233,7 +238,14 @@ function calcularFechaVencimiento(tipoPlan: string): Date {
  * Estructura esperada:
  * {
  *   "event": "transaction.updated",
- *   "data": { ... },
+ *   "data": {
+ *     "transaction": {
+ *       "id": "...",
+ *       "status": "APPROVED",
+ *       "amount_in_cents": 400000,
+ *       ...
+ *     }
+ *   },
  *   "timestamp": "2026-08-28T10:30:00Z",
  *   "signature": {
  *     "checksum": "...",
@@ -264,16 +276,19 @@ function validarSignatureWebhook(payload: any, signatureObj: any): boolean {
       return false;
     }
 
+    // IMPORTANTE: Wompi anida los datos en data.transaction
+    const transaction = data?.transaction || data;
+
     // Construir la cadena a hashear siguiendo el orden de properties
     let dataToSign = "";
 
     for (const prop of properties) {
-      // Ejemplo: "transaction.id" -> extraer "id" de data.id
+      // Ejemplo: "transaction.id" -> extraer "id" de transaction.id
       const key = prop.replace("transaction.", "");
-      const value = data[key];
+      const value = transaction?.[key];
 
       if (value === undefined) {
-        console.warn(`⚠️ Property ${prop} no encontrada en data`);
+        console.warn(`⚠️ Property ${prop} no encontrada en transaction (buscó en transaction.${key})`);
         return false;
       }
 
@@ -289,8 +304,8 @@ function validarSignatureWebhook(payload: any, signatureObj: any): boolean {
       .update(dataToSign)
       .digest("hex");
 
-    console.log("🔐 Validación de firma webhook (Wompi):");
-    console.log(`  - Properties: ${properties.join(", ")}`);
+    console.log("🔐 Validación de checksum webhook:");
+    console.log(`  - Properties a hashear: ${properties.join(", ")}`);
     console.log(`  - Timestamp: ${timestamp}`);
     console.log(`  - Data to hash (primeros 50 chars): ${dataToSign.substring(0, 50)}...`);
     console.log(`  - Checksum recibido:   ${checksum.substring(0, 32)}...`);
@@ -306,7 +321,7 @@ function validarSignatureWebhook(payload: any, signatureObj: any): boolean {
 
     return esValida;
   } catch (error) {
-    console.error("❌ Error validando signature:", error);
+    console.error("❌ Error validando checksum:", error);
     return false;
   }
 }
