@@ -275,6 +275,7 @@ function FormularioPagoYUsuario({
   onClose: () => void;
   onComprado: () => void;
 }) {
+  const sesion = useSesionStore();
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -309,7 +310,19 @@ function FormularioPagoYUsuario({
         throw new Error("La contraseña debe tener al menos 8 caracteres");
       }
 
-      // Guardar datos del usuario en localStorage (serán usados después del pago)
+      // Obtener token y empresaId de la sesión
+      const token = sesion.token || localStorage.getItem("token");
+      const empresaId = sesion.empresa?.id;
+
+      if (!empresaId) {
+        throw new Error("No se pudo obtener la empresa. Por favor recarga la página.");
+      }
+
+      console.log(`📝 Preparando pago de usuario:`);
+      console.log(`  Empresa: ${empresaId}`);
+      console.log(`  Token: ${token ? "Presente" : "FALTANTE"}`);
+
+      // Datos del nuevo usuario a crear
       const datosUsuarioNuevo = {
         nombre,
         email,
@@ -317,21 +330,34 @@ function FormularioPagoYUsuario({
         rol,
         permisos,
       };
+
+      // Guardar en localStorage como respaldo
       localStorage.setItem("usuarioPreregistrado", JSON.stringify(datosUsuarioNuevo));
 
-      // Crear checkout en Wompi
-      const response = await api.post("/checkout/usuarios-adicionales", {
-        cantidadUsuarios: 1, // Siempre es 1 usuario al crearlo directamente
-        datosUsuario: datosUsuarioNuevo, // Enviar datos del usuario
-      });
+      // Realizar POST con headers explícitos y empresaId en body
+      const response = await api.post(
+        "/checkout/usuarios-adicionales",
+        {
+          empresaId, // ← IMPORTANT: Enviar empresaId en body
+          cantidadUsuarios: 1,
+          datosUsuario: datosUsuarioNuevo,
+        },
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        }
+      );
+
+      console.log(`✅ Checkout creado exitosamente`);
 
       // Redirigir a Wompi
       if (response.data?.checkout?.url) {
+        console.log(`🔗 Redirigiendo a Wompi...`);
         window.location.href = response.data.checkout.url;
       } else {
         setError("No se pudo generar el checkout");
       }
     } catch (err: any) {
+      console.error(`❌ Error en pago de usuario:`, err);
       setError(mensajeError(err, "Error al procesar el pago"));
     } finally {
       setProcesando(false);

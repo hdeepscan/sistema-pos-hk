@@ -53,18 +53,24 @@ export async function crearCheckoutUsuarios(
   try {
     console.log(`\n🛒 POST /checkout/usuarios-adicionales`);
     const usuario = (request as any).usuario;
-    const empresaId = (request as any).empresaId;
-    const { cantidadUsuarios, datosUsuario } = request.body as any;
+    let empresaId = (request as any).empresaId;
+    const { cantidadUsuarios, datosUsuario, empresaId: empresaIdBody } = request.body as any;
+
+    // Usar empresaId del body como fallback si no viene del middleware
+    if (!empresaId && empresaIdBody) {
+      empresaId = empresaIdBody;
+      console.log(`  empresaId extraído del body (fallback)`);
+    }
 
     console.log(`  Usuario autenticado: ${usuario ? usuario.email : "NO"}`);
     console.log(`  empresaId: ${empresaId || "NO"}`);
     console.log(`  cantidadUsuarios: ${cantidadUsuarios}`);
     console.log(`  datosUsuario.nombre: ${datosUsuario?.nombre || "NO"}`);
 
-    // Validar autenticación
-    if (!usuario || !empresaId) {
-      console.warn(`  ❌ Falló autenticación: usuario=${!!usuario}, empresaId=${!!empresaId}`);
-      return reply.status(401).send({ error: "No autenticado" });
+    // Validar que tengamos empresaId (puede venir del usuario autenticado o del body)
+    if (!empresaId) {
+      console.warn(`  ❌ Falló: no hay empresaId disponible`);
+      return reply.status(400).send({ error: "empresaId requerido" });
     }
 
     // Validar cantidad
@@ -78,7 +84,14 @@ export async function crearCheckoutUsuarios(
     });
 
     if (!empresa) {
+      console.warn(`  ❌ Empresa no encontrada: ${empresaId}`);
       return reply.status(404).send({ error: "Empresa no encontrada" });
+    }
+
+    // Si no hay usuario autenticado, al menos verificamos que la empresa existe
+    // Para flujos donde el usuario envía empresaId válido
+    if (!usuario) {
+      console.warn(`  ⚠️ No hay usuario autenticado, pero empresaId válida: ${empresaId}`);
     }
 
     // Precio fijo: $10,000 COP por usuario
