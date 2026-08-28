@@ -80,16 +80,13 @@ export class WompiService {
       const monto = Math.round(datos.monto * 100); // Wompi usa centavos
 
       // Crear transacción en Wompi
-      // Nota: redirect_url es para después del pago. Usa la URL base del sitio
-      const baseUrl = (process.env.API_URL || "http://localhost:4000").replace(/\/api.*/, "").replace(/\/$/, "");
-
       const response = await this.apiClient.post("/transactions", {
         amount_in_cents: monto,
         currency: "COP",
         customer_email: datos.email,
         reference: referenciaPago,
         description: `Suscripción ${datos.tipoPlan} - ${datos.empresaId}`,
-        redirect_url: `${baseUrl}/#/checkout`, // URL más simple, sin /api/
+        // Sin redirect_url - Wompi usará su checkout modal
         metadata: {
           empresaId: datos.empresaId,
           tipoPlan: datos.tipoPlan,
