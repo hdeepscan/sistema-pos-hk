@@ -27,8 +27,8 @@ interface CheckoutPageProps {
 
 export default function CheckoutPage({ onBack, isRegistration = false }: CheckoutPageProps) {
   const navigate = useNavigate();
-  const { registroDatos, setSesion, limpiarRegistroDatos } = useSesionStore();
-  const [planes, setPlanes] = useState<Plan[]>([]);
+  const { registroDatos, setSesion, limpiarRegistroDatos, empresa } = useSesionStore();
+  const [planesCompletos, setPlanesCompletos] = useState<Plan[]>([]);
   const [cargando, setCargando] = useState(true);
   const [planSeleccionado, setPlanSeleccionado] = useState<string>(isRegistration ? "TRIAL_5D" : "MENSUAL");
   const [usuariosAdicionales, setUsuariosAdicionales] = useState(0);
@@ -38,15 +38,23 @@ export default function CheckoutPage({ onBack, isRegistration = false }: Checkou
   useEffect(() => {
     api.get("/pagos/planes")
       .then(({ data }) => {
-        setPlanes(data.planes);
+        setPlanesCompletos(data.planes);
         setCargando(false);
       })
       .catch((error) => {
         console.error("Error cargando planes:", error);
-        notif.error("Error al cargar planes");
+        notif?.error?.("Error al cargar planes") || console.error("Error cargando planes");
         setCargando(false);
       });
   }, []);
+
+  // Filtrar planes: Ocultar TRIAL_5D si es usuario existente
+  const planesFiltrados = planesCompletos.filter((plan) => {
+    // Si es registro nuevo, mostrar todos los planes
+    if (isRegistration) return true;
+    // Si es usuario existente, ocultar TRIAL_5D
+    return plan.tipoPlan !== "TRIAL_5D";
+  });
 
   // Verificar si volvemos de Wompi
   useEffect(() => {
@@ -61,7 +69,12 @@ export default function CheckoutPage({ onBack, isRegistration = false }: Checkou
         const { data: estadoData } = await api.get(`/pagos/estado/${referenciaPago}`);
 
         if (estadoData.estado === "COMPLETADO" || estadoData.estado === "APROBADO") {
-          notif.success("¡Pago realizado exitosamente!");
+          // Mostrar notificación de forma segura
+          try {
+            notif?.success?.("¡Pago realizado exitosamente!");
+          } catch (e) {
+            console.log("✅ Pago realizado exitosamente");
+          }
 
           const { data: registroData } = await api.post("/auth/registro-empresa", {
             empresaNombre: datosReg.empresaNombre,
@@ -83,20 +96,36 @@ export default function CheckoutPage({ onBack, isRegistration = false }: Checkou
           localStorage.removeItem("checkout_pending");
           limpiarRegistroDatos();
 
-          notif.success("¡Empresa creada exitosamente!");
+          try {
+            notif?.success?.("¡Empresa creada exitosamente!");
+          } catch (e) {
+            console.log("✅ Empresa creada exitosamente");
+          }
 
           setTimeout(() => {
             navigate("/");
           }, 1500);
         } else if (estadoData.estado === "PENDIENTE") {
-          notif.warning("Tu pago aún está procesándose. Por favor espera...");
+          try {
+            notif?.warning?.("Tu pago aún está procesándose. Por favor espera...");
+          } catch (e) {
+            console.log("⏳ Pago pendiente de procesamiento");
+          }
         } else {
           localStorage.removeItem("checkout_pending");
-          notif.error("El pago no fue aprobado. Intenta de nuevo.");
+          try {
+            notif?.error?.("El pago no fue aprobado. Intenta de nuevo.");
+          } catch (e) {
+            console.error("❌ El pago no fue aprobado");
+          }
         }
       } catch (error: any) {
         console.error("Error verificando pago:", error);
-        notif.error("Error al verificar el estado del pago");
+        try {
+          notif?.error?.("Error al verificar el estado del pago");
+        } catch (e) {
+          console.error("Error al verificar pago");
+        }
       }
     };
 
@@ -104,19 +133,27 @@ export default function CheckoutPage({ onBack, isRegistration = false }: Checkou
     return () => clearTimeout(timer);
   }, [setSesion, limpiarRegistroDatos, navigate]);
 
-  const planActual = planes.find((p) => p.tipoPlan === planSeleccionado);
+  const planActual = planesFiltrados.find((p) => p.tipoPlan === planSeleccionado);
   const montoBase = planActual?.precioFinal || 0;
   const montoAdicional = (planActual?.precioXUsuarioAdicional || 0) * usuariosAdicionales;
   const montoTotal = montoBase + montoAdicional;
 
   const crearCheckout = async () => {
     if (!planSeleccionado) {
-      notif.error("Selecciona un plan");
+      try {
+        notif?.error?.("Selecciona un plan");
+      } catch (e) {
+        alert("Selecciona un plan");
+      }
       return;
     }
 
     if (isRegistration && !registroDatos) {
-      notif.error("Datos de registro incompletos");
+      try {
+        notif?.error?.("Datos de registro incompletos");
+      } catch (e) {
+        alert("Datos de registro incompletos");
+      }
       return;
     }
 
@@ -137,7 +174,11 @@ export default function CheckoutPage({ onBack, isRegistration = false }: Checkou
       );
 
       if (data.success && data.checkout) {
-        notif.info("Redirigiendo a Wompi...");
+        try {
+          notif?.info?.("Redirigiendo a Wompi...");
+        } catch (e) {
+          console.log("Redirigiendo a Wompi...");
+        }
         setReferenciaPago(data.checkout.referenciaPago);
 
         if (isRegistration && registroDatos) {
@@ -158,7 +199,11 @@ export default function CheckoutPage({ onBack, isRegistration = false }: Checkou
       }
     } catch (error: any) {
       const mensaje = error.response?.data?.error || "Error al procesar pago";
-      notif.error(mensaje);
+      try {
+        notif?.error?.(mensaje);
+      } catch (e) {
+        alert(mensaje);
+      }
     } finally {
       setProcesando(false);
     }
@@ -168,10 +213,12 @@ export default function CheckoutPage({ onBack, isRegistration = false }: Checkou
 
   if (cargando) {
     return (
-      <div style={styles.container}>
-        <div style={styles.loading}>
-          <div style={styles.spinner}>⏳</div>
-          <p>Cargando planes...</p>
+      <div style={styles.wrapper}>
+        <div style={styles.container}>
+          <div style={styles.loading}>
+            <div style={styles.spinner}>⏳</div>
+            <p>Cargando planes...</p>
+          </div>
         </div>
       </div>
     );
@@ -212,7 +259,7 @@ export default function CheckoutPage({ onBack, isRegistration = false }: Checkou
 
         {/* Planes */}
         <div style={styles.planesGrid}>
-          {planes.map((plan) => (
+          {planesFiltrados.map((plan) => (
             <div
               key={plan.tipoPlan}
               onClick={() => setPlanSeleccionado(plan.tipoPlan)}
@@ -349,10 +396,22 @@ export default function CheckoutPage({ onBack, isRegistration = false }: Checkou
   );
 }
 
+const COLORS = {
+  primary: "#0066FF",     // Azul POS HK
+  primaryDark: "#0052CC",
+  secondary: "#22C55E",   // Verde POS HK
+  bgMain: "#FFFFFF",
+  bgLight: "#F8FAFC",
+  border: "#E2E8F0",
+  text: "#1F2937",
+  textMuted: "#6B7280",
+  success: "#22C55E",
+};
+
 const styles = {
   wrapper: {
     minHeight: "100vh",
-    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+    background: COLORS.bgLight,
     padding: "40px 20px",
     fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
   } as React.CSSProperties,
@@ -360,9 +419,9 @@ const styles = {
   container: {
     maxWidth: "1000px",
     margin: "0 auto",
-    background: "white",
-    borderRadius: "20px",
-    boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
+    background: COLORS.bgMain,
+    borderRadius: "16px",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.08), 0 10px 30px rgba(0,0,0,0.05)",
     padding: "50px",
   } as React.CSSProperties,
 
@@ -377,29 +436,30 @@ const styles = {
     fontSize: "32px",
     fontWeight: "700",
     margin: "0 0 8px 0",
-    color: "#1a202c",
+    color: COLORS.text,
   } as React.CSSProperties,
 
   subtitle: {
     fontSize: "16px",
-    color: "#718096",
+    color: COLORS.textMuted,
     margin: "0",
   } as React.CSSProperties,
 
   backBtn: {
     padding: "10px 16px",
-    background: "#edf2f7",
-    border: "none",
+    background: COLORS.bgLight,
+    border: `1px solid ${COLORS.border}`,
     borderRadius: "8px",
     cursor: "pointer",
     fontSize: "14px",
-    color: "#4a5568",
+    color: COLORS.text,
     fontWeight: "500",
+    transition: "all 0.2s ease",
   } as React.CSSProperties,
 
   infoBox: {
-    background: "#f7fafc",
-    border: "1px solid #e2e8f0",
+    background: COLORS.bgLight,
+    border: `1px solid ${COLORS.border}`,
     borderRadius: "12px",
     padding: "20px",
     marginBottom: "30px",
@@ -416,14 +476,14 @@ const styles = {
 
   label: {
     fontSize: "12px",
-    color: "#718096",
+    color: COLORS.textMuted,
     fontWeight: "600",
     textTransform: "uppercase",
   } as React.CSSProperties,
 
   value: {
     fontSize: "16px",
-    color: "#2d3748",
+    color: COLORS.text,
     fontWeight: "600",
   } as React.CSSProperties,
 
@@ -440,27 +500,29 @@ const styles = {
     borderRadius: "12px",
     cursor: "pointer",
     transition: "all 0.3s ease",
-    border: "2px solid #e2e8f0",
+    border: `2px solid ${COLORS.border}`,
+    backgroundColor: COLORS.bgMain,
   } as React.CSSProperties,
 
   planCardActive: {
-    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-    color: "white",
-    border: "2px solid #667eea",
-    boxShadow: "0 10px 30px rgba(102, 126, 234, 0.3)",
+    background: `rgba(0, 102, 255, 0.03)`,
+    color: COLORS.text,
+    border: `2px solid ${COLORS.primary}`,
+    boxShadow: `0 4px 20px rgba(0, 102, 255, 0.12)`,
   } as React.CSSProperties,
 
   planCardInactive: {
-    background: "#f7fafc",
-    color: "#2d3748",
-    border: "2px solid #e2e8f0",
+    background: COLORS.bgMain,
+    color: COLORS.text,
+    border: `2px solid ${COLORS.border}`,
+    boxShadow: "none",
   } as React.CSSProperties,
 
   badge: {
     position: "absolute",
     top: "-12px",
     right: "20px",
-    background: "#48bb78",
+    background: COLORS.secondary,
     color: "white",
     padding: "4px 12px",
     borderRadius: "20px",
@@ -476,10 +538,12 @@ const styles = {
     fontSize: "18px",
     fontWeight: "700",
     margin: "0 0 8px 0",
+    color: COLORS.text,
   } as React.CSSProperties,
 
   duracion: {
     fontSize: "13px",
+    color: COLORS.textMuted,
     opacity: 0.8,
   } as React.CSSProperties,
 
@@ -491,17 +555,19 @@ const styles = {
     fontSize: "28px",
     fontWeight: "700",
     lineHeight: "1",
+    color: COLORS.primary,
   } as React.CSSProperties,
 
   ahorro: {
     fontSize: "13px",
-    opacity: 0.9,
+    color: COLORS.secondary,
     marginTop: "4px",
+    fontWeight: "500",
   } as React.CSSProperties,
 
   precioUsuario: {
     fontSize: "12px",
-    opacity: 0.8,
+    color: COLORS.textMuted,
     marginBottom: "15px",
   } as React.CSSProperties,
 
@@ -509,19 +575,21 @@ const styles = {
     fontSize: "24px",
     fontWeight: "700",
     textAlign: "center",
+    color: COLORS.primary,
   } as React.CSSProperties,
 
   usuariosSection: {
-    background: "#f7fafc",
+    background: COLORS.bgLight,
     padding: "20px",
     borderRadius: "12px",
     marginBottom: "30px",
+    border: `1px solid ${COLORS.border}`,
   } as React.CSSProperties,
 
   sectionTitle: {
     fontSize: "14px",
     fontWeight: "600",
-    color: "#2d3748",
+    color: COLORS.text,
     display: "block",
     marginBottom: "15px",
   } as React.CSSProperties,
@@ -534,34 +602,35 @@ const styles = {
 
   btnUsuario: {
     padding: "8px 12px",
-    background: "white",
-    border: "1px solid #cbd5e0",
+    background: COLORS.bgMain,
+    border: `1px solid ${COLORS.border}`,
     borderRadius: "6px",
     cursor: "pointer",
     fontSize: "16px",
     fontWeight: "600",
-    color: "#2d3748",
+    color: COLORS.text,
+    transition: "all 0.2s ease",
   } as React.CSSProperties,
 
   inputUsuario: {
     flex: 1,
     padding: "8px 12px",
-    border: "1px solid #cbd5e0",
+    border: `1px solid ${COLORS.border}`,
     borderRadius: "6px",
     fontSize: "14px",
     textAlign: "center",
+    color: COLORS.text,
   } as React.CSSProperties,
 
   precioAdicional: {
     fontSize: "13px",
-    color: "#718096",
-    marginTop: "10px",
+    color: COLORS.textMuted,
     margin: "10px 0 0 0",
   } as React.CSSProperties,
 
   resumenBox: {
-    background: "#f7fafc",
-    border: "1px solid #e2e8f0",
+    background: COLORS.bgLight,
+    border: `1px solid ${COLORS.border}`,
     borderRadius: "12px",
     padding: "20px",
     marginBottom: "20px",
@@ -571,7 +640,7 @@ const styles = {
     display: "flex",
     justifyContent: "space-between",
     fontSize: "14px",
-    color: "#4a5568",
+    color: COLORS.textMuted,
     marginBottom: "10px",
   } as React.CSSProperties,
 
@@ -580,15 +649,15 @@ const styles = {
     justifyContent: "space-between",
     fontSize: "18px",
     fontWeight: "700",
-    color: "#1a202c",
-    borderTop: "1px solid #cbd5e0",
+    color: COLORS.text,
+    borderTop: `1px solid ${COLORS.border}`,
     paddingTop: "10px",
   } as React.CSSProperties,
 
   btnPagar: {
     width: "100%",
     padding: "16px",
-    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+    background: COLORS.primary,
     color: "white",
     border: "none",
     borderRadius: "8px",
@@ -596,7 +665,7 @@ const styles = {
     fontWeight: "700",
     cursor: "pointer",
     marginBottom: "30px",
-    transition: "transform 0.2s ease",
+    transition: "all 0.2s ease",
   } as React.CSSProperties,
 
   btnDisabled: {
@@ -605,16 +674,17 @@ const styles = {
   } as React.CSSProperties,
 
   features: {
-    background: "#f7fafc",
+    background: COLORS.bgLight,
     padding: "20px",
     borderRadius: "12px",
     marginBottom: "20px",
+    border: `1px solid ${COLORS.border}`,
   } as React.CSSProperties,
 
   featuresTitle: {
     fontSize: "14px",
     fontWeight: "700",
-    color: "#2d3748",
+    color: COLORS.text,
     margin: "0 0 12px 0",
   } as React.CSSProperties,
 
@@ -625,11 +695,12 @@ const styles = {
     display: "grid",
     gridTemplateColumns: "repeat(2, 1fr)",
     gap: "8px",
+    color: COLORS.textMuted,
   } as React.CSSProperties,
 
   security: {
     fontSize: "13px",
-    color: "#718096",
+    color: COLORS.textMuted,
     textAlign: "center",
   } as React.CSSProperties,
 
