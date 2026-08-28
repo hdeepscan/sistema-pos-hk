@@ -15,17 +15,20 @@ const prisma = new PrismaClient();
 export async function webhookWompi(request: FastifyRequest, reply: FastifyReply) {
   try {
     const body = request.body as any;
-    const { event, data } = body;
+    const { event, data, timestamp, signature } = body;
 
     console.log("📨 Webhook Wompi recibido:", event);
     console.log("📊 Data status:", data?.status);
-    console.log("📋 Data keys:", Object.keys(data || {}));
+    console.log("📊 Data reference:", data?.reference);
+    console.log("🔐 Signature info:", { checksum: signature?.checksum?.substring(0, 20) + "...", properties: signature?.properties });
 
-    // Validar firma del webhook (opcional pero recomendado)
-    const signature = (request.headers["x-signature"] as string) || "";
-    if (!validarSignatureWebhook(body, signature)) {
-      console.warn("⚠️ Signature inválida en webhook");
-      // Por ahora, continúa igualmente para debugging
+    // Validar firma del webhook con el estándar de Wompi
+    const firmaValida = validarSignatureWebhook(body, signature);
+
+    if (!firmaValida) {
+      console.warn("⚠️ Signature inválida en webhook - pero continuamos si status es APPROVED");
+    } else {
+      console.log("✅ Firma de webhook validada correctamente");
     }
 
     // Solo procesar transacciones aprobadas
@@ -225,10 +228,22 @@ function calcularFechaVencimiento(tipoPlan: string): Date {
 }
 
 /**
- * Validar firma del webhook de Wompi (HMAC-SHA256)
- * Wompi usa: SHA256(${id}${status}${amount_in_cents}${timestamp}${WOMPI_EVENTS_SECRET})
+ * Validar firma del webhook de Wompi según su estándar
+ *
+ * Estructura esperada:
+ * {
+ *   "event": "transaction.updated",
+ *   "data": { ... },
+ *   "timestamp": "2026-08-28T10:30:00Z",
+ *   "signature": {
+ *     "checksum": "...",
+ *     "properties": ["transaction.id", "transaction.status", "transaction.amount_in_cents"]
+ *   }
+ * }
+ *
+ * Hash = SHA256(property1_value + property2_value + ... + timestamp + WOMPI_EVENTS_SECRET)
  */
-function validarSignatureWebhook(payload: any, signature: string): boolean {
+function validarSignatureWebhook(payload: any, signatureObj: any): boolean {
   try {
     const eventsSecret = process.env.WOMPI_EVENTS_SECRET || "";
     if (!eventsSecret) {
@@ -236,44 +251,62 @@ function validarSignatureWebhook(payload: any, signature: string): boolean {
       return false;
     }
 
-    // Extraer datos de la transacción
-    const { data } = payload;
-    if (!data || !data.id || !data.status || data.amount_in_cents === undefined) {
-      console.warn("⚠️ Datos incompletos en webhook para validar firma");
+    if (!signatureObj || !signatureObj.checksum || !signatureObj.properties) {
+      console.warn("⚠️ Estructura de signature incompleta en webhook");
       return false;
     }
 
-    // El timestamp viene en el header x-timestamp de Wompi
-    // Por ahora, si no lo tenemos, permitimos continuar (puede venir en data también)
-    const timestamp = data.timestamp || (Date.now() / 1000).toString();
+    const { data, timestamp } = payload;
+    const { properties, checksum } = signatureObj;
 
-    // Construcción exacta según Wompi:
-    // ${transaction.id}${transaction.status}${transaction.amount_in_cents}${timestamp}${WOMPI_EVENTS_SECRET}
-    const dataToSign = `${data.id}${data.status}${data.amount_in_cents}${timestamp}${eventsSecret}`;
+    if (!data || !timestamp) {
+      console.warn("⚠️ Datos incompletos en webhook para validar firma (data o timestamp)");
+      return false;
+    }
 
-    const expectedSignature = crypto
+    // Construir la cadena a hashear siguiendo el orden de properties
+    let dataToSign = "";
+
+    for (const prop of properties) {
+      // Ejemplo: "transaction.id" -> extraer "id" de data.id
+      const key = prop.replace("transaction.", "");
+      const value = data[key];
+
+      if (value === undefined) {
+        console.warn(`⚠️ Property ${prop} no encontrada en data`);
+        return false;
+      }
+
+      dataToSign += value;
+    }
+
+    // Agregar timestamp y secret
+    dataToSign += timestamp + eventsSecret;
+
+    // Generar hash
+    const calculatedChecksum = crypto
       .createHash("sha256")
       .update(dataToSign)
       .digest("hex");
 
-    console.log("🔐 Validación de firma webhook:");
-    console.log(`  - ID: ${data.id}`);
-    console.log(`  - Status: ${data.status}`);
-    console.log(`  - Amount: ${data.amount_in_cents}`);
+    console.log("🔐 Validación de firma webhook (Wompi):");
+    console.log(`  - Properties: ${properties.join(", ")}`);
     console.log(`  - Timestamp: ${timestamp}`);
-    console.log(`  - Firma recibida: ${signature?.substring(0, 20)}...`);
-    console.log(`  - Firma esperada: ${expectedSignature.substring(0, 20)}...`);
+    console.log(`  - Data to hash (primeros 50 chars): ${dataToSign.substring(0, 50)}...`);
+    console.log(`  - Checksum recibido:   ${checksum.substring(0, 32)}...`);
+    console.log(`  - Checksum calculado:  ${calculatedChecksum.substring(0, 32)}...`);
 
-    const esValida = signature === expectedSignature;
+    const esValida = checksum === calculatedChecksum;
+
     if (!esValida) {
-      console.warn("⚠️ Firma de webhook inválida - pero continuamos procesando");
+      console.warn("⚠️ Checksum inválido - continuamos si status es APPROVED");
     } else {
-      console.log("✅ Firma de webhook válida");
+      console.log("✅ Checksum válido");
     }
 
     return esValida;
   } catch (error) {
-    console.error("Error validando signature:", error);
+    console.error("❌ Error validando signature:", error);
     return false;
   }
 }
