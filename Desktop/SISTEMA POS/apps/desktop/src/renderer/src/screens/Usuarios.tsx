@@ -26,6 +26,10 @@ export default function Usuarios() {
   const [mostrarNuevo, setMostrarNuevo] = useState(false);
   const [editar, setEditar] = useState<Usuario | null>(null);
   const [cargando, setCargando] = useState(true);
+  const [limitePendiente, setLimitePendiente] = useState<{
+    usuariosActuales: number;
+    limiteUsuarios: number;
+  } | null>(null);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -89,8 +93,38 @@ export default function Usuarios() {
         El historial de acciones de los usuarios ahora esta en la seccion "Auditoria".
       </p>
 
-      {mostrarNuevo && <FormularioUsuario onClose={() => setMostrarNuevo(false)} onGuardado={cargar} />}
-      {editar && <FormularioUsuario usuario={editar} onClose={() => setEditar(null)} onGuardado={cargar} />}
+      {mostrarNuevo && (
+        <FormularioUsuario
+          onClose={() => setMostrarNuevo(false)}
+          onGuardado={cargar}
+          onLimitePendiente={(data) => {
+            setMostrarNuevo(false);
+            setLimitePendiente(data);
+          }}
+        />
+      )}
+      {editar && (
+        <FormularioUsuario
+          usuario={editar}
+          onClose={() => setEditar(null)}
+          onGuardado={cargar}
+          onLimitePendiente={(data) => {
+            setEditar(null);
+            setLimitePendiente(data);
+          }}
+        />
+      )}
+      {limitePendiente && (
+        <ModalComprarUsuarios
+          usuariosActuales={limitePendiente.usuariosActuales}
+          limiteUsuarios={limitePendiente.limiteUsuarios}
+          onClose={() => setLimitePendiente(null)}
+          onComprado={() => {
+            setLimitePendiente(null);
+            cargar();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -99,10 +133,12 @@ function FormularioUsuario({
   usuario,
   onClose,
   onGuardado,
+  onLimitePendiente,
 }: {
   usuario?: Usuario;
   onClose: () => void;
   onGuardado: () => void;
+  onLimitePendiente?: (data: { usuariosActuales: number; limiteUsuarios: number }) => void;
 }) {
   const [nombre, setNombre] = useState(usuario?.nombre ?? "");
   const [email, setEmail] = useState(usuario?.email ?? "");
@@ -141,7 +177,15 @@ function FormularioUsuario({
       onGuardado();
       onClose();
     } catch (err: any) {
-      setError(mensajeError(err, "No se pudo guardar el usuario"));
+      // Capturar error de límite de usuarios
+      if (err?.response?.data?.codigo === "LIMITE_USUARIOS_ALCANZADO") {
+        const { usuariosActuales, limiteUsuarios } = err.response.data;
+        if (onLimitePendiente) {
+          onLimitePendiente({ usuariosActuales, limiteUsuarios });
+        }
+      } else {
+        setError(mensajeError(err, "No se pudo guardar el usuario"));
+      }
     } finally {
       setGuardando(false);
     }
@@ -216,6 +260,104 @@ function FormularioUsuario({
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Modal para comprar usuarios adicionales ($10,000 COP c/u)
+ */
+function ModalComprarUsuarios({
+  usuariosActuales,
+  limiteUsuarios,
+  onClose,
+  onComprado,
+}: {
+  usuariosActuales: number;
+  limiteUsuarios: number;
+  onClose: () => void;
+  onComprado: () => void;
+}) {
+  const [cantidadUsuarios, setCantidadUsuarios] = useState(1);
+  const [cargando, setCargando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const precioUnitario = 10000; // $10,000 COP
+  const precioTotal = cantidadUsuarios * precioUnitario;
+
+  async function comprar() {
+    setCargando(true);
+    setError(null);
+    try {
+      const response = await api.post("/checkout/usuarios-adicionales", {
+        cantidadUsuarios,
+      });
+
+      // Redirigir a Wompi
+      if (response.data?.checkout?.url) {
+        window.location.href = response.data.checkout.url;
+      } else {
+        setError("No se pudo generar el checkout");
+      }
+    } catch (err: any) {
+      setError(mensajeError(err, "Error al crear el checkout"));
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop">
+      <div className="card" style={{ width: 480 }}>
+        <h4 style={{ marginBottom: 16 }}>Comprar usuarios adicionales</h4>
+
+        <div style={{ marginBottom: 20, padding: "12px 16px", background: "var(--bg-tertiary)", borderRadius: "6px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+            <span style={{ fontSize: 13, opacity: 0.8 }}>Usuarios actuales</span>
+            <span style={{ fontWeight: "600" }}>{usuariosActuales} / {limiteUsuarios}</span>
+          </div>
+          <div style={{ fontSize: 12, opacity: 0.7 }}>
+            Necesitas comprar más slots para crear nuevos usuarios
+          </div>
+        </div>
+
+        <div className="grid-form" style={{ marginBottom: 20 }}>
+          <label>
+            Cantidad de usuarios a comprar
+            <input
+              type="number"
+              min="1"
+              max="100"
+              value={cantidadUsuarios}
+              onChange={(e) => setCantidadUsuarios(Math.max(1, parseInt(e.target.value) || 1))}
+            />
+          </label>
+        </div>
+
+        <div style={{ marginBottom: 20, padding: "12px 16px", background: "var(--bg-secondary)", borderRadius: "6px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 13 }}>Precio unitario</span>
+            <span style={{ fontSize: 13 }}>$10,000 COP</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border)" }}>
+            <span style={{ fontWeight: "600", fontSize: 14 }}>Total</span>
+            <span style={{ fontWeight: "700", fontSize: 16, color: "#0066FF" }}>
+              ${precioTotal.toLocaleString("es-CO")} COP
+            </span>
+          </div>
+        </div>
+
+        {error && <span className="error-text" style={{ display: "block", marginBottom: 16 }}>{error}</span>}
+
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={comprar} disabled={cargando} style={{ flex: 1 }}>
+            {cargando ? "Procesando..." : "Proceder al pago"}
+          </button>
+          <button className="secondary" type="button" onClick={onClose} disabled={cargando}>
+            Cancelar
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -37,6 +37,25 @@ export async function usuariosRoutes(app: FastifyInstance) {
     const existente = await prisma.usuario.findUnique({ where: { email: parsed.data.email } });
     if (existente) return reply.code(409).send({ error: "Ya existe un usuario con ese email" });
 
+    // Validar límite de usuarios
+    const empresa = await prisma.empresa.findUnique({
+      where: { id: empresaId },
+      select: { limiteUsuarios: true },
+    });
+
+    if (empresa) {
+      const usuariosActuales = await prisma.usuario.count({ where: { empresaId } });
+      if (usuariosActuales >= empresa.limiteUsuarios) {
+        return reply.code(400).send({
+          error: "LIMITE_USUARIOS_ALCANZADO",
+          codigo: "LIMITE_USUARIOS_ALCANZADO",
+          usuariosActuales,
+          limiteUsuarios: empresa.limiteUsuarios,
+          mensaje: `Has alcanzado el límite de ${empresa.limiteUsuarios} usuarios. Compra más slots para continuar.`,
+        });
+      }
+    }
+
     const passwordHash = await hashPassword(parsed.data.password);
     const usuario = await prisma.usuario.create({
       data: {
