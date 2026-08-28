@@ -79,31 +79,14 @@ export class WompiService {
       const referenciaPago = datos.referenciaPago || this.generarReferenciaPago();
       const monto = Math.round(datos.monto * 100); // Wompi usa centavos
 
-      // Crear transacción en Wompi
-      const response = await this.apiClient.post("/transactions", {
-        amount_in_cents: monto,
-        currency: "COP",
-        customer_email: datos.email,
-        reference: referenciaPago,
-        description: `Suscripción ${datos.tipoPlan} - ${datos.empresaId}`,
-        // Sin redirect_url - Wompi usará su checkout modal
-        metadata: {
-          empresaId: datos.empresaId,
-          tipoPlan: datos.tipoPlan,
-          usuariosAdicionales: datos.usuariosAdicionales || 0,
-          nombre: datos.nombre,
-          telefono: datos.telefono || "",
-        },
-      });
+      // Usar Wompi Link (no transacción directa)
+      // Wompi Link es más simple: creas un link de pago que redirige al checkout
+      const checkoutUrl = `https://checkout.wompi.co/l/${this.publicKey}?currency=COP&amount_in_cents=${monto}&reference=${referenciaPago}`;
 
-      const { data: transaccion } = response;
-
-      console.log(`✓ Transacción Wompi creada: ${referenciaPago}`);
+      console.log(`✓ Checkout Wompi creado: ${referenciaPago}`);
 
       return {
-        url: transaccion.data.processing_mode === "redirect"
-          ? transaccion.data.redirect_url
-          : `https://checkout.wompi.co/l/${transaccion.data.id}`,
+        url: checkoutUrl,
         referenciaPago,
         monto: datos.monto,
         tipoPlan: datos.tipoPlan,
