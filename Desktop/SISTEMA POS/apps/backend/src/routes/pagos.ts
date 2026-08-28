@@ -23,6 +23,21 @@ export async function rutasPagos(fastify: FastifyInstance) {
     return webhookPago(request, reply);
   });
 
+  // TEST: Verificar credenciales de Wompi
+  fastify.get("/pagos/test-wompi", async (request, reply) => {
+    const publicKey = process.env.WOMPI_PUBLIC_KEY;
+    const privateKey = process.env.WOMPI_PRIVATE_KEY;
+
+    return reply.send({
+      hasPublicKey: !!publicKey,
+      hasPrivateKey: !!privateKey,
+      publicKeyLength: publicKey?.length || 0,
+      privateKeyLength: privateKey?.length || 0,
+      publicKeyPrefix: publicKey ? publicKey.substring(0, 10) + "..." : "N/A",
+      privateKeyPrefix: privateKey ? privateKey.substring(0, 10) + "..." : "N/A",
+    });
+  });
+
   // Crear checkout (público - funciona para registro y usuarios autenticados)
   fastify.post("/checkout/crear", async (request, reply) => {
     return crearCheckout(request, reply);
