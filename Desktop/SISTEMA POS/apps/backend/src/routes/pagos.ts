@@ -23,25 +23,22 @@ export async function rutasPagos(fastify: FastifyInstance) {
     return webhookPago(request, reply);
   });
 
-  // Rutas protegidas (requieren autenticación)
-  // NOTA: Por ahora /checkout/crear es público para testear Wompi
+  // Crear checkout (público - funciona para registro y usuarios autenticados)
   fastify.post("/checkout/crear", async (request, reply) => {
     return crearCheckout(request, reply);
   });
 
+  // Obtener estado de pago (público - necesario para flujo de registro)
+  fastify.get("/pagos/estado/:referenciaPago", async (request, reply) => {
+    return obtenerEstadoPago(request, reply);
+  });
+
+  // Rutas protegidas (requieren autenticación)
   fastify.post(
     "/checkout/confirmar",
     { preHandler: authMiddleware },
     async (request, reply) => {
       return confirmarPago(request, reply);
-    }
-  );
-
-  fastify.get(
-    "/pagos/estado/:referenciaPago",
-    { preHandler: authMiddleware },
-    async (request, reply) => {
-      return obtenerEstadoPago(request, reply);
     }
   );
 }

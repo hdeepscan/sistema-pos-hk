@@ -1132,8 +1132,8 @@ model Suscripcion {
 
 model Pago {
   id                String         @id @default(uuid())
-  empresa           Empresa        @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  empresaId         String
+  empresa           Empresa?       @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empresaId         String?
 
   referenciaPago    String         @unique
   estado            EstadoPago     @default(PENDIENTE)
@@ -1144,8 +1144,9 @@ model Pago {
   tipoPlan          TipoPlan
   usuariosAdicionales Int          @default(0)
 
-  metodoPago        String         @default("PayU")
+  metodoPago        String         @default("Wompi")
   transaccionId     String?
+  email             String?
 
   fechaPago         DateTime?
   respuestaPayU     String?

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { notif } from "../lib/notificationService";
 import { useSesionStore } from "../lib/store";
+import { useNavigate } from "react-router-dom";
 
 interface Plan {
   tipoPlan: "MENSUAL" | "TRIMESTRAL" | "ANUAL";
@@ -19,13 +20,21 @@ interface CheckoutData {
   tipoPlan: string;
 }
 
-export default function CheckoutPage() {
-  const { empresa, usuario } = useSesionStore();
+interface CheckoutPageProps {
+  onBack?: () => void;
+  isRegistration?: boolean;
+}
+
+export default function CheckoutPage({ onBack, isRegistration = false }: CheckoutPageProps) {
+  const navigate = useNavigate();
+  const { empresa, usuario, registroDatos, setSesion, limpiarRegistroDatos } = useSesionStore();
+  const apiBaseUrl = useSesionStore((s) => s.apiBaseUrl);
   const [planes, setPlanes] = useState<Plan[]>([]);
   const [cargando, setCargando] = useState(true);
   const [planSeleccionado, setPlanSeleccionado] = useState<string>("MENSUAL");
   const [usuariosAdicionales, setUsuariosAdicionales] = useState(0);
   const [procesando, setProcesando] = useState(false);
+  const [referenciaPago, setReferenciaPago] = useState<string | null>(null);
 
   // Cargar planes
   useEffect(() => {
@@ -42,6 +51,69 @@ export default function CheckoutPage() {
       });
   }, []);
 
+  // Verificar si volvemos de un pago pendiente (después de volver de Wompi)
+  useEffect(() => {
+    const checkoutPending = localStorage.getItem("checkout_pending");
+    if (!checkoutPending) return;
+
+    const verificarPago = async () => {
+      try {
+        const pending = JSON.parse(checkoutPending);
+        const { referenciaPago, registroDatos: datosReg, tipoPlan, usuariosAdicionales: usuarios } = pending;
+
+        // Verificar estado del pago
+        const { data: estadoData } = await api.get(`/pagos/estado/${referenciaPago}`);
+
+        if (estadoData.estado === "COMPLETADO" || estadoData.estado === "APROBADO") {
+          notif.success("¡Pago realizado exitosamente!");
+
+          // Crear la empresa ahora
+          const { data: registroData } = await api.post("/auth/registro-empresa", {
+            empresaNombre: datosReg.empresaNombre,
+            adminNombre: datosReg.adminNombre,
+            adminEmail: datosReg.adminEmail,
+            adminPassword: datosReg.adminPassword,
+            referenciaPago,
+            tipoPlan,
+            usuariosAdicionales: usuarios,
+          });
+
+          // Establecer sesión
+          setSesion({
+            token: registroData.token,
+            usuario: registroData.usuario,
+            empresa: registroData.empresa,
+            sucursales: registroData.sucursales || [],
+          });
+
+          // Limpiar estado
+          localStorage.removeItem("checkout_pending");
+          limpiarRegistroDatos();
+
+          notif.success("¡Empresa creada exitosamente!");
+
+          // Redirigir al POS (el App component va a gestionar esto)
+          // Esperar un momento para que se vea la notificación
+          setTimeout(() => {
+            navigate("/");
+          }, 1500);
+        } else if (estadoData.estado === "PENDIENTE") {
+          notif.warning("Tu pago aún está procesándose. Por favor espera...");
+        } else {
+          localStorage.removeItem("checkout_pending");
+          notif.error("El pago no fue aprobado. Intenta de nuevo.");
+        }
+      } catch (error: any) {
+        console.error("Error verificando pago:", error);
+        notif.error("Error al verificar el estado del pago");
+      }
+    };
+
+    // Esperar un poco para que el webhook se procese
+    const timer = setTimeout(verificarPago, 2000);
+    return () => clearTimeout(timer);
+  }, [setSesion, limpiarRegistroDatos, navigate]);
+
   // Obtener plan seleccionado
   const planActual = planes.find((p) => p.tipoPlan === planSeleccionado);
 
@@ -57,6 +129,12 @@ export default function CheckoutPage() {
       return;
     }
 
+    // En modo registro, validar que tengamos datos
+    if (isRegistration && !registroDatos) {
+      notif.error("Datos de registro incompletos");
+      return;
+    }
+
     setProcesando(true);
 
     try {
@@ -65,14 +143,30 @@ export default function CheckoutPage() {
         {
           tipoPlan: planSeleccionado,
           usuariosAdicionales,
-          empresaId,
-          email: usuario?.email,
-          nombre: usuario?.nombre,
+          // En modo registro, enviar datos del store
+          email: isRegistration ? registroDatos?.adminEmail : usuario?.email,
+          nombre: isRegistration ? registroDatos?.adminNombre : usuario?.nombre,
+          // Opcional: identificar que es un registro
+          isRegistration,
         }
       );
 
       if (data.success && data.checkout) {
         notif.info("Redirigiendo a Wompi...");
+        setReferenciaPago(data.checkout.referenciaPago);
+
+        // Guardar info de pago en localStorage para verificar después
+        if (isRegistration && registroDatos) {
+          localStorage.setItem(
+            "checkout_pending",
+            JSON.stringify({
+              referenciaPago: data.checkout.referenciaPago,
+              registroDatos,
+              tipoPlan: planSeleccionado,
+              usuariosAdicionales,
+            })
+          );
+        }
 
         // Redirigir a Wompi después de 1 segundo
         setTimeout(() => {
@@ -98,16 +192,30 @@ export default function CheckoutPage() {
     );
   }
 
+  const displayName = isRegistration ? registroDatos?.empresaNombre : empresa?.nombre;
+  const displayEmail = isRegistration ? registroDatos?.adminEmail : usuario?.email;
+
   return (
     <div className="checkout-page">
       <div className="checkout-container">
+        {/* Header con botón volver */}
+        {isRegistration && onBack && (
+          <button
+            onClick={onBack}
+            className="secondary"
+            style={{ marginBottom: 16, alignSelf: "flex-start" }}
+          >
+            ← Volver
+          </button>
+        )}
+
         {/* Header */}
         <div className="checkout-header">
           <h1>Selecciona tu Plan</h1>
           <p>Acceso a todos los módulos del POS</p>
           <div className="checkout-empresa-info">
-            <strong>{empresa?.nombre}</strong>
-            <span>{usuario?.email}</span>
+            <strong>{displayName}</strong>
+            <span>{displayEmail}</span>
           </div>
         </div>
 

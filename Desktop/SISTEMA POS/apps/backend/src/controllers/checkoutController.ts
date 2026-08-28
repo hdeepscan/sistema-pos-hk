@@ -44,6 +44,9 @@ export async function obtenerPlanes(
 /**
  * POST /api/checkout/crear
  * Crear una orden de pago
+ * Funciona en dos modos:
+ * 1. Autenticado: usuario existente con empresaId
+ * 2. Registro: nuevo usuario sin autenticación, envía email y nombre
  */
 export async function crearCheckout(
   request: FastifyRequest,
@@ -52,22 +55,41 @@ export async function crearCheckout(
   try {
     const usuario = (request as any).usuario;
     const empresaId = (request as any).empresaId;
-
-    if (!usuario || !empresaId) {
-      return reply.status(401).send({ error: "No autenticado" });
-    }
-
-    const {
-      tipoPlan,
-      usuariosAdicionales = 0,
-    }: {
-      tipoPlan: "MENSUAL" | "TRIMESTRAL" | "ANUAL";
-      usuariosAdicionales?: number;
-    } = request.body as any;
+    const { tipoPlan, usuariosAdicionales = 0, email, nombre, isRegistration } = request.body as any;
 
     // Validar plan
     if (!["MENSUAL", "TRIMESTRAL", "ANUAL"].includes(tipoPlan)) {
       return reply.status(400).send({ error: "Plan inválido" });
+    }
+
+    // Modo registro: validar email y nombre
+    let userEmail = usuario?.email;
+    let userName = usuario?.nombre;
+    let actualEmpresaId = empresaId;
+
+    if (isRegistration) {
+      // Flujo de registro: no hay usuario autenticado
+      if (!email || !nombre) {
+        return reply.status(400).send({ error: "Email y nombre requeridos para registro" });
+      }
+      userEmail = email;
+      userName = nombre;
+      // En modo registro, generar un ID temporal para la empresa
+      actualEmpresaId = `temp-${Date.now()}`;
+    } else {
+      // Flujo normal: verificar que esté autenticado
+      if (!usuario || !empresaId) {
+        return reply.status(401).send({ error: "No autenticado" });
+      }
+
+      // Obtener datos de la empresa
+      const empresa = await prisma.empresa.findUnique({
+        where: { id: empresaId },
+      });
+
+      if (!empresa) {
+        return reply.status(404).send({ error: "Empresa no encontrada" });
+      }
     }
 
     // Obtener precio del plan
@@ -88,38 +110,32 @@ export async function crearCheckout(
       : Number(precioPlan.precioXUsuarioAdicional);
     const montoTotal = precioFinal + (usuariosAdicionales * precioXUsuario);
 
-    // Obtener datos de la empresa
-    const empresa = await prisma.empresa.findUnique({
-      where: { id: empresaId },
-    });
-
-    if (!empresa) {
-      return reply.status(404).send({ error: "Empresa no encontrada" });
-    }
-
     // Crear orden de pago
-    const referenciaPago = `POS-${empresaId}-${Date.now()}`;
+    const referenciaPago = `POS-${actualEmpresaId}-${Date.now()}`;
 
     const checkoutData = await wompiService.crearOrdenPago({
-      empresaId,
+      empresaId: actualEmpresaId,
       referenciaPago,
       tipoPlan,
       monto: montoTotal,
       usuariosAdicionales,
-      email: usuario.email,
-      nombre: usuario.nombre,
-      telefono: usuario.telefono,
+      email: userEmail,
+      nombre: userName,
+      telefono: "",
     });
 
     // Guardar referencia de pago en base de datos (estado PENDIENTE)
+    // En modo registro, usar null para empresaId (se asociará después)
     const pago = await prisma.pago.create({
       data: {
-        empresaId,
+        empresaId: isRegistration ? null : actualEmpresaId,
         referenciaPago,
         estado: "PENDIENTE",
         monto: montoTotal,
         tipoPlan,
         usuariosAdicionales,
+        // Guardar email para identificar el pago en modo registro
+        email: userEmail,
       },
     });
 
@@ -308,6 +324,8 @@ export async function webhookPago(
 /**
  * GET /api/pagos/estado/:referenciaPago
  * Obtener estado de un pago
+ * Público: funciona para usuarios autenticados y en flujo de registro
+ * La referenciaPago es suficientemente única como para no exponer información sensible
  */
 export async function obtenerEstadoPago(
   request: FastifyRequest,
@@ -316,10 +334,7 @@ export async function obtenerEstadoPago(
   try {
     const { referenciaPago } = request.params as any;
     const usuario = (request as any).usuario;
-
-    if (!usuario) {
-      return reply.status(401).send({ error: "No autenticado" });
-    }
+    const empresaId = (request as any).empresaId;
 
     const pago = await prisma.pago.findUnique({
       where: { referenciaPago },
@@ -329,9 +344,13 @@ export async function obtenerEstadoPago(
       return reply.status(404).send({ error: "Pago no encontrado" });
     }
 
-    // Verificar que el usuario sea dueño de la empresa
-    if (pago.empresaId !== (request as any).empresaId) {
-      return reply.status(403).send({ error: "No autorizado" });
+    // Validar acceso:
+    // 1. Si está autenticado, solo puede ver pagos de su empresa
+    // 2. Si no está autenticado, puede ver cualquier pago (flujo de registro)
+    if (usuario && empresaId) {
+      if (pago.empresaId && pago.empresaId !== empresaId) {
+        return reply.status(403).send({ error: "No autorizado" });
+      }
     }
 
     return reply.send({

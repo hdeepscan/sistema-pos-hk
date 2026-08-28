@@ -6,6 +6,13 @@ export interface Sucursal {
   tipo: "FISICA" | "ECOMMERCE";
 }
 
+interface RegistroDatos {
+  empresaNombre: string;
+  adminNombre: string;
+  adminEmail: string;
+  adminPassword: string;
+}
+
 interface SesionState {
   apiBaseUrl: string;
   token: string | null;
@@ -14,6 +21,7 @@ interface SesionState {
   sucursales: Sucursal[];
   sucursalActivaId: string | null;
   hidratado: boolean;
+  registroDatos: RegistroDatos | null;
   setApiBaseUrl: (url: string) => void;
   setSesion: (args: {
     token: string;
@@ -23,6 +31,8 @@ interface SesionState {
   }) => void;
   setSucursalActiva: (id: string) => void;
   setHidratado: () => void;
+  setRegistroDatos: (datos: RegistroDatos) => void;
+  limpiarRegistroDatos: () => void;
   logout: () => void;
 }
 
@@ -34,6 +44,7 @@ export const useSesionStore = create<SesionState>((set) => ({
   sucursales: [],
   sucursalActivaId: null,
   hidratado: false,
+  registroDatos: null,
   setApiBaseUrl: (apiBaseUrl) => set({ apiBaseUrl }),
   setSesion: ({ token, usuario, empresa, sucursales }) =>
     set({
@@ -46,8 +57,10 @@ export const useSesionStore = create<SesionState>((set) => ({
     }),
   setSucursalActiva: (sucursalActivaId) => set({ sucursalActivaId }),
   setHidratado: () => set({ hidratado: true }),
+  setRegistroDatos: (registroDatos) => set({ registroDatos }),
+  limpiarRegistroDatos: () => set({ registroDatos: null }),
   logout: () =>
-    set({ token: null, usuario: null, empresa: null, sucursales: [], sucursalActivaId: null }),
+    set({ token: null, usuario: null, empresa: null, sucursales: [], sucursalActivaId: null, registroDatos: null }),
 }));
 
 export function usePermiso(permiso: string): boolean {

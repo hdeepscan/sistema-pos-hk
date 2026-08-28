@@ -5,6 +5,7 @@ import logo from "../assets/logo.png";
 import { mensajeError } from "../lib/errores";
 import { IconoOjo, IconoOjoTachado } from "../lib/iconos";
 import { electronAPI } from "../lib/electron-api";
+import CheckoutPage from "./CheckoutPage";
 
 // Campo de contraseña con boton de ojo para ver/ocultar.
 function CampoPassword({
@@ -55,7 +56,7 @@ function CampoPassword({
 }
 
 export default function Login() {
-  const [modo, setModo] = useState<"login" | "registro">("login");
+  const [modo, setModo] = useState<"login" | "registro" | "checkout">("login");
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -68,6 +69,7 @@ export default function Login() {
   const setSesion = useSesionStore((s) => s.setSesion);
   const apiBaseUrl = useSesionStore((s) => s.apiBaseUrl);
   const setApiBaseUrl = useSesionStore((s) => s.setApiBaseUrl);
+  const setRegistroDatos = useSesionStore((s) => s.setRegistroDatos);
 
   async function aplicarSesion(data: {
     token: string;
@@ -106,20 +108,36 @@ export default function Login() {
   async function handleRegistro(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setCargando(true);
-    try {
-      const { data } = await api.post("/auth/registro-empresa", {
-        empresaNombre,
-        adminNombre,
-        adminEmail: email,
-        adminPassword: password,
-      });
-      await aplicarSesion(data);
-    } catch (err: any) {
-      setError(mensajeError(err, "No se pudo registrar la empresa"));
-    } finally {
-      setCargando(false);
+
+    // Validar campos
+    if (!empresaNombre || !adminNombre || !email || !password) {
+      setError("Por favor completa todos los campos");
+      return;
     }
+
+    if (password.length < 8) {
+      setError("La contraseña debe tener al menos 8 caracteres");
+      return;
+    }
+
+    // Guardar datos en el store y cambiar a modo checkout
+    setRegistroDatos({
+      empresaNombre,
+      adminNombre,
+      adminEmail: email,
+      adminPassword: password,
+    });
+
+    setModo("checkout");
+  }
+
+  // Mostrar CheckoutPage si está en modo checkout
+  if (modo === "checkout") {
+    return (
+      <div>
+        <CheckoutPage onBack={() => setModo("registro")} isRegistration={true} />
+      </div>
+    );
   }
 
   return (
@@ -190,7 +208,7 @@ export default function Login() {
             />
             {error && <span className="error-text">{error}</span>}
             <button type="submit" disabled={cargando}>
-              {cargando ? "Creando..." : "Crear empresa"}
+              {cargando ? "Continuando..." : "Continuar al pago"}
             </button>
           </form>
         )}
