@@ -76,6 +76,9 @@ model Empresa {
   fechaVencimiento  DateTime?  // null = nunca caduca, para empresas heredadas
   planSuscripcion   String     @default("TRIAL_5D")  // TRIAL_5D, MENSUAL, TRIMESTRAL, ANUAL
 
+  // Límite de usuarios: base es 2, incrementa al comprar usuarios adicionales ($10,000 COP c/u)
+  limiteUsuarios    Int        @default(2)
+
   // Dias tras la venta a credito en que se considera vencido, si el saldo
   // sigue pendiente. Se aplica como snapshot en Venta.fechaVencimientoCredito
   // al momento de la venta (cambiarlo aqui no afecta creditos ya generados).

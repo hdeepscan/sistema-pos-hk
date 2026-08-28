@@ -9,6 +9,7 @@ import { Decimal } from "@prisma/client/runtime/library";
 import {
   obtenerPlanes,
   crearCheckout,
+  crearCheckoutUsuarios,
   confirmarPago,
   webhookPago,
   obtenerEstadoPago,
@@ -168,6 +169,15 @@ export async function rutasPagos(fastify: FastifyInstance) {
     { preHandler: authMiddleware },
     async (request, reply) => {
       return confirmarPago(request, reply);
+    }
+  );
+
+  // Checkout de usuarios adicionales ($10,000 COP c/u) - requiere autenticación
+  fastify.post(
+    "/checkout/usuarios-adicionales",
+    { preHandler: authMiddleware },
+    async (request, reply) => {
+      return crearCheckoutUsuarios(request, reply);
     }
   );
 }

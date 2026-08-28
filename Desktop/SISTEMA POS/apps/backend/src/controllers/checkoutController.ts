@@ -42,6 +42,92 @@ export async function obtenerPlanes(
 }
 
 /**
+ * POST /api/checkout/usuarios-adicionales
+ * Crear orden de pago para comprar usuarios adicionales ($10,000 COP c/u)
+ * Requiere autenticación (usuario debe tener token JWT)
+ */
+export async function crearCheckoutUsuarios(
+  request: FastifyRequest,
+  reply: FastifyReply
+) {
+  try {
+    const usuario = (request as any).usuario;
+    const empresaId = (request as any).empresaId;
+    const { cantidadUsuarios } = request.body as any;
+
+    // Validar autenticación
+    if (!usuario || !empresaId) {
+      return reply.status(401).send({ error: "No autenticado" });
+    }
+
+    // Validar cantidad
+    if (!cantidadUsuarios || cantidadUsuarios < 1 || cantidadUsuarios > 100) {
+      return reply.status(400).send({ error: "Cantidad de usuarios inválida (1-100)" });
+    }
+
+    // Verificar que la empresa exista
+    const empresa = await prisma.empresa.findUnique({
+      where: { id: empresaId },
+    });
+
+    if (!empresa) {
+      return reply.status(404).send({ error: "Empresa no encontrada" });
+    }
+
+    // Precio fijo: $10,000 COP por usuario
+    const precioPorUsuario = 10000;
+    const montoTotal = precioPorUsuario * cantidadUsuarios;
+
+    // Crear orden de pago
+    const referenciaPago = `USU-${empresaId}-${Date.now()}`;
+
+    const checkoutData = await wompiService.crearOrdenPago({
+      empresaId,
+      referenciaPago,
+      tipoPlan: "USUARIOS_ADICIONALES",
+      monto: montoTotal,
+      usuariosAdicionales: cantidadUsuarios,
+      email: usuario.email,
+      nombre: usuario.nombre,
+      telefono: "",
+    });
+
+    // Guardar transacción pendiente
+    const pago = await prisma.pago.create({
+      data: {
+        empresaId,
+        referenciaPago,
+        estado: "PENDIENTE",
+        monto: montoTotal,
+        tipoPlan: "USUARIOS_ADICIONALES",
+        usuariosAdicionales: cantidadUsuarios,
+        datosRegistro: JSON.stringify({
+          tipoCompra: "USUARIOS_ADICIONALES",
+          cantidadUsuarios,
+        }),
+      },
+    });
+
+    return reply.send({
+      success: true,
+      checkout: {
+        url: checkoutData.url,
+        referenciaPago: checkoutData.referenciaPago,
+        monto: checkoutData.monto,
+        tipoPlan: "USUARIOS_ADICIONALES",
+        cantidadUsuarios,
+      },
+    });
+  } catch (error: any) {
+    console.error("Error creando checkout de usuarios:", error?.response?.data || error?.message || error);
+    return reply.status(500).send({
+      error: "Error al crear checkout",
+      detalles: error?.response?.data?.message || error?.message || "Error desconocido",
+    });
+  }
+}
+
+/**
  * POST /api/checkout/crear
  * Crear una orden de pago
  * Funciona en dos modos:
