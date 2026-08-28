@@ -89,6 +89,39 @@ async function procesarPagoAprobado(transaccion: any) {
       }
     }
 
+    // CASO ESPECIAL: Compra de usuarios adicionales ($10,000 COP c/u)
+    if (datosRegistro?.tipoCompra === "USUARIOS_ADICIONALES") {
+      console.log(`👥 Procesando compra de usuarios adicionales`);
+      const cantidadUsuarios = datosRegistro?.cantidadUsuarios || 0;
+
+      if (cantidadUsuarios > 0 && pago.empresaId) {
+        // Incrementar límite de usuarios de la empresa
+        const empresa = await prisma.empresa.update({
+          where: { id: pago.empresaId },
+          data: {
+            limiteUsuarios: {
+              increment: cantidadUsuarios,
+            },
+          },
+        });
+
+        console.log(`✅ Límite de usuarios incrementado: +${cantidadUsuarios} (nuevo total: ${empresa.limiteUsuarios})`);
+      }
+
+      // Marcar pago como completado
+      await prisma.pago.update({
+        where: { referenciaPago: reference },
+        data: {
+          estado: "COMPLETADO",
+          transaccionId: transaccion.id,
+          fechaPago: new Date(),
+        },
+      });
+
+      console.log(`✅ Pago de usuarios completado: ${reference}`);
+      return;
+    }
+
     // Extraer datos de transacción de Wompi y registro
     const empresaNombre = datosRegistro?.empresaNombre || "Mi Empresa";
     const adminNombre = datosRegistro?.adminNombre || "Admin";
