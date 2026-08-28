@@ -148,10 +148,11 @@ export async function crearCheckout(
         tipoPlan: checkoutData.tipoPlan,
       },
     });
-  } catch (error) {
-    console.error("Error creando checkout:", error);
+  } catch (error: any) {
+    console.error("Error creando checkout:", error?.response?.data || error?.message || error);
     return reply.status(500).send({
       error: "Error al crear checkout",
+      detalles: error?.response?.data?.message || error?.message || "Error desconocido",
     });
   }
 }
