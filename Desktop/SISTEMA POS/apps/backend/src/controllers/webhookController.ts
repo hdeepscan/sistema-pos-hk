@@ -171,7 +171,7 @@ async function procesarPagoAprobado(transaccion: any) {
       mensaje: error?.message,
       codigo: error?.code,
       stack: error?.stack?.substring(0, 300),
-      referencia,
+      reference: transaccion?.reference || "DESCONOCIDA",
     });
     throw error;
   }
