@@ -3,6 +3,7 @@
  */
 
 import type { FastifyInstance } from "fastify";
+import axios from "axios";
 import {
   obtenerPlanes,
   crearCheckout,
@@ -41,7 +42,6 @@ export async function rutasPagos(fastify: FastifyInstance) {
   // TEST: Intentar crear transacción de prueba en Wompi
   fastify.post("/pagos/test-wompi-transaction", async (request, reply) => {
     try {
-      const axios = require("axios");
       const privateKey = process.env.WOMPI_PRIVATE_KEY;
 
       const testData = {
