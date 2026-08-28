@@ -11,6 +11,7 @@ import { electronAPI } from "../lib/electron-api";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { MobileMenu } from "../components/MobileMenu";
 import { ToastContainer } from "../components/ToastContainer";
+import { SubscriptionCard } from "../components/SubscriptionCard";
 
 const INTERVALO_CREDITOS_MS = 5 * 60 * 1000;
 
@@ -173,6 +174,15 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
             </div>
           </div>
         </div>
+
+        {/* Tarjeta de Suscripción con Contador Regresivo */}
+        <div style={{ padding: "0 12px" }}>
+          <SubscriptionCard
+            fechaVencimiento={empresa?.fechaVencimiento}
+            planSuscripcion={empresa?.planSuscripcion}
+          />
+        </div>
+
         <div className="sidebar-context">
           <strong>{empresa?.nombre}</strong>
           {sucursalActiva?.nombre} · {usuario?.nombre}
@@ -298,59 +308,6 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
                 </button>
               </div>
             </div>
-          </div>
-        )}
-
-        {/* Banner de Suscripción/Prueba */}
-        {diasRestantes !== null && (
-          <div
-            style={{
-              backgroundColor: diasRestantes <= 2 ? "#fee2e2" : "#dbeafe",
-              borderLeft: `4px solid ${diasRestantes <= 2 ? "#dc2626" : "#2563eb"}`,
-              padding: "12px 16px",
-              marginBottom: "16px",
-              borderRadius: "4px",
-              fontSize: "14px",
-              color: diasRestantes <= 2 ? "#7f1d1d" : "#1e3a8a",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              flexWrap: "wrap",
-              gap: "12px",
-            }}
-          >
-            <div>
-              {diasRestantes > 0 ? (
-                <>
-                  ⏰ Te quedan <strong>{diasRestantes} día{diasRestantes !== 1 ? "s" : ""}</strong> de{" "}
-                  {empresa?.planSuscripcion === "TRIAL_5D" ? "prueba" : "suscripción"}
-                  {diasRestantes <= 2 && " • ¡Renueva pronto!"}
-                </>
-              ) : (
-                <>
-                  ❌ Tu suscripción ha vencido. Realiza el pago para continuar usando el sistema.
-                </>
-              )}
-            </div>
-            {diasRestantes <= 7 && (
-              <button
-                type="button"
-                onClick={() => navigate("/checkout")}
-                style={{
-                  padding: "4px 12px",
-                  fontSize: "12px",
-                  fontWeight: "600",
-                  backgroundColor: diasRestantes <= 2 ? "#dc2626" : "#2563eb",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "4px",
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {diasRestantes > 0 ? "Renovar" : "Pagar ahora"}
-              </button>
-            )}
           </div>
         )}
 
