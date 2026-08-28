@@ -1153,6 +1153,9 @@ model Pago {
   fechaPago         DateTime?
   respuestaPayU     String?
 
+  // Datos temporales de registro para flujo de registro (JSON stringified con empresaNombre, adminNombre, adminEmail, adminPassword)
+  datosRegistro     String?
+
   creado            DateTime       @default(now())
   actualizado       DateTime       @updatedAt
 

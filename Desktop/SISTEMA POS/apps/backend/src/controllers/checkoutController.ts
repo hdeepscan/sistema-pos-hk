@@ -124,6 +124,21 @@ export async function crearCheckout(
       telefono: "",
     });
 
+    // En modo registro, preparar datos temporales para guardar en Pago
+    let datosRegistroJson: string | undefined;
+    if (isRegistration) {
+      const datosRegistro = {
+        empresaNombre: (request.body as any).empresaNombre,
+        adminNombre: userName,
+        adminEmail: userEmail,
+        adminPassword: (request.body as any).password, // Sin hashear, será hasheado en webhook
+        tipoPlan,
+      };
+      datosRegistroJson = JSON.stringify(datosRegistro);
+      console.log(`📝 Datos de registro preparados para referencia: ${referenciaPago}`);
+      console.log(datosRegistro);
+    }
+
     // Guardar referencia de pago en base de datos
     const pago = await prisma.pago.create({
       data: {
@@ -133,20 +148,9 @@ export async function crearCheckout(
         monto: montoTotal,
         tipoPlan,
         usuariosAdicionales,
+        datosRegistro: datosRegistroJson,
       },
     });
-
-    // En modo registro, guardar datos temporales en logs para el webhook
-    // El webhook accederá a estos datos usando la referenciaPago
-    if (isRegistration) {
-      console.log(`📝 Datos de registro guardados para referencia: ${referenciaPago}`);
-      console.log({
-        empresaNombre: (request.body as any).empresaNombre,
-        adminNombre: userName,
-        adminEmail: userEmail,
-        tipoPlan,
-      });
-    }
 
     return reply.send({
       success: true,

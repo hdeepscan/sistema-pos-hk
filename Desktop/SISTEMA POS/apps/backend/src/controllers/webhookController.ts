@@ -64,14 +64,22 @@ async function procesarPagoAprobado(transaccion: any) {
       return;
     }
 
-    // Recuperar datos de registro desde localStorage del cliente (enviado en metadata)
-    // NOTA: En producción, estos datos deberían estar guardados en una tabla temporal
-    const datosRegistro = metadata || {};
+    // Recuperar datos de registro desde Pago.datosRegistro (guardados en checkoutController)
+    let datosRegistro: any = {};
+    if (pago.datosRegistro) {
+      try {
+        datosRegistro = JSON.parse(pago.datosRegistro);
+      } catch (e) {
+        console.error("Error parseando datosRegistro:", e);
+        datosRegistro = {};
+      }
+    }
 
-    // Extraer datos de transacción de Wompi
+    // Extraer datos de transacción de Wompi y registro
     const empresaNombre = datosRegistro?.empresaNombre || "Mi Empresa";
     const adminNombre = datosRegistro?.adminNombre || "Admin";
     const adminEmail = customer_email || datosRegistro?.adminEmail || "no-email@example.com";
+    // La contraseña viene en plaintext desde el frontend, NO está hasheada
     const adminPassword = datosRegistro?.adminPassword || generarPasswordTemporal();
     const tipoPlan = datosRegistro?.tipoPlan || pago?.tipoPlan || "MENSUAL";
 
@@ -146,7 +154,11 @@ async function procesarPagoAprobado(transaccion: any) {
 
     console.log(`✅ Sucursal creada`);
 
-    // 6. Enviar email con credenciales
+    console.log(`🎉 Registro completado para: ${empresaNombre} (${adminEmail})`);
+
+    // 6. Enviar email con credenciales (AISLADO: no afecta si falla)
+    // Este bloque se ejecuta DESPUÉS del commit de usuario/empresa/sucursal
+    // Si falla, solo falla el email, no la creación de la cuenta
     try {
       console.log(`📧 Intentando enviar email a: ${adminEmail}`);
       await enviarEmailBienvenida(
@@ -155,17 +167,16 @@ async function procesarPagoAprobado(transaccion: any) {
         adminNombre,
         adminPassword
       );
-      console.log(`✉️ Email enviado exitosamente`);
+      console.log(`✉️ Email enviado exitosamente a ${adminEmail}`);
     } catch (emailError: any) {
-      console.error("⚠️ Error enviando email:", {
+      console.error("⚠️ Error enviando email (cuenta creada correctamente):", {
+        email: adminEmail,
         mensaje: emailError?.message,
         codigo: emailError?.code,
         stack: emailError?.stack?.substring(0, 200),
       });
-      // No fallar el webhook si falla el email
+      // No fallar ni revertir si falla el email - la cuenta ya está creada
     }
-
-    console.log(`🎉 Registro completado para: ${empresaNombre} (${adminEmail})`);
   } catch (error: any) {
     console.error("❌ Error CRÍTICO procesando pago aprobado:", {
       mensaje: error?.message,
