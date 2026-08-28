@@ -160,16 +160,21 @@ export default function CheckoutPage({ onBack, isRegistration = false }: Checkou
     setProcesando(true);
 
     try {
+      // Obtener empresaId si es renovación (usuario autenticado)
+      const usuarioStore = useSesionStore.getState();
+      const empresaId = !isRegistration ? usuarioStore.empresa?.id : undefined;
+
       const { data } = await api.post<{ success: boolean; checkout: CheckoutData }>(
         "/checkout/crear",
         {
           tipoPlan: planSeleccionado,
           usuariosAdicionales,
-          email: isRegistration ? registroDatos?.adminEmail : "",
-          nombre: isRegistration ? registroDatos?.adminNombre : "",
+          email: isRegistration ? registroDatos?.adminEmail : usuarioStore.usuario?.email,
+          nombre: isRegistration ? registroDatos?.adminNombre : usuarioStore.usuario?.nombre,
           empresaNombre: isRegistration ? registroDatos?.empresaNombre : "",
           password: isRegistration ? registroDatos?.adminPassword : "",
           isRegistration,
+          empresaId, // Agregar para renovaciones
         }
       );
 

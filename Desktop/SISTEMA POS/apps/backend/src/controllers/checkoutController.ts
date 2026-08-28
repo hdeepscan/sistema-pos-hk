@@ -54,18 +54,21 @@ export async function crearCheckout(
 ) {
   try {
     const usuario = (request as any).usuario;
-    const empresaId = (request as any).empresaId;
-    const { tipoPlan, usuariosAdicionales = 0, email, nombre, isRegistration } = request.body as any;
+    const empresaIdAuth = (request as any).empresaId;
+    const { tipoPlan, usuariosAdicionales = 0, email, nombre, isRegistration, empresaId: empresaIdBody } = request.body as any;
 
     // Validar plan
     if (!["TRIAL_5D", "MENSUAL", "TRIMESTRAL", "ANUAL"].includes(tipoPlan)) {
       return reply.status(400).send({ error: "Plan inválido" });
     }
 
+    // Determinar si es renovación (usuario autenticado + empresaId)
+    const isRenovacion = !isRegistration && (empresaIdAuth || empresaIdBody);
+
     // Modo registro: validar email y nombre
     let userEmail = usuario?.email;
     let userName = usuario?.nombre;
-    let actualEmpresaId = empresaId;
+    let actualEmpresaId = empresaIdAuth || empresaIdBody;
 
     if (isRegistration) {
       // Flujo de registro: no hay usuario autenticado
@@ -76,20 +79,23 @@ export async function crearCheckout(
       userName = nombre;
       // En modo registro, generar un ID temporal para la empresa
       actualEmpresaId = `temp-${Date.now()}`;
-    } else {
-      // Flujo normal: verificar que esté autenticado
-      if (!usuario || !empresaId) {
-        return reply.status(401).send({ error: "No autenticado" });
+    } else if (isRenovacion) {
+      // Flujo de renovación: usuario autenticado, usar empresaId
+      if (!actualEmpresaId) {
+        return reply.status(400).send({ error: "ID de empresa no proporcionado para renovación" });
       }
 
-      // Obtener datos de la empresa
+      // Verificar que la empresa exista
       const empresa = await prisma.empresa.findUnique({
-        where: { id: empresaId },
+        where: { id: actualEmpresaId },
       });
 
       if (!empresa) {
         return reply.status(404).send({ error: "Empresa no encontrada" });
       }
+    } else {
+      // Flujo sin autenticación (debería ser registro)
+      return reply.status(400).send({ error: "Flujo inválido" });
     }
 
     // Obtener precio del plan

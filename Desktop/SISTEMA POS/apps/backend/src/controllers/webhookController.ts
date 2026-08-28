@@ -97,7 +97,7 @@ async function procesarPagoAprobado(transaccion: any) {
     const adminPassword = datosRegistro?.adminPassword || generarPasswordTemporal();
     const tipoPlan = datosRegistro?.tipoPlan || pago?.tipoPlan || "MENSUAL";
 
-    console.log(`📝 Creando empresa: ${empresaNombre}`);
+    console.log(`📝 Procesando pago: ${empresaNombre || "Renovación"}`);
     console.log(`👤 Admin: ${adminNombre} (${adminEmail})`);
     console.log(`💳 Plan: ${tipoPlan}`);
     console.log(`📊 Pago encontrado en BD:`, pago ? { estado: pago.estado, tipoPlan: pago.tipoPlan } : "NO ENCONTRADO");
@@ -106,44 +106,87 @@ async function procesarPagoAprobado(transaccion: any) {
     const fechaVencimiento = calcularFechaVencimiento(tipoPlan);
     console.log(`📅 Fecha de vencimiento: ${fechaVencimiento.toISOString().split("T")[0]}`);
 
-    // 1. Crear la empresa CON fechaVencimiento
-    const empresa = await prisma.empresa.create({
-      data: {
-        nombre: empresaNombre,
-        plan: tipoPlan,
-        planSuscripcion: tipoPlan,
-        fechaVencimiento,
-        activo: true,
-      },
-    });
+    // Determinar si es renovación (empresaId no es temporal)
+    const esRenovacion = pago?.empresaId && !pago.empresaId.startsWith("temp-");
 
-    console.log(`✅ Empresa creada: ${empresa.id}`);
+    let empresa: any;
 
-    // 2. Hashear contraseña
-    const passwordHash = await bcrypt.hash(adminPassword, 10);
+    if (esRenovacion) {
+      // Renovación: actualizar empresa existente
+      console.log(`🔄 Renovando empresa: ${pago?.empresaId}`);
+      empresa = await prisma.empresa.update({
+        where: { id: pago.empresaId },
+        data: {
+          planSuscripcion: tipoPlan,
+          fechaVencimiento,
+          plan: tipoPlan,
+        },
+      });
+      console.log(`✅ Empresa renovada: ${empresa.id}`);
+    } else {
+      // Registro nuevo: crear empresa
+      console.log(`➕ Creando empresa nueva`);
+      empresa = await prisma.empresa.create({
+        data: {
+          nombre: empresaNombre,
+          plan: tipoPlan,
+          planSuscripcion: tipoPlan,
+          fechaVencimiento,
+          activo: true,
+        },
+      });
+      console.log(`✅ Empresa creada: ${empresa.id}`);
+    }
 
-    // 3. Crear usuario admin
-    const usuario = await prisma.usuario.create({
-      data: {
-        empresaId: empresa.id,
-        nombre: adminNombre,
-        email: adminEmail,
-        passwordHash,
-        rol: "ADMIN",
-        activo: true,
-        permisos: [
-          "crear_venta",
-          "editar_venta",
-          "eliminar_venta",
-          "ver_reportes",
-          "gestionar_usuarios",
-        ],
-      },
-    });
+    // 2. Si es renovación, solo actualizar pago. Si es registro nuevo, crear usuario y sucursal
+    let usuario: any = null;
 
-    console.log(`✅ Usuario creado: ${usuario.id}`);
+    if (!esRenovacion) {
+      // Registro nuevo: crear usuario y sucursal
+      // 2a. Hashear contraseña
+      const passwordHash = await bcrypt.hash(adminPassword, 10);
 
-    // 4. Actualizar pago a COMPLETADO
+      // 2b. Crear usuario admin
+      usuario = await prisma.usuario.create({
+        data: {
+          empresaId: empresa.id,
+          nombre: adminNombre,
+          email: adminEmail,
+          passwordHash,
+          rol: "ADMIN",
+          activo: true,
+          permisos: [
+            "crear_venta",
+            "editar_venta",
+            "eliminar_venta",
+            "ver_reportes",
+            "gestionar_usuarios",
+          ],
+        },
+      });
+
+      console.log(`✅ Usuario creado: ${usuario.id}`);
+
+      // 2c. Crear sucursal por defecto
+      await prisma.sucursal.create({
+        data: {
+          empresaId: empresa.id,
+          nombre: "Sucursal Principal",
+          tipo: "FISICA",
+          activo: true,
+        },
+      });
+
+      console.log(`✅ Sucursal creada`);
+    } else {
+      // Renovación: solo obtener usuario existente para referencia
+      usuario = await prisma.usuario.findFirst({
+        where: { empresaId: empresa.id, rol: "ADMIN" },
+      });
+      console.log(`ℹ️ Renovación: Usuario existente: ${usuario?.id || "N/A"}`);
+    }
+
+    // 3. Actualizar pago a COMPLETADO
     await prisma.pago.update({
       where: { referenciaPago: reference },
       data: {
@@ -155,18 +198,6 @@ async function procesarPagoAprobado(transaccion: any) {
     });
 
     console.log(`✅ Pago actualizado: COMPLETADO`);
-
-    // 5. Crear sucursal por defecto
-    await prisma.sucursal.create({
-      data: {
-        empresaId: empresa.id,
-        nombre: "Sucursal Principal",
-        tipo: "FISICA",
-        activo: true,
-      },
-    });
-
-    console.log(`✅ Sucursal creada`);
 
     console.log(`🎉 Registro completado para: ${empresaNombre} (${adminEmail})`);
 
