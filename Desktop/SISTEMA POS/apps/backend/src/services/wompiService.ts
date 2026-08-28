@@ -114,8 +114,11 @@ export class WompiService {
       // Generar firma de integridad con parámetro signature:integrity
       const firma = this.generarFirmaIntegridad(referenciaPago, monto);
 
-      // Usar Wompi Web Checkout dinámico (/p/ con parámetros + signature:integrity)
-      const checkoutUrl = `https://checkout.wompi.co/p/?public-key=${this.publicKey}&currency=COP&amount-in-cents=${monto}&reference=${referenciaPago}&signature:integrity=${firma}`;
+      // URL de redirección tras pago exitoso
+      const redirectUrl = "https://sistema-pos-hk.up.railway.app/#/checkout?pago=exitoso";
+
+      // Usar Wompi Web Checkout dinámico (/p/ con parámetros + signature:integrity + redirect)
+      const checkoutUrl = `https://checkout.wompi.co/p/?public-key=${this.publicKey}&currency=COP&amount-in-cents=${monto}&reference=${referenciaPago}&redirect-url=${encodeURIComponent(redirectUrl)}&signature:integrity=${firma}`;
 
       console.log("🔗 Checkout URL lista");
       console.log(`✓ Checkout creado: ${referenciaPago}`);

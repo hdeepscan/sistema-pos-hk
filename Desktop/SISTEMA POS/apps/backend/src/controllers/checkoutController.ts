@@ -124,18 +124,28 @@ export async function crearCheckout(
       telefono: "",
     });
 
-    // Guardar referencia de pago en base de datos (solo si no es modo registro)
-    // En modo registro, guardamos después de crear la empresa
-    if (!isRegistration) {
-      const pago = await prisma.pago.create({
-        data: {
-          empresaId: actualEmpresaId,
-          referenciaPago,
-          estado: "PENDIENTE",
-          monto: montoTotal,
-          tipoPlan,
-          usuariosAdicionales,
-        },
+    // Guardar referencia de pago en base de datos
+    // En modo registro, también guardamos los datos temporales para que el webhook pueda acceder
+    const pago = await prisma.pago.create({
+      data: {
+        empresaId: actualEmpresaId,
+        referenciaPago,
+        estado: "PENDIENTE",
+        monto: montoTotal,
+        tipoPlan,
+        usuariosAdicionales,
+      },
+    });
+
+    // En modo registro, guardar datos temporales en localStorage metadata
+    // El webhook accederá a estos datos usando la referenciaPago
+    if (isRegistration && registroDatos) {
+      console.log(`📝 Datos de registro guardados para referencia: ${referenciaPago}`);
+      console.log({
+        empresaNombre: registroDatos.empresaNombre,
+        adminNombre: registroDatos.adminNombre,
+        adminEmail: registroDatos.adminEmail,
+        tipoPlan,
       });
     }
 

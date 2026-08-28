@@ -130,6 +130,8 @@ export default function CheckoutPage({ onBack, isRegistration = false }: Checkou
           usuariosAdicionales,
           email: isRegistration ? registroDatos?.adminEmail : "",
           nombre: isRegistration ? registroDatos?.adminNombre : "",
+          empresaNombre: isRegistration ? registroDatos?.empresaNombre : "",
+          password: isRegistration ? registroDatos?.adminPassword : "",
           isRegistration,
         }
       );

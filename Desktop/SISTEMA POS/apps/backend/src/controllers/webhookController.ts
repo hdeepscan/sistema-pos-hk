@@ -68,14 +68,17 @@ async function procesarPagoAprobado(transaccion: any) {
     // NOTA: En producción, estos datos deberían estar guardados en una tabla temporal
     const datosRegistro = metadata || {};
 
-    const empresaNombre = datosRegistro.empresaNombre || "Mi Empresa";
-    const adminNombre = datosRegistro.adminNombre || "Admin";
-    const adminEmail = customer_email;
-    const adminPassword = datosRegistro.adminPassword || generarPasswordTemporal();
-    const tipoPlan = datosRegistro.tipoPlan || "MENSUAL";
+    // Extraer datos de transacción de Wompi
+    const empresaNombre = datosRegistro?.empresaNombre || "Mi Empresa";
+    const adminNombre = datosRegistro?.adminNombre || "Admin";
+    const adminEmail = customer_email || datosRegistro?.adminEmail || "no-email@example.com";
+    const adminPassword = datosRegistro?.adminPassword || generarPasswordTemporal();
+    const tipoPlan = datosRegistro?.tipoPlan || pago?.tipoPlan || "MENSUAL";
 
     console.log(`📝 Creando empresa: ${empresaNombre}`);
-    console.log(`💳 Plan seleccionado: ${tipoPlan}`);
+    console.log(`👤 Admin: ${adminNombre} (${adminEmail})`);
+    console.log(`💳 Plan: ${tipoPlan}`);
+    console.log(`📊 Pago encontrado en BD:`, pago ? { estado: pago.estado, tipoPlan: pago.tipoPlan } : "NO ENCONTRADO");
 
     // Calcular fecha de vencimiento según el plan
     const fechaVencimiento = calcularFechaVencimiento(tipoPlan);
@@ -145,21 +148,31 @@ async function procesarPagoAprobado(transaccion: any) {
 
     // 6. Enviar email con credenciales
     try {
+      console.log(`📧 Intentando enviar email a: ${adminEmail}`);
       await enviarEmailBienvenida(
         adminEmail,
         empresaNombre,
         adminNombre,
         adminPassword
       );
-      console.log(`✉️ Email enviado a: ${adminEmail}`);
-    } catch (emailError) {
-      console.error("⚠️ Error enviando email:", emailError);
+      console.log(`✉️ Email enviado exitosamente`);
+    } catch (emailError: any) {
+      console.error("⚠️ Error enviando email:", {
+        mensaje: emailError?.message,
+        codigo: emailError?.code,
+        stack: emailError?.stack?.substring(0, 200),
+      });
       // No fallar el webhook si falla el email
     }
 
-    console.log(`🎉 Registro completado para: ${empresaNombre}`);
-  } catch (error) {
-    console.error("❌ Error procesando pago aprobado:", error);
+    console.log(`🎉 Registro completado para: ${empresaNombre} (${adminEmail})`);
+  } catch (error: any) {
+    console.error("❌ Error CRÍTICO procesando pago aprobado:", {
+      mensaje: error?.message,
+      codigo: error?.code,
+      stack: error?.stack?.substring(0, 300),
+      referencia,
+    });
     throw error;
   }
 }
