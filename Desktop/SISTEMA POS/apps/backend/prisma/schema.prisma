@@ -114,7 +114,6 @@ model Empresa {
   asientosContables AsientoContable[]
   cotizaciones     Cotizacion[]
   licencia         Licencia?
-  pagos            Pago[]
 
   @@map("empresas")
 }
@@ -1132,7 +1131,6 @@ model Suscripcion {
 
 model Pago {
   id                String         @id @default(uuid())
-  empresa           Empresa?       @relation(fields: [empresaId], references: [id], onDelete: Cascade)
   empresaId         String?
 
   referenciaPago    String         @unique
