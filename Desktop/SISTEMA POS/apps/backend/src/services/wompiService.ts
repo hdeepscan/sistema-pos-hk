@@ -18,7 +18,7 @@ const WOMPI_CONFIG = {
 export interface WompiOrderData {
   empresaId: string;
   referenciaPago: string;
-  tipoPlan: "MENSUAL" | "TRIMESTRAL" | "ANUAL";
+  tipoPlan: "TRIAL_5D" | "MENSUAL" | "TRIMESTRAL" | "ANUAL";
   monto: number;
   usuariosAdicionales?: number;
   email: string;

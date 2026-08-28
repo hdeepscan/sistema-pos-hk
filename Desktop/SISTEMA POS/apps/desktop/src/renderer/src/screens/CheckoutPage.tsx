@@ -5,7 +5,7 @@ import { useSesionStore } from "../lib/store";
 import { useNavigate } from "react-router-dom";
 
 interface Plan {
-  tipoPlan: "MENSUAL" | "TRIMESTRAL" | "ANUAL";
+  tipoPlan: "TRIAL_5D" | "MENSUAL" | "TRIMESTRAL" | "ANUAL";
   precio: number;
   descuento: number;
   precioFinal: number;
@@ -30,7 +30,7 @@ export default function CheckoutPage({ onBack, isRegistration = false }: Checkou
   const { registroDatos, setSesion, limpiarRegistroDatos } = useSesionStore();
   const [planes, setPlanes] = useState<Plan[]>([]);
   const [cargando, setCargando] = useState(true);
-  const [planSeleccionado, setPlanSeleccionado] = useState<string>("MENSUAL");
+  const [planSeleccionado, setPlanSeleccionado] = useState<string>(isRegistration ? "TRIAL_5D" : "MENSUAL");
   const [usuariosAdicionales, setUsuariosAdicionales] = useState(0);
   const [procesando, setProcesando] = useState(false);
 
@@ -219,10 +219,12 @@ export default function CheckoutPage({ onBack, isRegistration = false }: Checkou
                 ...(planSeleccionado === plan.tipoPlan ? styles.planCardActive : styles.planCardInactive),
               }}
             >
+              {plan.tipoPlan === "TRIAL_5D" && <div style={{...styles.badge, backgroundColor: "#10b981"}}>⭐ PRUEBA GRATIS</div>}
               {plan.tipoPlan === "ANUAL" && <div style={styles.badge}>RECOMENDADO</div>}
 
               <div style={styles.planHeader}>
                 <h3 style={styles.planTitle}>
+                  {plan.tipoPlan === "TRIAL_5D" && "🎁 Prueba Gratis"}
                   {plan.tipoPlan === "MENSUAL" && "📅 Mensual"}
                   {plan.tipoPlan === "TRIMESTRAL" && "🔄 Trimestral"}
                   {plan.tipoPlan === "ANUAL" && "🎯 Anual"}
@@ -232,7 +234,7 @@ export default function CheckoutPage({ onBack, isRegistration = false }: Checkou
 
               <div style={styles.planPrecio}>
                 <div style={styles.precioActual}>
-                  ${plan.precioFinal.toLocaleString("es-CO")}
+                  {plan.tipoPlan === "TRIAL_5D" ? "$4,000 COP" : `$${plan.precioFinal.toLocaleString("es-CO")}`}
                 </div>
                 {plan.descuento > 0 && (
                   <div style={styles.ahorro}>
@@ -241,9 +243,16 @@ export default function CheckoutPage({ onBack, isRegistration = false }: Checkou
                 )}
               </div>
 
-              <div style={styles.precioUsuario}>
-                ${plan.precioXUsuarioAdicional.toLocaleString("es-CO")}/usuario adicional
-              </div>
+              {plan.tipoPlan !== "TRIAL_5D" && (
+                <div style={styles.precioUsuario}>
+                  ${plan.precioXUsuarioAdicional.toLocaleString("es-CO")}/usuario adicional
+                </div>
+              )}
+              {plan.tipoPlan === "TRIAL_5D" && (
+                <div style={{...styles.precioUsuario, color: "#10b981", fontWeight: "600"}}>
+                  ✓ Acceso completo sin compromiso
+                </div>
+              )}
 
               <div style={styles.checkmark}>
                 {planSeleccionado === plan.tipoPlan && "✓"}
@@ -253,7 +262,7 @@ export default function CheckoutPage({ onBack, isRegistration = false }: Checkou
         </div>
 
         {/* Usuarios Adicionales */}
-        {planActual && (
+        {planActual && planActual.tipoPlan !== "TRIAL_5D" && (
           <div style={styles.usuariosSection}>
             <label style={styles.sectionTitle}>Usuarios Adicionales</label>
             <div style={styles.usuariosControl}>

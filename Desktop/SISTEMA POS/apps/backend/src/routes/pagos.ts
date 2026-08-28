@@ -42,6 +42,15 @@ export async function rutasPagos(fastify: FastifyInstance) {
 
       const planes = [
         {
+          tipoPlan: "TRIAL_5D",
+          precio: new Decimal(4000),
+          descuento: new Decimal(0),
+          precioFinal: new Decimal(4000),
+          diasDuracion: 5,
+          precioXUsuarioAdicional: new Decimal(0),  // Trial sin usuarios adicionales
+          activo: true,
+        },
+        {
           tipoPlan: "MENSUAL",
           precio: new Decimal(40000),
           descuento: new Decimal(0),

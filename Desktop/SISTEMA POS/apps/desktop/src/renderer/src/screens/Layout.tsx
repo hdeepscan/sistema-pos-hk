@@ -40,7 +40,20 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
   const [pedidosPendientes, setPedidosPendientes] = useState(0);
   const [shopDomain, setShopDomain] = useState<string | null>(null);
   const [update, setUpdate] = useState<{ estado: string; version?: string; porcentaje?: number } | null>(null);
+  const [diasRestantes, setDiasRestantes] = useState<number | null>(null);
   const navigate = useNavigate();
+
+  // Calcular días restantes de suscripción
+  useEffect(() => {
+    if (empresa?.fechaVencimiento) {
+      const hoy = new Date();
+      const vencimiento = new Date(empresa.fechaVencimiento);
+      const diferencia = Math.ceil(
+        (vencimiento.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      setDiasRestantes(diferencia);
+    }
+  }, [empresa?.fechaVencimiento]);
 
   useEffect(() => {
     api
@@ -287,6 +300,60 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
             </div>
           </div>
         )}
+
+        {/* Banner de Suscripción/Prueba */}
+        {diasRestantes !== null && (
+          <div
+            style={{
+              backgroundColor: diasRestantes <= 2 ? "#fee2e2" : "#dbeafe",
+              borderLeft: `4px solid ${diasRestantes <= 2 ? "#dc2626" : "#2563eb"}`,
+              padding: "12px 16px",
+              marginBottom: "16px",
+              borderRadius: "4px",
+              fontSize: "14px",
+              color: diasRestantes <= 2 ? "#7f1d1d" : "#1e3a8a",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "12px",
+            }}
+          >
+            <div>
+              {diasRestantes > 0 ? (
+                <>
+                  ⏰ Te quedan <strong>{diasRestantes} día{diasRestantes !== 1 ? "s" : ""}</strong> de{" "}
+                  {empresa?.planSuscripcion === "TRIAL_5D" ? "prueba" : "suscripción"}
+                  {diasRestantes <= 2 && " • ¡Renueva pronto!"}
+                </>
+              ) : (
+                <>
+                  ❌ Tu suscripción ha vencido. Realiza el pago para continuar usando el sistema.
+                </>
+              )}
+            </div>
+            {diasRestantes <= 7 && (
+              <button
+                type="button"
+                onClick={() => navigate("/checkout")}
+                style={{
+                  padding: "4px 12px",
+                  fontSize: "12px",
+                  fontWeight: "600",
+                  backgroundColor: diasRestantes <= 2 ? "#dc2626" : "#2563eb",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {diasRestantes > 0 ? "Renovar" : "Pagar ahora"}
+              </button>
+            )}
+          </div>
+        )}
+
         {children}
       </main>
 

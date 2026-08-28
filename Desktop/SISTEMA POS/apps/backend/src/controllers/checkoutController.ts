@@ -58,7 +58,7 @@ export async function crearCheckout(
     const { tipoPlan, usuariosAdicionales = 0, email, nombre, isRegistration } = request.body as any;
 
     // Validar plan
-    if (!["MENSUAL", "TRIMESTRAL", "ANUAL"].includes(tipoPlan)) {
+    if (!["TRIAL_5D", "MENSUAL", "TRIMESTRAL", "ANUAL"].includes(tipoPlan)) {
       return reply.status(400).send({ error: "Plan inválido" });
     }
 

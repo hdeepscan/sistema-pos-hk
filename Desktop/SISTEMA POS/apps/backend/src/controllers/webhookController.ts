@@ -72,14 +72,22 @@ async function procesarPagoAprobado(transaccion: any) {
     const adminNombre = datosRegistro.adminNombre || "Admin";
     const adminEmail = customer_email;
     const adminPassword = datosRegistro.adminPassword || generarPasswordTemporal();
+    const tipoPlan = datosRegistro.tipoPlan || "MENSUAL";
 
     console.log(`📝 Creando empresa: ${empresaNombre}`);
+    console.log(`💳 Plan seleccionado: ${tipoPlan}`);
 
-    // 1. Crear la empresa
+    // Calcular fecha de vencimiento según el plan
+    const fechaVencimiento = calcularFechaVencimiento(tipoPlan);
+    console.log(`📅 Fecha de vencimiento: ${fechaVencimiento.toISOString().split("T")[0]}`);
+
+    // 1. Crear la empresa CON fechaVencimiento
     const empresa = await prisma.empresa.create({
       data: {
         nombre: empresaNombre,
-        plan: datosRegistro.tipoPlan || "MENSUAL",
+        plan: tipoPlan,
+        planSuscripcion: tipoPlan,
+        fechaVencimiento,
         activo: true,
       },
     });
@@ -161,6 +169,29 @@ async function procesarPagoAprobado(transaccion: any) {
  */
 function generarPasswordTemporal(): string {
   return crypto.randomBytes(8).toString("hex").toUpperCase();
+}
+
+/**
+ * Calcular fecha de vencimiento según el tipo de plan
+ */
+function calcularFechaVencimiento(tipoPlan: string): Date {
+  const ahora = new Date();
+
+  if (tipoPlan === "TRIAL_5D") {
+    ahora.setDate(ahora.getDate() + 5);
+    console.log("⏰ Plan TRIAL: +5 días");
+  } else if (tipoPlan === "MENSUAL") {
+    ahora.setDate(ahora.getDate() + 30);
+    console.log("📅 Plan MENSUAL: +30 días");
+  } else if (tipoPlan === "TRIMESTRAL") {
+    ahora.setDate(ahora.getDate() + 90);
+    console.log("📅 Plan TRIMESTRAL: +90 días");
+  } else if (tipoPlan === "ANUAL") {
+    ahora.setFullYear(ahora.getFullYear() + 1);
+    console.log("📅 Plan ANUAL: +1 año (365 días)");
+  }
+
+  return ahora;
 }
 
 /**

@@ -44,6 +44,7 @@ enum CanalVenta {
 }
 
 enum TipoPlan {
+  TRIAL_5D
   MENSUAL
   TRIMESTRAL
   ANUAL
@@ -70,6 +71,10 @@ model Empresa {
   plan           String   @default("TRIAL")
   activo         Boolean  @default(true)
   fechaRegistro  DateTime @default(now())
+
+  // Suscripción: fecha de vencimiento y tipo de plan actual
+  fechaVencimiento  DateTime?  // null = nunca caduca, para empresas heredadas
+  planSuscripcion   String     @default("TRIAL_5D")  // TRIAL_5D, MENSUAL, TRIMESTRAL, ANUAL
 
   // Dias tras la venta a credito en que se considera vencido, si el saldo
   // sigue pendiente. Se aplica como snapshot en Venta.fechaVencimientoCredito
