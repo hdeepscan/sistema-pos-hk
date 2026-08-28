@@ -124,18 +124,20 @@ export async function crearCheckout(
       telefono: "",
     });
 
-    // Guardar referencia de pago en base de datos (estado PENDIENTE)
-    // En modo registro, usar empresaId temporal (será reemplazado después de crear la empresa)
-    const pago = await prisma.pago.create({
-      data: {
-        empresaId: actualEmpresaId, // temp-xxxxx en modo registro, será actualizado después
-        referenciaPago,
-        estado: "PENDIENTE",
-        monto: montoTotal,
-        tipoPlan,
-        usuariosAdicionales,
-      },
-    });
+    // Guardar referencia de pago en base de datos (solo si no es modo registro)
+    // En modo registro, guardamos después de crear la empresa
+    if (!isRegistration) {
+      const pago = await prisma.pago.create({
+        data: {
+          empresaId: actualEmpresaId,
+          referenciaPago,
+          estado: "PENDIENTE",
+          monto: montoTotal,
+          tipoPlan,
+          usuariosAdicionales,
+        },
+      });
+    }
 
     return reply.send({
       success: true,
