@@ -134,8 +134,6 @@ export async function crearCheckout(
         monto: montoTotal,
         tipoPlan,
         usuariosAdicionales,
-        // Guardar email para identificar el pago en modo registro
-        email: userEmail,
       },
     });
 
