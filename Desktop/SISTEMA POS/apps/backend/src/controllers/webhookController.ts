@@ -225,23 +225,53 @@ function calcularFechaVencimiento(tipoPlan: string): Date {
 }
 
 /**
- * Validar firma del webhook (HMAC-SHA256)
+ * Validar firma del webhook de Wompi (HMAC-SHA256)
+ * Wompi usa: SHA256(${id}${status}${amount_in_cents}${timestamp}${WOMPI_EVENTS_SECRET})
  */
 function validarSignatureWebhook(payload: any, signature: string): boolean {
   try {
-    const secret = process.env.WOMPI_INTEGRITY_SECRET || "";
-    if (!secret) {
-      console.warn("⚠️ WOMPI_INTEGRITY_SECRET no configurada");
+    const eventsSecret = process.env.WOMPI_EVENTS_SECRET || "";
+    if (!eventsSecret) {
+      console.warn("⚠️ WOMPI_EVENTS_SECRET no configurada - signature no puede validarse");
       return false;
     }
 
-    const payloadString = JSON.stringify(payload);
+    // Extraer datos de la transacción
+    const { data } = payload;
+    if (!data || !data.id || !data.status || data.amount_in_cents === undefined) {
+      console.warn("⚠️ Datos incompletos en webhook para validar firma");
+      return false;
+    }
+
+    // El timestamp viene en el header x-timestamp de Wompi
+    // Por ahora, si no lo tenemos, permitimos continuar (puede venir en data también)
+    const timestamp = data.timestamp || (Date.now() / 1000).toString();
+
+    // Construcción exacta según Wompi:
+    // ${transaction.id}${transaction.status}${transaction.amount_in_cents}${timestamp}${WOMPI_EVENTS_SECRET}
+    const dataToSign = `${data.id}${data.status}${data.amount_in_cents}${timestamp}${eventsSecret}`;
+
     const expectedSignature = crypto
-      .createHmac("sha256", secret)
-      .update(payloadString)
+      .createHash("sha256")
+      .update(dataToSign)
       .digest("hex");
 
-    return signature === expectedSignature;
+    console.log("🔐 Validación de firma webhook:");
+    console.log(`  - ID: ${data.id}`);
+    console.log(`  - Status: ${data.status}`);
+    console.log(`  - Amount: ${data.amount_in_cents}`);
+    console.log(`  - Timestamp: ${timestamp}`);
+    console.log(`  - Firma recibida: ${signature?.substring(0, 20)}...`);
+    console.log(`  - Firma esperada: ${expectedSignature.substring(0, 20)}...`);
+
+    const esValida = signature === expectedSignature;
+    if (!esValida) {
+      console.warn("⚠️ Firma de webhook inválida - pero continuamos procesando");
+    } else {
+      console.log("✅ Firma de webhook válida");
+    }
+
+    return esValida;
   } catch (error) {
     console.error("Error validando signature:", error);
     return false;
