@@ -86,8 +86,8 @@ export class WompiService {
       console.log("  Referencia:", referenciaPago);
       console.log("  Moneda: COP");
 
-      // Usar Wompi Link (no transacción directa)
-      const checkoutUrl = `https://checkout.wompi.co/l/${this.publicKey}?currency=COP&amount_in_cents=${monto}&reference=${referenciaPago}`;
+      // Usar Wompi Web Checkout dinámico (/p/ con parámetros)
+      const checkoutUrl = `https://checkout.wompi.co/p/?public-key=${this.publicKey}&currency=COP&amount-in-cents=${monto}&reference=${referenciaPago}`;
 
       console.log("🔗 Checkout URL:", checkoutUrl);
       console.log(`✓ Checkout Wompi creado: ${referenciaPago}`);
