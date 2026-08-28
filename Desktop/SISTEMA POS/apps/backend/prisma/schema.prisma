@@ -1146,7 +1146,6 @@ model Pago {
 
   metodoPago        String         @default("Wompi")
   transaccionId     String?
-  email             String?
 
   fechaPago         DateTime?
   respuestaPayU     String?
