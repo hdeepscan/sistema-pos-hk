@@ -48,6 +48,7 @@ enum TipoPlan {
   MENSUAL
   TRIMESTRAL
   ANUAL
+  USUARIOS_ADICIONALES
 }
 
 enum EstadoLicencia {
