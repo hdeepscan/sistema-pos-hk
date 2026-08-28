@@ -81,9 +81,19 @@ export class WompiService {
       return "";
     }
 
+    // Concatenar exactamente: referencia + monto + moneda + secret
     const datos = `${referencia}${montoCentavos}${moneda}${this.integritySecret}`;
     const firma = crypto.createHash("sha256").update(datos).digest("hex");
-    console.log("🔐 Firma de integridad generada correctamente");
+
+    console.log("🔐 Datos para firma:", {
+      referencia,
+      montoCentavos,
+      moneda,
+      secretLength: this.integritySecret.length,
+      datosLongitud: datos.length,
+      firmaGenerada: firma.substring(0, 10) + "...",
+    });
+
     return firma;
   }
 
