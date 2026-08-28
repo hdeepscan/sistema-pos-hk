@@ -38,6 +38,45 @@ export async function rutasPagos(fastify: FastifyInstance) {
     });
   });
 
+  // TEST: Intentar crear transacción de prueba en Wompi
+  fastify.post("/pagos/test-wompi-transaction", async (request, reply) => {
+    try {
+      const axios = require("axios");
+      const privateKey = process.env.WOMPI_PRIVATE_KEY;
+
+      const testData = {
+        amount_in_cents: 4000000, // $40,000 COP
+        currency: "COP",
+        customer_email: "test@example.com",
+        reference: `TEST-${Date.now()}`,
+        description: "Test transaction",
+        redirect_url: `${process.env.API_URL || "http://localhost:4000"}/api/checkout/confirmar`,
+      };
+
+      console.log("📨 Intentando transacción de prueba con datos:", testData);
+
+      const response = await axios.post("https://api.wompi.co/v1/transactions", testData, {
+        headers: {
+          Authorization: `Bearer ${privateKey}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      return reply.send({
+        success: true,
+        wompiResponse: response.data,
+      });
+    } catch (error: any) {
+      console.error("❌ Error en transacción de prueba:", error?.response?.data || error?.message);
+      return reply.status(500).send({
+        error: "Error en transacción de prueba",
+        wompiError: error?.response?.data,
+        status: error?.response?.status,
+        message: error?.message,
+      });
+    }
+  });
+
   // Crear checkout (público - funciona para registro y usuarios autenticados)
   fastify.post("/checkout/crear", async (request, reply) => {
     return crearCheckout(request, reply);
