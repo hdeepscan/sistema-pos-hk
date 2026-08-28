@@ -156,29 +156,15 @@ async function procesarPagoAprobado(transaccion: any) {
           rol: "ADMIN",
           activo: true,
           permisos: [
-            // Ventas
-            "crear_venta",
-            "editar_venta",
-            "eliminar_venta",
-            "ventas.ver",
-            "ventas.sin_stock",
-            // Reportes
-            "ver_reportes",
-            "reportes.ver",
-            // Créditos
+            // Permisos que el frontend busca específicamente
             "creditos.administrar",
-            // Usuarios
-            "gestionar_usuarios",
             "usuarios.administrar",
-            // Productos
+            "ventas.ver",
             "productos.administrar",
-            // Clientes
             "clientes.administrar",
-            // Gastos
             "gastos.administrar",
-            // Configuración
+            "reportes.ver",
             "configuracion.administrar",
-            // Contabilidad
             "contabilidad.ver",
           ],
         },
