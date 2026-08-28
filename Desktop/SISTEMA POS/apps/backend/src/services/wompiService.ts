@@ -79,10 +79,17 @@ export class WompiService {
       const referenciaPago = datos.referenciaPago || this.generarReferenciaPago();
       const monto = Math.round(datos.monto * 100); // Wompi usa centavos
 
+      // Debug: Log datos exactos
+      console.log("📊 Datos para Wompi Link:");
+      console.log("  Public Key:", this.publicKey?.substring(0, 10) + "...");
+      console.log("  Monto (centavos):", monto);
+      console.log("  Referencia:", referenciaPago);
+      console.log("  Moneda: COP");
+
       // Usar Wompi Link (no transacción directa)
-      // Wompi Link es más simple: creas un link de pago que redirige al checkout
       const checkoutUrl = `https://checkout.wompi.co/l/${this.publicKey}?currency=COP&amount_in_cents=${monto}&reference=${referenciaPago}`;
 
+      console.log("🔗 Checkout URL:", checkoutUrl);
       console.log(`✓ Checkout Wompi creado: ${referenciaPago}`);
 
       return {
