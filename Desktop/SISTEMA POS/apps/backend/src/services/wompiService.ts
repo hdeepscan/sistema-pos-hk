@@ -108,8 +108,12 @@ export class WompiService {
         monto: datos.monto,
         tipoPlan: datos.tipoPlan,
       };
-    } catch (error) {
-      console.error("Error creando orden Wompi:", error);
+    } catch (error: any) {
+      const wompiError = error?.response?.data || error?.message;
+      console.error("❌ Error creando orden Wompi:", JSON.stringify(wompiError, null, 2));
+      console.error("Status:", error?.response?.status);
+      console.error("Email enviado:", datos.email);
+      console.error("Monto (en centavos):", Math.round(datos.monto * 100));
       throw error;
     }
   }
