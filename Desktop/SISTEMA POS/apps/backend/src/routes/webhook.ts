@@ -7,7 +7,7 @@ export async function rutasWebhook(fastify: FastifyInstance) {
    * Webhook público que recibe notificaciones de Wompi
    * Wompi envía notificaciones cuando hay cambios en transacciones
    */
-  fastify.post("/wompi-webhook", async (request, reply) => {
+  fastify.post("/api/wompi-webhook", async (request, reply) => {
     return webhookWompi(request, reply);
   });
 }
