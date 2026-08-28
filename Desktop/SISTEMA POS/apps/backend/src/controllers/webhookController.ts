@@ -18,6 +18,8 @@ export async function webhookWompi(request: FastifyRequest, reply: FastifyReply)
     const { event, data } = body;
 
     console.log("📨 Webhook Wompi recibido:", event);
+    console.log("📊 Data status:", data?.status);
+    console.log("📋 Data keys:", Object.keys(data || {}));
 
     // Validar firma del webhook (opcional pero recomendado)
     const signature = (request.headers["x-signature"] as string) || "";
@@ -27,8 +29,12 @@ export async function webhookWompi(request: FastifyRequest, reply: FastifyReply)
     }
 
     // Solo procesar transacciones aprobadas
+    console.log(`🔍 Condición check: event=${event}, status=${data?.status}`);
     if (event === "transaction.updated" && data?.status === "APPROVED") {
+      console.log("✅ Ejecutando procesarPagoAprobado...");
       await procesarPagoAprobado(data);
+    } else {
+      console.log(`⏭️ No procesa: event no es transaction.updated O status no es APPROVED`);
     }
 
     // Wompi espera un 200 OK
