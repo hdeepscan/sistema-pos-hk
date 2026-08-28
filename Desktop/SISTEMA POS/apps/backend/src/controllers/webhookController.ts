@@ -146,7 +146,7 @@ async function procesarPagoAprobado(transaccion: any) {
       // 2a. Hashear contraseña
       const passwordHash = await bcrypt.hash(adminPassword, 10);
 
-      // 2b. Crear usuario admin
+      // 2b. Crear usuario admin con todos los permisos
       usuario = await prisma.usuario.create({
         data: {
           empresaId: empresa.id,
@@ -156,11 +156,30 @@ async function procesarPagoAprobado(transaccion: any) {
           rol: "ADMIN",
           activo: true,
           permisos: [
+            // Ventas
             "crear_venta",
             "editar_venta",
             "eliminar_venta",
+            "ventas.ver",
+            "ventas.sin_stock",
+            // Reportes
             "ver_reportes",
+            "reportes.ver",
+            // Créditos
+            "creditos.administrar",
+            // Usuarios
             "gestionar_usuarios",
+            "usuarios.administrar",
+            // Productos
+            "productos.administrar",
+            // Clientes
+            "clientes.administrar",
+            // Gastos
+            "gastos.administrar",
+            // Configuración
+            "configuracion.administrar",
+            // Contabilidad
+            "contabilidad.ver",
           ],
         },
       });
