@@ -4,6 +4,8 @@
 
 import type { FastifyInstance } from "fastify";
 import axios from "axios";
+import { PrismaClient } from "@prisma/client";
+import { Decimal } from "@prisma/client/runtime/library";
 import {
   obtenerPlanes,
   crearCheckout,
@@ -12,6 +14,8 @@ import {
   obtenerEstadoPago,
 } from "../controllers/checkoutController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
+
+const prisma = new PrismaClient();
 
 export async function rutasPagos(fastify: FastifyInstance) {
   // Rutas públicas (sin autenticación)
@@ -22,6 +26,68 @@ export async function rutasPagos(fastify: FastifyInstance) {
   // Webhook de Wompi (público)
   fastify.post("/pagos/webhook", async (request, reply) => {
     return webhookPago(request, reply);
+  });
+
+  // TEST: Seed de planes de pago (temporal - solo para testing)
+  fastify.get("/pagos/seed", async (request, reply) => {
+    try {
+      const planesExistentes = await prisma.precioPlan.findMany();
+
+      if (planesExistentes.length > 0) {
+        return reply.send({
+          mensaje: "Los planes ya existen",
+          planes: planesExistentes,
+        });
+      }
+
+      const planes = [
+        {
+          tipoPlan: "MENSUAL",
+          precio: new Decimal(40000),
+          descuento: new Decimal(0),
+          precioFinal: new Decimal(40000),
+          diasDuracion: 30,
+          precioXUsuarioAdicional: new Decimal(5000),
+          activo: true,
+        },
+        {
+          tipoPlan: "TRIMESTRAL",
+          precio: new Decimal(110000),
+          descuento: new Decimal(0),
+          precioFinal: new Decimal(110000),
+          diasDuracion: 90,
+          precioXUsuarioAdicional: new Decimal(5000),
+          activo: true,
+        },
+        {
+          tipoPlan: "ANUAL",
+          precio: new Decimal(360000),
+          descuento: new Decimal(0),
+          precioFinal: new Decimal(360000),
+          diasDuracion: 365,
+          precioXUsuarioAdicional: new Decimal(5000),
+          activo: true,
+        },
+      ];
+
+      const planesCreados = [];
+      for (const plan of planes) {
+        const created = await prisma.precioPlan.create({
+          data: plan as any,
+        });
+        planesCreados.push(created);
+      }
+
+      return reply.send({
+        mensaje: "✅ Planes creados exitosamente",
+        planesCreados,
+      });
+    } catch (error: any) {
+      return reply.status(500).send({
+        error: "Error creando planes",
+        detalle: error?.message,
+      });
+    }
   });
 
   // TEST: Verificar credenciales de Wompi
