@@ -9,7 +9,14 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
     // Obtener token del header
     const authHeader = request.headers.authorization;
 
+    console.log(`🔐 Auth middleware - Ruta: ${request.method} ${request.url}`);
+    console.log(`🔐 Auth header presente: ${authHeader ? "SÍ" : "NO"}`);
+    if (authHeader) {
+      console.log(`🔐 Auth header válido: ${authHeader.startsWith("Bearer ") ? "SÍ" : "NO"}`);
+    }
+
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      console.warn(`⚠️ Auth falló: Header inválido - ${authHeader ? "no empieza con 'Bearer '" : "vacío"}`);
       return reply.status(401).send({ error: "No autorizado" });
     }
 

@@ -51,12 +51,19 @@ export async function crearCheckoutUsuarios(
   reply: FastifyReply
 ) {
   try {
+    console.log(`\n🛒 POST /checkout/usuarios-adicionales`);
     const usuario = (request as any).usuario;
     const empresaId = (request as any).empresaId;
     const { cantidadUsuarios, datosUsuario } = request.body as any;
 
+    console.log(`  Usuario autenticado: ${usuario ? usuario.email : "NO"}`);
+    console.log(`  empresaId: ${empresaId || "NO"}`);
+    console.log(`  cantidadUsuarios: ${cantidadUsuarios}`);
+    console.log(`  datosUsuario.nombre: ${datosUsuario?.nombre || "NO"}`);
+
     // Validar autenticación
     if (!usuario || !empresaId) {
+      console.warn(`  ❌ Falló autenticación: usuario=${!!usuario}, empresaId=${!!empresaId}`);
       return reply.status(401).send({ error: "No autenticado" });
     }
 
