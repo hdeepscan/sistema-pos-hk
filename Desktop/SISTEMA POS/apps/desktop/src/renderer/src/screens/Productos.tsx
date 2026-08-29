@@ -942,7 +942,13 @@ function EtiquetaCard({ producto, onActualizado }: { producto: ProductoDetalle; 
       setEditando(null);
       onActualizado();
     } catch (err: any) {
-      setError(mensajeError(err, "No se pudo guardar el codigo"));
+      // ✅ NUEVO: Detectar error específico de código de barras duplicado
+      if (err?.response?.status === 409 && err?.response?.data?.codigo === "CODIGO_BARRAS_DUPLICADO") {
+        setError("❌ Error: Este código de barras ya existe. Intenta con uno distinto.");
+        console.warn(`⚠️ Código de barras duplicado intentado: ${valor}`);
+      } else {
+        setError(mensajeError(err, "No se pudo guardar el codigo"));
+      }
     } finally {
       setOcupado(false);
     }
@@ -954,12 +960,23 @@ function EtiquetaCard({ producto, onActualizado }: { producto: ProductoDetalle; 
     try {
       for (const u of unidades) {
         if (!u.codigoBarras) {
-          await api.patch(`/productos/${u.id}`, { codigoBarras: generarSKUCorto() });
+          try {
+            await api.patch(`/productos/${u.id}`, { codigoBarras: generarSKUCorto() });
+          } catch (err: any) {
+            // ✅ NUEVO: Si hay duplicado al generar, al menos no fallar todo
+            if (err?.response?.status === 409 && err?.response?.data?.codigo === "CODIGO_BARRAS_DUPLICADO") {
+              console.warn(`⚠️ No se pudo generar código único para producto ${u.id}: código duplicado`);
+              // Intentar generar otro
+              await api.patch(`/productos/${u.id}`, { codigoBarras: generarSKUCorto() });
+            } else {
+              throw err;
+            }
+          }
         }
       }
       onActualizado();
     } catch (err: any) {
-      setError(mensajeError(err, "No se pudieron generar los codigos"));
+      setError(mensajeError(err, "No se pudieron generar los codigos. Algunos productos pueden tener códigos de barras duplicados."));
     } finally {
       setOcupado(false);
     }

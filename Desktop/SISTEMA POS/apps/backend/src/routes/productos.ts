@@ -943,12 +943,33 @@ export async function productosRoutes(app: FastifyInstance) {
     if (!producto) return reply.code(404).send({ error: "Producto no encontrado" });
 
     const { sucursalIds, ...datosProducto } = parsed.data;
+
+    // Validar SKU único
     if (datosProducto.sku && datosProducto.sku !== producto.sku) {
       const choca = await prisma.producto.findUnique({
         where: { empresaId_sku: { empresaId, sku: datosProducto.sku } },
       });
       if (choca) return reply.code(409).send({ error: "Ya existe otro producto con ese SKU" });
     }
+
+    // ✅ NUEVO: Validar código de barras único
+    if (datosProducto.codigoBarras && datosProducto.codigoBarras !== producto.codigoBarras) {
+      const codigoExistente = await prisma.producto.findFirst({
+        where: {
+          empresaId,
+          codigoBarras: datosProducto.codigoBarras,
+          id: { not: id }, // Excluir el producto actual
+        },
+      });
+      if (codigoExistente) {
+        console.warn(`⚠️ Intento de código de barras duplicado: ${datosProducto.codigoBarras} (empresa: ${empresaId})`);
+        return reply.code(409).send({
+          error: "El código de barras ingresado ya está en uso por otro producto o variante.",
+          codigo: "CODIGO_BARRAS_DUPLICADO",
+        });
+      }
+    }
+
     let actualizado = await prisma.producto.update({ where: { id }, data: datosProducto });
 
     if (sucursalIds !== undefined) {
