@@ -944,7 +944,7 @@ function EtiquetaCard({ producto, onActualizado }: { producto: ProductoDetalle; 
     } catch (err: any) {
       // ✅ NUEVO: Detectar error específico de código de barras duplicado
       if (err?.response?.status === 409 && err?.response?.data?.codigo === "CODIGO_BARRAS_DUPLICADO") {
-        setError("❌ Error: Este código de barras ya existe. Intenta con uno distinto.");
+        setError("Este código de barras ya existe. Intenta con uno distinto.");
         console.warn(`⚠️ Código de barras duplicado intentado: ${valor}`);
       } else {
         setError(mensajeError(err, "No se pudo guardar el codigo"));
@@ -1188,7 +1188,21 @@ function EtiquetaCard({ producto, onActualizado }: { producto: ProductoDetalle; 
           {imprimiendo ? "Imprimiendo..." : `Imprimir ${totalEtiquetas} etiqueta${totalEtiquetas === 1 ? "" : "s"}`}
         </button>
         {mensaje && <span className="badge success">{mensaje}</span>}
-        {error && <span className="error-text">{error}</span>}
+        {error && (
+          <div
+            style={{
+              padding: "8px 12px",
+              borderRadius: "6px",
+              background: "#fee2e2",
+              border: "1px solid #fecaca",
+              color: "#991b1b",
+              fontSize: "13px",
+              fontWeight: 500,
+            }}
+          >
+            {error}
+          </div>
+        )}
       </div>
     </div>
   );
