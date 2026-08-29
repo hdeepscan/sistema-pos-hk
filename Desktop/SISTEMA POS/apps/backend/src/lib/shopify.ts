@@ -405,18 +405,25 @@ export async function ajustarInventarioEnShopify(
   locationId: string,
   delta: number
 ): Promise<void> {
-  const { token, shopDomain } = await obtenerAccessToken(empresaId);
-  const res = await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/inventory_levels/adjust.json`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": token },
-    body: JSON.stringify({
-      location_id: Number(locationId),
-      inventory_item_id: Number(inventoryItemId),
-      available_adjustment: delta,
-    }),
-  });
-  if (!res.ok) {
-    throw new Error(`No se pudo ajustar el inventario en Shopify (${res.status}): ${await res.text()}`);
+  // ✅ NUEVO: Usar el sistema de cola de sincronización
+  // en lugar de llamar directamente a Shopify (evita rate limits)
+  const { ShopifySyncService } = await import("./shopify-sync-service.js");
+  const syncService = new ShopifySyncService(empresaId);
+
+  try {
+    // Agregar a cola para procesarse de forma asincrónica
+    await syncService.agregarACola("ACTUALIZAR_INVENTARIO", {
+      shopifyInventoryItemId: inventoryItemId,
+      shopifyLocationId: locationId,
+      cantidad: delta, // Este será el delta que procesa el worker
+    });
+
+    console.log(
+      `[shopify] Ajuste de inventario encolado: Item=${inventoryItemId}, Delta=${delta}`
+    );
+  } catch (error) {
+    console.error(`[shopify] Error encolando ajuste de inventario:`, error);
+    throw error;
   }
 }
 

@@ -1006,6 +1006,39 @@ export async function productosRoutes(app: FastifyInstance) {
       });
     }
 
+    // ✅ NUEVO: Sincronizar cambios de producto con Shopify (nombre, precio, código)
+    if (actualizado.shopifyProductId && Object.keys(datosProducto).length > 0) {
+      try {
+        const { ShopifySyncService } = await import("../lib/shopify-sync-service.js");
+        const syncService = new ShopifySyncService(empresaId);
+
+        // Detectar qué campos cambiaron y fueron editados
+        const cambios = Object.keys(datosProducto).reduce(
+          (acc, key) => {
+            if (datosProducto[key] !== (producto as any)[key]) {
+              acc[key] = datosProducto[key];
+            }
+            return acc;
+          },
+          {} as Record<string, any>
+        );
+
+        if (Object.keys(cambios).length > 0) {
+          console.log(`[Sync] Producto editado, encolando sincronización: ${cambios}`);
+          await syncService.actualizarProductoEnShopify({
+            shopifyProductId: actualizado.shopifyProductId,
+            shopifyVariantId: actualizado.shopifyVariantId || undefined,
+            nombre: actualizado.nombre,
+            precio: Number(actualizado.precio),
+            codigoBarras: actualizado.codigoBarras || undefined,
+          });
+        }
+      } catch (error) {
+        console.warn(`[Sync] No se pudo encolar sincronización de producto:`, error);
+        // No fallar la solicitud si falla la sincronización
+      }
+    }
+
     return actualizado;
   });
 

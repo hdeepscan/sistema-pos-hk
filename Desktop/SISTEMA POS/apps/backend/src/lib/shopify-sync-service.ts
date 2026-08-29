@@ -123,14 +123,12 @@ export class ShopifySyncService {
 
       // Procesar según el tipo de cambio
       switch (cambio.tipo) {
+        case "ACTUALIZAR_INVENTARIO":
         case "INVENTORY_UPDATE":
           await this.sincronizarInventario(datos);
           break;
 
-        case "PRICE_UPDATE":
-          await this.sincronizarPrecio(datos);
-          break;
-
+        case "ACTUALIZAR_PRODUCTO":
         case "PRODUCT_UPDATE":
           await this.sincronizarProducto(datos);
           break;
