@@ -575,10 +575,15 @@ export async function shopifyRoutes(app: FastifyInstance) {
 
       // Webhooks a registrar
       const webhooks = [
-        { topic: "products/update", address: `${webhookUrl}/shopify/webhooks/products/update` },
-        { topic: "inventory_levels/update", address: `${webhookUrl}/shopify/webhooks/inventory/update` },
-        { topic: "orders/create", address: `${webhookUrl}/shopify/webhooks/orders/create` },
-        { topic: "orders/update", address: `${webhookUrl}/shopify/webhooks/orders/update` },
+        // ✅ NUEVO: Crear productos desde Shopify
+        { topic: "products/create", address: `${webhookUrl}/shopify/webhooks` },
+        // Actualizar productos (nombre, descripción, estado)
+        { topic: "products/update", address: `${webhookUrl}/shopify/webhooks` },
+        // ✅ CORREGIDO: Sincronizar niveles de inventario
+        { topic: "inventory_levels/update", address: `${webhookUrl}/shopify/webhooks` },
+        // Procesar órdenes desde Shopify
+        { topic: "orders/create", address: `${webhookUrl}/shopify/webhooks` },
+        { topic: "orders/updated", address: `${webhookUrl}/shopify/webhooks` },
       ];
 
       const { ShopifyGraphQLClient } = await import("../lib/shopify-graphql.js");

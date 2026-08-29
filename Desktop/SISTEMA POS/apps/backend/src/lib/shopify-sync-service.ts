@@ -380,12 +380,16 @@ export class ShopifySyncService {
 
       // Procesar según el tipo de evento
       switch (payload.type) {
+        case "products/create":
+          await this.procesarProductoCreate(payload.data);
+          break;
+
         case "products/update":
           await this.procesarProductoUpdate(payload.data);
           break;
 
-        case "inventory_items/update":
-          await this.procesarInventoryItemUpdate(payload.data);
+        case "inventory_levels/update":
+          await this.procesarInventoryLevelUpdate(payload.data);
           break;
 
         case "orders/create":
@@ -447,19 +451,140 @@ export class ShopifySyncService {
   }
 
   /**
-   * Procesar webhook de actualización de inventory item
+   * Procesar webhook de creación de producto en Shopify
+   * Crea el producto base + todas sus variantes en POS
    */
-  private async procesarInventoryItemUpdate(data: Record<string, any>): Promise<void> {
-    console.log(`[Webhook] Inventory item actualizado en Shopify:`, data.id);
+  private async procesarProductoCreate(data: Record<string, any>): Promise<void> {
+    console.log(`[Webhook] Nuevo producto creado en Shopify:`, data.id, data.title);
 
-    const shopifyInventoryItemId = String(data.id);
+    try {
+      const shopifyProductId = String(data.id);
+      const shopifyGid = data.admin_graphql_api_id;
 
-    // TODO: Actualizar ShopifyInventoryItem con los nuevos datos
-    // TODO: Sincronizar niveles de stock desde Shopify
+      // Verificar si ya existe
+      const productoExistente = await prisma.producto.findFirst({
+        where: {
+          empresaId: this.empresaId,
+          shopifyProductId,
+        },
+      });
 
-    console.log(
-      `[Webhook] Sincronizando inventory levels para item: ${shopifyInventoryItemId}`
-    );
+      if (productoExistente) {
+        console.log(`[Webhook] Producto ya existe en POS: ${shopifyProductId}`);
+        return;
+      }
+
+      // Crear producto base
+      const producto = await prisma.producto.create({
+        data: {
+          empresaId: this.empresaId,
+          sku: `SKU-${shopifyProductId}`,
+          nombre: data.title,
+          descripcion: data.body_html || null,
+          activo: data.status === "active",
+          shopifyProductId,
+          precio: 0, // Se actualiza con variantes
+          costo: 0,
+        },
+      });
+
+      console.log(`[Webhook] Producto creado en POS: ${producto.id}`);
+
+      // Crear variantes
+      if (data.variants && data.variants.length > 0) {
+        for (const variant of data.variants) {
+          await prisma.producto.create({
+            data: {
+              empresaId: this.empresaId,
+              nombre: data.title,
+              sku: variant.sku || `SKU-${variant.id}`,
+              precio: parseFloat(variant.price || "0"),
+              costo: 0,
+              activo: data.status === "active",
+              shopifyProductId: shopifyProductId,
+              shopifyVariantId: String(variant.id),
+              shopifyInventoryItemId: variant.inventory_item_id ? String(variant.inventory_item_id) : null,
+              varianteTitulo: variant.title,
+            },
+          });
+
+          console.log(`[Webhook] Variante creada: ${variant.sku || variant.title}`);
+        }
+      }
+    } catch (error) {
+      console.error(`[Webhook Error] Error creando producto desde Shopify:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Procesar webhook de actualización de inventario desde Shopify
+   * Sincroniza los niveles de stock hacia el POS
+   */
+  private async procesarInventoryLevelUpdate(data: Record<string, any>): Promise<void> {
+    console.log(`[Webhook] Inventory level actualizado en Shopify:`, data.inventory_item_id);
+
+    try {
+      const shopifyInventoryItemId = String(data.inventory_item_id);
+      const shopifyLocationId = String(data.location_id);
+      const nuevoStock = data.available || 0;
+
+      // Buscar variante con este inventory_item_id
+      const variante = await prisma.producto.findFirst({
+        where: {
+          empresaId: this.empresaId,
+          shopifyInventoryItemId,
+        },
+        include: { inventario: true },
+      });
+
+      if (!variante) {
+        console.log(`[Webhook] Variante no encontrada para inventory_item: ${shopifyInventoryItemId}`);
+        return;
+      }
+
+      // Actualizar stock en sucursal (por defecto, la primera activa)
+      const sucursales = await prisma.sucursal.findMany({
+        where: { empresaId: this.empresaId, activo: true },
+        orderBy: { creadoEn: "asc" },
+        take: 1,
+      });
+
+      if (sucursales.length === 0) {
+        console.warn(`[Webhook] No hay sucursales activas para actualizar stock`);
+        return;
+      }
+
+      const sucursal = sucursales[0];
+
+      // Buscar o crear inventario de la sucursal
+      const inventario = await prisma.inventarioSucursal.findFirst({
+        where: {
+          productoId: variante.id,
+          sucursalId: sucursal.id,
+        },
+      });
+
+      if (inventario) {
+        await prisma.inventarioSucursal.update({
+          where: { id: inventario.id },
+          data: { cantidad: nuevoStock },
+        });
+      } else {
+        await prisma.inventarioSucursal.create({
+          data: {
+            productoId: variante.id,
+            sucursalId: sucursal.id,
+            cantidad: nuevoStock,
+          },
+        });
+      }
+
+      console.log(`[Webhook] Stock sincronizado: ${variante.sku} = ${nuevoStock}`);
+    } catch (error) {
+      console.error(`[Webhook Error] Error sincronizando inventory level:`, error);
+      throw error;
+    }
   }
 
   /**
@@ -538,6 +663,99 @@ export class ShopifySyncService {
       }
     } catch (error) {
       console.error(`[Webhook] ❌ Error procesando orden:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ NUEVO: Sincronizar inventario del POS hacia Shopify
+   * Cuando se vende, devuelve o ajusta stock en POS, actualizar en Shopify
+   */
+  async actualizarInventarioEnShopify(
+    variante: { shopifyInventoryItemId?: string; sku: string; nombre: string },
+    nuevoStock: number,
+    shopifyLocationId?: string
+  ): Promise<void> {
+    if (!this.client) {
+      console.warn(`[Sync] No hay cliente Shopify configurado`);
+      return;
+    }
+
+    if (!variante.shopifyInventoryItemId) {
+      console.warn(`[Sync] Variante sin shopifyInventoryItemId: ${variante.sku}`);
+      return;
+    }
+
+    try {
+      console.log(`[Sync] Actualizando inventario en Shopify: ${variante.sku} = ${nuevoStock}`);
+
+      // Usar query GraphQL para actualizar inventory level
+      const query = `
+        mutation updateInventoryLevel($input: InventoryLevelAdjustQuantityInput!) {
+          inventoryLevelAdjustQuantity(input: $input) {
+            inventoryLevel {
+              available
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+      `;
+
+      // Por ahora, agregar a cola para procesarse después
+      await this.agregarACola("ACTUALIZAR_INVENTARIO", {
+        shopifyInventoryItemId: variante.shopifyInventoryItemId,
+        shopifyLocationId: shopifyLocationId || "gid://shopify/Location/1",
+        nuevoStock,
+      });
+
+      console.log(`[Sync] ✅ Actualización de inventario en cola: ${variante.sku}`);
+    } catch (error) {
+      console.error(`[Sync Error] Error actualizando inventario en Shopify:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ NUEVO: Sincronizar cambios de producto del POS hacia Shopify
+   * Cuando se edita nombre, precio o código de barras en POS
+   */
+  async actualizarProductoEnShopify(
+    producto: {
+      shopifyProductId?: string;
+      shopifyVariantId?: string;
+      nombre: string;
+      precio: number;
+      codigoBarras?: string | null;
+    }
+  ): Promise<void> {
+    if (!this.client) {
+      console.warn(`[Sync] No hay cliente Shopify configurado`);
+      return;
+    }
+
+    if (!producto.shopifyProductId) {
+      console.warn(`[Sync] Producto sin shopifyProductId`);
+      return;
+    }
+
+    try {
+      console.log(`[Sync] Actualizando producto en Shopify: ${producto.nombre}`);
+
+      // Agregar a cola para procesarse después
+      await this.agregarACola("ACTUALIZAR_PRODUCTO", {
+        shopifyProductId: producto.shopifyProductId,
+        shopifyVariantId: producto.shopifyVariantId || null,
+        nombre: producto.nombre,
+        precio: producto.precio,
+        codigoBarras: producto.codigoBarras,
+      });
+
+      console.log(`[Sync] ✅ Actualización de producto en cola: ${producto.nombre}`);
+    } catch (error) {
+      console.error(`[Sync Error] Error actualizando producto en Shopify:`, error);
       throw error;
     }
   }
