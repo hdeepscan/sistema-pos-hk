@@ -28,7 +28,7 @@ function CampoPassword({
         onChange={(e) => onChange(e.target.value)}
         required
         minLength={minLength}
-        className="w-full bg-white/5 border border-white/10 text-white placeholder-white/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:bg-white/10 transition-all"
+        className="w-full !bg-white/5 !border !border-white/10 !text-white placeholder-white/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:!bg-white/10 transition-all"
       />
       <button
         type="button"
@@ -165,7 +165,7 @@ export default function Login() {
                 value={empresaNombre}
                 onChange={(e) => setEmpresaNombre(e.target.value)}
                 required
-                className="w-full bg-white/5 border border-white/10 text-white placeholder-white/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:bg-white/10 transition-all"
+                className="w-full !bg-white/5 !border !border-white/10 !text-white placeholder-white/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:!bg-white/10 transition-all"
               />
               <input
                 type="text"
@@ -173,7 +173,7 @@ export default function Login() {
                 value={adminNombre}
                 onChange={(e) => setAdminNombre(e.target.value)}
                 required
-                className="w-full bg-white/5 border border-white/10 text-white placeholder-white/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:bg-white/10 transition-all"
+                className="w-full !bg-white/5 !border !border-white/10 !text-white placeholder-white/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:!bg-white/10 transition-all"
               />
             </>
           )}
@@ -185,7 +185,7 @@ export default function Login() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="w-full bg-white/5 border border-white/10 text-white placeholder-white/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:bg-white/10 transition-all"
+            className="w-full !bg-white/5 !border !border-white/10 !text-white placeholder-white/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:!bg-white/10 transition-all"
           />
 
           {/* Password */}
@@ -204,7 +204,7 @@ export default function Login() {
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="rounded bg-white/10 border border-white/20 text-purple-500 focus:ring-purple-400"
+                  className="rounded !bg-white/10 !border !border-white/20 text-purple-500 focus:ring-purple-400"
                 />
                 Recuérdame
               </label>
@@ -225,7 +225,7 @@ export default function Login() {
           <button
             type="submit"
             disabled={cargando}
-            className="w-full bg-gradient-to-r from-[#8b5cf6] to-[#a855f7] text-white font-semibold rounded-xl py-3.5 shadow-lg hover:shadow-purple-500/30 hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full !bg-gradient-to-r !from-[#8b5cf6] !to-[#a855f7] !text-white font-semibold rounded-xl py-3.5 shadow-lg hover:shadow-purple-500/30 hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {cargando
               ? modo === "login"
@@ -249,7 +249,7 @@ export default function Login() {
             <div className="flex gap-4">
               <button
                 type="button"
-                className="flex-1 flex items-center justify-center gap-2 bg-white/5 border border-white/10 text-white font-medium rounded-xl py-2.5 hover:bg-white/10 transition-all"
+                className="flex-1 flex items-center justify-center gap-2 !bg-white/5 !border !border-white/10 !text-white font-medium rounded-xl py-2.5 hover:!bg-white/10 transition-all"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -261,7 +261,7 @@ export default function Login() {
               </button>
               <button
                 type="button"
-                className="flex-1 flex items-center justify-center gap-2 bg-white/5 border border-white/10 text-white font-medium rounded-xl py-2.5 hover:bg-white/10 transition-all"
+                className="flex-1 flex items-center justify-center gap-2 !bg-white/5 !border !border-white/10 !text-white font-medium rounded-xl py-2.5 hover:!bg-white/10 transition-all"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M17.05 13.5c-.91 0-1.74.46-2.21 1.16-.47.71-.47 1.63 0 2.34.47.7 1.3 1.16 2.21 1.16.91 0 1.74-.46 2.21-1.16.47-.71.47-1.63 0-2.34-.47-.7-1.3-1.16-2.21-1.16zm-11 0c-.91 0-1.74.46-2.21 1.16-.47.71-.47 1.63 0 2.34.47.7 1.3 1.16 2.21 1.16.91 0 1.74-.46 2.21-1.16.47-.71.47-1.63 0-2.34-.47-.7-1.3-1.16-2.21-1.16zM5.5 2C4.12 2 3 3.12 3 4.5v15C3 20.88 4.12 22 5.5 22h13c1.38 0 2.5-1.12 2.5-2.5v-15C21 3.12 19.88 2 18.5 2h-13zM6 17h12v2H6v-2zm0-5h12v2H6v-2z" />
