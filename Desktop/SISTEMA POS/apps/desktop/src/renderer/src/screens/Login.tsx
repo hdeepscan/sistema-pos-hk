@@ -7,7 +7,6 @@ import { IconoOjo, IconoOjoTachado } from "../lib/iconos";
 import { electronAPI } from "../lib/electron-api";
 import CheckoutPage from "./CheckoutPage";
 
-// Campo de contraseña con boton de ojo para ver/ocultar
 function CampoPassword({
   value,
   onChange,
@@ -34,7 +33,6 @@ function CampoPassword({
       <button
         type="button"
         onClick={() => setVer(!ver)}
-        title={ver ? "Ocultar contraseña" : "Ver contraseña"}
         className="absolute right-4 top-3.5 text-white/50 cursor-pointer hover:text-white transition-colors"
       >
         {ver ? <IconoOjoTachado size={18} /> : <IconoOjo size={18} />}
@@ -119,16 +117,31 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-[url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2000&auto=format&fit=crop')] bg-cover bg-center">
-      {/* TARJETA DE CRISTAL (GLASS CARD) */}
+    <div
+      className="min-h-screen w-full flex items-center justify-center overflow-hidden"
+      style={{
+        background: "linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #4facfe 75%, #00f2fe 100%)",
+        backgroundSize: "400% 400%",
+        animation: "gradient-shift 15s ease infinite",
+      }}
+    >
+      <style>{`
+        @keyframes gradient-shift {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+      `}</style>
+
+      {/* GLASS CARD - Contenedor principal centrado */}
       <div className="w-full max-w-md p-8 sm:p-10 rounded-[26px] bg-white/10 backdrop-blur-[24px] backdrop-saturate-[1.35] border border-white/20 shadow-[0_8px_32px_0_rgba(0,0,0,0.36)] mx-4">
 
-        {/* Textos Principales */}
+        {/* Header */}
         <div className="mb-8 text-center">
           <div className="flex justify-center mb-4">
-            <img src={logo} alt="Sistema POS HK" className="h-14" />
+            <img src={logo} alt="Sistema POS HK" className="h-16 w-auto" />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-1">
+          <h1 className="text-3xl font-bold text-white mb-2">
             {modo === "login" ? "Welcome back" : "Bienvenido"}
           </h1>
           <p className="text-white/70 text-sm">
@@ -138,10 +151,12 @@ export default function Login() {
           </p>
         </div>
 
-        {/* Formulario */}
-        <form className="flex flex-col gap-4" onSubmit={modo === "login" ? handleLogin : handleRegistro}>
-
-          {/* Registro: Campos adicionales */}
+        {/* Form */}
+        <form
+          className="flex flex-col gap-4"
+          onSubmit={modo === "login" ? handleLogin : handleRegistro}
+        >
+          {/* Registro only fields */}
           {modo === "registro" && (
             <>
               <input
@@ -163,7 +178,7 @@ export default function Login() {
             </>
           )}
 
-          {/* Input Email */}
+          {/* Email */}
           <input
             type="email"
             placeholder={modo === "login" ? "Email o usuario" : "Tu email"}
@@ -173,7 +188,7 @@ export default function Login() {
             className="w-full bg-white/5 border border-white/10 text-white placeholder-white/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:bg-white/10 transition-all"
           />
 
-          {/* Input Password */}
+          {/* Password */}
           <CampoPassword
             placeholder="Contraseña"
             value={password}
@@ -181,7 +196,7 @@ export default function Login() {
             minLength={modo === "registro" ? 8 : undefined}
           />
 
-          {/* Login: Opciones extra */}
+          {/* Remember me & Forgot password (Login only) */}
           {modo === "login" && (
             <div className="flex items-center justify-between text-sm text-white/70 mt-1 mb-2">
               <label className="flex items-center gap-2 cursor-pointer hover:text-white transition-colors">
@@ -189,7 +204,7 @@ export default function Login() {
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="rounded bg-white/10 border-white/20 text-purple-500 focus:ring-purple-400"
+                  className="rounded bg-white/10 border border-white/20 text-purple-500 focus:ring-purple-400"
                 />
                 Recuérdame
               </label>
@@ -199,14 +214,14 @@ export default function Login() {
             </div>
           )}
 
-          {/* Error Message */}
+          {/* Error */}
           {error && (
             <div className="p-3 bg-red-500/20 border border-red-500/30 rounded-xl text-red-200 text-sm text-center">
               {error}
             </div>
           )}
 
-          {/* Botón Principal */}
+          {/* Submit Button */}
           <button
             type="submit"
             disabled={cargando}
@@ -222,7 +237,7 @@ export default function Login() {
           </button>
         </form>
 
-        {/* Separador (solo en Login) */}
+        {/* Divider & Socials (Login only) */}
         {modo === "login" && (
           <>
             <div className="flex items-center gap-3 my-6">
@@ -231,7 +246,6 @@ export default function Login() {
               <div className="flex-1 h-px bg-white/10"></div>
             </div>
 
-            {/* Botones Sociales (Cristal) */}
             <div className="flex gap-4">
               <button
                 type="button"
@@ -258,7 +272,7 @@ export default function Login() {
           </>
         )}
 
-        {/* Link de Registro/Login */}
+        {/* Toggle Link */}
         <p className="text-center text-sm text-white/70 mt-8">
           {modo === "login" ? (
             <>
