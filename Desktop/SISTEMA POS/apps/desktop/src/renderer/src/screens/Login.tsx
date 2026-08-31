@@ -32,10 +32,10 @@ function CampoPassword({
         minLength={minLength}
         aria-invalid={!!error}
         aria-describedby={error ? "password-error" : undefined}
-        className={`w-full !bg-white/5 !border !text-white placeholder-white/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:!bg-white/10 transition-all backdrop-blur-sm ${
+        className={`w-full !bg-white/5 !border !border-white/10 !text-white placeholder-white/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:!bg-white/10 transition-all backdrop-blur-sm ${
           error
             ? "!border-red-400/50 focus:ring-red-400"
-            : "!border-white/10 focus:ring-amber-400"
+            : "focus:ring-amber-400"
         }`}
       />
       <button
@@ -217,8 +217,8 @@ export default function Login() {
                   }}
                   aria-invalid={!!fieldErrors.empresa}
                   aria-describedby={fieldErrors.empresa ? "empresa-error" : undefined}
-                  className={`w-full !bg-white/5 !border !text-white placeholder-white/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:!bg-white/10 transition-all backdrop-blur-sm ${
-                    fieldErrors.empresa ? "!border-red-400/50 focus:ring-red-400" : "!border-white/10 focus:ring-amber-400"
+                  className={`w-full !bg-white/5 !border !border-white/10 !text-white placeholder-white/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:!bg-white/10 transition-all backdrop-blur-sm ${
+                    fieldErrors.empresa ? "!border-red-400/50 focus:ring-red-400" : "focus:ring-amber-400"
                   }`}
                 />
                 {fieldErrors.empresa && (
@@ -239,8 +239,8 @@ export default function Login() {
                     setFieldErrors({ ...fieldErrors, admin: "" });
                   }}
                   aria-invalid={!!fieldErrors.admin}
-                  className={`w-full !bg-white/5 !border !text-white placeholder-white/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:!bg-white/10 transition-all backdrop-blur-sm ${
-                    fieldErrors.admin ? "!border-red-400/50 focus:ring-red-400" : "!border-white/10 focus:ring-amber-400"
+                  className={`w-full !bg-white/5 !border !border-white/10 !text-white placeholder-white/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:!bg-white/10 transition-all backdrop-blur-sm ${
+                    fieldErrors.admin ? "!border-red-400/50 focus:ring-red-400" : "focus:ring-amber-400"
                   }`}
                 />
               </div>
@@ -262,8 +262,8 @@ export default function Login() {
               }}
               aria-invalid={!!fieldErrors.email}
               aria-describedby={fieldErrors.email ? "email-error" : undefined}
-              className={`w-full !bg-white/5 !border !text-white placeholder-white/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:!bg-white/10 transition-all backdrop-blur-sm ${
-                fieldErrors.email ? "!border-red-400/50 focus:ring-red-400" : "!border-white/10 focus:ring-amber-400"
+              className={`w-full !bg-white/5 !border !border-white/10 !text-white placeholder-white/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:!bg-white/10 transition-all backdrop-blur-sm ${
+                fieldErrors.email ? "!border-red-400/50 focus:ring-red-400" : "focus:ring-amber-400"
               }`}
             />
             {fieldErrors.email && (
