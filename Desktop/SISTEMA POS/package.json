@@ -1,5 +1,4 @@
 {
-  "type": "module",
   "name": "sistema-pos",
   "private": true,
   "version": "0.1.0",
@@ -17,10 +16,6 @@
     "node": ">=20"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.3.3",
-    "autoprefixer": "^10.5.4",
-    "postcss": "^8.5.26",
-    "tailwindcss": "^4.3.3",
     "usb": "^3.1.0"
   }
 }
