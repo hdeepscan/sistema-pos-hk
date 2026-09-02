@@ -7,6 +7,7 @@ import { electronAPI } from "./lib/electron-api";
 import { ErrorBoundary } from "./lib/ErrorBoundary";
 import { isMobileDevice, getMobilePreference, setMobilePreference } from "./lib/mobile-detect";
 import { notif } from "./lib/notificationService";
+import { LicenseBlockOverlay } from "./components/LicenseBlockOverlay";
 import Login from "./screens/Login";
 import SeleccionSucursal from "./screens/SeleccionSucursal";
 import Layout from "./screens/Layout";
@@ -186,9 +187,14 @@ export default function App() {
   };
 
   return (
-    <Layout isMobile={isMobile} setIsMobile={toggleMobilePreference}>
-      <ErrorBoundary key={location.pathname}>
-        <Routes>
+    <>
+      {/* Bloqueo de licencia vencida - Capa superior */}
+      <LicenseBlockOverlay />
+
+      {/* UI normal del sistema */}
+      <Layout isMobile={isMobile} setIsMobile={toggleMobilePreference}>
+        <ErrorBoundary key={location.pathname}>
+          <Routes>
           <Route path="/" element={<Navigate to="/pos" replace />} />
           <Route path="/pos" element={isMobile ? <PosMobile onToggleMobile={toggleMobilePreference} /> : <Pos />} />
           <Route path="/ventas" element={<Ventas />} />
@@ -215,7 +221,8 @@ export default function App() {
           <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="*" element={<Navigate to="/pos" replace />} />
         </Routes>
-      </ErrorBoundary>
-    </Layout>
+        </ErrorBoundary>
+      </Layout>
+    </>
   );
 }
