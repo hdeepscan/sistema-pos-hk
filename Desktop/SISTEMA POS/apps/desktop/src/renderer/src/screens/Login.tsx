@@ -10,7 +10,7 @@ import CheckoutPage from "./CheckoutPage";
 const loginStyles = `
   .login-container {
     min-height: 100vh;
-    background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+    background: linear-gradient(135deg, #f0f9ff 0%, #f0fdf4 100%);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -19,46 +19,50 @@ const loginStyles = `
 
   .login-card {
     background: white;
-    border-radius: 12px;
-    padding: 32px;
-    max-width: 400px;
+    border-radius: 16px;
+    padding: 40px;
+    max-width: 420px;
     width: 100%;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(59, 130, 246, 0.1);
   }
 
   .login-logo {
     text-align: center;
-    margin-bottom: 24px;
+    margin-bottom: 32px;
   }
 
   .login-logo img {
-    height: 56px;
+    height: 64px;
     width: auto;
+    filter: drop-shadow(0 2px 8px rgba(59, 130, 246, 0.15));
   }
 
   .login-title {
-    font-size: 24px;
-    font-weight: bold;
-    color: #1f2937;
+    font-size: 28px;
+    font-weight: 700;
+    color: #0c3a7d;
     text-align: center;
     margin-bottom: 8px;
+    letter-spacing: -0.5px;
   }
 
   .login-subtitle {
     font-size: 14px;
-    color: #6b7280;
+    color: #64748b;
     text-align: center;
-    margin-bottom: 24px;
+    margin-bottom: 32px;
   }
 
   .login-error {
-    background-color: #fee2e2;
+    background: linear-gradient(135deg, #fee2e2 0%, #fef2f2 100%);
     border: 1px solid #fecaca;
-    border-radius: 8px;
-    padding: 12px;
-    margin-bottom: 16px;
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 24px;
     color: #991b1b;
     font-size: 14px;
+    font-weight: 500;
   }
 
   .login-error-list {
@@ -69,40 +73,49 @@ const loginStyles = `
 
   .login-error-list li {
     font-size: 12px;
-    margin-top: 4px;
+    margin-top: 6px;
+    opacity: 0.9;
   }
 
   .login-form {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 18px;
   }
 
   .form-group {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
   }
 
   .form-label {
     font-size: 13px;
-    font-weight: 500;
-    color: #374151;
+    font-weight: 600;
+    color: #1e293b;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
   }
 
   .form-input {
-    border: 1px solid #d1d5db;
-    border-radius: 6px;
-    padding: 10px 12px;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 12px 14px;
     font-size: 14px;
     font-family: inherit;
-    transition: all 0.2s;
+    transition: all 0.3s ease;
+    background-color: #f8fafc;
+  }
+
+  .form-input::placeholder {
+    color: #94a3b8;
   }
 
   .form-input:focus {
     outline: none;
-    border-color: #d97706;
-    box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.1);
+    border-color: #3b82f6;
+    background-color: white;
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
   }
 
   .form-input-with-icon {
@@ -111,6 +124,7 @@ const loginStyles = `
 
   .form-input-with-icon input {
     width: 100%;
+    padding-right: 40px;
   }
 
   .form-input-toggle {
@@ -121,46 +135,57 @@ const loginStyles = `
     background: none;
     border: none;
     cursor: pointer;
-    color: #6b7280;
-    padding: 4px;
+    color: #94a3b8;
+    padding: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: color 0.2s;
   }
 
   .form-input-toggle:hover {
-    color: #374151;
+    color: #3b82f6;
   }
 
   .form-error {
     font-size: 12px;
     color: #dc2626;
     margin-top: 4px;
+    font-weight: 500;
   }
 
   .submit-button {
-    background-color: #d97706;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
     color: white;
     border: none;
-    border-radius: 6px;
-    padding: 12px 16px;
+    border-radius: 10px;
+    padding: 14px 16px;
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.3s ease;
     margin-top: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
   }
 
   .submit-button:hover:not(:disabled) {
-    background-color: #b45309;
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+    transform: translateY(-2px);
+  }
+
+  .submit-button:active:not(:disabled) {
+    transform: translateY(0);
   }
 
   .submit-button:disabled {
-    opacity: 0.6;
+    opacity: 0.7;
     cursor: not-allowed;
   }
 
@@ -177,27 +202,78 @@ const loginStyles = `
     to { transform: rotate(360deg); }
   }
 
+  .login-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 24px 0;
+    color: #cbd5e1;
+  }
+
+  .login-divider::before,
+  .login-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, #cbd5e1 0%, transparent 100%);
+  }
+
+  .login-divider::after {
+    background: linear-gradient(90deg, transparent 0%, #cbd5e1 100%);
+  }
+
+  .login-divider-text {
+    font-size: 12px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
   .login-toggle {
     text-align: center;
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid #e5e7eb;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #e2e8f0;
     font-size: 13px;
-    color: #6b7280;
+    color: #64748b;
   }
 
   .login-toggle button {
     background: none;
     border: none;
-    color: #d97706;
-    font-weight: 600;
+    color: #22c55e;
+    font-weight: 700;
     cursor: pointer;
     padding: 0;
     font-size: 13px;
+    transition: color 0.2s;
+    text-decoration: underline;
   }
 
   .login-toggle button:hover {
-    color: #b45309;
+    color: #16a34a;
+  }
+
+  .login-footer {
+    text-align: center;
+    margin-top: 24px;
+    font-size: 11px;
+    color: #94a3b8;
+  }
+
+  @media (max-width: 480px) {
+    .login-card {
+      padding: 28px 20px;
+    }
+
+    .login-title {
+      font-size: 24px;
+    }
+
+    .submit-button {
+      padding: 12px 14px;
+      font-size: 13px;
+    }
   }
 `;
 
@@ -333,11 +409,11 @@ export default function Login() {
             {modo === "registro" && (
               <>
                 <div className="form-group">
-                  <label className="form-label">Nombre de la empresa</label>
+                  <label className="form-label">Empresa</label>
                   <input
                     type="text"
                     className="form-input"
-                    placeholder="Tu tienda o negocio"
+                    placeholder="Nombre de tu tienda"
                     value={empresaNombre}
                     onChange={(e) => {
                       setEmpresaNombre(e.target.value);
@@ -348,11 +424,11 @@ export default function Login() {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Tu nombre</label>
+                  <label className="form-label">Tu Nombre</label>
                   <input
                     type="text"
                     className="form-input"
-                    placeholder="Nombre del administrador"
+                    placeholder="Tu nombre completo"
                     value={adminNombre}
                     onChange={(e) => {
                       setAdminNombre(e.target.value);
@@ -367,7 +443,7 @@ export default function Login() {
             {/* Email */}
             <div className="form-group">
               <label className="form-label">
-                {modo === "login" ? "Email o usuario" : "Email"}
+                {modo === "login" ? "Email" : "Correo Electrónico"}
               </label>
               <input
                 type="email"
@@ -385,13 +461,13 @@ export default function Login() {
             {/* Password */}
             <div className="form-group">
               <label className="form-label">
-                Contraseña {modo === "registro" && "(mín. 8)"}
+                Contraseña {modo === "registro" && "(8+ caracteres)"}
               </label>
               <div className="form-input-with-icon">
                 <input
                   type={mostrarPassword ? "text" : "password"}
                   className="form-input"
-                  placeholder="Tu contraseña"
+                  placeholder="••••••••"
                   value={password}
                   onChange={(e) => {
                     setPassword(e.target.value);
@@ -403,6 +479,7 @@ export default function Login() {
                   type="button"
                   className="form-input-toggle"
                   onClick={() => setMostrarPassword(!mostrarPassword)}
+                  title={mostrarPassword ? "Ocultar" : "Mostrar"}
                 >
                   {mostrarPassword ? <IconoOjoTachado size={16} /> : <IconoOjo size={16} />}
                 </button>
@@ -420,16 +497,21 @@ export default function Login() {
                     : "Procesando..."
                   : modo === "login"
                     ? "Acceder"
-                    : "Continuar"}
+                    : "Crear Cuenta"}
               </span>
             </button>
           </form>
+
+          {/* Divider */}
+          <div className="login-divider">
+            <span className="login-divider-text">O</span>
+          </div>
 
           {/* Toggle */}
           <div className="login-toggle">
             {modo === "login" ? (
               <>
-                ¿Nuevo usuario?{" "}
+                ¿No tienes cuenta?{" "}
                 <button
                   type="button"
                   onClick={() => {
@@ -440,7 +522,7 @@ export default function Login() {
                     setPassword("");
                   }}
                 >
-                  Crear cuenta
+                  Regístrate aquí
                 </button>
               </>
             ) : (
@@ -460,6 +542,11 @@ export default function Login() {
                 </button>
               </>
             )}
+          </div>
+
+          {/* Footer */}
+          <div className="login-footer">
+            © 2024 Sistema POS HK • Tu negocio, bajo control
           </div>
         </div>
       </div>
