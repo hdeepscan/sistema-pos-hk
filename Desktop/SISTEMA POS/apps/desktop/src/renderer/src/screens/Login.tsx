@@ -10,7 +10,14 @@ import CheckoutPage from "./CheckoutPage";
 const loginStyles = `
   .login-container {
     min-height: 100vh;
-    background: linear-gradient(135deg, #f0f4f8 0%, #e8f1f8 50%, #f0f8f4 100%);
+    background: linear-gradient(-45deg,
+      rgba(219, 234, 254, 0.8) 0%,
+      rgba(220, 252, 231, 0.7) 25%,
+      rgba(219, 234, 254, 0.75) 50%,
+      rgba(220, 252, 231, 0.8) 75%,
+      rgba(219, 234, 254, 0.8) 100%);
+    background-size: 400% 400%;
+    animation: gradientShift 15s ease infinite;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -19,28 +26,51 @@ const loginStyles = `
     overflow: hidden;
   }
 
+  @keyframes gradientShift {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+
   .login-container::before {
     content: '';
     position: absolute;
-    width: 500px;
-    height: 500px;
-    background: radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, transparent 70%);
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(59, 130, 246, 0.12) 0%, transparent 70%);
     border-radius: 50%;
-    top: -250px;
-    right: -250px;
+    top: -300px;
+    right: -300px;
     pointer-events: none;
+    animation: float 20s ease-in-out infinite;
   }
 
   .login-container::after {
     content: '';
     position: absolute;
-    width: 400px;
-    height: 400px;
-    background: radial-gradient(circle, rgba(34, 197, 94, 0.05) 0%, transparent 70%);
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(34, 197, 94, 0.12) 0%, transparent 70%);
     border-radius: 50%;
-    bottom: -200px;
-    left: -200px;
+    bottom: -250px;
+    left: -250px;
     pointer-events: none;
+    animation: float 25s ease-in-out infinite reverse;
+  }
+
+  @keyframes float {
+    0%, 100% {
+      transform: translate(0, 0);
+    }
+    50% {
+      transform: translate(30px, -30px);
+    }
   }
 
   .login-card {

@@ -5,8 +5,14 @@ const overlayStyles = `
   .license-block-overlay {
     position: fixed;
     inset: 0;
-    background: linear-gradient(135deg, #1a0000 0%, #0a2a0a 50%, #000a1a 100%);
-    backdrop-filter: blur(10px);
+    background: linear-gradient(-45deg,
+      rgba(219, 234, 254, 0.8) 0%,
+      rgba(220, 252, 231, 0.7) 25%,
+      rgba(219, 234, 254, 0.75) 50%,
+      rgba(220, 252, 231, 0.8) 75%,
+      rgba(219, 234, 254, 0.8) 100%);
+    background-size: 400% 400%;
+    animation: gradientShift 15s ease infinite;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -15,43 +21,79 @@ const overlayStyles = `
     overflow: hidden;
   }
 
+  @keyframes gradientShift {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+
   .license-block-overlay::before {
     content: '';
     position: absolute;
-    width: 400px;
-    height: 400px;
+    width: 500px;
+    height: 500px;
     background: radial-gradient(circle, rgba(239, 68, 68, 0.15) 0%, transparent 70%);
     border-radius: 50%;
-    top: -200px;
-    right: -200px;
+    top: -250px;
+    right: -250px;
     pointer-events: none;
+    animation: float 20s ease-in-out infinite;
   }
 
   .license-block-overlay::after {
     content: '';
     position: absolute;
-    width: 300px;
-    height: 300px;
-    background: radial-gradient(circle, rgba(34, 197, 94, 0.1) 0%, transparent 70%);
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, rgba(34, 197, 94, 0.15) 0%, transparent 70%);
     border-radius: 50%;
-    bottom: -150px;
-    left: -150px;
+    bottom: -200px;
+    left: -200px;
     pointer-events: none;
+    animation: float 25s ease-in-out infinite reverse;
+  }
+
+  @keyframes float {
+    0%, 100% {
+      transform: translate(0, 0);
+    }
+    50% {
+      transform: translate(30px, -30px);
+    }
   }
 
   .license-block-content {
-    background: rgba(255, 255, 255, 0.06);
-    backdrop-filter: blur(25px);
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(30px) saturate(200%);
     border-radius: 24px;
     padding: 56px 48px;
     max-width: 520px;
     width: 100%;
     text-align: center;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.95);
+    box-shadow:
+      0 2px 8px rgba(0, 0, 0, 0.08),
+      0 10px 20px rgba(0, 0, 0, 0.12),
+      0 20px 40px rgba(59, 130, 246, 0.12),
+      0 40px 80px rgba(0, 0, 0, 0.14);
     animation: slideUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
     position: relative;
     z-index: 10;
+  }
+
+  .license-block-content:hover {
+    background: rgba(255, 255, 255, 0.85);
+    box-shadow:
+      0 2px 8px rgba(0, 0, 0, 0.10),
+      0 12px 24px rgba(0, 0, 0, 0.15),
+      0 28px 56px rgba(59, 130, 246, 0.18),
+      0 50px 100px rgba(0, 0, 0, 0.18);
   }
 
   @keyframes slideUp {
@@ -94,48 +136,43 @@ const overlayStyles = `
   .license-block-title {
     font-size: 36px;
     font-weight: 800;
-    background: linear-gradient(135deg, #ffffff 0%, #e0f2fe 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: #0f172a;
     margin-bottom: 16px;
     letter-spacing: -0.8px;
   }
 
   .license-block-company {
     font-size: 16px;
-    color: rgba(255, 255, 255, 0.7);
+    color: #475569;
     margin-bottom: 24px;
     line-height: 1.6;
   }
 
   .license-block-company strong {
-    color: rgba(255, 255, 255, 0.95);
+    color: #1e293b;
     font-weight: 600;
   }
 
   .license-block-expired-date {
     font-size: 15px;
-    color: #fca5a5;
+    color: #dc2626;
     font-weight: 700;
     margin-bottom: 32px;
     padding: 16px 20px;
-    background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.1) 100%);
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(220, 38, 38, 0.05) 100%);
     border-radius: 12px;
-    border: 1px solid rgba(239, 68, 68, 0.3);
-    backdrop-filter: blur(10px);
+    border: 1px solid rgba(239, 68, 68, 0.25);
   }
 
   .license-block-warning {
     font-size: 14px;
-    color: rgba(255, 255, 255, 0.8);
+    color: #1e293b;
     margin-bottom: 32px;
     line-height: 1.6;
-    background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.05) 100%);
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(220, 38, 38, 0.05) 100%);
     padding: 16px;
     border-radius: 12px;
     border-left: 4px solid #ef4444;
-    backdrop-filter: blur(10px);
   }
 
   .license-block-buttons {
@@ -190,35 +227,35 @@ const overlayStyles = `
   }
 
   .license-block-secondary-btn {
-    background: rgba(255, 255, 255, 0.08);
-    color: rgba(255, 255, 255, 0.9);
-    border: 2px solid rgba(255, 255, 255, 0.15);
-    backdrop-filter: blur(10px);
+    background: rgba(255, 255, 255, 0.5);
+    color: #1e293b;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    backdrop-filter: blur(20px);
   }
 
   .license-block-secondary-btn:hover {
-    background: rgba(255, 255, 255, 0.12);
-    border-color: rgba(59, 130, 246, 0.3);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    background: rgba(255, 255, 255, 0.85);
+    border-color: #3b82f6;
+    box-shadow: 0 8px 20px rgba(59, 130, 246, 0.15);
   }
 
   .license-block-footer {
     margin-top: 28px;
     padding-top: 20px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: 1px solid #e2e8f0;
     font-size: 12px;
-    color: rgba(255, 255, 255, 0.5);
+    color: #94a3b8;
   }
 
   .license-block-footer a {
-    color: #86efac;
+    color: #22c55e;
     text-decoration: none;
     font-weight: 600;
     transition: color 0.2s;
   }
 
   .license-block-footer a:hover {
-    color: #22c55e;
+    color: #16a34a;
     text-decoration: underline;
   }
 
