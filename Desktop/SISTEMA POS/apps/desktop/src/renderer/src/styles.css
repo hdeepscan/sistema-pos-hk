@@ -78,6 +78,28 @@
   50% { transform: translateY(-4px); }
 }
 
+/* ===== ANIMATED GRADIENT BACKGROUND ===== */
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes floatOrb {
+  0%, 100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(30px, -30px);
+  }
+}
+
 /* ===== CUSTOM CURSORS - RETAIL/POS FOCUSED ===== */
 
 /* Cursor default - Pointer Hand Outline */
@@ -250,13 +272,21 @@ select {
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
-  background: var(--bg);
+  background: linear-gradient(-45deg,
+    rgba(219, 234, 254, 0.8) 0%,
+    rgba(220, 252, 231, 0.7) 25%,
+    rgba(219, 234, 254, 0.75) 50%,
+    rgba(220, 252, 231, 0.8) 75%,
+    rgba(219, 234, 254, 0.8) 100%);
+  background-size: 400% 400%;
+  animation: gradientShift 15s ease infinite;
   color: var(--text);
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
   -webkit-text-rendering: optimizeLegibility;
   text-rendering: optimizeLegibility;
   letter-spacing: -0.01em;
+  position: relative;
 }
 
 h1, h2, h3, h4 {
@@ -270,6 +300,31 @@ h1, h2, h3, h4 {
 .app-shell {
   display: flex;
   min-height: 100vh;
+  background: inherit;
+}
+
+.app-shell::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: inherit;
+  animation: gradientShift 15s ease infinite;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.app-shell::after {
+  content: '';
+  position: fixed;
+  top: -250px;
+  right: -250px;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: -1;
+  animation: floatOrb 20s ease-in-out infinite;
 }
 
 .sidebar {
@@ -282,6 +337,22 @@ h1, h2, h3, h4 {
   flex-direction: column;
   gap: 4px;
   border-right: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+}
+
+.sidebar::before {
+  content: '';
+  position: fixed;
+  bottom: -200px;
+  left: -200px;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(34, 197, 94, 0.06) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  animation: floatOrb 25s ease-in-out infinite reverse;
 }
 
 .sidebar-brand {
