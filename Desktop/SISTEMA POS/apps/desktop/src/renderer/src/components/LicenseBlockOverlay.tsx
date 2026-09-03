@@ -5,33 +5,59 @@ const overlayStyles = `
   .license-block-overlay {
     position: fixed;
     inset: 0;
-    background: linear-gradient(135deg, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.95) 100%);
-    backdrop-filter: blur(8px);
+    background: linear-gradient(135deg, #1a0000 0%, #0a2a0a 50%, #000a1a 100%);
+    backdrop-filter: blur(10px);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 9999;
     padding: 16px;
+    overflow: hidden;
+  }
+
+  .license-block-overlay::before {
+    content: '';
+    position: absolute;
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, rgba(239, 68, 68, 0.15) 0%, transparent 70%);
+    border-radius: 50%;
+    top: -200px;
+    right: -200px;
+    pointer-events: none;
+  }
+
+  .license-block-overlay::after {
+    content: '';
+    position: absolute;
+    width: 300px;
+    height: 300px;
+    background: radial-gradient(circle, rgba(34, 197, 94, 0.1) 0%, transparent 70%);
+    border-radius: 50%;
+    bottom: -150px;
+    left: -150px;
+    pointer-events: none;
   }
 
   .license-block-content {
-    background: linear-gradient(180deg, #ffffff 0%, #f9fafb 100%);
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(25px);
     border-radius: 24px;
     padding: 56px 48px;
     max-width: 520px;
     width: 100%;
     text-align: center;
-    box-shadow:
-      0 20px 25px rgba(0, 0, 0, 0.15),
-      0 0 1px rgba(0, 0, 0, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.5);
-    animation: slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.08);
+    animation: slideUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+    z-index: 10;
   }
 
   @keyframes slideUp {
     from {
       opacity: 0;
-      transform: translateY(30px);
+      transform: translateY(40px);
     }
     to {
       opacity: 1;
@@ -48,16 +74,16 @@ const overlayStyles = `
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 8px 16px rgba(239, 68, 68, 0.3);
+    box-shadow: 0 12px 24px rgba(239, 68, 68, 0.4);
     position: relative;
   }
 
-  .license-block-icon-container::after {
+  .license-block-icon-container::before {
     content: '';
     position: absolute;
     inset: 0;
     border-radius: 50%;
-    background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.2), transparent);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, transparent 50%);
   }
 
   .license-block-icon {
@@ -66,45 +92,50 @@ const overlayStyles = `
   }
 
   .license-block-title {
-    font-size: 32px;
+    font-size: 36px;
     font-weight: 800;
-    color: #1f2937;
+    background: linear-gradient(135deg, #ffffff 0%, #e0f2fe 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
     margin-bottom: 16px;
-    letter-spacing: -0.5px;
+    letter-spacing: -0.8px;
   }
 
   .license-block-company {
     font-size: 16px;
-    color: #6b7280;
+    color: rgba(255, 255, 255, 0.7);
     margin-bottom: 24px;
     line-height: 1.6;
   }
 
   .license-block-company strong {
-    color: #1f2937;
+    color: rgba(255, 255, 255, 0.95);
     font-weight: 600;
   }
 
   .license-block-expired-date {
     font-size: 15px;
-    color: #dc2626;
+    color: #fca5a5;
     font-weight: 700;
     margin-bottom: 32px;
     padding: 16px 20px;
-    background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.1) 100%);
     border-radius: 12px;
-    border: 1px solid #fca5a5;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    backdrop-filter: blur(10px);
   }
 
   .license-block-warning {
-    font-size: 15px;
-    color: #7f1d1d;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.8);
     margin-bottom: 32px;
     line-height: 1.6;
-    background: rgba(127, 29, 29, 0.05);
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.05) 100%);
     padding: 16px;
     border-radius: 12px;
-    border-left: 4px solid #dc2626;
+    border-left: 4px solid #ef4444;
+    backdrop-filter: blur(10px);
   }
 
   .license-block-buttons {
@@ -118,24 +149,40 @@ const overlayStyles = `
   .license-block-secondary-btn {
     padding: 16px 24px;
     border-radius: 12px;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 700;
     border: none;
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
     text-transform: uppercase;
     letter-spacing: 0.8px;
+    position: relative;
+    overflow: hidden;
   }
 
   .license-block-primary-btn {
     background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
     color: white;
-    box-shadow: 0 8px 16px rgba(34, 197, 94, 0.3);
+    box-shadow: 0 8px 20px rgba(34, 197, 94, 0.4);
+  }
+
+  .license-block-primary-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    animation: shine 3s infinite;
+  }
+
+  @keyframes shine {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
   }
 
   .license-block-primary-btn:hover {
     transform: translateY(-4px);
-    box-shadow: 0 12px 24px rgba(34, 197, 94, 0.4);
+    box-shadow: 0 12px 30px rgba(34, 197, 94, 0.5);
+    background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
   }
 
   .license-block-primary-btn:active {
@@ -143,34 +190,52 @@ const overlayStyles = `
   }
 
   .license-block-secondary-btn {
-    background: #f3f4f6;
-    color: #374151;
-    border: 2px solid #e5e7eb;
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.9);
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
   }
 
   .license-block-secondary-btn:hover {
-    background: #e5e7eb;
-    border-color: #d1d5db;
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(59, 130, 246, 0.3);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
   }
 
   .license-block-footer {
     margin-top: 28px;
     padding-top: 20px;
-    border-top: 1px solid #e5e7eb;
-    font-size: 13px;
-    color: #9ca3af;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.5);
   }
 
   .license-block-footer a {
-    color: #3b82f6;
+    color: #86efac;
     text-decoration: none;
     font-weight: 600;
     transition: color 0.2s;
   }
 
   .license-block-footer a:hover {
-    color: #2563eb;
+    color: #22c55e;
     text-decoration: underline;
+  }
+
+  @media (max-width: 480px) {
+    .license-block-content {
+      padding: 40px 28px;
+    }
+
+    .license-block-title {
+      font-size: 28px;
+    }
+
+    .license-block-primary-btn,
+    .license-block-secondary-btn {
+      padding: 14px 20px;
+      font-size: 13px;
+    }
   }
 `;
 
