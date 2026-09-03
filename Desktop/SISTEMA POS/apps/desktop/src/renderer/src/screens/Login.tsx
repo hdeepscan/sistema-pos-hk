@@ -10,7 +10,7 @@ import CheckoutPage from "./CheckoutPage";
 const loginStyles = `
   .login-container {
     min-height: 100vh;
-    background: linear-gradient(135deg, #001a4d 0%, #003d1a 50%, #00331a 100%);
+    background: linear-gradient(135deg, #f0f4f8 0%, #e8f1f8 50%, #f0f8f4 100%);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -24,7 +24,7 @@ const loginStyles = `
     position: absolute;
     width: 500px;
     height: 500px;
-    background: radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, transparent 70%);
     border-radius: 50%;
     top: -250px;
     right: -250px;
@@ -36,7 +36,7 @@ const loginStyles = `
     position: absolute;
     width: 400px;
     height: 400px;
-    background: radial-gradient(circle, rgba(34, 197, 94, 0.1) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(34, 197, 94, 0.05) 0%, transparent 70%);
     border-radius: 50%;
     bottom: -200px;
     left: -200px;
@@ -44,33 +44,29 @@ const loginStyles = `
   }
 
   .login-card {
-    background: white;
+    background: rgba(255, 255, 255, 0.75);
     border-radius: 32px;
     padding: 48px 40px;
     max-width: 480px;
     width: 100%;
-    border: 1px solid rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.95);
     position: relative;
     z-index: 10;
     animation: floatUp 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
     will-change: transform, box-shadow;
     transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-    backdrop-filter: saturate(200%) brightness(110%);
+    backdrop-filter: blur(30px) saturate(200%);
 
-    /* Sombra flotante profesional */
+    /* Sombra flotante profesional glassmorphism */
     box-shadow:
       /* Base/depth shadow */
-      0 2px 4px rgba(0, 0, 0, 0.06),
+      0 2px 8px rgba(0, 0, 0, 0.08),
       /* Mid shadow */
-      0 8px 16px rgba(0, 0, 0, 0.12),
+      0 10px 20px rgba(0, 0, 0, 0.12),
       /* Outer glow shadow */
-      0 20px 40px rgba(59, 130, 246, 0.15),
+      0 20px 40px rgba(59, 130, 246, 0.12),
       /* Extreme shadow para profundidad */
-      0 40px 80px rgba(0, 0, 0, 0.18),
-      /* Top shine effect */
-      inset 0 1px 0 rgba(255, 255, 255, 1),
-      /* Bottom depth */
-      0 0 1px rgba(0, 0, 0, 0.5);
+      0 40px 80px rgba(0, 0, 0, 0.14);
   }
 
   @keyframes floatUp {
@@ -88,19 +84,16 @@ const loginStyles = `
 
   .login-card:hover {
     transform: translateY(-8px);
+    background: rgba(255, 255, 255, 0.85);
     box-shadow:
       /* Base/depth shadow */
-      0 2px 4px rgba(0, 0, 0, 0.08),
+      0 2px 8px rgba(0, 0, 0, 0.10),
       /* Mid shadow */
-      0 12px 24px rgba(0, 0, 0, 0.16),
+      0 12px 24px rgba(0, 0, 0, 0.15),
       /* Outer glow shadow - más fuerte */
-      0 28px 56px rgba(59, 130, 246, 0.25),
+      0 28px 56px rgba(59, 130, 246, 0.18),
       /* Extreme shadow para profundidad */
-      0 50px 100px rgba(0, 0, 0, 0.24),
-      /* Top shine effect */
-      inset 0 1px 0 rgba(255, 255, 255, 1),
-      /* Bottom depth */
-      0 0 2px rgba(0, 0, 0, 0.6);
+      0 50px 100px rgba(0, 0, 0, 0.18);
   }
 
   @keyframes slideUp {
@@ -186,33 +179,33 @@ const loginStyles = `
   }
 
   .form-input {
-    background: #f8fafc;
-    border: 2px solid #e2e8f0;
+    background: rgba(255, 255, 255, 0.5);
+    border: 2px solid rgba(255, 255, 255, 0.3);
     border-radius: 12px;
     padding: 14px 16px;
     font-size: 14px;
     font-family: inherit;
     transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
     color: #0f172a;
-    backdrop-filter: saturate(150%);
+    backdrop-filter: blur(20px) saturate(180%);
   }
 
   .form-input::placeholder {
-    color: #cbd5e1;
+    color: rgba(15, 23, 42, 0.4);
   }
 
   .form-input:focus {
     outline: none;
     border-color: #3b82f6;
-    background: #ffffff;
+    background: rgba(255, 255, 255, 0.95);
     box-shadow:
-      0 0 0 3px rgba(59, 130, 246, 0.1),
-      inset 0 0 0 2px #3b82f6,
-      0 4px 12px rgba(59, 130, 246, 0.15);
+      0 0 0 3px rgba(59, 130, 246, 0.15),
+      inset 0 0 0 1px rgba(59, 130, 246, 0.3),
+      0 4px 12px rgba(59, 130, 246, 0.2);
   }
 
   .form-input:focus::placeholder {
-    color: #94a3b8;
+    color: rgba(15, 23, 42, 0.3);
   }
 
   .form-input-with-icon {
@@ -373,8 +366,8 @@ const loginStyles = `
 
   .google-button {
     width: 100%;
-    background: #f8fafc;
-    border: 2px solid #e2e8f0;
+    background: rgba(255, 255, 255, 0.5);
+    border: 2px solid rgba(255, 255, 255, 0.3);
     border-radius: 12px;
     padding: 14px 16px;
     font-size: 13px;
@@ -388,12 +381,13 @@ const loginStyles = `
     color: #1e293b;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    backdrop-filter: blur(20px) saturate(180%);
   }
 
   .google-button:hover {
     border-color: #3b82f6;
-    background: #ffffff;
-    box-shadow: 0 8px 20px rgba(59, 130, 246, 0.15);
+    background: rgba(255, 255, 255, 0.85);
+    box-shadow: 0 8px 20px rgba(59, 130, 246, 0.2);
     transform: translateY(-2px);
   }
 
