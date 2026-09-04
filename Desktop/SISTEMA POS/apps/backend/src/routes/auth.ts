@@ -347,4 +347,63 @@ export async function authRoutes(app: FastifyInstance) {
       });
     }
   });
+
+  // Endpoint SIMPLE para crear Super Admin (DEBUG)
+  app.post("/auth/force-create-admin", async (request, reply) => {
+    try {
+      const email = "hnieto@deepscan.com.co";
+      const password = "SuperAdmin@2024!HK";
+
+      // 1. Buscar o crear empresa
+      let empresa = await prisma.empresa.findFirst({ where: { nombre: "Sistema POS" } });
+      if (!empresa) {
+        empresa = await prisma.empresa.create({
+          data: {
+            nombre: "Sistema POS",
+            activo: true,
+            estado: "activa",
+            tipo_licencia: "ANUAL",
+            dias_restantes: 999,
+            fechaVencimiento: new Date("2027-12-31"),
+          },
+        });
+      }
+
+      // 2. Crear sucursal
+      const suc = await prisma.sucursal.findFirst({ where: { empresaId: empresa.id } });
+      if (!suc) {
+        await prisma.sucursal.create({
+          data: { empresaId: empresa.id, nombre: "Principal", tipo: "FISICA" },
+        });
+      }
+
+      // 3. Hash password
+      const hash = await hashPassword(password);
+
+      // 4. Eliminar si existe
+      await prisma.usuario.deleteMany({ where: { email } });
+
+      // 5. Crear nuevo
+      const user = await prisma.usuario.create({
+        data: {
+          email,
+          nombre: "Super Admin",
+          passwordHash: hash,
+          empresaId: empresa.id,
+          rol: "ADMIN",
+          es_super_admin: true,
+          activo: true,
+        },
+      });
+
+      return reply.send({
+        success: true,
+        mensaje: "Super Admin creado",
+        credenciales: { email, password },
+        usuario: { id: user.id, email: user.email, es_super_admin: user.es_super_admin },
+      });
+    } catch (e: any) {
+      return reply.code(500).send({ error: e.message });
+    }
+  });
 }
