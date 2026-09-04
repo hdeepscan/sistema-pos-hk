@@ -161,7 +161,7 @@ export async function authRoutes(app: FastifyInstance) {
     };
   });
 
-  // Crear Super Admin inicial (solo se ejecuta si no existe)
+  // Diagnóstico: verificar y crear Super Admin si es necesario
   app.post("/auth/init-super-admin", async (request, reply) => {
     const SUPER_ADMIN_EMAIL = "hnieto@deepscan.com.co";
     const SUPER_ADMIN_PASSWORD = "SuperAdmin@2024!HK";
@@ -170,6 +170,7 @@ export async function authRoutes(app: FastifyInstance) {
       // Verificar si ya existe
       const existente = await prisma.usuario.findUnique({
         where: { email: SUPER_ADMIN_EMAIL },
+        include: { empresa: true },
       });
 
       if (existente) {
@@ -177,6 +178,14 @@ export async function authRoutes(app: FastifyInstance) {
           success: true,
           mensaje: "Super Admin ya existe",
           email: SUPER_ADMIN_EMAIL,
+          usuario: {
+            id: existente.id,
+            email: existente.email,
+            nombre: existente.nombre,
+            es_super_admin: existente.es_super_admin,
+            activo: existente.activo,
+            empresaActiva: existente.empresa.activo,
+          },
         });
       }
 
@@ -235,12 +244,106 @@ export async function authRoutes(app: FastifyInstance) {
         mensaje: "Super Admin creado exitosamente",
         email: superAdmin.email,
         password: SUPER_ADMIN_PASSWORD,
+        usuario: {
+          id: superAdmin.id,
+          email: superAdmin.email,
+          nombre: superAdmin.nombre,
+          es_super_admin: superAdmin.es_super_admin,
+          activo: superAdmin.activo,
+        },
       });
     } catch (error: any) {
-      console.error("Error creando Super Admin:", error);
+      console.error("Error en init-super-admin:", error);
       return reply.code(500).send({
         success: false,
         error: error.message || "Error creando Super Admin",
+        detalles: error.toString(),
+      });
+    }
+  });
+
+  // Endpoint para recrear Super Admin (fuerza eliminar y recrear)
+  app.post("/auth/reset-super-admin", async (request, reply) => {
+    const SUPER_ADMIN_EMAIL = "hnieto@deepscan.com.co";
+    const SUPER_ADMIN_PASSWORD = "SuperAdmin@2024!HK";
+
+    try {
+      // Eliminar usuario existente si existe
+      await prisma.usuario.deleteMany({
+        where: { email: SUPER_ADMIN_EMAIL },
+      });
+
+      // Crear empresa "Sistema POS" si no existe
+      let empresa = await prisma.empresa.findFirst({
+        where: { nombre: "Sistema POS" },
+      });
+
+      if (!empresa) {
+        empresa = await prisma.empresa.create({
+          data: {
+            nombre: "Sistema POS",
+            plan: "ENTERPRISE",
+            activo: true,
+            estado: "activa",
+            tipo_licencia: "ANUAL",
+            dias_restantes: 999,
+            fechaVencimiento: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+          },
+        });
+      }
+
+      // Crear sucursal principal si no existe
+      const sucursalExistente = await prisma.sucursal.findFirst({
+        where: { empresaId: empresa.id },
+      });
+
+      if (!sucursalExistente) {
+        await prisma.sucursal.create({
+          data: {
+            empresaId: empresa.id,
+            nombre: "Principal",
+            tipo: "FISICA",
+          },
+        });
+      }
+
+      // Generar hash de contraseña con salto de 10
+      const passwordHash = await hashPassword(SUPER_ADMIN_PASSWORD);
+
+      // Crear nuevo Super Admin
+      const superAdmin = await prisma.usuario.create({
+        data: {
+          email: SUPER_ADMIN_EMAIL,
+          nombre: "Super Admin",
+          passwordHash,
+          empresaId: empresa.id,
+          rol: "ADMIN",
+          es_super_admin: true,
+          activo: true,
+        },
+      });
+
+      return reply.code(201).send({
+        success: true,
+        mensaje: "Super Admin fue eliminado y recreado exitosamente",
+        credenciales: {
+          email: SUPER_ADMIN_EMAIL,
+          password: SUPER_ADMIN_PASSWORD,
+        },
+        usuario: {
+          id: superAdmin.id,
+          email: superAdmin.email,
+          nombre: superAdmin.nombre,
+          es_super_admin: superAdmin.es_super_admin,
+          activo: superAdmin.activo,
+        },
+      });
+    } catch (error: any) {
+      console.error("Error en reset-super-admin:", error);
+      return reply.code(500).send({
+        success: false,
+        error: error.message || "Error reseteando Super Admin",
+        detalles: error.toString(),
       });
     }
   });
