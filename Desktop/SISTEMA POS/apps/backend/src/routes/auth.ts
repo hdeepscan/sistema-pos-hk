@@ -495,6 +495,79 @@ export async function authRoutes(app: FastifyInstance) {
     }
   });
 
+  // 🏢 POST /auth/setup-podium - Crear usuario PODIUM ACCESSORIES directamente
+  app.get("/auth/setup-podium", async (request, reply) => {
+    try {
+      const ahora = new Date();
+      const fechaVencimiento = new Date(ahora.getTime() + 90 * 24 * 60 * 60 * 1000);
+      const passwordHash = await hashPassword("Podium1234*");
+
+      // Crear en transacción
+      const { empresa, usuario } = await prisma.$transaction(async (tx) => {
+        const empresa = await tx.empresa.create({
+          data: {
+            nombre: "PODIUM ACCESSORIES",
+            activo: true,
+            estado: "activa",
+            tipo_licencia: "MENSUAL",
+            dias_restantes: 90,
+            fechaVencimiento: fechaVencimiento,
+            bloqueada_por_admin: false,
+          },
+        });
+
+        const usuario = await tx.usuario.create({
+          data: {
+            empresaId: empresa.id,
+            nombre: "JULIAN",
+            email: "accessoriespodium@gmail.com",
+            passwordHash: passwordHash,
+            rol: "ADMIN",
+            es_super_admin: false,
+            activo: true,
+          },
+        });
+
+        await tx.sucursal.create({
+          data: {
+            empresaId: empresa.id,
+            nombre: "Principal",
+            tipo: "FISICA",
+            activo: true,
+          },
+        });
+
+        return { empresa, usuario };
+      });
+
+      return reply.send({
+        success: true,
+        mensaje: "✅ Usuario PODIUM ACCESSORIES creado exitosamente",
+        empresa: {
+          id: empresa.id,
+          nombre: empresa.nombre,
+          estado: empresa.estado,
+          diasRestantes: empresa.dias_restantes,
+          fechaVencimiento: empresa.fechaVencimiento,
+        },
+        usuario: {
+          id: usuario.id,
+          nombre: usuario.nombre,
+          email: usuario.email,
+          rol: usuario.rol,
+        },
+        credenciales: {
+          email: "accessoriespodium@gmail.com",
+          password: "Podium1234*",
+          link: "https://centrala.up.railway.app",
+        },
+      });
+    } catch (e: any) {
+      console.error("Error creando PODIUM:", e);
+      return reply.code(500).send({ error: e.message });
+    }
+  });
+
   // 🏢 POST /auth/create-test-usuario - Crear usuario de prueba PODIUM ACCESSORIES
   app.post("/auth/create-test-usuario", async (request, reply) => {
     try {
