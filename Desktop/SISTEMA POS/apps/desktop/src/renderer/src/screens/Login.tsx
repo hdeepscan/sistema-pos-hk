@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useSesionStore } from "../lib/store";
+import { AdminLoginModal } from "../components/AdminLoginModal";
 import logo from "../assets/logo.png";
 import { mensajeError } from "../lib/errores";
 import { IconoOjo, IconoOjoTachado } from "../lib/iconos";
@@ -492,6 +493,7 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [mostrarPassword, setMostrarPassword] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({});
+  const [adminModalOpen, setAdminModalOpen] = useState(false);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -569,20 +571,9 @@ export default function Login() {
     }
   }
 
-  async function handleAdminAccess() {
-    if (!usuario) {
-      setError("Debes iniciar sesión primero para acceder a Administradores");
-      return;
-    }
-
-    // Verificar si es Super Admin por email
-    const SUPER_ADMIN_EMAIL = "hnieto@deepscan.com.co";
-    if (usuario.email !== SUPER_ADMIN_EMAIL) {
-      setError(`Solo ${SUPER_ADMIN_EMAIL} puede acceder a Administradores`);
-      return;
-    }
-
-    navigate("/centrala-admin");
+  function handleAdminAccess() {
+    // Abrir modal de login para administradores
+    setAdminModalOpen(true);
   }
 
   async function handleRegistro(e: React.FormEvent) {
@@ -829,6 +820,12 @@ export default function Login() {
           </div>
         </div>
       </div>
+
+      {/* Admin Login Modal */}
+      <AdminLoginModal
+        isOpen={adminModalOpen}
+        onClose={() => setAdminModalOpen(false)}
+      />
     </>
   );
 }
