@@ -494,4 +494,88 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.code(500).send({ error: e.message });
     }
   });
+
+  // 🏢 POST /auth/create-test-usuario - Crear usuario de prueba PODIUM ACCESSORIES
+  app.post("/auth/create-test-usuario", async (request, reply) => {
+    try {
+      const { empresaNombre, nombre, email, password, diasPlan } = request.body as any;
+
+      // Verificar si el email ya existe
+      const existente = await prisma.usuario.findUnique({ where: { email } });
+      if (existente) {
+        return reply.code(409).send({ error: "Email ya existe en el sistema" });
+      }
+
+      // Calcular fecha de vencimiento
+      const ahora = new Date();
+      const diasTotal = diasPlan || 90; // Default 3 meses
+      const fechaVencimiento = new Date(ahora.getTime() + diasTotal * 24 * 60 * 60 * 1000);
+
+      // Hash de contraseña
+      const passwordHash = await hashPassword(password);
+
+      // Crear empresa, sucursal y usuario en transacción
+      const { empresa, usuario } = await prisma.$transaction(async (tx) => {
+        const empresa = await tx.empresa.create({
+          data: {
+            nombre: empresaNombre,
+            activo: true,
+            estado: "activa",
+            tipo_licencia: "MENSUAL",
+            dias_restantes: diasTotal,
+            fechaVencimiento: fechaVencimiento,
+          },
+        });
+
+        const usuario = await tx.usuario.create({
+          data: {
+            empresaId: empresa.id,
+            nombre: nombre,
+            email: email,
+            passwordHash: passwordHash,
+            rol: "ADMIN",
+            activo: true,
+          },
+        });
+
+        // Crear sucursal principal
+        await tx.sucursal.create({
+          data: {
+            empresaId: empresa.id,
+            nombre: "Principal",
+            tipo: "FISICA",
+            activo: true,
+          },
+        });
+
+        return { empresa, usuario };
+      });
+
+      return reply.code(201).send({
+        success: true,
+        mensaje: "Usuario creado exitosamente",
+        empresa: {
+          id: empresa.id,
+          nombre: empresa.nombre,
+          estado: empresa.estado,
+          diasRestantes: empresa.dias_restantes,
+          fechaVencimiento: empresa.fechaVencimiento,
+        },
+        usuario: {
+          id: usuario.id,
+          nombre: usuario.nombre,
+          email: usuario.email,
+          rol: usuario.rol,
+        },
+        credenciales: {
+          email: email,
+          password: password,
+          link: "https://centrala.up.railway.app",
+        },
+      });
+    } catch (e: any) {
+      console.error("Error creando usuario:", e);
+      return reply.code(500).send({ error: e.message });
+    }
+  });
 }
