@@ -28,11 +28,11 @@ const verificarSuperAdmin = async (request: FastifyRequest, reply: FastifyReply)
 };
 
 export default async function adminRoutes(app: FastifyInstance) {
-  // Registrar middleware en todas las rutas de admin
-  app.addHook("onRequest", verificarSuperAdmin);
-
   // 📊 GET /admin/clientes - Listar todos los clientes
-  app.get("/clientes", async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get(
+    "/clientes",
+    { preHandler: [app.authenticate, verificarSuperAdmin] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const clientes = await prisma.empresa.findMany({
         select: {
@@ -79,7 +79,10 @@ export default async function adminRoutes(app: FastifyInstance) {
   });
 
   // ➕ POST /admin/clientes - Crear nuevo cliente (bypass de pago)
-  app.post("/clientes", async (request: FastifyRequest, reply: FastifyReply) => {
+  app.post(
+    "/clientes",
+    { preHandler: [app.authenticate, verificarSuperAdmin] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const { nombreEmpresa, emailAdmin, nombreAdmin, tipoLicencia } = request.body as any;
 
@@ -153,7 +156,10 @@ export default async function adminRoutes(app: FastifyInstance) {
   });
 
   // 📅 PATCH /admin/clientes/:id/licencia - Extender licencia
-  app.patch("/clientes/:id/licencia", async (request: FastifyRequest, reply: FastifyReply) => {
+  app.patch(
+    "/clientes/:id/licencia",
+    { preHandler: [app.authenticate, verificarSuperAdmin] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const { id } = request.params as any;
       const { dias } = request.body as any;
@@ -199,7 +205,10 @@ export default async function adminRoutes(app: FastifyInstance) {
   });
 
   // 🔑 POST /admin/clientes/:id/reset-password - Resetear contraseña
-  app.post("/clientes/:id/reset-password", async (request: FastifyRequest, reply: FastifyReply) => {
+  app.post(
+    "/clientes/:id/reset-password",
+    { preHandler: [app.authenticate, verificarSuperAdmin] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const { id } = request.params as any;
 
@@ -240,7 +249,10 @@ export default async function adminRoutes(app: FastifyInstance) {
   });
 
   // 🚫 PATCH /admin/clientes/:id/bloquear - Bloquear/Desbloquear cliente
-  app.patch("/clientes/:id/bloquear", async (request: FastifyRequest, reply: FastifyReply) => {
+  app.patch(
+    "/clientes/:id/bloquear",
+    { preHandler: [app.authenticate, verificarSuperAdmin] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const { id } = request.params as any;
       const { bloqueado, razon } = request.body as any;
@@ -273,7 +285,10 @@ export default async function adminRoutes(app: FastifyInstance) {
   });
 
   // 📋 GET /admin/auditoria - Ver logs de auditoría
-  app.get("/auditoria", async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get(
+    "/auditoria",
+    { preHandler: [app.authenticate, verificarSuperAdmin] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const logs = await prisma.adminAuditoria.findMany({
         orderBy: { fecha: "desc" },
