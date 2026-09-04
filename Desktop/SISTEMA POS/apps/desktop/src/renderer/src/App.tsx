@@ -8,7 +8,9 @@ import { ErrorBoundary } from "./lib/ErrorBoundary";
 import { isMobileDevice, getMobilePreference, setMobilePreference } from "./lib/mobile-detect";
 import { notif } from "./lib/notificationService";
 import { LicenseBlockOverlay } from "./components/LicenseBlockOverlay";
+import { ProtectedAdminRoute } from "./components/ProtectedAdminRoute";
 import Login from "./screens/Login";
+import CentralaAdmin from "./screens/CentralaAdmin";
 import SeleccionSucursal from "./screens/SeleccionSucursal";
 import Layout from "./screens/Layout";
 import Pos from "./screens/Pos";
@@ -171,6 +173,23 @@ export default function App() {
     );
   }
 
+  // Super Admin Dashboard - Acceso directo sin sucursal
+  if (location.pathname === "/centrala-admin") {
+    return (
+      <Routes>
+        <Route
+          path="/centrala-admin"
+          element={
+            <ProtectedAdminRoute>
+              <CentralaAdmin />
+            </ProtectedAdminRoute>
+          }
+        />
+        <Route path="*" element={<Navigate to="/centrala-admin" replace />} />
+      </Routes>
+    );
+  }
+
   if (!sucursalActivaId) {
     return (
       <Routes>
@@ -195,6 +214,14 @@ export default function App() {
       <Layout isMobile={isMobile} setIsMobile={toggleMobilePreference}>
         <ErrorBoundary key={location.pathname}>
           <Routes>
+          <Route
+            path="/centrala-admin"
+            element={
+              <ProtectedAdminRoute>
+                <CentralaAdmin />
+              </ProtectedAdminRoute>
+            }
+          />
           <Route path="/" element={<Navigate to="/pos" replace />} />
           <Route path="/pos" element={isMobile ? <PosMobile onToggleMobile={toggleMobilePreference} /> : <Pos />} />
           <Route path="/ventas" element={<Ventas />} />
