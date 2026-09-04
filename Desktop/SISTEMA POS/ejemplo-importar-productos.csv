@@ -1,0 +1,13 @@
+SKU,Producto,Categoria,Precio,Costo,Codigo de barras
+CAMISETA-001,Camiseta Básica Azul,Ropa,29.99,12.50,7501234567890
+CAMISETA-002,Camiseta Básica Roja,Ropa,29.99,12.50,7501234567891
+CAMISETA-003,Camiseta Básica Negro,Ropa,29.99,12.50,7501234567892
+PANTALON-001,Pantalón Jeans Hombre,Ropa,59.99,25.00,7501234567893
+PANTALON-002,Pantalón Chino Beige,Ropa,49.99,20.00,7501234567894
+ZAPATOS-001,Zapatos Deportivos Negro,Calzado,89.99,40.00,7501234567895
+ZAPATOS-002,Zapatos Formales Marrón,Calzado,129.99,60.00,7501234567896
+GORRA-001,Gorra Ajustable,Accesorios,14.99,5.00,7501234567897
+BUFANDA-001,Bufanda Lana Gris,Accesorios,24.99,10.00,7501234567898
+CINTURON-001,Cinturón Cuero Negro,Accesorios,34.99,15.00,7501234567899
+BOLSA-001,Mochila Casual,Bolsas,74.99,30.00,7501234567900
+BOLSA-002,Bolsa Mensajero Marrón,Bolsas,94.99,45.00,7501234567901

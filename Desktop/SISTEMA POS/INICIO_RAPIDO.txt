@@ -1,0 +1,246 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                                                                            ║
+║                     SISTEMA POS HK - INICIO RÁPIDO                         ║
+║                                                                            ║
+║                              v0.8.16 - 2026-08-05                          ║
+║                                                                            ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+
+📌 UBICACIONES IMPORTANTES:
+═══════════════════════════════════════════════════════════════════════════
+
+  Raíz del proyecto:
+  📁 C:\Users\PC\Desktop\SISTEMA POS\
+
+  Acceso directo en escritorio:
+  🔗 Sistema POS HK.lnk
+
+  Documentación:
+  📖 PROYECTO_CONTEXTO.md      - Contexto general del proyecto
+  📖 SISTEMA_CREDITOS.md       - Documentación del sistema de créditos
+  📖 TAREAS_PENDIENTES.md      - Lista de mejoras futuras
+  📖 RESUMEN_SESION_0816.md    - Resumen de esta sesión
+  📖 README.md                 - Guía principal
+
+
+🚀 EJECUTAR LA APLICACIÓN:
+═══════════════════════════════════════════════════════════════════════════
+
+  OPCIÓN 1: Más fácil (Recomendado)
+  ─────────────────────────────────
+  1. Busca "Sistema POS HK" en tu escritorio
+  2. Doble click
+  3. Espera a que se instale (primera vez)
+  4. ¡Listo!
+
+  OPCIÓN 2: Manual
+  ────────────────
+  1. Abre: apps\desktop\release\Sistema POS HK Setup 0.8.15.exe
+  2. Ejecuta e instala
+  3. ¡Listo!
+
+  OPCIÓN 3: Desarrollo local
+  ──────────────────────────
+  1. Abre terminal en C:\Users\PC\Desktop\SISTEMA POS\
+  2. npm run dev -w apps/backend   (en pestaña 1)
+  3. npm run dev -w apps/desktop   (en pestaña 2)
+  4. Espera a que compile y abre Electron
+
+
+🔑 CREDENCIALES DE PRUEBA:
+═══════════════════════════════════════════════════════════════════════════
+
+  Si necesitas crear nueva empresa:
+  ├─ Email: tu@email.com
+  ├─ Contraseña: cualquiera
+  └─ Click "Registrar empresa"
+
+  Si ya tienes empresa registrada:
+  ├─ Usa tus credenciales existentes
+  └─ URL servidor: será saved automáticamente
+
+
+💳 PROBAR SISTEMA DE CRÉDITOS:
+═══════════════════════════════════════════════════════════════════════════
+
+  1. Ve a "POS" (Punto de Venta)
+  2. Busca/escanea un producto
+  3. En "Método de pago" selecciona CREDITO
+  4. Se abre modal:
+     ├─ Selecciona cliente (o crea uno nuevo)
+     ├─ Elige cuotas: 3
+     ├─ Plazo: 6 meses
+     ├─ Abono inicial: opcional
+     └─ Click "Confirmar Crédito"
+  5. ¡Crédito creado!
+
+  Ver el crédito:
+  1. Ve a "Créditos"
+  2. Verás listado de créditos por estado
+  3. Click "Ver info" en un crédito
+  4. Se abre modal con:
+     ├─ Total, pagado, pendiente
+     ├─ Próximas fechas de pago (tabla cuotas)
+     ├─ Historial de abonos
+     └─ Registro de nuevo abono
+
+  Alertas:
+  1. Ve a "Notificaciones"
+  2. Verás alertas de:
+     ├─ Cuotas VENCIDAS (rojo)
+     ├─ Cuotas que vencen HOY (amarillo)
+     └─ Próximas cuotas (azul)
+
+
+🛠️ PROBLEMAS COMUNES:
+═══════════════════════════════════════════════════════════════════════════
+
+  "No se conecta al servidor"
+  → Verificar que URL está correcta
+  → Asegurar conexión a internet
+
+  "Productos no sincroniza de Shopify"
+  → Ir a Configuración → Shopify
+  → Click "Conectar" y re-autenticar
+  → Click "Sincronizar ahora"
+
+  "Impresora no funciona"
+  → Instalar driver de impresora
+  → Ir a Configuración → Seleccionar impresora
+  → Probar con botón "Imprimir prueba"
+
+  "Base de datos error"
+  → Verificar conexión internet
+  → Reiniciar aplicación
+
+
+📚 DOCUMENTACIÓN IMPORTANTE:
+═══════════════════════════════════════════════════════════════════════════
+
+  LEER PRIMERO:
+  ├─ README.md              (2 min) - Vista general
+  └─ PROYECTO_CONTEXTO.md   (10 min) - Entender estructura
+
+  SI TRABAJAS CON CRÉDITOS:
+  └─ SISTEMA_CREDITOS.md    (15 min) - Documentación completa
+
+  SI QUIERES CONTRIBUIR:
+  └─ TAREAS_PENDIENTES.md   (10 min) - Lista de mejoras
+
+
+🔗 ARCHIVOS CLAVE DEL SISTEMA:
+═══════════════════════════════════════════════════════════════════════════
+
+  Backend (API):
+  apps/backend/src/routes/
+  ├─ creditos.ts          ← Sistema de créditos (endpoints)
+  ├─ ventas.ts            ← Crear ventas
+  ├─ clientes.ts          ← Gestión de clientes
+  └─ shopify.ts           ← Sincronización Shopify
+
+  Frontend (App):
+  apps/desktop/src/renderer/src/
+  ├─ screens/
+  │  ├─ Pos.tsx           ← Punto de venta (modal crédito aquí)
+  │  ├─ Creditos.tsx      ← Gestión de créditos
+  │  ├─ Clientes.tsx      ← Mostrar deuda
+  │  ├─ Ventas.tsx        ← Historial de ventas
+  │  ├─ Notificaciones.tsx ← Alertas
+  │  └─ Calendario.tsx    ← Eventos de pago
+  └─ components/
+     ├─ ModalCredito.tsx         ← Modal crear crédito
+     └─ DetalleCreditoModal.tsx   ← Modal ver detalles
+
+
+📊 VERSIONES RECIENTES:
+═══════════════════════════════════════════════════════════════════════════
+
+  v0.8.16 (ACTUAL)
+  ├─ ✅ Documentación completa
+  ├─ ✅ Acceso directo escritorio
+  ├─ ✅ Tareas pendientes
+  └─ ✅ Guía rápida (este archivo)
+
+  v0.8.15
+  ├─ ✅ Fix crítico campos BD
+  └─ ✅ numeroCuotasCredito + referencia en abonos
+
+  v0.8.13
+  ├─ ✅ Modal crédito en POS
+  ├─ ✅ Detalles crédito con abonos
+  └─ ✅ Integración calendario/notificaciones
+
+
+✅ CHECKLIST DE INSTALACIÓN:
+═══════════════════════════════════════════════════════════════════════════
+
+  [ ] Acceso directo en escritorio visible
+  [ ] App se abre sin errores
+  [ ] Puedo iniciar sesión
+  [ ] Crear empresa / acceder a empresa existente
+  [ ] Ver punto de venta (POS)
+  [ ] Ver lista de créditos
+  [ ] Ver notificaciones
+  [ ] Probar crear venta con CREDITO
+  [ ] Probar registrar abono
+  [ ] Impresora reconocida (opcional)
+
+
+💡 TIPS:
+═══════════════════════════════════════════════════════════════════════════
+
+  • La app guarda URL del servidor localmente después de ingresar
+  • Los créditos se aplican FIFO (primero el más antiguo)
+  • Las cuotas se distribuyen equitativamente en el tiempo
+  • Los abonos actúan globales por cliente (no por crédito específico)
+  • Las alertas usan endpoint GET /creditos/alertas automáticamente
+  • El calendario sincroniza en tiempo real vía WebSocket
+
+
+🔐 SEGURIDAD:
+═══════════════════════════════════════════════════════════════════════════
+
+  • NO compartir URLs de servidor con usuarios no autorizados
+  • JWT tokens se guardan localmente (seguro en dispositivo)
+  • Las contraseñas se envían por HTTPS (si servidor en producción)
+  • Cada empresa tiene datos aislados por empresaId
+
+
+📞 AYUDA RÁPIDA:
+═══════════════════════════════════════════════════════════════════════════
+
+  ¿Dónde está el archivo de logs?
+  → C:\Users\PC\AppData\Local\Programs\@sistema-pos\resources\logs
+
+  ¿Cómo resetear credenciales?
+  → Eliminar datos en AppData y reiniciar app
+
+  ¿Dónde guarda la app los datos offline?
+  → C:\Users\PC\AppData\Local\Programs\@sistema-pos\data\cola-sync.json
+
+  ¿Necesito internet siempre?
+  → Los cambios se guardan localmente si no hay conexión
+
+
+🎯 PRÓXIMOS PASOS:
+═══════════════════════════════════════════════════════════════════════════
+
+  1. Leer PROYECTO_CONTEXTO.md (10 min)
+  2. Probar crear un crédito en POS (5 min)
+  3. Ver crédito en Créditos.tsx (2 min)
+  4. Registrar un abono (3 min)
+  5. Ver alerta en Notificaciones (1 min)
+
+  TOTAL: 21 minutos para entender todo
+
+
+═══════════════════════════════════════════════════════════════════════════
+
+Última actualización: 2026-08-05
+Versión: 0.8.16
+Estado: ✅ Listo para usar
+
+Disfruta del Sistema POS HK! 🎉
+
+═══════════════════════════════════════════════════════════════════════════

@@ -1,0 +1,9 @@
+node_modules/
+dist/
+out/
+release/
+.env
+*.log
+*.tsbuildinfo
+apps/backend/prisma/dev.db
+apps/desktop/src/renderer/dist/
