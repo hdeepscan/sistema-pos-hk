@@ -1,288 +1,289 @@
-import { Router, Request, Response } from "express";
+import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { PrismaClient } from "@prisma/client";
 import * as bcrypt from "bcrypt";
 
 const prisma = new PrismaClient();
-const router = Router();
 
 // 🔐 Middleware: Verificar Super Admin
-const verificarSuperAdmin = async (req: Request, res: Response, next: any) => {
+const verificarSuperAdmin = async (request: FastifyRequest, reply: FastifyReply) => {
   try {
-    const usuarioId = (req as any).usuarioId;
-    if (!usuarioId) return res.status(401).json({ error: "No autorizado" });
+    const usuarioId = (request as any).usuarioId;
+    if (!usuarioId) {
+      return reply.code(401).send({ error: "No autorizado" });
+    }
 
-    const usuario = await prisma.usuarios.findUnique({
+    const usuario = await prisma.usuario.findUnique({
       where: { id: usuarioId },
     });
 
     if (!usuario || !usuario.es_super_admin) {
       console.warn(`⚠️ SEGURIDAD: Intento de acceso no autorizado a admin por ${usuario?.email}`);
-      return res.status(403).json({ error: "Solo Super Admin puede acceder" });
+      return reply.code(403).send({ error: "Solo Super Admin puede acceder" });
     }
 
-    (req as any).superAdmin = usuario;
-    next();
+    (request as any).superAdmin = usuario;
   } catch (error) {
-    res.status(500).json({ error: "Error verificando permisos" });
+    reply.code(500).send({ error: "Error verificando permisos" });
   }
 };
 
-router.use(verificarSuperAdmin);
+export default async function adminRoutes(app: FastifyInstance) {
+  // Registrar middleware en todas las rutas de admin
+  app.addHook("onRequest", verificarSuperAdmin);
 
-// 📊 GET /admin/clientes - Listar todos los clientes
-router.get("/clientes", async (req: Request, res: Response) => {
-  try {
-    const clientes = await prisma.empresas.findMany({
-      select: {
-        id: true,
-        nombre: true,
-        estado: true,
-        tipo_licencia: true,
-        dias_restantes: true,
-        fecha_vencimiento: true,
-        bloqueada_por_admin: true,
-        razon_bloqueo: true,
-        createdAt: true,
-        usuario: {
-          select: {
-            email: true,
-            nombre: true,
+  // 📊 GET /admin/clientes - Listar todos los clientes
+  app.get("/clientes", async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const clientes = await prisma.empresa.findMany({
+        select: {
+          id: true,
+          nombre: true,
+          estado: true,
+          tipo_licencia: true,
+          dias_restantes: true,
+          fechaVencimiento: true,
+          bloqueada_por_admin: true,
+          razon_bloqueo: true,
+          fechaRegistro: true,
+          usuarios: {
+            select: {
+              email: true,
+              nombre: true,
+            },
+            where: { rol: "ADMIN" },
+            take: 1,
           },
-          where: { rol: "admin" },
-          take: 1,
         },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+        orderBy: { fechaRegistro: "desc" },
+      });
 
-    const clientesFormateados = clientes.map((c: any) => ({
-      id: c.id,
-      nombre: c.nombre,
-      estado: c.estado,
-      tipo_licencia: c.tipo_licencia,
-      dias_restantes: c.dias_restantes,
-      email_admin: c.usuario?.[0]?.email || "N/A",
-      nombre_admin: c.usuario?.[0]?.nombre || "N/A",
-      fecha_creacion: c.createdAt,
-      fecha_vencimiento: c.fecha_vencimiento,
-      bloqueada_por_admin: c.bloqueada_por_admin,
-      razon_bloqueo: c.razon_bloqueo,
-    }));
+      const clientesFormateados = clientes.map((c: any) => ({
+        id: c.id,
+        nombre: c.nombre,
+        estado: c.estado,
+        tipo_licencia: c.tipo_licencia,
+        dias_restantes: c.dias_restantes,
+        email_admin: c.usuarios?.[0]?.email || "N/A",
+        nombre_admin: c.usuarios?.[0]?.nombre || "N/A",
+        fecha_creacion: c.fechaRegistro,
+        fecha_vencimiento: c.fechaVencimiento,
+        bloqueada_por_admin: c.bloqueada_por_admin,
+        razon_bloqueo: c.razon_bloqueo,
+      }));
 
-    res.json(clientesFormateados);
-  } catch (error) {
-    console.error("Error listando clientes:", error);
-    res.status(500).json({ error: "Error listando clientes" });
-  }
-});
-
-// ➕ POST /admin/clientes - Crear nuevo cliente (bypass de pago)
-router.post("/clientes", async (req: Request, res: Response) => {
-  try {
-    const { nombreEmpresa, emailAdmin, nombreAdmin, tipoLicencia } = req.body;
-
-    if (!nombreEmpresa || !emailAdmin || !nombreAdmin) {
-      return res.status(400).json({ error: "Faltan datos requeridos" });
+      reply.send(clientesFormateados);
+    } catch (error) {
+      console.error("Error listando clientes:", error);
+      reply.code(500).send({ error: "Error listando clientes" });
     }
+  });
 
-    // Generar contraseña temporal
-    const passwordTemporal = `TEMP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const passwordHash = await bcrypt.hash(passwordTemporal, 10);
+  // ➕ POST /admin/clientes - Crear nuevo cliente (bypass de pago)
+  app.post("/clientes", async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const { nombreEmpresa, emailAdmin, nombreAdmin, tipoLicencia } = request.body as any;
 
-    // Calcular fecha de vencimiento según tipo de licencia
-    const hoy = new Date();
-    let diasExpiracion = 30;
-    if (tipoLicencia === "prueba") diasExpiracion = 14;
-    else if (tipoLicencia === "trimestral") diasExpiracion = 90;
-    else if (tipoLicencia === "anual") diasExpiracion = 365;
+      if (!nombreEmpresa || !emailAdmin || !nombreAdmin) {
+        return reply.code(400).send({ error: "Faltan datos requeridos" });
+      }
 
-    const fechaVencimiento = new Date(hoy.getTime() + diasExpiracion * 24 * 60 * 60 * 1000);
+      // Generar contraseña temporal
+      const passwordTemporal = `TEMP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const passwordHash = await bcrypt.hash(passwordTemporal, 10);
 
-    // Crear empresa
-    const empresa = await prisma.empresas.create({
-      data: {
-        nombre: nombreEmpresa,
-        estado: "activa",
-        tipo_licencia: tipoLicencia,
-        dias_restantes: diasExpiracion,
-        fecha_vencimiento: fechaVencimiento,
-        bloqueada_por_admin: false,
-      },
-    });
+      // Calcular fecha de vencimiento según tipo de licencia
+      const hoy = new Date();
+      let diasExpiracion = 30;
+      if (tipoLicencia === "prueba") diasExpiracion = 14;
+      else if (tipoLicencia === "trimestral") diasExpiracion = 90;
+      else if (tipoLicencia === "anual") diasExpiracion = 365;
 
-    // Crear usuario admin para la empresa
-    const usuario = await prisma.usuarios.create({
-      data: {
-        email: emailAdmin,
-        nombre: nombreAdmin,
-        password_hash: passwordHash,
-        empresa_id: empresa.id,
-        rol: "admin",
-        es_super_admin: false,
-      },
-    });
+      const fechaVencimiento = new Date(hoy.getTime() + diasExpiracion * 24 * 60 * 60 * 1000);
 
-    // Registrar en auditoría
-    await prisma.admin_auditoria.create({
-      data: {
-        super_admin_id: (req as any).superAdmin.id,
-        accion: "CREAR_CLIENTE",
-        entidad: "empresas",
-        entidad_id: empresa.id,
-        detalles: {
+      // Crear empresa
+      const empresa = await prisma.empresa.create({
+        data: {
           nombre: nombreEmpresa,
-          email_admin: emailAdmin,
+          estado: "activa",
           tipo_licencia: tipoLicencia,
+          dias_restantes: diasExpiracion,
+          fechaVencimiento: fechaVencimiento,
+          bloqueada_por_admin: false,
         },
-      },
-    });
+      });
 
-    res.json({
-      success: true,
-      empresa,
-      usuario,
-      passwordTemporal,
-      mensaje: "Cliente creado exitosamente. Contraseña temporal generada.",
-    });
-  } catch (error) {
-    console.error("Error creando cliente:", error);
-    res.status(500).json({ error: "Error creando cliente" });
-  }
-});
+      // Crear usuario admin para la empresa
+      const usuario = await prisma.usuario.create({
+        data: {
+          email: emailAdmin,
+          nombre: nombreAdmin,
+          passwordHash: passwordHash,
+          empresaId: empresa.id,
+          rol: "ADMIN",
+          es_super_admin: false,
+        },
+      });
 
-// 📅 PATCH /admin/clientes/:id/licencia - Extender licencia
-router.patch("/clientes/:id/licencia", async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { dias } = req.body;
+      // Registrar en auditoría
+      await prisma.adminAuditoria.create({
+        data: {
+          super_admin_id: (request as any).superAdmin.id,
+          accion: "CREAR_CLIENTE",
+          entidad: "empresas",
+          entidad_id: empresa.id,
+          detalles: JSON.stringify({
+            nombre: nombreEmpresa,
+            email_admin: emailAdmin,
+            tipo_licencia: tipoLicencia,
+          }),
+        },
+      });
 
-    if (!dias || dias <= 0) {
-      return res.status(400).json({ error: "Días inválido" });
+      reply.send({
+        success: true,
+        empresa,
+        usuario,
+        passwordTemporal,
+        mensaje: "Cliente creado exitosamente. Contraseña temporal generada.",
+      });
+    } catch (error) {
+      console.error("Error creando cliente:", error);
+      reply.code(500).send({ error: "Error creando cliente" });
     }
+  });
 
-    const empresa = await prisma.empresas.findUnique({ where: { id } });
-    if (!empresa) {
-      return res.status(404).json({ error: "Cliente no encontrado" });
+  // 📅 PATCH /admin/clientes/:id/licencia - Extender licencia
+  app.patch("/clientes/:id/licencia", async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const { id } = request.params as any;
+      const { dias } = request.body as any;
+
+      if (!dias || dias <= 0) {
+        return reply.code(400).send({ error: "Días inválido" });
+      }
+
+      const empresa = await prisma.empresa.findUnique({ where: { id } });
+      if (!empresa) {
+        return reply.code(404).send({ error: "Cliente no encontrado" });
+      }
+
+      const nuevaFecha = new Date(
+        empresa.fechaVencimiento!.getTime() + dias * 24 * 60 * 60 * 1000
+      );
+      const nuevosDias = empresa.dias_restantes + dias;
+
+      const empresaActualizada = await prisma.empresa.update({
+        where: { id },
+        data: {
+          fechaVencimiento: nuevaFecha,
+          dias_restantes: nuevosDias,
+        },
+      });
+
+      // Auditoría
+      await prisma.adminAuditoria.create({
+        data: {
+          super_admin_id: (request as any).superAdmin.id,
+          accion: "EXTENDER_LICENCIA",
+          entidad: "empresas",
+          entidad_id: id,
+          detalles: JSON.stringify({ dias, nueva_fecha: nuevaFecha }),
+        },
+      });
+
+      reply.send({ success: true, empresa: empresaActualizada });
+    } catch (error) {
+      console.error("Error extendiendo licencia:", error);
+      reply.code(500).send({ error: "Error extendiendo licencia" });
     }
+  });
 
-    const nuevaFecha = new Date(
-      empresa.fecha_vencimiento!.getTime() + dias * 24 * 60 * 60 * 1000
-    );
-    const nuevosDias = empresa.dias_restantes + dias;
+  // 🔑 POST /admin/clientes/:id/reset-password - Resetear contraseña
+  app.post("/clientes/:id/reset-password", async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const { id } = request.params as any;
 
-    const empresaActualizada = await prisma.empresas.update({
-      where: { id },
-      data: {
-        fecha_vencimiento: nuevaFecha,
-        dias_restantes: nuevosDias,
-      },
-    });
+      const empresa = await prisma.empresa.findUnique({ where: { id } });
+      if (!empresa) {
+        return reply.code(404).send({ error: "Cliente no encontrado" });
+      }
 
-    // Auditoría
-    await prisma.admin_auditoria.create({
-      data: {
-        super_admin_id: (req as any).superAdmin.id,
-        accion: "EXTENDER_LICENCIA",
-        entidad: "empresas",
-        entidad_id: id,
-        detalles: { dias, nueva_fecha: nuevaFecha },
-      },
-    });
+      // Generar nueva contraseña temporal
+      const nuevaPassword = `TEMP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const passwordHash = await bcrypt.hash(nuevaPassword, 10);
 
-    res.json({ success: true, empresa: empresaActualizada });
-  } catch (error) {
-    console.error("Error extendiendo licencia:", error);
-    res.status(500).json({ error: "Error extendiendo licencia" });
-  }
-});
+      // Actualizar usuario admin de la empresa
+      await prisma.usuario.updateMany({
+        where: { empresaId: id, rol: "ADMIN" },
+        data: { passwordHash: passwordHash },
+      });
 
-// 🔑 POST /admin/clientes/:id/reset-password - Resetear contraseña
-router.post("/clientes/:id/reset-password", async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
+      // Auditoría
+      await prisma.adminAuditoria.create({
+        data: {
+          super_admin_id: (request as any).superAdmin.id,
+          accion: "RESET_PASSWORD",
+          entidad: "empresas",
+          entidad_id: id,
+        },
+      });
 
-    const empresa = await prisma.empresas.findUnique({ where: { id } });
-    if (!empresa) {
-      return res.status(404).json({ error: "Cliente no encontrado" });
+      reply.send({
+        success: true,
+        passwordTemporal: nuevaPassword,
+        mensaje: "Contraseña reseteada. Nueva contraseña temporal generada.",
+      });
+    } catch (error) {
+      console.error("Error reseteando password:", error);
+      reply.code(500).send({ error: "Error reseteando password" });
     }
+  });
 
-    // Generar nueva contraseña temporal
-    const nuevaPassword = `TEMP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const passwordHash = await bcrypt.hash(nuevaPassword, 10);
+  // 🚫 PATCH /admin/clientes/:id/bloquear - Bloquear/Desbloquear cliente
+  app.patch("/clientes/:id/bloquear", async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const { id } = request.params as any;
+      const { bloqueado, razon } = request.body as any;
 
-    // Actualizar usuario admin de la empresa
-    await prisma.usuarios.updateMany({
-      where: { empresa_id: id, rol: "admin" },
-      data: { password_hash: passwordHash },
-    });
+      const empresa = await prisma.empresa.update({
+        where: { id },
+        data: {
+          bloqueada_por_admin: bloqueado,
+          razon_bloqueo: razon || null,
+          fecha_ultimo_bloqueo: bloqueado ? new Date() : null,
+        },
+      });
 
-    // Auditoría
-    await prisma.admin_auditoria.create({
-      data: {
-        super_admin_id: (req as any).superAdmin.id,
-        accion: "RESET_PASSWORD",
-        entidad: "empresas",
-        entidad_id: id,
-      },
-    });
+      // Auditoría
+      await prisma.adminAuditoria.create({
+        data: {
+          super_admin_id: (request as any).superAdmin.id,
+          accion: bloqueado ? "BLOQUEAR_CLIENTE" : "DESBLOQUEAR_CLIENTE",
+          entidad: "empresas",
+          entidad_id: id,
+          detalles: JSON.stringify({ razon }),
+        },
+      });
 
-    res.json({
-      success: true,
-      passwordTemporal: nuevaPassword,
-      mensaje: "Contraseña reseteada. Nueva contraseña temporal generada.",
-    });
-  } catch (error) {
-    console.error("Error reseteando password:", error);
-    res.status(500).json({ error: "Error reseteando password" });
-  }
-});
+      reply.send({ success: true, empresa });
+    } catch (error) {
+      console.error("Error bloqueando cliente:", error);
+      reply.code(500).send({ error: "Error bloqueando cliente" });
+    }
+  });
 
-// 🚫 PATCH /admin/clientes/:id/bloquear - Bloquear/Desbloquear cliente
-router.patch("/clientes/:id/bloquear", async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { bloqueado, razon } = req.body;
+  // 📋 GET /admin/auditoria - Ver logs de auditoría
+  app.get("/auditoria", async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const logs = await prisma.adminAuditoria.findMany({
+        orderBy: { fecha: "desc" },
+        take: 100,
+      });
 
-    const empresa = await prisma.empresas.update({
-      where: { id },
-      data: {
-        bloqueada_por_admin: bloqueado,
-        razon_bloqueo: razon || null,
-        fecha_ultimo_bloqueo: bloqueado ? new Date() : null,
-      },
-    });
-
-    // Auditoría
-    await prisma.admin_auditoria.create({
-      data: {
-        super_admin_id: (req as any).superAdmin.id,
-        accion: bloqueado ? "BLOQUEAR_CLIENTE" : "DESBLOQUEAR_CLIENTE",
-        entidad: "empresas",
-        entidad_id: id,
-        detalles: { razon },
-      },
-    });
-
-    res.json({ success: true, empresa });
-  } catch (error) {
-    console.error("Error bloqueando cliente:", error);
-    res.status(500).json({ error: "Error bloqueando cliente" });
-  }
-});
-
-// 📋 GET /admin/auditoria - Ver logs de auditoría
-router.get("/auditoria", async (req: Request, res: Response) => {
-  try {
-    const logs = await prisma.admin_auditoria.findMany({
-      orderBy: { fecha: "desc" },
-      take: 100,
-    });
-
-    res.json(logs);
-  } catch (error) {
-    console.error("Error obteniendo auditoría:", error);
-    res.status(500).json({ error: "Error obteniendo auditoría" });
-  }
-});
-
-export default router;
+      reply.send(logs);
+    } catch (error) {
+      console.error("Error obteniendo auditoría:", error);
+      reply.code(500).send({ error: "Error obteniendo auditoría" });
+    }
+  });
+}
