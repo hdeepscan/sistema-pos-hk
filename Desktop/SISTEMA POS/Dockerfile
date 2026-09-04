@@ -7,15 +7,17 @@ RUN apt-get update && apt-get install -y postgresql-client && rm -rf /var/lib/ap
 
 # Copy package files for dependency installation
 COPY package*.json ./
-COPY apps/backend/package*.json ./apps/backend/
-COPY apps/desktop/package*.json ./apps/desktop/
-COPY packages/shared/package*.json ./packages/shared/
+COPY "Desktop/SISTEMA POS/package*.json" ./
+COPY "Desktop/SISTEMA POS/apps/backend/package*.json" ./apps/backend/
+COPY "Desktop/SISTEMA POS/apps/desktop/package*.json" ./apps/desktop/
+COPY "Desktop/SISTEMA POS/packages/shared/package*.json" ./packages/shared/
 
 # Install ALL dependencies (including devDependencies needed for build)
 RUN npm install --include=dev
 
 # Copy application source code
-COPY . .
+COPY "Desktop/SISTEMA POS/apps" ./apps
+COPY "Desktop/SISTEMA POS/packages" ./packages
 
 # Generate Prisma client BEFORE building (required for TypeScript compilation)
 # Remove cached Prisma types to ensure clean generation
@@ -35,10 +37,9 @@ RUN ls -la apps/backend/dist/public/index.html || echo "WARNING: index.html not 
 
 EXPOSE 8080
 
-# Health check - Force rebuild: 2026-08-19
+# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD node -e "require('http').get('http://localhost:4000/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
 
 # Start the backend server
-# Note: Migrations will run automatically on first connection if using Prisma's migration feature
 CMD ["node", "apps/backend/dist/server.js"]
