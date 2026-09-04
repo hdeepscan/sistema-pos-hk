@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useSesionStore } from "../lib/store";
 import logo from "../assets/logo.png";
@@ -427,6 +428,42 @@ const loginStyles = `
     filter: brightness(0) invert(1);
   }
 
+  .admin-button {
+    width: 100%;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 6px 16px rgba(99, 102, 241, 0.35);
+    margin-top: 12px;
+  }
+
+  .admin-button:hover {
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    box-shadow: 0 10px 24px rgba(99, 102, 241, 0.45);
+    transform: translateY(-2px);
+  }
+
+  .admin-button:active {
+    transform: translateY(0);
+  }
+
+  .admin-icon {
+    width: 16px;
+    height: 16px;
+  }
+
   @media (max-width: 480px) {
     .login-card {
       padding: 32px 24px;
@@ -449,6 +486,7 @@ const loginStyles = `
 `;
 
 export default function Login() {
+  const navigate = useNavigate();
   const [modo, setModo] = useState<"login" | "registro" | "checkout">("login");
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -714,6 +752,19 @@ export default function Login() {
                   <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#ea4335"/>
                 </svg>
                 <span>Google</span>
+              </button>
+
+              {/* Admin Access Button */}
+              <button
+                type="button"
+                className="admin-button"
+                onClick={() => navigate("/centrala-admin")}
+                title="Acceso para administradores"
+              >
+                <svg className="admin-icon" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 1C6.48 1 2 5.48 2 11s4.48 10 10 10 10-4.48 10-10S17.52 1 12 1m0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3m0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+                </svg>
+                <span>Administradores</span>
               </button>
             </>
           )}
