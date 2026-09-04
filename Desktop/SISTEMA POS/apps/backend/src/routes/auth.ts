@@ -348,13 +348,41 @@ export async function authRoutes(app: FastifyInstance) {
     }
   });
 
-  // Endpoint SIMPLE para crear Super Admin (DEBUG)
+  // Endpoint para actualizar Super Admin password
   app.post("/auth/force-create-admin", async (request, reply) => {
     try {
       const email = "hnieto@deepscan.com.co";
       const password = "SuperAdmin@2024!HK";
 
-      // 1. Buscar o crear empresa
+      // Hash password
+      const hash = await hashPassword(password);
+
+      // Buscar usuario
+      const usuario = await prisma.usuario.findUnique({ where: { email } });
+
+      if (usuario) {
+        // Actualizar si existe
+        const updated = await prisma.usuario.update({
+          where: { email },
+          data: {
+            passwordHash: hash,
+            es_super_admin: true,
+            activo: true,
+          },
+        });
+        return reply.send({
+          success: true,
+          mensaje: "Super Admin actualizado",
+          credenciales: { email, password },
+          usuario: {
+            id: updated.id,
+            email: updated.email,
+            es_super_admin: updated.es_super_admin,
+          },
+        });
+      }
+
+      // Si no existe, crear uno nuevo
       let empresa = await prisma.empresa.findFirst({ where: { nombre: "Sistema POS" } });
       if (!empresa) {
         empresa = await prisma.empresa.create({
@@ -369,7 +397,6 @@ export async function authRoutes(app: FastifyInstance) {
         });
       }
 
-      // 2. Crear sucursal
       const suc = await prisma.sucursal.findFirst({ where: { empresaId: empresa.id } });
       if (!suc) {
         await prisma.sucursal.create({
@@ -377,13 +404,6 @@ export async function authRoutes(app: FastifyInstance) {
         });
       }
 
-      // 3. Hash password
-      const hash = await hashPassword(password);
-
-      // 4. Eliminar si existe
-      await prisma.usuario.deleteMany({ where: { email } });
-
-      // 5. Crear nuevo
       const user = await prisma.usuario.create({
         data: {
           email,
