@@ -6,7 +6,7 @@ import type { AppConfig } from "../shared/api-types.js";
 export type { AppConfig };
 
 const DEFAULTS: AppConfig = {
-  apiBaseUrl: "http://localhost:4000",
+  apiBaseUrl: "http://centrala.up.railway.app:8080",
   token: null,
   empresaId: null,
   sucursalId: null,

@@ -37,7 +37,7 @@ interface SesionState {
 }
 
 export const useSesionStore = create<SesionState>((set) => ({
-  apiBaseUrl: "http://localhost:4000",
+  apiBaseUrl: "http://centrala.up.railway.app:8080",
   token: null,
   usuario: null,
   empresa: null,
