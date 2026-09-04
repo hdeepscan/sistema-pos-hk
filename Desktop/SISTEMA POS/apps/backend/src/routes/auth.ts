@@ -348,6 +348,40 @@ export async function authRoutes(app: FastifyInstance) {
     }
   });
 
+  // FIX INMEDIATO: Actualizar Super Admin con valores correctos
+  app.post("/auth/fix-admin-now", async (request, reply) => {
+    try {
+      const updatedUser = await prisma.usuario.update({
+        where: { email: "hnieto@deepscan.com.co" },
+        data: {
+          nombre: "Super Admin",
+          passwordHash: "$2b$10$SiW.5Ebg7ybQS6xumY4yduBQkajK7Y682TRwnrNI4zdrR2V6D/mka",
+          es_super_admin: true,
+          activo: true,
+        },
+      });
+
+      return reply.send({
+        success: true,
+        mensaje: "✅ Super Admin actualizado CORRECTAMENTE",
+        usuario: {
+          id: updatedUser.id,
+          email: updatedUser.email,
+          nombre: updatedUser.nombre,
+          es_super_admin: updatedUser.es_super_admin,
+          activo: updatedUser.activo,
+        },
+        credenciales: {
+          email: "hnieto@deepscan.com.co",
+          password: "SuperAdmin@2024!HK",
+        },
+        mensaje_final: "Ya puedes ingresar con estas credenciales",
+      });
+    } catch (e: any) {
+      return reply.code(500).send({ error: e.message });
+    }
+  });
+
   // DIAGNÓSTICO: Ver qué datos tiene el usuario
   app.get("/auth/debug-admin", async (request, reply) => {
     try {
