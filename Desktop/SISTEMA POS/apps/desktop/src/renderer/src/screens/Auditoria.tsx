@@ -3,6 +3,7 @@ import { api } from "../lib/api";
 import { BotonesExportar } from "../lib/BotonesExportar";
 import type { ColumnaExport } from "../lib/export";
 import { mensajeError } from "../lib/errores";
+import { Pagination } from "../components/Pagination";
 
 interface EntradaAuditoria {
   id: string;
@@ -157,38 +158,50 @@ export default function Auditoria() {
         </div>
       </div>
 
-      <div className="card">
-        {cargando ? (
-          <p className="empty-state">Cargando...</p>
-        ) : error ? (
-          <p className="error-text">{error}</p>
-        ) : entradas.length === 0 ? (
-          <p className="empty-state">No hay actividad que coincida con estos filtros</p>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Fecha</th>
-                <th>Usuario</th>
-                <th>Accion</th>
-                <th>Detalle</th>
-              </tr>
-            </thead>
-            <tbody>
-              {entradas.map((e) => (
-                <tr key={e.id}>
-                  <td style={{ whiteSpace: "nowrap" }}>{new Date(e.fecha).toLocaleString("es-CO")}</td>
-                  <td>{e.usuario?.nombre ?? "-"}</td>
-                  <td>
-                    <span className="badge neutral">{etiqueta(e.accion)}</span>
-                  </td>
-                  <td style={{ fontSize: 12.5, color: "var(--text-muted)" }}>{e.detalle ?? "-"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      <Pagination
+        items={entradas}
+        itemsPerPageOptions={[10, 25, 50]}
+        renderTable={(pageItems) =>
+          cargando ? (
+            <div className="card">
+              <p className="empty-state">Cargando...</p>
+            </div>
+          ) : error ? (
+            <div className="card">
+              <p className="error-text">{error}</p>
+            </div>
+          ) : pageItems.length === 0 && entradas.length === 0 ? (
+            <div className="card">
+              <p className="empty-state">No hay actividad que coincida con estos filtros</p>
+            </div>
+          ) : (
+            <div className="card">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Usuario</th>
+                    <th>Accion</th>
+                    <th>Detalle</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageItems.map((e) => (
+                    <tr key={e.id}>
+                      <td style={{ whiteSpace: "nowrap" }}>{new Date(e.fecha).toLocaleString("es-CO")}</td>
+                      <td>{e.usuario?.nombre ?? "-"}</td>
+                      <td>
+                        <span className="badge neutral">{etiqueta(e.accion)}</span>
+                      </td>
+                      <td style={{ fontSize: 12.5, color: "var(--text-muted)" }}>{e.detalle ?? "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        }
+      />
     </div>
   );
 }

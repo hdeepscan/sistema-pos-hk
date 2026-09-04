@@ -7,6 +7,7 @@ import type { ColumnaExport } from "../lib/export";
 import { mensajeError } from "../lib/errores";
 import { electronAPI } from "../lib/electron-api";
 import { generarSvgCodigoBarras } from "../lib/barcode";
+import { Pagination } from "../components/Pagination";
 import type { ReciboData } from "../../../shared/api-types";
 
 interface VentaItem {
@@ -438,55 +439,65 @@ export default function Ventas() {
         </div>
       </div>
 
-      <div className="card">
-        {cargando ? (
-          <p className="empty-state">Cargando...</p>
-        ) : ventasFiltradas.length === 0 ? (
-          <p className="empty-state">No hay ventas que coincidan con estos filtros</p>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>No.</th>
-                <th>Fecha</th>
-                <th>Canal</th>
-                <th>Sucursal</th>
-                <th>Productos</th>
-                <th>Pago</th>
-                <th>Total</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {ventasFiltradas.map((v) => (
-                <tr key={v.id} className="list-item" style={{ cursor: "pointer" }} onClick={() => setSeleccionada(v)}>
-                  <td>#{v.consecutivo}</td>
-                  <td>{new Date(v.fecha).toLocaleString("es-CO")}</td>
-                  <td>
-                    <span className={`badge ${badgeCanal[v.canal] ?? "neutral"}`}>{ETIQUETAS_CANAL[v.canal] ?? v.canal}</span>
-                    {v.ventaLibre && (
-                      <span className="badge warning" style={{ marginLeft: 4 }}>
-                        Libre
-                      </span>
-                    )}
-                  </td>
-                  <td>{sucursales.find((s) => s.id === v.sucursalId)?.nombre ?? "-"}</td>
-                  <td style={{ maxWidth: 280 }}>{resumenItems(v.items)}</td>
-                  <td>
-                    <span className={`badge ${badgePago[v.metodoPago] ?? "neutral"}`}>{v.metodoPago}</span>
-                  </td>
-                  <td>${Number(v.total).toLocaleString("es-CO")}</td>
-                  <td>
-                    <button className="secondary" type="button" onClick={(e) => { e.stopPropagation(); setSeleccionada(v); }}>
-                      Ver detalle
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      <Pagination
+        items={ventasFiltradas}
+        itemsPerPageOptions={[10, 25, 50]}
+        renderTable={(pageItems) =>
+          cargando ? (
+            <div className="card">
+              <p className="empty-state">Cargando...</p>
+            </div>
+          ) : pageItems.length === 0 && ventasFiltradas.length === 0 ? (
+            <div className="card">
+              <p className="empty-state">No hay ventas que coincidan con estos filtros</p>
+            </div>
+          ) : (
+            <div className="card">
+              <table>
+                <thead>
+                  <tr>
+                    <th>No.</th>
+                    <th>Fecha</th>
+                    <th>Canal</th>
+                    <th>Sucursal</th>
+                    <th>Productos</th>
+                    <th>Pago</th>
+                    <th>Total</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageItems.map((v) => (
+                    <tr key={v.id} className="list-item" style={{ cursor: "pointer" }} onClick={() => setSeleccionada(v)}>
+                      <td>#{v.consecutivo}</td>
+                      <td>{new Date(v.fecha).toLocaleString("es-CO")}</td>
+                      <td>
+                        <span className={`badge ${badgeCanal[v.canal] ?? "neutral"}`}>{ETIQUETAS_CANAL[v.canal] ?? v.canal}</span>
+                        {v.ventaLibre && (
+                          <span className="badge warning" style={{ marginLeft: 4 }}>
+                            Libre
+                          </span>
+                        )}
+                      </td>
+                      <td>{sucursales.find((s) => s.id === v.sucursalId)?.nombre ?? "-"}</td>
+                      <td style={{ maxWidth: 280 }}>{resumenItems(v.items)}</td>
+                      <td>
+                        <span className={`badge ${badgePago[v.metodoPago] ?? "neutral"}`}>{v.metodoPago}</span>
+                      </td>
+                      <td>${Number(v.total).toLocaleString("es-CO")}</td>
+                      <td>
+                        <button className="secondary" type="button" onClick={(e) => { e.stopPropagation(); setSeleccionada(v); }}>
+                          Ver detalle
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        }
+      />
 
       {seleccionada && (
         <DetalleVenta
