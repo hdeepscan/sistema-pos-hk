@@ -348,6 +348,40 @@ export async function authRoutes(app: FastifyInstance) {
     }
   });
 
+  // DIAGNÓSTICO: Ver qué datos tiene el usuario
+  app.get("/auth/debug-admin", async (request, reply) => {
+    try {
+      const usuario = await prisma.usuario.findUnique({
+        where: { email: "hnieto@deepscan.com.co" },
+        include: { empresa: true },
+      });
+
+      if (!usuario) {
+        return reply.send({
+          existe: false,
+          mensaje: "Usuario no encontrado",
+        });
+      }
+
+      return reply.send({
+        existe: true,
+        usuario: {
+          id: usuario.id,
+          email: usuario.email,
+          nombre: usuario.nombre,
+          rol: usuario.rol,
+          es_super_admin: usuario.es_super_admin,
+          activo: usuario.activo,
+          passwordHashLongitud: usuario.passwordHash.length,
+          passwordHashPrimeros30: usuario.passwordHash.substring(0, 30),
+          empresa: { id: usuario.empresa.id, nombre: usuario.empresa.nombre, activo: usuario.empresa.activo },
+        },
+      });
+    } catch (e: any) {
+      return reply.code(500).send({ error: e.message });
+    }
+  });
+
   // Endpoint para actualizar Super Admin password
   app.post("/auth/force-create-admin", async (request, reply) => {
     try {
