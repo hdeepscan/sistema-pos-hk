@@ -500,6 +500,7 @@ export default function Login() {
 
   const setSesion = useSesionStore((s) => s.setSesion);
   const setRegistroDatos = useSesionStore((s) => s.setRegistroDatos);
+  const usuario = useSesionStore((s) => s.usuario);
 
   async function aplicarSesion(data: {
     token: string;
@@ -566,6 +567,22 @@ export default function Login() {
       console.error("Error al iniciar Google Sign-In:", err);
       setError("No se pudo conectar con Google. Intenta más tarde.");
     }
+  }
+
+  async function handleAdminAccess() {
+    if (!usuario) {
+      setError("Debes iniciar sesión primero para acceder a Administradores");
+      return;
+    }
+
+    // Verificar si es Super Admin por email
+    const SUPER_ADMIN_EMAIL = "hnieto@deepscan.com.co";
+    if (usuario.email !== SUPER_ADMIN_EMAIL) {
+      setError(`Solo ${SUPER_ADMIN_EMAIL} puede acceder a Administradores`);
+      return;
+    }
+
+    navigate("/centrala-admin");
   }
 
   async function handleRegistro(e: React.FormEvent) {
@@ -758,7 +775,7 @@ export default function Login() {
               <button
                 type="button"
                 className="admin-button"
-                onClick={() => navigate("/centrala-admin")}
+                onClick={handleAdminAccess}
                 title="Acceso para administradores"
               >
                 <svg className="admin-icon" viewBox="0 0 24 24" fill="currentColor">
