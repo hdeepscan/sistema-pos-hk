@@ -22,16 +22,25 @@ interface Cliente {
 const styles = `
   .admin-container {
     min-height: 100vh;
-    background: linear-gradient(-45deg, rgba(219, 234, 254, 0.8) 0%, rgba(220, 252, 231, 0.7) 25%, rgba(219, 234, 254, 0.75) 50%, rgba(220, 252, 231, 0.8) 75%, rgba(219, 234, 254, 0.8) 100%);
-    background-size: 400% 400%;
-    animation: gradientShift 15s ease infinite;
+    background: #FFFFFF;
+    background-size: 200% 100%;
+    animation: subtleShineAdmin 8s ease-in-out infinite;
     padding: 32px;
   }
 
-  @keyframes gradientShift {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
+  @keyframes subtleShineAdmin {
+    0% {
+      background: linear-gradient(90deg, #FFFFFF 0%, #F9FAFB 50%, #FFFFFF 100%);
+      background-position: -200% center;
+    }
+    50% {
+      background: linear-gradient(90deg, #FFFFFF 0%, #F8F9FA 50%, #FFFFFF 100%);
+      background-position: 200% center;
+    }
+    100% {
+      background: linear-gradient(90deg, #FFFFFF 0%, #F9FAFB 50%, #FFFFFF 100%);
+      background-position: -200% center;
+    }
   }
 
   .admin-header {
@@ -50,20 +59,23 @@ const styles = `
   }
 
   .logout-btn {
-    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    background: #3B82F6;
     color: white;
     border: none;
-    border-radius: 12px;
-    padding: 12px 24px;
+    border-radius: 10px;
+    padding: 10px 20px;
     font-weight: 600;
+    font-size: 13px;
+    text-transform: uppercase;
     cursor: pointer;
     transition: all 0.3s ease;
-    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
   }
 
   .logout-btn:hover {
+    background: #2563EB;
     transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
   }
 
   .kpi-grid {
@@ -77,19 +89,19 @@ const styles = `
   }
 
   .kpi-card {
-    background: rgba(255, 255, 255, 0.75);
-    backdrop-filter: blur(30px);
-    border: 1px solid rgba(255, 255, 255, 0.95);
-    border-radius: 24px;
+    background: #FFFFFF;
+    border: 1px solid rgba(59, 130, 246, 0.08);
+    border-radius: 16px;
     padding: 24px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
     text-align: center;
     transition: all 0.3s ease;
   }
 
   .kpi-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.08);
+    border-color: rgba(59, 130, 246, 0.15);
   }
 
   .kpi-label {
@@ -107,14 +119,13 @@ const styles = `
   }
 
   .admin-section {
-    background: rgba(255, 255, 255, 0.75);
-    backdrop-filter: blur(30px);
-    border: 1px solid rgba(255, 255, 255, 0.95);
-    border-radius: 24px;
+    background: #FFFFFF;
+    border: 1px solid rgba(59, 130, 246, 0.08);
+    border-radius: 16px;
     padding: 32px;
     max-width: 1400px;
     margin: 0 auto;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   }
 
   .section-title {
@@ -132,18 +143,24 @@ const styles = `
 
   .search-input {
     flex: 1;
-    padding: 12px 16px;
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.5);
+    padding: 10px 14px;
+    border: 2px solid #E2E8F0;
+    border-radius: 10px;
+    background: #F9FAFB;
     font-size: 14px;
     transition: all 0.3s;
+    color: #0f172a;
+  }
+
+  .search-input::placeholder {
+    color: #94a3b8;
   }
 
   .search-input:focus {
     outline: none;
-    border-color: #6366f1;
-    background: rgba(255, 255, 255, 0.95);
+    border-color: #3B82F6;
+    background: #FFFFFF;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
   }
 
   .clients-table {
@@ -153,14 +170,15 @@ const styles = `
   }
 
   .clients-table th {
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    background: #3B82F6;
     color: white;
     padding: 14px;
     text-align: left;
     font-weight: 600;
     font-size: 12px;
     text-transform: uppercase;
-    border-radius: 12px 12px 0 0;
+    letter-spacing: 0.4px;
+    border-radius: 10px 10px 0 0;
   }
 
   .clients-table td {
@@ -174,7 +192,7 @@ const styles = `
   }
 
   .clients-table tr:hover {
-    background: rgba(99, 102, 241, 0.05);
+    background: rgba(59, 130, 246, 0.04);
   }
 
   .status-badge {
