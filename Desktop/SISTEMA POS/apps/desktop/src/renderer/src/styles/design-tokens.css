@@ -1,0 +1,330 @@
+/**
+ * CENTRALA DESIGN SYSTEM
+ * Tokens globales para todo el ecosistema empresarial
+ *
+ * Filosofía:
+ * - 70-80% Neutrales
+ * - 15-20% Azul (Primario)
+ * - 5-10% Cian (Acento)
+ * - Verde solo para Success
+ * - Rojo solo para Danger
+ */
+
+:root {
+  /* ================================
+     CENTRALA COLOR PALETTE
+     ================================ */
+
+  /* PRIMARY: AZUL CENTRALA */
+  --color-primary-900: #0F3A66;  /* Darkest - Rarely used */
+  --color-primary-800: #1A4D80;  /* Dark - Sidebar hover */
+  --color-primary-700: #2563EB;  /* Deep Blue - Main blue */
+  --color-primary-600: #3B82F6;  /* Primary Blue - Buttons, links, active states */
+  --color-primary-500: #60A5FA;  /* Medium Blue - Secondary actions */
+  --color-primary-400: #93C5FD;  /* Light Blue - Hover states */
+  --color-primary-300: #BFDBFE;  /* Lighter Blue - Borders, subtle */
+  --color-primary-200: #DBEAFE;  /* Very Light - Backgrounds, highlights */
+  --color-primary-100: #EFF6FF;  /* Softest - Input focus, soft backgrounds */
+  --color-primary-50: #F0F9FF;   /* Almost White - Extreme light backgrounds */
+
+  /* ACCENT: CYAN CENTRALA */
+  --color-accent-700: #0891B2;   /* Dark Cyan - Rarely used */
+  --color-accent-600: #06B6D4;   /* Cyan - Secondary accent */
+  --color-accent-500: #22D3EE;   /* Medium Cyan - Accents */
+  --color-accent-400: #67E8F9;   /* Light Cyan - Subtle accents */
+  --color-accent-300: #A5F3FC;   /* Lighter Cyan - Borders */
+  --color-accent-200: #CFFAFE;   /* Very Light - Backgrounds */
+  --color-accent-100: #ECFDF5;   /* Softest - Backgrounds */
+
+  /* SUCCESS: GREEN (Reserved for success only) */
+  --color-success-700: #15803D;
+  --color-success-600: #16A34A;
+  --color-success-500: #22C55E;  /* Standard green */
+  --color-success-400: #4ADE80;
+  --color-success-300: #86EFAC;
+  --color-success-200: #BBF7D0;
+  --color-success-100: #DCFCE7;
+
+  /* DANGER: RED */
+  --color-danger-700: #B91C1C;
+  --color-danger-600: #DC2626;
+  --color-danger-500: #EF4444;   /* Standard red */
+  --color-danger-400: #F87171;
+  --color-danger-300: #FCA5A5;
+  --color-danger-200: #FECACA;
+  --color-danger-100: #FEE2E2;
+
+  /* WARNING: AMBER */
+  --color-warning-700: #B45309;
+  --color-warning-600: #D97706;
+  --color-warning-500: #F59E0B;  /* Standard amber */
+  --color-warning-400: #FBBF24;
+  --color-warning-300: #FCD34D;
+  --color-warning-200: #FDE68A;
+  --color-warning-100: #FEF3C7;
+
+  /* INFO: LIGHT BLUE */
+  --color-info-700: #0369A1;
+  --color-info-600: #0284C7;
+  --color-info-500: #0EA5E9;
+  --color-info-400: #38BDF8;
+  --color-info-300: #7DD3FC;
+  --color-info-200: #BAE6FD;
+  --color-info-100: #E0F2FE;
+
+  /* ================================
+     SEMANTIC COLORS
+     ================================ */
+
+  /* Text */
+  --color-text-primary: #0F172A;      /* Main text - #0f172a (very dark navy) */
+  --color-text-secondary: #475569;    /* Secondary text - gray-700 */
+  --color-text-tertiary: #64748B;     /* Tertiary text - gray-500 */
+  --color-text-muted: #94A3B8;        /* Muted text - gray-400 */
+  --color-text-disabled: #CBD5E1;     /* Disabled text - gray-300 */
+  --color-text-inverse: #FFFFFF;      /* Text on dark backgrounds */
+
+  /* Background */
+  --color-bg-primary: #FFFFFF;        /* Main white background */
+  --color-bg-secondary: #F9FAFB;      /* Light gray background */
+  --color-bg-tertiary: #F3F4F6;       /* Lighter gray background */
+  --color-bg-disabled: #EEEFF2;       /* Disabled background */
+  --color-bg-overlay: rgba(15, 23, 42, 0.6); /* Dark overlay */
+
+  /* Surface */
+  --color-surface-primary: #FFFFFF;   /* Main surface */
+  --color-surface-secondary: #F9FAFB; /* Secondary surface */
+  --color-surface-tertiary: #F3F4F6;  /* Tertiary surface */
+  --color-surface-elevated: #FFFFFF;  /* Elevated surface - modal, dropdown */
+
+  /* Border */
+  --color-border-primary: #E2E8F0;    /* Main borders - light gray */
+  --color-border-secondary: #CBD5E1;  /* Secondary borders */
+  --color-border-tertiary: #94A3B8;   /* Tertiary borders */
+  --color-border-focus: #3B82F6;      /* Focus borders - blue */
+  --color-border-success: #16A34A;    /* Success borders */
+  --color-border-danger: #DC2626;     /* Danger borders */
+  --color-border-warning: #F59E0B;    /* Warning borders */
+
+  /* ================================
+     INTERACTIVE STATES
+     ================================ */
+
+  /* Primary Button */
+  --button-primary-bg: #3B82F6;
+  --button-primary-bg-hover: #2563EB;
+  --button-primary-bg-active: #1D4ED8;
+  --button-primary-bg-disabled: #CBD5E1;
+  --button-primary-text: #FFFFFF;
+  --button-primary-text-disabled: #94A3B8;
+
+  /* Secondary Button */
+  --button-secondary-bg: #F9FAFB;
+  --button-secondary-bg-hover: #F3F4F6;
+  --button-secondary-border: #E2E8F0;
+  --button-secondary-text: #1F2937;
+  --button-secondary-text-hover: #111827;
+
+  /* Tertiary Button (Ghost) */
+  --button-tertiary-bg: transparent;
+  --button-tertiary-bg-hover: #F3F4F6;
+  --button-tertiary-text: #3B82F6;
+  --button-tertiary-text-hover: #2563EB;
+
+  /* Input States */
+  --input-bg: #FFFFFF;
+  --input-border: #E2E8F0;
+  --input-border-hover: #CBD5E1;
+  --input-border-focus: #3B82F6;
+  --input-border-error: #DC2626;
+  --input-text: #0F172A;
+  --input-placeholder: #94A3B8;
+  --input-disabled-bg: #F9FAFB;
+  --input-disabled-text: #CBD5E1;
+
+  /* ================================
+     COMPONENT SPECIFIC
+     ================================ */
+
+  /* Sidebar */
+  --sidebar-bg: #FFFFFF;
+  --sidebar-bg-hover: #F9FAFB;
+  --sidebar-bg-active: #EFF6FF;     /* Very light blue */
+  --sidebar-border: #E2E8F0;
+  --sidebar-text: #475569;
+  --sidebar-text-hover: #1F2937;
+  --sidebar-text-active: #3B82F6;   /* Blue text when active */
+  --sidebar-icon-active: #3B82F6;   /* Blue icon when active */
+
+  /* Card */
+  --card-bg: #FFFFFF;
+  --card-border: #E2E8F0;
+  --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
+  --card-shadow-hover: 0 2px 8px rgba(0, 0, 0, 0.1), 0 4px 12px rgba(0, 0, 0, 0.06);
+
+  /* Table */
+  --table-header-bg: #F9FAFB;
+  --table-header-text: #475569;
+  --table-header-border: #E2E8F0;
+  --table-row-hover-bg: #F9FAFB;
+  --table-row-selected-bg: #EFF6FF;  /* Light blue */
+  --table-row-border: #E2E8F0;
+
+  /* Status Badge */
+  --badge-success-bg: #DCFCE7;
+  --badge-success-text: #166534;
+  --badge-danger-bg: #FEE2E2;
+  --badge-danger-text: #991B1B;
+  --badge-warning-bg: #FEF3C7;
+  --badge-warning-text: #92400E;
+  --badge-info-bg: #E0F2FE;
+  --badge-info-text: #0C4A6E;
+
+  /* Modals & Overlays */
+  --modal-overlay: rgba(15, 23, 42, 0.5);
+  --modal-bg: #FFFFFF;
+  --modal-border: #E2E8F0;
+
+  /* ================================
+     SPACING SCALE
+     ================================ */
+
+  --spacing-0: 0;
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-5: 20px;
+  --spacing-6: 24px;
+  --spacing-8: 32px;
+  --spacing-10: 40px;
+  --spacing-12: 48px;
+  --spacing-16: 64px;
+
+  /* ================================
+     BORDER RADIUS
+     ================================ */
+
+  --radius-none: 0;
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-full: 999px;
+
+  /* ================================
+     SHADOWS
+     ================================ */
+
+  --shadow-none: none;
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 12px -6px rgba(0, 0, 0, 0.05);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+
+  /* Focus Shadow - Glow sutil azul */
+  --shadow-focus: 0 0 0 3px rgba(59, 130, 246, 0.1), 0 0 0 1px rgba(59, 130, 246, 0.5);
+
+  /* ================================
+     TYPOGRAPHY (Already defined in typography.css)
+     ================================ */
+
+  /* Font Families */
+  --font-heading: "Montserrat", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  /* ================================
+     TRANSITIONS & ANIMATIONS
+     ================================ */
+
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ================================
+     Z-INDEX SCALE
+     ================================ */
+
+  --z-index-dropdown: 1000;
+  --z-index-sticky: 1020;
+  --z-index-fixed: 1030;
+  --z-index-modal-backdrop: 1040;
+  --z-index-modal: 1050;
+  --z-index-popover: 1060;
+  --z-index-tooltip: 1070;
+  --z-index-notification: 1080;
+}
+
+/* ================================
+   OVERRIDE: Deprecated color names → use semantic tokens
+   This allows gradual migration from old system
+   ================================ */
+
+:root {
+  /* Keep these for backward compatibility, but they point to CENTRALA tokens */
+  --brand: var(--color-primary-600);           /* Was green, now blue */
+  --brand-dark: var(--color-primary-700);      /* Was dark green, now dark blue */
+  --brand-light: var(--color-primary-100);     /* Light blue background */
+
+  --accent: var(--color-accent-600);           /* Cyan */
+  --accent-light: var(--color-accent-100);     /* Light cyan background */
+
+  --success: var(--color-success-500);         /* Green - only for success */
+  --success-bg: var(--color-success-100);      /* Success background */
+  --danger: var(--color-danger-500);           /* Red */
+  --danger-bg: var(--color-danger-100);        /* Danger background */
+  --warning: var(--color-warning-500);         /* Amber */
+  --warning-bg: var(--color-warning-100);      /* Warning background */
+
+  --bg: var(--color-bg-secondary);             /* Light background */
+  --surface: var(--color-surface-primary);     /* White surface */
+  --surface-secondary: var(--color-bg-secondary); /* Secondary surface */
+  --border: var(--color-border-primary);       /* Gray border */
+  --border-light: var(--color-border-secondary); /* Lighter border */
+  --text: var(--color-text-primary);           /* Dark text */
+  --text-muted: var(--color-text-muted);       /* Muted text */
+
+  --sidebar-bg: var(--sidebar-bg);
+  --sidebar-bg-active: var(--sidebar-bg-active);  /* Now blue, not green */
+  --sidebar-text: var(--sidebar-text);
+  --sidebar-text-active: var(--sidebar-text-active); /* Now blue */
+
+  /* Radius */
+  --radius: 16px;
+  --radius-sm: 12px;
+  --radius-lg: 20px;
+
+  /* Shadows */
+  --shadow: var(--shadow-md);
+  --shadow-sm: var(--shadow-xs);
+  --shadow-lg: var(--shadow-xl);
+  --shadow-xl: var(--shadow-2xl);
+
+  /* Glass effect */
+  --glass: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.2);
+}
+
+/* ================================
+   UTILITIES: Color quick access
+   ================================ */
+
+.bg-primary { background-color: var(--color-primary-600); }
+.bg-primary-light { background-color: var(--color-primary-100); }
+.text-primary { color: var(--color-text-primary); }
+.text-secondary { color: var(--color-text-secondary); }
+.text-muted { color: var(--color-text-muted); }
+.border-primary { border-color: var(--color-border-primary); }
+.border-blue { border-color: var(--color-primary-600); }
+
+.text-success { color: var(--color-success-600); }
+.text-danger { color: var(--color-danger-600); }
+.text-warning { color: var(--color-warning-600); }
+
+.bg-success { background-color: var(--color-success-100); }
+.bg-danger { background-color: var(--color-danger-100); }
+.bg-warning { background-color: var(--color-warning-100); }
