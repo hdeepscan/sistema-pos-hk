@@ -1,5 +1,5 @@
 /* Import CENTRALA Design System Tokens */
-@import url('./design-tokens.css');
+@import url('./styles/design-tokens.css');
 
 :root {
   /* ===== CENTRALA PREMIUM DESIGN SYSTEM ===== */
