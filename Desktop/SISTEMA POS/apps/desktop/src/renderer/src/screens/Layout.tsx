@@ -6,7 +6,7 @@ import { usePedidoShopify } from "../lib/socket";
 import { api } from "../lib/api";
 import { reproducir } from "../lib/sonidos";
 import type { PedidoShopifyEvent } from "@sistema-pos/shared";
-import logo from "../assets/centrala-logo.png";
+import logo from "../assets/CENTRALA.pdf.png";
 import { electronAPI } from "../lib/electron-api";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { MobileMenu } from "../components/MobileMenu";
