@@ -676,12 +676,23 @@ export default function CentralaAdmin() {
     setCargando(true);
     setError(null);
     try {
-      const { data } = await api.get("/admin/clientes", {
-        params: { limit: 1000 },
+      const { data } = await api.get("/admin/clientes");
+      console.log("✅ Clientes cargados:", data);
+      // El backend devuelve un array directamente, no un objeto con propiedad 'clientes'
+      setClientes(Array.isArray(data) ? data : []);
+    } catch (err: any) {
+      console.error("❌ Error cargando clientes:", {
+        status: err.response?.status,
+        message: err.response?.data?.error || err.message,
+        config: err.config,
       });
-      setClientes(data.clientes || []);
-    } catch (err) {
-      setError("Error cargando clientes");
+      setError(
+        err.response?.status === 401
+          ? "No autorizado - Token inválido"
+          : err.response?.status === 403
+          ? "Acceso denegado - Solo Super Admin"
+          : `Error cargando clientes: ${err.response?.data?.error || err.message}`
+      );
     } finally {
       setCargando(false);
     }
