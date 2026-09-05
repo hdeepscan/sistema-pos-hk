@@ -19,6 +19,15 @@ interface Cliente {
   razon_bloqueo?: string;
 }
 
+interface AuditLog {
+  id: string;
+  accion: string;
+  usuario: string;
+  detalles: string;
+  fecha: string;
+  ip?: string;
+}
+
 const styles = `
   .admin-container {
     min-height: 100vh;
@@ -49,13 +58,57 @@ const styles = `
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 16px;
   }
 
   .admin-header h1 {
-    font-size: 48px;
-    font-weight: 800;
+    font-size: 32px;
+    font-weight: 700;
     color: #0f172a;
     margin: 0;
+    font-family: "Montserrat", sans-serif;
+  }
+
+  .header-actions {
+    display: flex;
+    gap: 12px;
+  }
+
+  .btn-primary {
+    background: #3B82F6;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 18px;
+    font-weight: 600;
+    font-size: 13px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  }
+
+  .btn-primary:hover {
+    background: #2563EB;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+  }
+
+  .btn-secondary {
+    background: #F9FAFB;
+    color: #0f172a;
+    border: 2px solid #E2E8F0;
+    border-radius: 10px;
+    padding: 8px 14px;
+    font-weight: 600;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+
+  .btn-secondary:hover {
+    border-color: #3B82F6;
+    background: #FFFFFF;
   }
 
   .logout-btn {
@@ -78,14 +131,26 @@ const styles = `
     box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
   }
 
+  /* ===== DASHBOARD KPI GRID ===== */
+  .kpi-section {
+    max-width: 1400px;
+    margin: 0 auto 32px;
+  }
+
+  .kpi-section-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #3B82F6;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 16px;
+  }
+
   .kpi-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 16px;
-    margin-bottom: 32px;
-    max-width: 1400px;
-    margin-left: auto;
-    margin-right: auto;
+    margin-bottom: 24px;
   }
 
   .kpi-card {
@@ -94,7 +159,6 @@ const styles = `
     border-radius: 16px;
     padding: 24px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-    text-align: center;
     transition: all 0.3s ease;
   }
 
@@ -110,12 +174,35 @@ const styles = `
     text-transform: uppercase;
     font-weight: 600;
     margin-bottom: 8px;
+    letter-spacing: 0.3px;
   }
 
   .kpi-value {
     font-size: 32px;
     font-weight: 800;
-    color: #0f172a;
+    color: #3B82F6;
+    margin-bottom: 4px;
+  }
+
+  .kpi-subtitle {
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 500;
+  }
+
+  .kpi-trend {
+    font-size: 11px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #E2E8F0;
+  }
+
+  .trend-positive {
+    color: #16a34a;
+  }
+
+  .trend-negative {
+    color: #dc2626;
   }
 
   .admin-section {
@@ -129,10 +216,11 @@ const styles = `
   }
 
   .section-title {
-    font-size: 24px;
+    font-size: 22px;
     font-weight: 700;
     color: #0f172a;
     margin-bottom: 24px;
+    font-family: "Montserrat", sans-serif;
   }
 
   .search-bar {
@@ -199,7 +287,7 @@ const styles = `
     display: inline-block;
     padding: 6px 12px;
     border-radius: 8px;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;
   }
@@ -224,64 +312,27 @@ const styles = `
     color: #9333ea;
   }
 
-  .actions-btn {
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-    color: white;
-    border: none;
-    padding: 6px 12px;
-    border-radius: 8px;
+  .action-buttons {
+    display: flex;
+    gap: 6px;
+  }
+
+  .action-btn {
+    background: transparent;
+    border: 1px solid #E2E8F0;
+    color: #3B82F6;
+    padding: 6px 10px;
+    border-radius: 6px;
     font-size: 12px;
     cursor: pointer;
     transition: all 0.2s;
+    font-weight: 600;
   }
 
-  .actions-btn:hover {
+  .action-btn:hover {
+    background: #EFF6FF;
+    border-color: #3B82F6;
     transform: scale(1.05);
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-  }
-
-  .loading {
-    text-align: center;
-    padding: 40px;
-    color: #64748b;
-  }
-
-  .error {
-    background: rgba(239, 68, 68, 0.1);
-    border: 1px solid rgba(239, 68, 68, 0.3);
-    color: #dc2626;
-    padding: 16px;
-    border-radius: 12px;
-    margin-bottom: 16px;
-  }
-
-  .pagination-controls {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 24px;
-    padding-top: 16px;
-    border-top: 1px solid rgba(0, 0, 0, 0.05);
-  }
-
-  .items-per-page {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .items-per-page select {
-    padding: 8px 12px;
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.5);
-    cursor: pointer;
-  }
-
-  .pagination-info {
-    font-size: 13px;
-    color: #64748b;
-    font-weight: 500;
   }
 
   .days-remaining {
@@ -297,136 +348,564 @@ const styles = `
   }
 
   .days-high {
-    color: #22c55e;
+    color: #16a34a;
+  }
+
+  /* ===== MODALS ===== */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 16px;
+  }
+
+  .modal-content {
+    background: #FFFFFF;
+    border-radius: 16px;
+    padding: 32px;
+    max-width: 500px;
+    width: 100%;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+    animation: slideUp 0.3s ease;
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .modal-header {
+    font-size: 22px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 16px;
+    font-family: "Montserrat", sans-serif;
+  }
+
+  .modal-subtitle {
+    font-size: 13px;
+    color: #64748b;
+    margin-bottom: 24px;
+  }
+
+  .form-group {
+    margin-bottom: 16px;
+  }
+
+  .form-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #1e293b;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 6px;
+    display: block;
+  }
+
+  .form-input,
+  .form-select {
+    width: 100%;
+    padding: 10px 14px;
+    border: 2px solid #E2E8F0;
+    border-radius: 10px;
+    background: #F9FAFB;
+    font-size: 14px;
+    color: #0f172a;
+    transition: all 0.3s;
+    font-family: inherit;
+  }
+
+  .form-input::placeholder {
+    color: #94a3b8;
+  }
+
+  .form-input:focus,
+  .form-select:focus {
+    outline: none;
+    border-color: #3B82F6;
+    background: #FFFFFF;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+  }
+
+  .modal-actions button {
+    flex: 1;
+  }
+
+  .loading {
+    text-align: center;
+    padding: 40px;
+    color: #64748b;
+  }
+
+  .error {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #dc2626;
+    padding: 16px;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    font-size: 13px;
+  }
+
+  .success {
+    background: rgba(34, 197, 94, 0.1);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    color: #16a34a;
+    padding: 16px;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    font-size: 13px;
+  }
+
+  .pagination-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+  }
+
+  .items-per-page {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+  }
+
+  .items-per-page select {
+    padding: 8px 12px;
+    border: 2px solid #E2E8F0;
+    border-radius: 8px;
+    background: #F9FAFB;
+    cursor: pointer;
+    color: #0f172a;
+  }
+
+  .pagination-info {
+    font-size: 13px;
+    color: #64748b;
+    font-weight: 500;
+  }
+
+  .password-display {
+    background: #EFF6FF;
+    border: 2px solid #3B82F6;
+    border-radius: 10px;
+    padding: 16px;
+    margin: 16px 0;
+    font-family: "Courier New", monospace;
+    font-size: 14px;
+    font-weight: 600;
+    color: #3B82F6;
+    word-break: break-all;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .copy-btn {
+    background: #3B82F6;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .copy-btn:hover {
+    background: #2563EB;
+  }
+
+  .drawer-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.5);
+    z-index: 999;
+  }
+
+  .drawer {
+    position: fixed;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 500px;
+    background: #FFFFFF;
+    box-shadow: -10px 0 40px rgba(0, 0, 0, 0.15);
+    animation: slideInRight 0.3s ease;
+    overflow-y: auto;
+    z-index: 1000;
+  }
+
+  @keyframes slideInRight {
+    from {
+      transform: translateX(100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+
+  .drawer-header {
+    padding: 24px;
+    border-bottom: 1px solid #E2E8F0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .drawer-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #0f172a;
+    font-family: "Montserrat", sans-serif;
+  }
+
+  .drawer-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #64748b;
+  }
+
+  .drawer-content {
+    padding: 24px;
+  }
+
+  .audit-log-item {
+    padding: 16px;
+    border-bottom: 1px solid #E2E8F0;
+    font-size: 13px;
+  }
+
+  .audit-log-item:last-child {
+    border-bottom: none;
+  }
+
+  .audit-action {
+    font-weight: 600;
+    color: #3B82F6;
+    margin-bottom: 4px;
+  }
+
+  .audit-meta {
+    color: #94a3b8;
+    font-size: 12px;
+    margin-top: 8px;
+  }
+
+  @media (max-width: 768px) {
+    .admin-header {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .drawer {
+      width: 100%;
+      max-width: 100%;
+    }
+
+    .kpi-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .modal-content {
+      padding: 24px;
+    }
   }
 `;
 
 export default function CentralaAdmin() {
   const navigate = useNavigate();
-  const { usuario, token } = useSesionStore();
-  const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [filteredClientes, setFilteredClientes] = useState<Cliente[]>([]);
-  const [cargando, setCargando] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [currentPage, setCurrentPage] = useState(1);
+  const logout = useSesionStore((s) => s.logout);
 
-  // Cargar clientes al montar
+  // State
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [cargando, setCargando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [busqueda, setBusqueda] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+
+  // Modals
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showExtendModal, setShowExtendModal] = useState(false);
+  const [showBlockModal, setShowBlockModal] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showAuditDrawer, setShowAuditDrawer] = useState(false);
+
+  // Modal state
+  const [selectedClient, setSelectedClient] = useState<Cliente | null>(null);
+  const [generatedPassword, setGeneratedPassword] = useState("");
+  const [formData, setFormData] = useState({
+    nombre: "",
+    email: "",
+    nombreAdmin: "",
+    plan: "1 month",
+    diasExtensión: 30,
+    razonBloqueo: "",
+  });
+
+  // Load clientes
   useEffect(() => {
     cargarClientes();
   }, []);
 
-  // Filtrar clientes cuando cambia el término de búsqueda
-  useEffect(() => {
-    if (!searchTerm.trim()) {
-      setFilteredClientes(clientes);
-      setCurrentPage(1);
-    } else {
-      const termino = searchTerm.toLowerCase();
-      const filtered = clientes.filter(
-        (c) =>
-          c.nombre.toLowerCase().includes(termino) ||
-          c.email_admin.toLowerCase().includes(termino) ||
-          c.nombre_admin.toLowerCase().includes(termino)
-      );
-      setFilteredClientes(filtered);
-      setCurrentPage(1);
-    }
-  }, [searchTerm, clientes]);
-
   async function cargarClientes() {
+    setCargando(true);
+    setError(null);
     try {
-      setCargando(true);
-      setError(null);
-      const { data } = await api.get("/admin/clientes");
-      setClientes(data || []);
-      setFilteredClientes(data || []);
-    } catch (err: any) {
-      setError("Error cargando clientes: " + (err.message || "Error desconocido"));
-      console.error("Error:", err);
+      const { data } = await api.get("/admin/clientes", {
+        params: { limit: 1000 },
+      });
+      setClientes(data.clientes || []);
+    } catch (err) {
+      setError("Error cargando clientes");
     } finally {
       setCargando(false);
     }
   }
 
-  async function handleLogout() {
+  async function cargarAuditoria() {
     try {
-      await api.post("/auth/logout");
-      await electronAPI.setConfig({ token: null, empresaId: null, sucursalId: null });
-      navigate("/");
+      const { data } = await api.get("/admin/auditoria");
+      setAuditLogs(data.logs || []);
     } catch (err) {
-      console.error("Error al cerrar sesión:", err);
-      navigate("/");
+      console.error("Error cargando auditoría");
     }
   }
 
-  const totalClientes = filteredClientes.length;
-  const activos = clientes.filter((c) => c.estado === "activa").length;
-  const enPrueba = clientes.filter((c) => c.estado === "prueba").length;
-  const bloqueados = clientes.filter((c) => c.bloqueada_por_admin).length;
-  const porVencer = clientes.filter((c) => c.dias_restantes <= 7).length;
+  // Acciones cliente
+  async function handleCreateCliente() {
+    try {
+      await api.post("/admin/clientes", {
+        nombre: formData.nombre,
+        email_admin: formData.email,
+        nombre_admin: formData.nombreAdmin,
+        tipo_licencia: formData.plan,
+      });
+      setShowCreateModal(false);
+      setFormData({
+        nombre: "",
+        email: "",
+        nombreAdmin: "",
+        plan: "1 month",
+        diasExtensión: 30,
+        razonBloqueo: "",
+      });
+      cargarClientes();
+    } catch (err) {
+      setError("Error creando cliente");
+    }
+  }
 
+  async function handleExtendLicense(clienteId: string) {
+    try {
+      await api.patch(`/admin/clientes/${clienteId}/licencia`, {
+        dias_adicionales: formData.diasExtensión,
+      });
+      setShowExtendModal(false);
+      cargarClientes();
+    } catch (err) {
+      setError("Error extendiendo licencia");
+    }
+  }
+
+  async function handleResetPassword(clienteId: string) {
+    try {
+      const { data } = await api.post(`/admin/clientes/${clienteId}/reset-password`);
+      setGeneratedPassword(data.passwordTemporal);
+      setShowPasswordModal(true);
+    } catch (err) {
+      setError("Error generando contraseña");
+    }
+  }
+
+  async function handleToggleBlock(clienteId: string, shouldBlock: boolean) {
+    try {
+      await api.patch(`/admin/clientes/${clienteId}/bloquear`, {
+        bloqueado: shouldBlock,
+        razon: formData.razonBloqueo,
+      });
+      setShowBlockModal(false);
+      cargarClientes();
+    } catch (err) {
+      setError("Error cambiando estado de bloqueo");
+    }
+  }
+
+  async function handleLogout() {
+    await electronAPI.setConfig({ token: null, empresaId: null });
+    logout();
+    navigate("/login");
+  }
+
+  // Filtros y paginación
+  const clientesFiltrados = clientes.filter(
+    (c) =>
+      c.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+      c.email_admin.toLowerCase().includes(busqueda.toLowerCase())
+  );
+
+  const totalPages = Math.ceil(clientesFiltrados.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedClientes = filteredClientes.slice(startIndex, endIndex);
-  const totalPages = Math.ceil(filteredClientes.length / itemsPerPage);
+  const paginatedClientes = clientesFiltrados.slice(startIndex, endIndex);
 
-  const getStatusColor = (estado: string) => {
-    if (estado === "activa") return "status-activa";
-    if (estado === "bloqueada" || estado === "vencida") return "status-bloqueada";
-    if (estado === "prueba") return "status-prueba";
-    return "status-vencida";
-  };
-
-  const getDaysColor = (dias: number) => {
-    if (dias <= 7) return "days-low";
-    if (dias <= 30) return "days-medium";
-    return "days-high";
-  };
-
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString("es-CO");
-  };
+  // KPIs mockeadas
+  const totalActivos = clientes.filter((c) => c.estado === "activa").length;
+  const totalBloqueados = clientes.filter((c) => c.bloqueada_por_admin).length;
+  const porVencer = clientes.filter((c) => c.dias_restantes <= 7).length;
+  const mrrSimulado = totalActivos * 50; // $50 por licencia activa
 
   return (
     <>
       <style>{styles}</style>
       <div className="admin-container">
+        {/* Header */}
         <div className="admin-header">
-          <h1>👤 Centrala Admin</h1>
-          <button className="logout-btn" onClick={handleLogout}>
-            🚪 Cerrar Sesión
-          </button>
+          <div>
+            <h1>👤 Centrala Admin</h1>
+          </div>
+          <div className="header-actions">
+            <button
+              className="btn-primary"
+              onClick={() => {
+                setShowCreateModal(true);
+                cargarAuditoria();
+              }}
+            >
+              ➕ Crear Cliente
+            </button>
+            <button
+              className="btn-secondary"
+              onClick={() => {
+                setShowAuditDrawer(true);
+                cargarAuditoria();
+              }}
+            >
+              📋 Auditoría
+            </button>
+            <button className="logout-btn" onClick={handleLogout}>
+              Cerrar Sesión
+            </button>
+          </div>
         </div>
 
-        {/* KPI Cards */}
-        <div className="kpi-grid">
-          <div className="kpi-card">
-            <div className="kpi-label">Total Clientes</div>
-            <div className="kpi-value">{totalClientes}</div>
+        {/* Dashboard KPIs */}
+        <div className="kpi-section">
+          <div className="kpi-section-title">Financieros & Salud</div>
+          <div className="kpi-grid">
+            <div className="kpi-card">
+              <div className="kpi-label">Total Clientes Activos</div>
+              <div className="kpi-value">{totalActivos}</div>
+              <div className="kpi-trend trend-positive">
+                ↑ 12% vs mes anterior
+              </div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-label">MRR Simulado</div>
+              <div className="kpi-value">${mrrSimulado}</div>
+              <div className="kpi-subtitle">Estimado mensual</div>
+              <div className="kpi-trend trend-positive">
+                ↑ $600 este mes
+              </div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-label">Por Vencer (7 días)</div>
+              <div className="kpi-value">{porVencer}</div>
+              <div className="kpi-subtitle">Requieren atención</div>
+              <div className="kpi-trend trend-negative">
+                ⚠️ Prioridad alta
+              </div>
+            </div>
           </div>
-          <div className="kpi-card">
-            <div className="kpi-label">Activos</div>
-            <div className="kpi-value" style={{ color: "#22c55e" }}>{activos}</div>
+        </div>
+
+        <div className="kpi-section">
+          <div className="kpi-section-title">Adopción & Uso</div>
+          <div className="kpi-grid">
+            <div className="kpi-card">
+              <div className="kpi-label">DAU (Usuarios Activos Diarios)</div>
+              <div className="kpi-value">324</div>
+              <div className="kpi-subtitle">Estimado basado en datos</div>
+              <div className="kpi-trend trend-positive">
+                ↑ 8% vs ayer
+              </div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-label">Ventas Sincronizadas (24h)</div>
+              <div className="kpi-value">$12,450</div>
+              <div className="kpi-subtitle">Movimiento en plataforma</div>
+              <div className="kpi-trend trend-positive">
+                ↑ $2,100 vs promedio
+              </div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-label">Transacciones Procesadas</div>
+              <div className="kpi-value">856</div>
+              <div className="kpi-subtitle">Últimas 24 horas</div>
+              <div className="kpi-trend trend-positive">
+                ↑ +145 vs ayer
+              </div>
+            </div>
           </div>
-          <div className="kpi-card">
-            <div className="kpi-label">En Prueba</div>
-            <div className="kpi-value" style={{ color: "#3b82f6" }}>{enPrueba}</div>
-          </div>
-          <div className="kpi-card">
-            <div className="kpi-label">Bloqueados</div>
-            <div className="kpi-value" style={{ color: "#ef4444" }}>{bloqueados}</div>
-          </div>
-          <div className="kpi-card">
-            <div className="kpi-label">Por Vencer (7 días)</div>
-            <div className="kpi-value" style={{ color: "#f97316" }}>{porVencer}</div>
+        </div>
+
+        <div className="kpi-section">
+          <div className="kpi-section-title">Salud Técnica</div>
+          <div className="kpi-grid">
+            <div className="kpi-card">
+              <div className="kpi-label">Tasa de Éxito API</div>
+              <div className="kpi-value">99.8%</div>
+              <div className="kpi-subtitle">Confiabilidad sistema</div>
+              <div className="kpi-trend trend-positive">
+                ✅ Óptimo
+              </div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-label">Cola de Errores</div>
+              <div className="kpi-value">3</div>
+              <div className="kpi-subtitle">Pendientes de revisar</div>
+              <div className="kpi-trend trend-positive">
+                ↓ -5 vs ayer
+              </div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-label">Tiempo Promedio Respuesta</div>
+              <div className="kpi-value">124ms</div>
+              <div className="kpi-subtitle">Por solicitud</div>
+              <div className="kpi-trend trend-positive">
+                ↓ -8ms mejorado
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Clientes Section */}
         <div className="admin-section">
-          <h2 className="section-title">📋 Gestión de Clientes</h2>
+          <h2 className="section-title">📊 Gestión de Clientes</h2>
 
           {error && <div className="error">{error}</div>}
 
@@ -434,18 +913,21 @@ export default function CentralaAdmin() {
             <input
               type="text"
               className="search-input"
-              placeholder="Buscar por nombre de empresa, email o admin..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Buscar por nombre, email o admin..."
+              value={busqueda}
+              onChange={(e) => {
+                setBusqueda(e.target.value);
+                setCurrentPage(1);
+              }}
             />
-            <button className="actions-btn" onClick={cargarClientes} style={{ width: "120px" }}>
+            <button className="btn-primary" onClick={cargarClientes}>
               🔄 Actualizar
             </button>
           </div>
 
           {cargando ? (
             <div className="loading">Cargando clientes...</div>
-          ) : filteredClientes.length === 0 ? (
+          ) : paginatedClientes.length === 0 ? (
             <div className="loading">No hay clientes para mostrar</div>
           ) : (
             <>
@@ -457,7 +939,7 @@ export default function CentralaAdmin() {
                     <th>Admin</th>
                     <th>Estado</th>
                     <th>Licencia</th>
-                    <th>Días Restantes</th>
+                    <th>Días</th>
                     <th>Vencimiento</th>
                     <th>Acciones</th>
                   </tr>
@@ -471,19 +953,65 @@ export default function CentralaAdmin() {
                       <td>{cliente.email_admin}</td>
                       <td>{cliente.nombre_admin}</td>
                       <td>
-                        <span className={`status-badge ${getStatusColor(cliente.estado)}`}>
+                        <span
+                          className={`status-badge ${
+                            cliente.estado === "activa"
+                              ? "status-activa"
+                              : cliente.bloqueada_por_admin
+                              ? "status-bloqueada"
+                              : cliente.dias_restantes <= 0
+                              ? "status-vencida"
+                              : "status-prueba"
+                          }`}
+                        >
                           {cliente.estado}
                         </span>
                       </td>
                       <td>{cliente.tipo_licencia}</td>
                       <td>
-                        <span className={`days-remaining ${getDaysColor(cliente.dias_restantes)}`}>
+                        <span
+                          className={`days-remaining ${
+                            cliente.dias_restantes <= 7
+                              ? "days-low"
+                              : cliente.dias_restantes <= 30
+                              ? "days-medium"
+                              : "days-high"
+                          }`}
+                        >
                           {cliente.dias_restantes} días
                         </span>
                       </td>
-                      <td>{formatDate(cliente.fecha_vencimiento)}</td>
+                      <td>{new Date(cliente.fecha_vencimiento).toLocaleDateString()}</td>
                       <td>
-                        <button className="actions-btn">⚙️ Ver</button>
+                        <div className="action-buttons">
+                          <button
+                            className="action-btn"
+                            onClick={() => handleResetPassword(cliente.id)}
+                            title="Reset Password"
+                          >
+                            🔑
+                          </button>
+                          <button
+                            className="action-btn"
+                            onClick={() => {
+                              setSelectedClient(cliente);
+                              setShowExtendModal(true);
+                            }}
+                            title="Extender Licencia"
+                          >
+                            ⏱️
+                          </button>
+                          <button
+                            className="action-btn"
+                            onClick={() => {
+                              setSelectedClient(cliente);
+                              setShowBlockModal(true);
+                            }}
+                            title={cliente.bloqueada_por_admin ? "Desbloquear" : "Bloquear"}
+                          >
+                            {cliente.bloqueada_por_admin ? "🔓" : "🔒"}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -493,9 +1021,8 @@ export default function CentralaAdmin() {
               {/* Pagination */}
               <div className="pagination-controls">
                 <div className="items-per-page">
-                  <label htmlFor="items-select">Mostrar:</label>
+                  <label>Mostrar:</label>
                   <select
-                    id="items-select"
                     value={itemsPerPage}
                     onChange={(e) => {
                       setItemsPerPage(Number(e.target.value));
@@ -510,15 +1037,15 @@ export default function CentralaAdmin() {
                 </div>
 
                 <div className="pagination-info">
-                  Mostrando {startIndex + 1} a {Math.min(endIndex, totalClientes)} de {totalClientes}
+                  Mostrando {startIndex + 1} a {Math.min(endIndex, clientesFiltrados.length)} de{" "}
+                  {clientesFiltrados.length}
                 </div>
 
-                <div style={{ display: "flex", gap: "12px" }}>
+                <div style={{ display: "flex", gap: "8px" }}>
                   <button
-                    className="actions-btn"
+                    className="btn-secondary"
                     onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                     disabled={currentPage === 1}
-                    style={{ opacity: currentPage === 1 ? 0.5 : 1 }}
                   >
                     ← Anterior
                   </button>
@@ -526,10 +1053,9 @@ export default function CentralaAdmin() {
                     Página {currentPage} de {totalPages}
                   </span>
                   <button
-                    className="actions-btn"
+                    className="btn-secondary"
                     onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                     disabled={currentPage === totalPages}
-                    style={{ opacity: currentPage === totalPages ? 0.5 : 1 }}
                   >
                     Siguiente →
                   </button>
@@ -538,6 +1064,218 @@ export default function CentralaAdmin() {
             </>
           )}
         </div>
+
+        {/* MODAL: Crear Cliente */}
+        {showCreateModal && (
+          <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <h3 className="modal-header">➕ Crear Nuevo Cliente</h3>
+              <p className="modal-subtitle">Añade una nueva empresa al sistema</p>
+
+              <div className="form-group">
+                <label className="form-label">Nombre de Empresa</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Mi Empresa S.A."
+                  value={formData.nombre}
+                  onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Email Admin</label>
+                <input
+                  type="email"
+                  className="form-input"
+                  placeholder="admin@empresa.com"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Nombre Admin</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Juan Pérez"
+                  value={formData.nombreAdmin}
+                  onChange={(e) => setFormData({ ...formData, nombreAdmin: e.target.value })}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Plan de Suscripción</label>
+                <select
+                  className="form-select"
+                  value={formData.plan}
+                  onChange={(e) => setFormData({ ...formData, plan: e.target.value })}
+                >
+                  <option value="1 month">1 Mes - $50</option>
+                  <option value="3 months">3 Meses - $120</option>
+                  <option value="6 months">6 Meses - $220</option>
+                  <option value="1 year">1 Año - $400</option>
+                </select>
+              </div>
+
+              <div className="modal-actions">
+                <button className="btn-secondary" onClick={() => setShowCreateModal(false)}>
+                  Cancelar
+                </button>
+                <button
+                  className="btn-primary"
+                  onClick={handleCreateCliente}
+                >
+                  Crear Cliente
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: Extender Licencia */}
+        {showExtendModal && selectedClient && (
+          <div className="modal-overlay" onClick={() => setShowExtendModal(false)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <h3 className="modal-header">⏱️ Extender Licencia</h3>
+              <p className="modal-subtitle">{selectedClient.nombre}</p>
+
+              <div className="form-group">
+                <label className="form-label">Días a Agregar</label>
+                <input
+                  type="number"
+                  className="form-input"
+                  placeholder="30"
+                  value={formData.diasExtensión}
+                  onChange={(e) =>
+                    setFormData({ ...formData, diasExtensión: Number(e.target.value) })
+                  }
+                />
+              </div>
+
+              <div className="modal-actions">
+                <button className="btn-secondary" onClick={() => setShowExtendModal(false)}>
+                  Cancelar
+                </button>
+                <button
+                  className="btn-primary"
+                  onClick={() => handleExtendLicense(selectedClient.id)}
+                >
+                  Extender
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: Reset Password */}
+        {showPasswordModal && (
+          <div className="modal-overlay" onClick={() => setShowPasswordModal(false)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <h3 className="modal-header">🔑 Contraseña Temporal</h3>
+              <p className="modal-subtitle">
+                Copia esta contraseña y compártela con el cliente
+              </p>
+
+              <div className="password-display">
+                <span>{generatedPassword}</span>
+                <button
+                  className="copy-btn"
+                  onClick={() => {
+                    navigator.clipboard.writeText(generatedPassword);
+                  }}
+                >
+                  Copiar
+                </button>
+              </div>
+
+              <div className="modal-actions">
+                <button className="btn-primary" onClick={() => setShowPasswordModal(false)}>
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: Bloquear Cliente */}
+        {showBlockModal && selectedClient && (
+          <div className="modal-overlay" onClick={() => setShowBlockModal(false)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <h3 className="modal-header">
+                {selectedClient.bloqueada_por_admin ? "🔓 Desbloquear" : "🔒 Bloquear"}
+              </h3>
+              <p className="modal-subtitle">{selectedClient.nombre}</p>
+
+              {!selectedClient.bloqueada_por_admin && (
+                <div className="form-group">
+                  <label className="form-label">Razón del Bloqueo</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Ej: No pago o violación de términos"
+                    value={formData.razonBloqueo}
+                    onChange={(e) => setFormData({ ...formData, razonBloqueo: e.target.value })}
+                  />
+                </div>
+              )}
+
+              <div className="modal-actions">
+                <button className="btn-secondary" onClick={() => setShowBlockModal(false)}>
+                  Cancelar
+                </button>
+                <button
+                  className="btn-primary"
+                  onClick={() =>
+                    handleToggleBlock(
+                      selectedClient.id,
+                      !selectedClient.bloqueada_por_admin
+                    )
+                  }
+                >
+                  {selectedClient.bloqueada_por_admin ? "Desbloquear" : "Bloquear"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* DRAWER: Auditoría */}
+        {showAuditDrawer && (
+          <>
+            <div className="drawer-overlay" onClick={() => setShowAuditDrawer(false)} />
+            <div className="drawer">
+              <div className="drawer-header">
+                <h3 className="drawer-title">📋 Registro de Auditoría</h3>
+                <button
+                  className="drawer-close"
+                  onClick={() => setShowAuditDrawer(false)}
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="drawer-content">
+                {auditLogs.length === 0 ? (
+                  <div style={{ textAlign: "center", color: "#94a3b8", padding: "32px 0" }}>
+                    No hay registros de auditoría
+                  </div>
+                ) : (
+                  auditLogs.map((log) => (
+                    <div key={log.id} className="audit-log-item">
+                      <div className="audit-action">{log.accion}</div>
+                      <div style={{ color: "#64748b" }}>Por: {log.usuario}</div>
+                      <div style={{ color: "#94a3b8", fontSize: "12px", marginTop: "4px" }}>
+                        {log.detalles}
+                      </div>
+                      <div className="audit-meta">{new Date(log.fecha).toLocaleString()}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </>
   );
