@@ -514,7 +514,8 @@ label {
   color: var(--text-muted);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
+  margin-bottom: 4px;
 }
 
 input,
@@ -627,7 +628,7 @@ button.danger:hover:not(:disabled) {
 .grid-form {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 20px;
 }
 
 .error-text {
