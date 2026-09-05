@@ -312,27 +312,74 @@ const styles = `
     color: #9333ea;
   }
 
-  .action-buttons {
-    display: flex;
-    gap: 6px;
+  .action-menu-container {
+    position: relative;
+    display: inline-block;
   }
 
-  .action-btn {
-    background: transparent;
-    border: 1px solid #E2E8F0;
-    color: #3B82F6;
-    padding: 6px 10px;
-    border-radius: 6px;
-    font-size: 12px;
+  .action-menu-btn {
+    background: #F9FAFB;
+    border: 2px solid #E2E8F0;
+    color: #0f172a;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 16px;
     cursor: pointer;
     transition: all 0.2s;
     font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    min-height: 40px;
   }
 
-  .action-btn:hover {
-    background: #EFF6FF;
+  .action-menu-btn:hover {
+    background: #FFFFFF;
     border-color: #3B82F6;
-    transform: scale(1.05);
+    color: #3B82F6;
+  }
+
+  .action-menu-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    min-width: 220px;
+    z-index: 500;
+    margin-top: 4px;
+    overflow: hidden;
+  }
+
+  .action-menu-item {
+    padding: 12px 16px;
+    border-bottom: 1px solid #F1F5F9;
+    cursor: pointer;
+    font-size: 13px;
+    color: #0f172a;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 500;
+  }
+
+  .action-menu-item:last-child {
+    border-bottom: none;
+  }
+
+  .action-menu-item:hover {
+    background: #F9FAFB;
+    color: #3B82F6;
+    padding-left: 20px;
+  }
+
+  .action-menu-item.danger:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: #dc2626;
   }
 
   .days-remaining {
@@ -662,10 +709,11 @@ export default function CentralaAdmin() {
     nombre: "",
     email: "",
     nombreAdmin: "",
-    plan: "1 month",
+    plan: "prueba",
     diasExtensión: 30,
     razonBloqueo: "",
   });
+  const [openActionsMenu, setOpenActionsMenu] = useState<string | null>(null);
 
   // Load clientes
   useEffect(() => {
@@ -710,59 +758,146 @@ export default function CentralaAdmin() {
   // Acciones cliente
   async function handleCreateCliente() {
     try {
-      await api.post("/admin/clientes", {
-        nombre: formData.nombre,
-        email_admin: formData.email,
-        nombre_admin: formData.nombreAdmin,
-        tipo_licencia: formData.plan,
+      console.log("📤 POST CREATE CLIENT:", {
+        url: "/admin/clientes",
+        payload: {
+          nombreEmpresa: formData.nombre,
+          emailAdmin: formData.email,
+          nombreAdmin: formData.nombreAdmin,
+          tipoLicencia: formData.plan,
+        },
       });
+
+      const { data } = await api.post("/admin/clientes", {
+        nombreEmpresa: formData.nombre,
+        emailAdmin: formData.email,
+        nombreAdmin: formData.nombreAdmin,
+        tipoLicencia: formData.plan,
+      });
+
+      console.log("✅ CREATE CLIENT SUCCESS:", data);
       setShowCreateModal(false);
       setFormData({
         nombre: "",
         email: "",
         nombreAdmin: "",
-        plan: "1 month",
+        plan: "prueba",
         diasExtensión: 30,
         razonBloqueo: "",
       });
       cargarClientes();
-    } catch (err) {
-      setError("Error creando cliente");
+    } catch (err: any) {
+      console.error("❌ CREATE CLIENT FAILED:", {
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        errorMessage: err.response?.data?.error,
+        fullResponse: err.response?.data,
+        payload: {
+          nombreEmpresa: formData.nombre,
+          emailAdmin: formData.email,
+          nombreAdmin: formData.nombreAdmin,
+          tipoLicencia: formData.plan,
+        },
+        axiosError: err.message,
+      });
+      setError(
+        err.response?.data?.error || `Error creando cliente: ${err.message}`
+      );
     }
   }
 
   async function handleExtendLicense(clienteId: string) {
     try {
-      await api.patch(`/admin/clientes/${clienteId}/licencia`, {
-        dias_adicionales: formData.diasExtensión,
+      console.log("📤 POST EXTEND LICENSE:", {
+        url: `/admin/clientes/${clienteId}/licencia`,
+        payload: { dias: formData.diasExtensión },
       });
+
+      const { data } = await api.patch(`/admin/clientes/${clienteId}/licencia`, {
+        dias: formData.diasExtensión,
+      });
+
+      console.log("✅ EXTEND LICENSE SUCCESS:", data);
       setShowExtendModal(false);
+      setFormData({ ...formData, diasExtensión: 30 });
       cargarClientes();
-    } catch (err) {
-      setError("Error extendiendo licencia");
+    } catch (err: any) {
+      console.error("❌ EXTEND LICENSE FAILED:", {
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        errorMessage: err.response?.data?.error,
+        fullResponse: err.response?.data,
+        payload: { dias: formData.diasExtensión },
+        clienteId,
+        axiosError: err.message,
+      });
+      setError(
+        err.response?.data?.error || `Error extendiendo licencia: ${err.message}`
+      );
     }
   }
 
   async function handleResetPassword(clienteId: string) {
     try {
+      console.log("📤 POST RESET PASSWORD:", {
+        url: `/admin/clientes/${clienteId}/reset-password`,
+      });
+
       const { data } = await api.post(`/admin/clientes/${clienteId}/reset-password`);
+
+      console.log("✅ RESET PASSWORD SUCCESS:", data);
       setGeneratedPassword(data.passwordTemporal);
       setShowPasswordModal(true);
-    } catch (err) {
-      setError("Error generando contraseña");
+    } catch (err: any) {
+      console.error("❌ RESET PASSWORD FAILED:", {
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        errorMessage: err.response?.data?.error,
+        fullResponse: err.response?.data,
+        clienteId,
+        axiosError: err.message,
+      });
+      setError(
+        err.response?.data?.error || `Error generando contraseña: ${err.message}`
+      );
     }
   }
 
   async function handleToggleBlock(clienteId: string, shouldBlock: boolean) {
     try {
-      await api.patch(`/admin/clientes/${clienteId}/bloquear`, {
+      console.log("📤 PATCH TOGGLE BLOCK:", {
+        url: `/admin/clientes/${clienteId}/bloquear`,
+        payload: {
+          bloqueado: shouldBlock,
+          razon: formData.razonBloqueo,
+        },
+      });
+
+      const { data } = await api.patch(`/admin/clientes/${clienteId}/bloquear`, {
         bloqueado: shouldBlock,
         razon: formData.razonBloqueo,
       });
+
+      console.log("✅ TOGGLE BLOCK SUCCESS:", data);
       setShowBlockModal(false);
+      setFormData({ ...formData, razonBloqueo: "" });
       cargarClientes();
-    } catch (err) {
-      setError("Error cambiando estado de bloqueo");
+    } catch (err: any) {
+      console.error("❌ TOGGLE BLOCK FAILED:", {
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        errorMessage: err.response?.data?.error,
+        fullResponse: err.response?.data,
+        payload: {
+          bloqueado: shouldBlock,
+          razon: formData.razonBloqueo,
+        },
+        clienteId,
+        axiosError: err.message,
+      });
+      setError(
+        err.response?.data?.error || `Error cambiando estado de bloqueo: ${err.message}`
+      );
     }
   }
 
@@ -994,34 +1129,67 @@ export default function CentralaAdmin() {
                       </td>
                       <td>{new Date(cliente.fecha_vencimiento).toLocaleDateString()}</td>
                       <td>
-                        <div className="action-buttons">
+                        <div className="action-menu-container">
                           <button
-                            className="action-btn"
-                            onClick={() => handleResetPassword(cliente.id)}
-                            title="Reset Password"
+                            className="action-menu-btn"
+                            onClick={() =>
+                              setOpenActionsMenu(
+                                openActionsMenu === cliente.id ? null : cliente.id
+                              )
+                            }
                           >
-                            🔑
+                            ⋮
                           </button>
-                          <button
-                            className="action-btn"
-                            onClick={() => {
-                              setSelectedClient(cliente);
-                              setShowExtendModal(true);
-                            }}
-                            title="Extender Licencia"
-                          >
-                            ⏱️
-                          </button>
-                          <button
-                            className="action-btn"
-                            onClick={() => {
-                              setSelectedClient(cliente);
-                              setShowBlockModal(true);
-                            }}
-                            title={cliente.bloqueada_por_admin ? "Desbloquear" : "Bloquear"}
-                          >
-                            {cliente.bloqueada_por_admin ? "🔓" : "🔒"}
-                          </button>
+
+                          {openActionsMenu === cliente.id && (
+                            <div className="action-menu-dropdown">
+                              <div
+                                className="action-menu-item"
+                                onClick={() => {
+                                  handleResetPassword(cliente.id);
+                                  setOpenActionsMenu(null);
+                                }}
+                              >
+                                <span>🔑</span> Resetear Contraseña
+                              </div>
+
+                              <div
+                                className="action-menu-item"
+                                onClick={() => {
+                                  setSelectedClient(cliente);
+                                  setShowExtendModal(true);
+                                  setOpenActionsMenu(null);
+                                }}
+                              >
+                                <span>⏱️</span> Modificar Licencia
+                              </div>
+
+                              <div
+                                className="action-menu-item danger"
+                                onClick={() => {
+                                  setSelectedClient(cliente);
+                                  setShowBlockModal(true);
+                                  setOpenActionsMenu(null);
+                                }}
+                              >
+                                <span>{cliente.bloqueada_por_admin ? "🔓" : "🔒"}</span>
+                                {cliente.bloqueada_por_admin
+                                  ? "Desbloquear Cliente"
+                                  : "Bloquear Cliente"}
+                              </div>
+
+                              <div
+                                className="action-menu-item"
+                                onClick={() => {
+                                  console.log("📝 Editar cliente:", cliente);
+                                  setSelectedClient(cliente);
+                                  setOpenActionsMenu(null);
+                                }}
+                              >
+                                <span>✏️</span> Editar Cliente
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1123,10 +1291,10 @@ export default function CentralaAdmin() {
                   value={formData.plan}
                   onChange={(e) => setFormData({ ...formData, plan: e.target.value })}
                 >
-                  <option value="1 month">1 Mes - $50</option>
-                  <option value="3 months">3 Meses - $120</option>
-                  <option value="6 months">6 Meses - $220</option>
-                  <option value="1 year">1 Año - $400</option>
+                  <option value="prueba">Prueba - 14 días</option>
+                  <option value="mensual">Mensual - $50</option>
+                  <option value="trimestral">Trimestral - $120</option>
+                  <option value="anual">Anual - $400</option>
                 </select>
               </div>
 

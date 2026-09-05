@@ -110,7 +110,20 @@ export default async function adminRoutes(app: FastifyInstance) {
     try {
       const { nombreEmpresa, emailAdmin, nombreAdmin, tipoLicencia } = request.body as any;
 
+      console.log("➕ CREATE CLIENT REQUEST:", {
+        nombreEmpresa,
+        emailAdmin,
+        nombreAdmin,
+        tipoLicencia,
+        superAdminId: (request as any).superAdmin?.id,
+      });
+
       if (!nombreEmpresa || !emailAdmin || !nombreAdmin) {
+        console.error("❌ MISSING REQUIRED FIELDS:", {
+          nombreEmpresa: !!nombreEmpresa,
+          emailAdmin: !!emailAdmin,
+          nombreAdmin: !!nombreAdmin,
+        });
         return reply.code(400).send({ error: "Faltan datos requeridos" });
       }
 
@@ -166,6 +179,14 @@ export default async function adminRoutes(app: FastifyInstance) {
         },
       });
 
+      console.log("✅ CLIENT CREATED SUCCESSFULLY:", {
+        empresaId: empresa.id,
+        empresaNombre: empresa.nombre,
+        usuarioId: usuario.id,
+        usuarioEmail: usuario.email,
+        tipoLicencia: empresa.tipo_licencia,
+      });
+
       reply.send({
         success: true,
         empresa,
@@ -173,8 +194,16 @@ export default async function adminRoutes(app: FastifyInstance) {
         passwordTemporal,
         mensaje: "Cliente creado exitosamente. Contraseña temporal generada.",
       });
-    } catch (error) {
-      console.error("Error creando cliente:", error);
+    } catch (error: any) {
+      console.error("❌ CREATE CLIENT ERROR:", {
+        error: error.message,
+        stack: error.stack,
+        payload: {
+          nombreEmpresa: (request.body as any)?.nombreEmpresa,
+          emailAdmin: (request.body as any)?.emailAdmin,
+          tipoLicencia: (request.body as any)?.tipoLicencia,
+        },
+      });
       reply.code(500).send({ error: "Error creando cliente" });
     }
   });
@@ -188,12 +217,20 @@ export default async function adminRoutes(app: FastifyInstance) {
       const { id } = request.params as any;
       const { dias } = request.body as any;
 
+      console.log("⏱️ EXTEND LICENSE REQUEST:", {
+        clienteId: id,
+        dias,
+        superAdminId: (request as any).superAdmin?.id,
+      });
+
       if (!dias || dias <= 0) {
+        console.error("❌ INVALID DIAS:", { dias, type: typeof dias });
         return reply.code(400).send({ error: "Días inválido" });
       }
 
       const empresa = await prisma.empresa.findUnique({ where: { id } });
       if (!empresa) {
+        console.error("❌ CLIENT NOT FOUND:", { clienteId: id });
         return reply.code(404).send({ error: "Cliente no encontrado" });
       }
 
@@ -210,6 +247,13 @@ export default async function adminRoutes(app: FastifyInstance) {
         },
       });
 
+      console.log("✅ LICENSE EXTENDED:", {
+        clienteId: id,
+        diasAgregados: dias,
+        nuevosDiasRestantes: nuevosDias,
+        nuevaFecha,
+      });
+
       // Auditoría
       await prisma.adminAuditoria.create({
         data: {
@@ -222,8 +266,13 @@ export default async function adminRoutes(app: FastifyInstance) {
       });
 
       reply.send({ success: true, empresa: empresaActualizada });
-    } catch (error) {
-      console.error("Error extendiendo licencia:", error);
+    } catch (error: any) {
+      console.error("❌ EXTEND LICENSE ERROR:", {
+        error: error.message,
+        stack: error.stack,
+        clienteId: request.params.id,
+        dias: (request.body as any)?.dias,
+      });
       reply.code(500).send({ error: "Error extendiendo licencia" });
     }
   });
@@ -236,8 +285,14 @@ export default async function adminRoutes(app: FastifyInstance) {
     try {
       const { id } = request.params as any;
 
+      console.log("🔑 RESET PASSWORD REQUEST:", {
+        clienteId: id,
+        superAdminId: (request as any).superAdmin?.id,
+      });
+
       const empresa = await prisma.empresa.findUnique({ where: { id } });
       if (!empresa) {
+        console.error("❌ CLIENT NOT FOUND FOR PASSWORD RESET:", { clienteId: id });
         return reply.code(404).send({ error: "Cliente no encontrado" });
       }
 
@@ -246,9 +301,15 @@ export default async function adminRoutes(app: FastifyInstance) {
       const passwordHash = await bcrypt.hash(nuevaPassword, 10);
 
       // Actualizar usuario admin de la empresa
-      await prisma.usuario.updateMany({
+      const updateResult = await prisma.usuario.updateMany({
         where: { empresaId: id, rol: "ADMIN" },
         data: { passwordHash: passwordHash },
+      });
+
+      console.log("✅ PASSWORD RESET:", {
+        clienteId: id,
+        empresa: empresa.nombre,
+        usuariosActualizados: updateResult.count,
       });
 
       // Auditoría
@@ -266,8 +327,12 @@ export default async function adminRoutes(app: FastifyInstance) {
         passwordTemporal: nuevaPassword,
         mensaje: "Contraseña reseteada. Nueva contraseña temporal generada.",
       });
-    } catch (error) {
-      console.error("Error reseteando password:", error);
+    } catch (error: any) {
+      console.error("❌ RESET PASSWORD ERROR:", {
+        error: error.message,
+        stack: error.stack,
+        clienteId: request.params.id,
+      });
       reply.code(500).send({ error: "Error reseteando password" });
     }
   });
@@ -281,6 +346,13 @@ export default async function adminRoutes(app: FastifyInstance) {
       const { id } = request.params as any;
       const { bloqueado, razon } = request.body as any;
 
+      console.log("🔒 BLOCK/UNBLOCK REQUEST:", {
+        clienteId: id,
+        bloqueado,
+        razon,
+        superAdminId: (request as any).superAdmin?.id,
+      });
+
       const empresa = await prisma.empresa.update({
         where: { id },
         data: {
@@ -288,6 +360,12 @@ export default async function adminRoutes(app: FastifyInstance) {
           razon_bloqueo: razon || null,
           fecha_ultimo_bloqueo: bloqueado ? new Date() : null,
         },
+      });
+
+      console.log("✅ CLIENT BLOCK STATUS UPDATED:", {
+        clienteId: id,
+        bloqueado,
+        empresa: empresa.nombre,
       });
 
       // Auditoría
@@ -302,8 +380,13 @@ export default async function adminRoutes(app: FastifyInstance) {
       });
 
       reply.send({ success: true, empresa });
-    } catch (error) {
-      console.error("Error bloqueando cliente:", error);
+    } catch (error: any) {
+      console.error("❌ BLOCK/UNBLOCK ERROR:", {
+        error: error.message,
+        stack: error.stack,
+        clienteId: request.params.id,
+        payload: { bloqueado: (request.body as any)?.bloqueado, razon: (request.body as any)?.razon },
+      });
       reply.code(500).send({ error: "Error bloqueando cliente" });
     }
   });
