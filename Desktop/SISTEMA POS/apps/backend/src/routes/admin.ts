@@ -7,22 +7,46 @@ const prisma = new PrismaClient();
 // 🔐 Middleware: Verificar Super Admin
 const verificarSuperAdmin = async (request: FastifyRequest, reply: FastifyReply) => {
   try {
-    const usuarioId = (request as any).usuarioId;
+    // El JWT fue verificado por app.authenticate, así que request.user debe existir
+    const usuarioId = request.user?.usuarioId;
+
     if (!usuarioId) {
-      return reply.code(401).send({ error: "No autorizado" });
+      console.error("🔴 ADMIN MIDDLEWARE: usuarioId no encontrado en request.user", {
+        user: request.user,
+      });
+      return reply.code(401).send({ error: "No autorizado - Usuario no identificado" });
     }
 
     const usuario = await prisma.usuario.findUnique({
       where: { id: usuarioId },
+      select: { id: true, email: true, es_super_admin: true },
     });
 
-    if (!usuario || !usuario.es_super_admin) {
-      console.warn(`⚠️ SEGURIDAD: Intento de acceso no autorizado a admin por ${usuario?.email}`);
+    console.log("🔍 ADMIN CHECK:", {
+      usuarioId,
+      email: usuario?.email,
+      es_super_admin: usuario?.es_super_admin,
+    });
+
+    if (!usuario) {
+      console.error(`🔴 ADMIN MIDDLEWARE: Usuario no encontrado en BD - ID: ${usuarioId}`);
+      return reply.code(401).send({ error: "No autorizado - Usuario no encontrado" });
+    }
+
+    if (!usuario.es_super_admin) {
+      console.warn(
+        `⚠️ SEGURIDAD: Intento de acceso no autorizado a admin por ${usuario.email}`
+      );
       return reply.code(403).send({ error: "Solo Super Admin puede acceder" });
     }
 
+    console.log(`✅ ADMIN ACCESS GRANTED para ${usuario.email}`);
     (request as any).superAdmin = usuario;
-  } catch (error) {
+  } catch (error: any) {
+    console.error("🔴 ADMIN MIDDLEWARE ERROR:", {
+      error: error.message,
+      stack: error.stack,
+    });
     reply.code(500).send({ error: "Error verificando permisos" });
   }
 };

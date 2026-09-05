@@ -42,8 +42,16 @@ export async function registerJwt(app: FastifyInstance) {
 
     try {
       await request.jwtVerify();
-    } catch {
-      return reply.code(401).send({ error: "No autorizado" });
+    } catch (error: any) {
+      console.error("🔴 JWT VERIFICATION FAILED:", {
+        error: error.message,
+        name: error.name,
+        code: error.code,
+        url: request.url,
+        method: request.method,
+        authHeader: request.headers.authorization ? "Presente" : "Ausente",
+      });
+      return reply.code(401).send({ error: "No autorizado - Token inválido" });
     }
 
     const usuario = await prisma.usuario.findUnique({

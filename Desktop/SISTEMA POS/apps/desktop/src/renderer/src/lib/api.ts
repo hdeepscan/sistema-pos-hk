@@ -28,11 +28,37 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401 && error.config?.url?.includes("usuarios-adicionales")) {
-      console.error(`❌ 401 en usuarios-adicionales`);
-      console.error(`  Response:`, error.response.data);
-      console.error(`  Request headers:`, error.config.headers);
+    // Handle 401 Unauthorized
+    if (error.response?.status === 401) {
+      console.error(`🔴 401 UNAUTHORIZED`, {
+        url: error.config?.url,
+        message: error.response.data?.error,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Clear local storage
+      localStorage.removeItem("token");
+      localStorage.removeItem("empresaId");
+      localStorage.removeItem("sucursalId");
+      localStorage.removeItem("sessionData");
+
+      // Get current location and redirect to login
+      const currentPath = window.location.pathname;
+      if (!currentPath.includes("/login")) {
+        console.log("🔄 Redirecting to /login due to 401");
+        // Use window.location.hash for Electron/React Router Hash routing
+        window.location.hash = "#/login";
+      }
     }
+
+    // Debug logging for specific endpoints
+    if (error.response?.status === 401 && error.config?.url?.includes("admin")) {
+      console.error(`❌ 401 en endpoint admin`);
+      console.error(`  URL:`, error.config.url);
+      console.error(`  Response:`, error.response.data);
+      console.error(`  Token sent:`, error.config.headers?.Authorization ? "SÍ" : "NO");
+    }
+
     return Promise.reject(error);
   }
 );
