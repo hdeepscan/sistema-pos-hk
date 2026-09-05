@@ -102,6 +102,9 @@ export async function authRoutes(app: FastifyInstance) {
         nombre: usuario.empresa.nombre,
         fechaVencimiento: usuario.empresa.fechaVencimiento,
         planSuscripcion: usuario.empresa.planSuscripcion,
+        dias_restantes: usuario.empresa.dias_restantes,
+        estado: usuario.empresa.estado,
+        tipo_licencia: usuario.empresa.tipo_licencia,
       },
       sucursales,
     });
