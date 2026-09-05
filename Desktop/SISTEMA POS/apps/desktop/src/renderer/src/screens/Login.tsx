@@ -615,7 +615,7 @@ export default function Login() {
         <div className="login-card">
           {/* Logo */}
           <div className="login-logo">
-            <img src={logo} alt="Sistema POS HK" />
+            <img src={logo} alt="CENTRALA" />
           </div>
 
           {/* Title */}
@@ -816,7 +816,7 @@ export default function Login() {
 
           {/* Footer */}
           <div className="login-footer">
-            © 2024 Sistema POS HK • Tu negocio, bajo control
+            © 2024 CENTRALA • Tu negocio, centralizado
           </div>
         </div>
       </div>

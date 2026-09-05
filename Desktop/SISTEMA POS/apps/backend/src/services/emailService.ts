@@ -19,7 +19,7 @@ export async function enviarEmailBienvenida(
   passwordTemporal: string
 ) {
   try {
-    const asunto = `¡Bienvenido a Sistema POS! - ${nombreEmpresa}`;
+    const asunto = `¡Bienvenido a CENTRALA! - ${nombreEmpresa}`;
 
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
@@ -27,8 +27,8 @@ export async function enviarEmailBienvenida(
 
           <!-- Header -->
           <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #667eea; margin: 0;">Sistema POS HK</h1>
-            <p style="color: #666; font-size: 14px; margin: 5px 0;">Gestión Completa de Ventas</p>
+            <h1 style="color: #667eea; margin: 0;">CENTRALA</h1>
+            <p style="color: #666; font-size: 14px; margin: 5px 0;">Tu Negocio, Centralizado</p>
           </div>
 
           <!-- Contenido principal -->
@@ -64,7 +64,7 @@ export async function enviarEmailBienvenida(
             <!-- Pasos -->
             <h3 style="color: #2d3748; margin-bottom: 15px;">🚀 Pasos Siguientes:</h3>
             <ol style="color: #4a5568; font-size: 14px; line-height: 1.8;">
-              <li>Ingresa a https://sistema-pos-hk.up.railway.app/</li>
+              <li>Ingresa a https://centrala.up.railway.app/</li>
               <li>Usa las credenciales de arriba</li>
               <li>Cambia tu contraseña temporal</li>
               <li>¡Empieza a usar tu POS!</li>
@@ -81,7 +81,7 @@ export async function enviarEmailBienvenida(
 
           <!-- Footer -->
           <div style="text-align: center; border-top: 1px solid #e2e8f0; padding-top: 20px; color: #718096; font-size: 12px;">
-            <p style="margin: 5px 0;">© 2026 Sistema POS HK. Todos los derechos reservados.</p>
+            <p style="margin: 5px 0;">© 2026 CENTRALA. Todos los derechos reservados.</p>
             <p style="margin: 5px 0;">Este es un correo automático. No respondas directamente.</p>
           </div>
 

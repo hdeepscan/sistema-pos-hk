@@ -2,8 +2,8 @@
   "name": "@sistema-pos/desktop",
   "version": "0.8.22",
   "private": true,
-  "description": "Sistema POS HK - punto de venta multi-sucursal con integracion Shopify",
-  "author": "Sistema POS HK",
+  "description": "CENTRALA - punto de venta multi-sucursal con integracion Shopify",
+  "author": "CENTRALA",
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",

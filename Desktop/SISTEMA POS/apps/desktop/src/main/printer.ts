@@ -421,7 +421,7 @@ function reporteCajaHtml(d: ReporteCajaData): string {
           ${fila(d.diferencia >= 0 ? "Sobrante" : "Faltante", `$${Math.abs(d.diferencia).toFixed(2)}`, true)}
         </table>
         <hr />
-        <div class="center" style="font-size:10px">Sistema POS HK</div>
+        <div class="center" style="font-size:10px">CENTRALA</div>
       </body>
     </html>`;
 }

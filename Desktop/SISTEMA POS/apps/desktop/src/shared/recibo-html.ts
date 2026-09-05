@@ -319,7 +319,7 @@ export function construirReciboHtml(data: ReciboData): string {
         ${p?.qrDataUrl ? `<img class="qr" src="${p.qrDataUrl}" alt="QR" />` : ""}
         ${p?.piePagina ? `<div class="center" style="font-size:9px;margin-top:2px">${escapeHtml(p.piePagina)}</div>` : ""}
         <hr />
-        <div class="footer">Desarrollado por POS HK</div>
+        <div class="footer">Powered by CENTRALA</div>
       </body>
     </html>`;
 

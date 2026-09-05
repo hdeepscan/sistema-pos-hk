@@ -166,13 +166,13 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
         <div className="sidebar-brand" style={{ padding: "28px 16px", borderBottom: "1px solid rgba(34, 197, 94, 0.08)", display: "flex", flexDirection: "column", alignItems: "center" }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, width: "100%" }}>
             <div style={{ borderRadius: 20, padding: 16, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px rgba(34, 197, 94, 0.1)" }}>
-              <img src={logo} alt="Sistema POS HK" style={{ height: 88, width: 88, objectFit: "contain" }} />
+              <img src={logo} alt="CENTRALA" style={{ height: 88, width: 88, objectFit: "contain" }} />
             </div>
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)", letterSpacing: "-0.5px" }}>
-                SISTEMA POS
+                CENTRALA
               </div>
-              <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 3 }}>Gestión de Ventas</div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 3 }}>Panel de Control</div>
             </div>
           </div>
         </div>

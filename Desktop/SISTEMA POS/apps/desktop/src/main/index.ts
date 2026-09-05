@@ -117,8 +117,8 @@ function createSplash(): BrowserWindow {
             <div class="tapa"></div>
             <div class="logo">${logoUrl ? `<img src="${logoUrl}" alt="" />` : ""}</div>
           </div>
-          <div class="titulo">Sistema POS HK</div>
-          <div class="tagline">Tu negocio, bajo control</div>
+          <div class="titulo">CENTRALA</div>
+          <div class="tagline">Tu negocio, centralizado</div>
           <div class="cargando">CARGANDO<span>.</span><span>.</span><span>.</span></div>
         </div>
       </body>
