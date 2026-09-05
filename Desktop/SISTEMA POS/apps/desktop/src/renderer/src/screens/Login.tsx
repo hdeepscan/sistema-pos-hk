@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useSesionStore } from "../lib/store";
 import { AdminLoginModal } from "../components/AdminLoginModal";
-import logo from "../assets/centrala-logo.png";
+import logo from "../assets/CENTRALA.pdf.png";
 import { mensajeError } from "../lib/errores";
 import { IconoOjo, IconoOjoTachado } from "../lib/iconos";
 import { electronAPI } from "../lib/electron-api";
@@ -12,14 +12,9 @@ import CheckoutPage from "./CheckoutPage";
 const loginStyles = `
   .login-container {
     min-height: 100vh;
-    background: linear-gradient(-45deg,
-      rgba(219, 234, 254, 0.8) 0%,
-      rgba(220, 252, 231, 0.7) 25%,
-      rgba(219, 234, 254, 0.75) 50%,
-      rgba(220, 252, 231, 0.8) 75%,
-      rgba(219, 234, 254, 0.8) 100%);
-    background-size: 400% 400%;
-    animation: gradientShift 15s ease infinite;
+    background: #FFFFFF;
+    background-size: 200% 100%;
+    animation: subtleShineLogin 8s ease-in-out infinite;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -28,15 +23,18 @@ const loginStyles = `
     overflow: hidden;
   }
 
-  @keyframes gradientShift {
+  @keyframes subtleShineLogin {
     0% {
-      background-position: 0% 50%;
+      background: linear-gradient(90deg, #FFFFFF 0%, #F9FAFB 50%, #FFFFFF 100%);
+      background-position: -200% center;
     }
     50% {
-      background-position: 100% 50%;
+      background: linear-gradient(90deg, #FFFFFF 0%, #F8F9FA 50%, #FFFFFF 100%);
+      background-position: 200% center;
     }
     100% {
-      background-position: 0% 50%;
+      background: linear-gradient(90deg, #FFFFFF 0%, #F9FAFB 50%, #FFFFFF 100%);
+      background-position: -200% center;
     }
   }
 
@@ -45,7 +43,7 @@ const loginStyles = `
     position: absolute;
     width: 600px;
     height: 600px;
-    background: radial-gradient(circle, rgba(59, 130, 246, 0.12) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(59, 130, 246, 0.04) 0%, transparent 70%);
     border-radius: 50%;
     top: -300px;
     right: -300px;
@@ -58,7 +56,7 @@ const loginStyles = `
     position: absolute;
     width: 500px;
     height: 500px;
-    background: radial-gradient(circle, rgba(34, 197, 94, 0.12) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(59, 130, 246, 0.02) 0%, transparent 70%);
     border-radius: 50%;
     bottom: -250px;
     left: -250px;
@@ -76,29 +74,23 @@ const loginStyles = `
   }
 
   .login-card {
-    background: rgba(255, 255, 255, 0.75);
-    border-radius: 32px;
+    background: #FFFFFF;
+    border-radius: 20px;
     padding: 48px 40px;
     max-width: 480px;
     width: 100%;
-    border: 1px solid rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(59, 130, 246, 0.08);
     position: relative;
     z-index: 10;
     animation: floatUp 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
     will-change: transform, box-shadow;
     transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-    backdrop-filter: blur(30px) saturate(200%);
 
-    /* Sombra flotante profesional glassmorphism */
+    /* Sombra moderna y limpia */
     box-shadow:
-      /* Base/depth shadow */
-      0 2px 8px rgba(0, 0, 0, 0.08),
-      /* Mid shadow */
-      0 10px 20px rgba(0, 0, 0, 0.12),
-      /* Outer glow shadow */
-      0 20px 40px rgba(59, 130, 246, 0.12),
-      /* Extreme shadow para profundidad */
-      0 40px 80px rgba(0, 0, 0, 0.14);
+      0 4px 12px rgba(0, 0, 0, 0.05),
+      0 8px 24px rgba(0, 0, 0, 0.08),
+      0 16px 40px rgba(59, 130, 246, 0.08);
   }
 
   @keyframes floatUp {
@@ -115,17 +107,11 @@ const loginStyles = `
   }
 
   .login-card:hover {
-    transform: translateY(-8px);
-    background: rgba(255, 255, 255, 0.85);
+    transform: translateY(-4px);
     box-shadow:
-      /* Base/depth shadow */
-      0 2px 8px rgba(0, 0, 0, 0.10),
-      /* Mid shadow */
-      0 12px 24px rgba(0, 0, 0, 0.15),
-      /* Outer glow shadow - más fuerte */
-      0 28px 56px rgba(59, 130, 246, 0.18),
-      /* Extreme shadow para profundidad */
-      0 50px 100px rgba(0, 0, 0, 0.18);
+      0 6px 16px rgba(0, 0, 0, 0.06),
+      0 12px 32px rgba(0, 0, 0, 0.1),
+      0 24px 48px rgba(59, 130, 246, 0.12);
   }
 
   @keyframes slideUp {
@@ -215,15 +201,14 @@ const loginStyles = `
   }
 
   .form-input {
-    background: rgba(255, 255, 255, 0.5);
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-radius: 12px;
-    padding: 14px 16px;
+    background: #F9FAFB;
+    border: 2px solid #E2E8F0;
+    border-radius: 10px;
+    padding: 12px 14px;
     font-size: 14px;
     font-family: inherit;
     transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
     color: #0f172a;
-    backdrop-filter: blur(20px) saturate(180%);
   }
 
   .form-input::placeholder {
@@ -281,7 +266,7 @@ const loginStyles = `
   }
 
   .submit-button {
-    background: linear-gradient(135deg, #3b82f6 0%, #22c55e 100%);
+    background: #3B82F6;
     color: white;
     border: none;
     border-radius: 12px;
@@ -297,7 +282,7 @@ const loginStyles = `
     gap: 8px;
     text-transform: uppercase;
     letter-spacing: 0.6px;
-    box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
+    box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
     position: relative;
     overflow: hidden;
   }
@@ -316,8 +301,8 @@ const loginStyles = `
   }
 
   .submit-button:hover:not(:disabled) {
-    background: linear-gradient(135deg, #2563eb 0%, #16a34a 100%);
-    box-shadow: 0 12px 30px rgba(59, 130, 246, 0.5);
+    background: #2563EB;
+    box-shadow: 0 12px 30px rgba(59, 130, 246, 0.4);
     transform: translateY(-4px);
   }
 
@@ -378,7 +363,7 @@ const loginStyles = `
   .login-toggle button {
     background: none;
     border: none;
-    color: #22c55e;
+    color: #3B82F6;
     font-weight: 700;
     cursor: pointer;
     padding: 0;
@@ -388,7 +373,7 @@ const loginStyles = `
   }
 
   .login-toggle button:hover {
-    color: #16a34a;
+    color: #2563EB;
     text-decoration: underline;
   }
 
@@ -402,10 +387,10 @@ const loginStyles = `
 
   .google-button {
     width: 100%;
-    background: rgba(255, 255, 255, 0.5);
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-radius: 12px;
-    padding: 14px 16px;
+    background: #F9FAFB;
+    border: 2px solid #E2E8F0;
+    border-radius: 10px;
+    padding: 12px 14px;
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
@@ -417,13 +402,12 @@ const loginStyles = `
     color: #1e293b;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    backdrop-filter: blur(20px) saturate(180%);
   }
 
   .google-button:hover {
     border-color: #3b82f6;
-    background: rgba(255, 255, 255, 0.85);
-    box-shadow: 0 8px 20px rgba(59, 130, 246, 0.2);
+    background: #FFFFFF;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
     transform: translateY(-2px);
   }
 
