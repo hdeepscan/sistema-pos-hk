@@ -1,0 +1,338 @@
+/**
+ * CENTRALA COMPONENT STYLES
+ * Global styles for dashboard components, tables, forms
+ */
+
+/* ================================
+   DASHBOARD & PAGE TITLES
+   ================================ */
+
+.page-title {
+  font-family: var(--font-heading);
+  font-size: var(--text-h1-size);
+  font-weight: var(--text-h1-weight);
+  line-height: var(--text-h1-line-height);
+  color: var(--text-primary, #0f172a);
+  margin: 0 0 24px 0;
+}
+
+.page-subtitle {
+  font-family: var(--font-body);
+  font-size: var(--text-body-lg-size);
+  font-weight: var(--text-body-weight);
+  line-height: var(--text-body-lg-line-height);
+  color: var(--text-secondary, #64748b);
+  margin: 0 0 32px 0;
+}
+
+/* ================================
+   CARDS & CONTAINERS
+   ================================ */
+
+.card-title {
+  font-family: var(--font-heading);
+  font-size: var(--text-h3-size);
+  font-weight: var(--text-h3-weight);
+  line-height: var(--text-h3-line-height);
+  color: var(--text-primary, #0f172a);
+  margin: 0 0 16px 0;
+}
+
+.card-subtitle {
+  font-family: var(--font-body);
+  font-size: var(--text-body-sm-size);
+  font-weight: var(--text-body-weight);
+  line-height: var(--text-body-line-height);
+  color: var(--text-secondary, #64748b);
+  margin: 0;
+}
+
+/* ================================
+   TABLE STYLES
+   ================================ */
+
+table {
+  font-family: var(--font-body);
+  border-collapse: collapse;
+}
+
+/* Table Header */
+thead th {
+  font-family: var(--font-body);
+  font-size: var(--text-label-size);
+  font-weight: var(--text-label-weight);
+  line-height: var(--text-label-line-height);
+  letter-spacing: var(--text-label-letter-spacing);
+  text-transform: uppercase;
+  color: var(--text-secondary, #64748b);
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 2px solid rgba(226, 232, 240, 0.5);
+}
+
+/* Table Body */
+tbody td {
+  font-family: var(--font-body);
+  font-size: var(--text-body-size);
+  font-weight: var(--text-body-weight);
+  line-height: var(--text-body-line-height);
+  color: var(--text-primary, #0f172a);
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.3);
+}
+
+/* Numeric Data in Tables */
+tbody td.number,
+tbody td[data-type="number"] {
+  font-family: var(--font-body);
+  font-size: var(--text-data-size);
+  font-weight: var(--text-data-weight);
+  text-align: right;
+  color: var(--text-primary, #0f172a);
+}
+
+/* Status Badges */
+.badge {
+  font-family: var(--font-body);
+  font-size: var(--text-xs-size);
+  font-weight: var(--text-label-weight);
+  line-height: var(--text-label-line-height);
+  padding: 6px 12px;
+  border-radius: 6px;
+  display: inline-block;
+}
+
+/* ================================
+   FORM ELEMENTS
+   ================================ */
+
+label {
+  font-family: var(--font-body);
+  font-size: var(--text-label-size);
+  font-weight: var(--text-label-weight);
+  line-height: var(--text-label-line-height);
+  letter-spacing: var(--text-label-letter-spacing);
+  text-transform: uppercase;
+  color: var(--text-secondary, #64748b);
+  display: block;
+  margin-bottom: 8px;
+}
+
+input,
+textarea,
+select {
+  font-family: var(--font-body);
+  font-size: var(--text-body-size);
+  font-weight: var(--text-body-weight);
+  line-height: var(--text-body-line-height);
+  color: var(--text-primary, #0f172a);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-muted, #94a3b8);
+  font-weight: var(--font-weight-regular);
+}
+
+/* ================================
+   BUTTONS
+   ================================ */
+
+button,
+.btn {
+  font-family: var(--text-button-font);
+  font-size: var(--text-button-size);
+  font-weight: var(--text-button-weight);
+  line-height: var(--text-button-line-height);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+button:hover,
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+button:active,
+.btn:active {
+  transform: translateY(0);
+}
+
+/* ================================
+   KPI CARDS
+   ================================ */
+
+.kpi-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kpi-label {
+  font-family: var(--font-body);
+  font-size: var(--text-label-size);
+  font-weight: var(--text-label-weight);
+  line-height: var(--text-label-line-height);
+  letter-spacing: var(--text-label-letter-spacing);
+  text-transform: uppercase;
+  color: var(--text-secondary, #64748b);
+}
+
+.kpi-value {
+  font-family: var(--text-kpi-font);
+  font-size: var(--text-kpi-size);
+  font-weight: var(--text-kpi-weight);
+  line-height: var(--text-kpi-line-height);
+  color: var(--text-primary, #0f172a);
+}
+
+/* ================================
+   ALERTS & MESSAGES
+   ================================ */
+
+.alert {
+  font-family: var(--font-body);
+  font-size: var(--text-body-size);
+  font-weight: var(--text-body-weight);
+  line-height: var(--text-body-line-height);
+  padding: 14px 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.alert-title {
+  font-family: var(--font-heading);
+  font-size: var(--text-h3-size);
+  font-weight: var(--text-h3-weight);
+  margin: 0 0 8px 0;
+}
+
+.alert-message {
+  font-family: var(--font-body);
+  font-size: var(--text-body-size);
+  font-weight: var(--text-body-weight);
+  margin: 0;
+}
+
+/* ================================
+   MODAL DIALOGS
+   ================================ */
+
+.modal-title {
+  font-family: var(--font-heading);
+  font-size: var(--text-h2-size);
+  font-weight: var(--text-h2-weight);
+  line-height: var(--text-h2-line-height);
+  color: var(--text-primary, #0f172a);
+  margin: 0 0 16px 0;
+}
+
+.modal-body {
+  font-family: var(--font-body);
+  font-size: var(--text-body-size);
+  font-weight: var(--text-body-weight);
+  line-height: var(--text-body-line-height);
+  color: var(--text-primary, #0f172a);
+}
+
+/* ================================
+   SIDEBAR NAVIGATION
+   ================================ */
+
+.nav-section-title {
+  font-family: var(--font-body);
+  font-size: var(--text-xs-size);
+  font-weight: var(--text-label-weight);
+  line-height: var(--text-label-line-height);
+  letter-spacing: var(--text-label-letter-spacing);
+  text-transform: uppercase;
+  color: var(--text-secondary, #64748b);
+  margin: 24px 0 12px 0;
+  padding: 0 16px;
+}
+
+.nav-link {
+  font-family: var(--font-body);
+  font-size: var(--text-body-size);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--text-body-line-height);
+  color: var(--text-primary, #1e293b);
+  text-decoration: none;
+  display: block;
+  padding: 12px 16px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.nav-link:hover {
+  background-color: rgba(59, 130, 246, 0.08);
+  color: #3b82f6;
+}
+
+.nav-link.active {
+  font-weight: var(--font-weight-semibold);
+  color: #3b82f6;
+}
+
+/* ================================
+   PAGINATION & CONTROLS
+   ================================ */
+
+.pagination-info {
+  font-family: var(--font-body);
+  font-size: var(--text-body-sm-size);
+  font-weight: var(--text-body-weight);
+  line-height: var(--text-body-line-height);
+  color: var(--text-secondary, #64748b);
+}
+
+.pagination-numbers {
+  font-family: var(--font-body);
+  font-size: var(--text-body-size);
+  font-weight: var(--text-body-weight);
+  line-height: var(--text-body-line-height);
+}
+
+/* ================================
+   FOOTER
+   ================================ */
+
+footer {
+  font-family: var(--font-body);
+  font-size: var(--text-xs-size);
+  font-weight: var(--text-body-weight);
+  line-height: var(--text-xs-line-height);
+  color: var(--text-muted, #94a3b8);
+}
+
+/* ================================
+   UTILITY CLASSES
+   ================================ */
+
+.text-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.text-nowrap {
+  white-space: nowrap;
+}
+
+.font-mono {
+  font-family: "Courier New", monospace;
+  font-size: calc(var(--text-body-size) - 1px);
+  letter-spacing: 0.5px;
+}
+
+.text-uppercase {
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.text-condensed {
+  letter-spacing: -0.5px;
+  font-weight: var(--font-weight-semibold);
+}

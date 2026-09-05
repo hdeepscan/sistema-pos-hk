@@ -33,15 +33,15 @@ export function construirReciboHtml(data: ReciboData): string {
           }
 
           body {
-            font-family: 'Courier New', Courier, monospace;
+            font-family: 'Inter', 'Courier New', Courier, monospace;
             width: 80mm;
             margin: 10px auto;
             padding: 0;
             background: white;
             font-size: 11px;
-            line-height: 1.3;
+            line-height: 1.4;
             color: #000000;
-            font-weight: 700;
+            font-weight: 400;
             /* NITIDEZ TÉRMICA: Desactivar antialiasing */
             -webkit-font-smoothing: none;
             font-smooth: never;
@@ -49,12 +49,15 @@ export function construirReciboHtml(data: ReciboData): string {
             image-rendering: pixelated;
           }
 
+          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
           /* Estilos para pantalla */
           h2 {
+            font-family: 'Montserrat', 'Courier New', monospace;
             text-align: center;
             margin: 4px 0;
             font-size: 14px;
-            font-weight: 900;
+            font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             color: #000000;
