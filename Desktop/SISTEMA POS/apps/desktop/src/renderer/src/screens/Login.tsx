@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useSesionStore } from "../lib/store";
 import { AdminLoginModal } from "../components/AdminLoginModal";
-import logo from "../assets/logo.png";
+import logo from "../assets/centrala-logo.png";
 import { mensajeError } from "../lib/errores";
 import { IconoOjo, IconoOjoTachado } from "../lib/iconos";
 import { electronAPI } from "../lib/electron-api";
