@@ -270,7 +270,7 @@ export default async function adminRoutes(app: FastifyInstance) {
       console.error("❌ EXTEND LICENSE ERROR:", {
         error: error.message,
         stack: error.stack,
-        clienteId: request.params.id,
+        clienteId: (request.params as any).id,
         dias: (request.body as any)?.dias,
       });
       reply.code(500).send({ error: "Error extendiendo licencia" });
@@ -331,7 +331,7 @@ export default async function adminRoutes(app: FastifyInstance) {
       console.error("❌ RESET PASSWORD ERROR:", {
         error: error.message,
         stack: error.stack,
-        clienteId: request.params.id,
+        clienteId: (request.params as any).id,
       });
       reply.code(500).send({ error: "Error reseteando password" });
     }
@@ -384,7 +384,7 @@ export default async function adminRoutes(app: FastifyInstance) {
       console.error("❌ BLOCK/UNBLOCK ERROR:", {
         error: error.message,
         stack: error.stack,
-        clienteId: request.params.id,
+        clienteId: (request.params as any).id,
         payload: { bloqueado: (request.body as any)?.bloqueado, razon: (request.body as any)?.razon },
       });
       reply.code(500).send({ error: "Error bloqueando cliente" });
