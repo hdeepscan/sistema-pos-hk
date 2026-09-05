@@ -169,10 +169,10 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
               <img src={logo} alt="CENTRALA" style={{ height: 88, width: 88, objectFit: "contain" }} />
             </div>
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)", letterSpacing: "-0.5px" }}>
+              <div style={{ fontFamily: '"Montserrat", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', fontSize: 15, fontWeight: 700, color: "var(--text-primary)", letterSpacing: "-0.5px", lineHeight: "1.35" }}>
                 CENTRALA
               </div>
-              <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 3 }}>Panel de Control</div>
+              <div style={{ fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', fontSize: 12, color: "var(--text-muted)", marginTop: 3, fontWeight: 400, lineHeight: "1.4" }}>Panel de Control</div>
             </div>
           </div>
         </div>

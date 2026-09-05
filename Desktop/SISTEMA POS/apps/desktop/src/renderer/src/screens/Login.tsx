@@ -151,20 +151,24 @@ const loginStyles = `
   }
 
   .login-title {
+    font-family: "Montserrat", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     font-size: 36px;
-    font-weight: 800;
+    font-weight: 700;
     color: #0f172a;
     text-align: center;
     margin-bottom: 12px;
-    letter-spacing: -0.8px;
+    letter-spacing: -0.5px;
+    line-height: 1.35;
   }
 
   .login-subtitle {
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     font-size: 15px;
     color: #64748b;
     text-align: center;
     margin-bottom: 32px;
-    font-weight: 500;
+    font-weight: 400;
+    line-height: 1.5;
   }
 
   .login-error {
