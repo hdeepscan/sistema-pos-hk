@@ -408,4 +408,165 @@ export default async function adminRoutes(app: FastifyInstance) {
       reply.code(500).send({ error: "Error obteniendo auditoría" });
     }
   });
+
+  // 📊 GET /admin/reportes/proveedores - Dashboard de Análisis de Proveedores (MOCK DATA)
+  app.get(
+    "/reportes/proveedores",
+    { preHandler: [app.authenticate, verificarSuperAdmin] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      console.log("📊 ANALYTICS: Proveedores Analytics Request");
+
+      // MOCK DATA - Datos simulados para la interfaz
+      const mockData = {
+        insights: [
+          {
+            id: "insight-1",
+            icon: "💰",
+            titulo: "Mayor Inversión",
+            descripcion: "Nike concentra el 38% del inventario ($17.1M)",
+            tipo: "info",
+          },
+          {
+            id: "insight-2",
+            icon: "🚨",
+            titulo: "Stock Estancado",
+            descripcion: "$4.5M sin movimiento hace 60+ días",
+            tipo: "warning",
+          },
+          {
+            id: "insight-3",
+            icon: "📈",
+            titulo: "Mayor Rentabilidad",
+            descripcion: "Adidas lidera con 42% de margen bruto",
+            tipo: "success",
+          },
+        ],
+        kpis: {
+          totalProveedores: 12,
+          valorInventario: 45000000,
+          valorVenta: 72000000,
+          utilidadPotencial: 27000000,
+        },
+        graficoDistribucion: [
+          { nombre: "Nike", valor: 17100000, porcentaje: 38 },
+          { nombre: "Adidas", valor: 11250000, porcentaje: 25 },
+          { nombre: "Puma", valor: 8100000, porcentaje: 18 },
+          { nombre: "New Balance", valor: 5400000, porcentaje: 12 },
+          { nombre: "Otros", valor: 3150000, porcentaje: 7 },
+        ],
+        ranking: [
+          {
+            id: "prov-1",
+            nombre: "Nike",
+            productos: 145,
+            unidades: 8900,
+            costo: 12600000,
+            venta: 17100000,
+            utilidad: 4500000,
+            margenPorcentaje: 35.7,
+          },
+          {
+            id: "prov-2",
+            nombre: "Adidas",
+            productos: 98,
+            unidades: 6200,
+            costo: 6506250,
+            venta: 11250000,
+            utilidad: 4743750,
+            margenPorcentaje: 42.2,
+          },
+          {
+            id: "prov-3",
+            nombre: "Puma",
+            productos: 76,
+            unidades: 4500,
+            costo: 5670000,
+            venta: 8100000,
+            utilidad: 2430000,
+            margenPorcentaje: 30.0,
+          },
+          {
+            id: "prov-4",
+            nombre: "New Balance",
+            productos: 52,
+            unidades: 3100,
+            costo: 3780000,
+            venta: 5400000,
+            utilidad: 1620000,
+            margenPorcentaje: 30.0,
+          },
+          {
+            id: "prov-5",
+            nombre: "Reebok",
+            productos: 41,
+            unidades: 2200,
+            costo: 1890000,
+            venta: 3150000,
+            utilidad: 1260000,
+            margenPorcentaje: 40.0,
+          },
+          {
+            id: "prov-6",
+            nombre: "ASICS",
+            productos: 34,
+            unidades: 1800,
+            costo: 2160000,
+            venta: 3240000,
+            utilidad: 1080000,
+            margenPorcentaje: 33.3,
+          },
+          {
+            id: "prov-7",
+            nombre: "Saucony",
+            productos: 28,
+            unidades: 1400,
+            costo: 1470000,
+            venta: 2100000,
+            utilidad: 630000,
+            margenPorcentaje: 30.0,
+          },
+          {
+            id: "prov-8",
+            nombre: "Mizuno",
+            productos: 22,
+            unidades: 950,
+            costo: 1235000,
+            venta: 1710000,
+            utilidad: 475000,
+            margenPorcentaje: 27.8,
+          },
+          {
+            id: "prov-9",
+            nombre: "Brooks",
+            productos: 18,
+            unidades: 800,
+            costo: 960000,
+            venta: 1440000,
+            utilidad: 480000,
+            margenPorcentaje: 33.3,
+          },
+          {
+            id: "prov-10",
+            nombre: "Hoka",
+            productos: 15,
+            unidades: 650,
+            costo: 1170000,
+            venta: 1950000,
+            utilidad: 780000,
+            margenPorcentaje: 40.0,
+          },
+        ],
+      };
+
+      console.log("✅ ANALYTICS: Datos mockeados listos");
+      reply.send(mockData);
+    } catch (error: any) {
+      console.error("❌ ANALYTICS ERROR:", {
+        error: error.message,
+        stack: error.stack,
+      });
+      reply.code(500).send({ error: "Error obteniendo reportes" });
+    }
+  });
 }

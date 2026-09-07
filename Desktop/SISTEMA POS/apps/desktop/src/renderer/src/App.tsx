@@ -11,6 +11,7 @@ import { LicenseBlockOverlay } from "./components/LicenseBlockOverlay";
 import { ProtectedAdminRoute } from "./components/ProtectedAdminRoute";
 import Login from "./screens/Login";
 import CentralaAdmin from "./screens/CentralaAdmin";
+import { ProveedoresAnalytics } from "./screens/ProveedoresAnalytics";
 import SeleccionSucursal from "./screens/SeleccionSucursal";
 import Layout from "./screens/Layout";
 import Pos from "./screens/Pos";
@@ -174,7 +175,7 @@ export default function App() {
   }
 
   // Super Admin Dashboard - Acceso directo sin sucursal
-  if (location.pathname === "/centrala-admin") {
+  if (location.pathname.startsWith("/centrala-admin")) {
     return (
       <Routes>
         <Route
@@ -182,6 +183,14 @@ export default function App() {
           element={
             <ProtectedAdminRoute>
               <CentralaAdmin />
+            </ProtectedAdminRoute>
+          }
+        />
+        <Route
+          path="/centrala-admin/reportes"
+          element={
+            <ProtectedAdminRoute>
+              <ProveedoresAnalytics />
             </ProtectedAdminRoute>
           }
         />
