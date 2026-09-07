@@ -329,7 +329,8 @@ export function ProveedoresAnalytics() {
     setLoading(true);
     setError(null);
     try {
-      const { data: analyticsData } = await api.get("/admin/reportes/proveedores");
+      // Usar endpoint del cliente (no del admin)
+      const { data: analyticsData } = await api.get("/reportes/analisis-proveedores");
       console.log("✅ Analytics Data Loaded:", analyticsData);
       setData(analyticsData);
     } catch (err: any) {

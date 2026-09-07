@@ -185,4 +185,191 @@ export async function reportesRoutes(app: FastifyInstance) {
       },
     };
   });
+
+  // 📦 GET /reportes/analisis-proveedores - Análisis de Proveedores para Cliente
+  app.get("/reportes/analisis-proveedores", async (request, reply) => {
+    try {
+      if (!request.user.permisos.includes("reportes.ver")) {
+        return reply.code(403).send({ error: "No tienes permiso para ver reportes" });
+      }
+
+      const { empresaId } = request.user;
+      console.log(`📦 ANALYTICS: Fetchin data for empresa ${empresaId}`);
+
+      // Obtener proveedores de esta empresa con sus productos e inventario
+      const proveedores = await prisma.proveedor.findMany({
+        where: { empresaId }, // CRÍTICO: Filtro por empresaId
+        include: {
+          productos: {
+            where: { empresaId }, // CRÍTICO: Filtro por empresaId
+            include: {
+              inventario: true, // InventarioSucursal
+            },
+          },
+        },
+      });
+
+      console.log(`📦 ANALYTICS: Found ${proveedores.length} proveedores for empresa ${empresaId}`);
+
+      // Calcular ranking dinámicamente
+      interface ProveedorCalculo {
+        id: string;
+        nombre: string;
+        productos: number;
+        unidades: number;
+        costo: number;
+        venta: number;
+        utilidad: number;
+        margenPorcentaje: number;
+      }
+
+      const ranking: ProveedorCalculo[] = proveedores
+        .map((prov) => {
+          let totalProductos = 0;
+          let totalUnidades = 0;
+          let totalCosto = 0;
+          let totalVenta = 0;
+
+          for (const producto of prov.productos) {
+            totalProductos++;
+            let cantidadProducto = 0;
+            for (const inv of producto.inventario) {
+              cantidadProducto += inv.cantidad;
+            }
+            totalUnidades += cantidadProducto;
+            totalCosto += Number(producto.costo) * cantidadProducto;
+            totalVenta += Number(producto.precio) * cantidadProducto;
+          }
+
+          const utilidad = totalVenta - totalCosto;
+          const margenPorcentaje = totalVenta > 0 ? (utilidad / totalVenta) * 100 : 0;
+
+          return {
+            id: prov.id,
+            nombre: prov.nombre,
+            productos: totalProductos,
+            unidades: totalUnidades,
+            costo: Math.round(totalCosto),
+            venta: Math.round(totalVenta),
+            utilidad: Math.round(utilidad),
+            margenPorcentaje: Number(margenPorcentaje.toFixed(1)),
+          };
+        })
+        .filter((prov) => prov.productos > 0)
+        .sort((a, b) => b.costo - a.costo);
+
+      // Calcular KPIs
+      const totalProveedores = ranking.length;
+      const valorInventario = ranking.reduce((sum, p) => sum + p.costo, 0);
+      const valorVenta = ranking.reduce((sum, p) => sum + p.venta, 0);
+      const utilidadPotencial = ranking.reduce((sum, p) => sum + p.utilidad, 0);
+
+      const kpis = {
+        totalProveedores,
+        valorInventario,
+        valorVenta,
+        utilidadPotencial,
+      };
+
+      // Gráfico de distribución
+      interface DistribucionItem {
+        nombre: string;
+        valor: number;
+        porcentaje: number;
+      }
+
+      const top5Ranking = ranking.slice(0, 5);
+      const sumaTop5 = top5Ranking.reduce((sum, p) => sum + p.costo, 0);
+      const graficoDistribucion: DistribucionItem[] = top5Ranking.map((prov) => ({
+        nombre: prov.nombre,
+        valor: prov.costo,
+        porcentaje: sumaTop5 > 0 ? Number(((prov.costo / sumaTop5) * 100).toFixed(1)) : 0,
+      }));
+
+      // Insights dinámicos
+      interface Insight {
+        id: string;
+        icon: string;
+        titulo: string;
+        descripcion: string;
+        tipo: string;
+      }
+
+      const insights: Insight[] = [];
+
+      if (ranking.length > 0) {
+        const mayor = ranking[0];
+        const porcentajeMayor = valorInventario > 0
+          ? Number(((mayor.costo / valorInventario) * 100).toFixed(0))
+          : 0;
+        insights.push({
+          id: "insight-1",
+          icon: "💰",
+          titulo: "Mayor Inversión",
+          descripcion: `${mayor.nombre} concentra el ${porcentajeMayor}% del inventario ($${(mayor.costo / 1000000).toFixed(1)}M)`,
+          tipo: "info",
+        });
+      }
+
+      if (ranking.length > 0) {
+        const masRentable = ranking.reduce((prev, curr) =>
+          curr.margenPorcentaje > prev.margenPorcentaje ? curr : prev
+        );
+        insights.push({
+          id: "insight-2",
+          icon: "📈",
+          titulo: "Mayor Rentabilidad",
+          descripcion: `${masRentable.nombre} lidera con ${masRentable.margenPorcentaje}% de margen bruto`,
+          tipo: "success",
+        });
+      }
+
+      if (ranking.length > 0) {
+        const conPocosStock = ranking.filter((p) => p.unidades < 100);
+        if (conPocosStock.length > 0) {
+          insights.push({
+            id: "insight-3",
+            icon: "🚨",
+            titulo: "Stock Bajo",
+            descripcion: `${conPocosStock.length} proveedor(es) con menos de 100 unidades en inventario`,
+            tipo: "warning",
+          });
+        } else {
+          insights.push({
+            id: "insight-3",
+            icon: "✅",
+            titulo: "Inventario Saludable",
+            descripcion: `Todos los proveedores tienen stock adecuado (${ranking.reduce((sum, p) => sum + p.unidades, 0)} unidades totales)`,
+            tipo: "success",
+          });
+        }
+      }
+
+      console.log(`✅ ANALYTICS: Real data ready for empresa ${empresaId}`);
+      reply.send({
+        insights,
+        kpis,
+        graficoDistribucion,
+        ranking,
+      });
+    } catch (error: any) {
+      console.error("❌ ANALYTICS ERROR:", {
+        error: error.message,
+        stack: error.stack,
+      });
+
+      // Fallback con estructura válida
+      reply.send({
+        insights: [],
+        kpis: {
+          totalProveedores: 0,
+          valorInventario: 0,
+          valorVenta: 0,
+          utilidadPotencial: 0,
+        },
+        graficoDistribucion: [],
+        ranking: [],
+      });
+    }
+  });
 }

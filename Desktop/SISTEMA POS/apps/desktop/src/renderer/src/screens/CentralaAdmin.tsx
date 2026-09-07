@@ -953,14 +953,6 @@ export default function CentralaAdmin() {
             >
               📋 Auditoría
             </button>
-            <button
-              className="btn-secondary"
-              onClick={() => {
-                window.location.hash = "#/centrala-admin/reportes";
-              }}
-            >
-              📊 Reportes
-            </button>
             <button className="logout-btn" onClick={handleLogout}>
               Cerrar Sesión
             </button>

@@ -3,6 +3,7 @@ import { api } from "../lib/api";
 import { useSesionStore } from "../lib/store";
 import { LineChart, BarraHorizontal, DonutChart, VariacionBadge, formatoMoneda } from "../lib/charts";
 import { BotonesExportar } from "../lib/BotonesExportar";
+import { ProveedoresAnalytics } from "./ProveedoresAnalytics";
 import type { ColumnaExport } from "../lib/export";
 
 interface Resumen {
@@ -100,7 +101,7 @@ export default function Reportes() {
   const [canal, setCanal] = useState("");
   const [resumen, setResumen] = useState<Resumen | null>(null);
   const [cargando, setCargando] = useState(true);
-  const [activeTab, setActiveTab] = useState<"overview" | "canales" | "productos" | "analisis">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "canales" | "productos" | "analisis" | "proveedores">("overview");
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -142,11 +143,12 @@ export default function Reportes() {
       </div>
 
       {/* TABS */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 24, borderBottom: "2px solid var(--border)", paddingBottom: 16 }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 24, borderBottom: "2px solid var(--border)", paddingBottom: 16, overflowX: "auto" }}>
         {[
-          { id: "overview", label: "Resumen Ejecutivo", icon: Iconos.dinero },
+          { id: "overview", label: "📊 Dashboard Ventas", icon: Iconos.dinero },
           { id: "canales", label: "Análisis por Canal", icon: Iconos.canales },
           { id: "productos", label: "Top Productos", icon: Iconos.paquete },
+          { id: "proveedores", label: "📦 Análisis Proveedores", icon: Iconos.paquete },
           { id: "analisis", label: "Análisis Avanzado", icon: Iconos.grafico },
         ].map((tab) => (
           <button
@@ -604,6 +606,9 @@ export default function Reportes() {
               </div>
             </div>
           )}
+
+          {/* TAB: PROVEEDORES */}
+          {activeTab === "proveedores" && <ProveedoresAnalytics />}
 
           {/* TAB: ANÁLISIS */}
           {activeTab === "analisis" && (
