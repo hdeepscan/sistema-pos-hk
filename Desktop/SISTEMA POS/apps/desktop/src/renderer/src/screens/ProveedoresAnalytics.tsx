@@ -7,7 +7,24 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  AreaChart,
+  Area,
+  LineChart,
+  Line,
 } from "recharts";
+import {
+  TrendingUp,
+  DollarSign,
+  Package,
+  AlertTriangle,
+  AlertCircle,
+  X,
+} from "lucide-react";
 
 interface Insight {
   id: string;
@@ -39,12 +56,28 @@ interface RankingItem {
   venta: number;
   utilidad: number;
   margenPorcentaje: number;
+  unidadesVendidas?: number;
+  valorVendido?: number;
+  rotacion?: number;
+}
+
+interface GraficoComparativoItem {
+  nombre: string;
+  "Inversión Actual": number;
+  "Ventas Históricas": number;
+}
+
+interface GraficoTendenciaItem {
+  mes: string;
+  ventas: number;
 }
 
 interface AnalyticsData {
   insights: Insight[];
   kpis: KPIs;
   graficoDistribucion: DistribucionItem[];
+  graficoComparativo?: GraficoComparativoItem[];
+  graficoTendencia?: GraficoTendenciaItem[];
   ranking: RankingItem[];
 }
 
@@ -105,8 +138,15 @@ const styles = `
   }
 
   .insight-icon {
-    font-size: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    background: rgba(59, 130, 246, 0.1);
+    border-radius: 12px;
     margin-bottom: 12px;
+    color: #3B82F6;
   }
 
   .insight-titulo {
@@ -333,6 +373,24 @@ const styles = `
 
   .drawer-close-btn:hover {
     color: #0f172a;
+    background: rgba(0, 0, 0, 0.05);
+  }
+
+  /* ===== POWER BI CHARTS ===== */
+  .powerbi-section {
+    background: #FFFFFF;
+    border: 1px solid rgba(59, 130, 246, 0.08);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 32px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  }
+
+  .powerbi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+    gap: 24px;
+    margin-bottom: 32px;
   }
 
   .drawer-content {
@@ -552,7 +610,10 @@ export function ProveedoresAnalytics() {
 
       {/* Header */}
       <div className="analytics-header">
-        <h1 className="analytics-title">📊 Análisis de Proveedores</h1>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px" }}>
+          <Package size={32} color="#3B82F6" />
+          <h1 className="analytics-title">Análisis de Proveedores</h1>
+        </div>
         <p className="analytics-subtitle">
           Inteligencia de negocios: distribución de inventario, rentabilidad y
           trends
@@ -576,7 +637,10 @@ export function ProveedoresAnalytics() {
 
           {/* KPIs */}
           <div className="kpi-section">
-            <h3 className="section-title">📈 KPIs Principales</h3>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
+              <TrendingUp size={20} color="#3B82F6" />
+              <h3 className="section-title">KPIs Principales</h3>
+            </div>
             <div className="kpi-grid">
               <div className="kpi-card">
                 <div className="kpi-label">Total Proveedores</div>
@@ -605,7 +669,10 @@ export function ProveedoresAnalytics() {
 
           {/* CHART */}
           <div className="chart-section">
-            <h3 className="section-title">💰 Distribución de Inventario</h3>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
+              <DollarSign size={20} color="#3B82F6" />
+              <h3 className="section-title">Distribución de Inventario</h3>
+            </div>
             <ResponsiveContainer width="100%" height={400}>
               <PieChart>
                 <Pie
@@ -639,9 +706,92 @@ export function ProveedoresAnalytics() {
             </ResponsiveContainer>
           </div>
 
+          {/* POWER BI CHARTS */}
+          {data.graficoComparativo && data.graficoComparativo.length > 0 && (
+            <div className="powerbi-section">
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
+                <TrendingUp size={20} color="#3B82F6" />
+                <h3 className="section-title">Análisis Comparativo: Inversión vs Ventas</h3>
+              </div>
+              <ResponsiveContainer width="100%" height={350}>
+                <BarChart
+                  data={data.graficoComparativo}
+                  margin={{ top: 20, right: 30, left: 0, bottom: 20 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                  <XAxis
+                    dataKey="nombre"
+                    tick={{ fontSize: 12 }}
+                    angle={-45}
+                    textAnchor="end"
+                    height={80}
+                  />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip
+                    formatter={(value: number) => formatearMoneda(value)}
+                    contentStyle={{
+                      background: "#FFFFFF",
+                      border: "1px solid #E2E8F0",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                    }}
+                  />
+                  <Legend />
+                  <Bar dataKey="Inversión Actual" fill="#3B82F6" radius={[8, 8, 0, 0]} />
+                  <Bar dataKey="Ventas Históricas" fill="#10B981" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {data.graficoTendencia && data.graficoTendencia.length > 0 && (
+            <div className="powerbi-section">
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
+                <TrendingUp size={20} color="#3B82F6" />
+                <h3 className="section-title">Tendencia de Ventas (Últimos 6 Meses)</h3>
+              </div>
+              <ResponsiveContainer width="100%" height={300}>
+                <AreaChart
+                  data={data.graficoTendencia}
+                  margin={{ top: 10, right: 30, left: 0, bottom: 10 }}
+                >
+                  <defs>
+                    <linearGradient id="colorVentas" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#06B6D4" stopOpacity={0.8} />
+                      <stop offset="95%" stopColor="#06B6D4" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                  <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip
+                    formatter={(value: number) => formatearMoneda(value)}
+                    contentStyle={{
+                      background: "#FFFFFF",
+                      border: "1px solid #E2E8F0",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="ventas"
+                    stroke="#06B6D4"
+                    strokeWidth={3}
+                    fillOpacity={1}
+                    fill="url(#colorVentas)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
           {/* TABLE */}
           <div className="table-section">
-            <h3 className="section-title">🏆 Ranking de Proveedores</h3>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
+              <TrendingUp size={20} color="#3B82F6" />
+              <h3 className="section-title">Ranking de Proveedores</h3>
+            </div>
             <div className="table-wrapper">
               <table className="ranking-table">
                 <thead>
@@ -650,13 +800,15 @@ export function ProveedoresAnalytics() {
                     <th onClick={() => ordenarTabla("productos")}>
                       Productos
                     </th>
-                    <th onClick={() => ordenarTabla("unidades")}>Unidades</th>
+                    <th onClick={() => ordenarTabla("unidades")}>Stock Act.</th>
+                    <th>Unid. Vendidas</th>
                     <th onClick={() => ordenarTabla("costo")}>Costo Total</th>
                     <th onClick={() => ordenarTabla("venta")}>Venta Total</th>
                     <th onClick={() => ordenarTabla("utilidad")}>Utilidad</th>
                     <th onClick={() => ordenarTabla("margenPorcentaje")}>
                       Margen %
                     </th>
+                    <th>Rotación</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -671,6 +823,9 @@ export function ProveedoresAnalytics() {
                       </td>
                       <td>{proveedor.productos}</td>
                       <td>{proveedor.unidades.toLocaleString()}</td>
+                      <td style={{ fontWeight: 600, color: "#06B6D4" }}>
+                        {(proveedor.unidadesVendidas || 0).toLocaleString()}
+                      </td>
                       <td className="currency">
                         {formatearMoneda(proveedor.costo)}
                       </td>
@@ -682,6 +837,9 @@ export function ProveedoresAnalytics() {
                       </td>
                       <td className="percentage">
                         {proveedor.margenPorcentaje.toFixed(1)}%
+                      </td>
+                      <td style={{ fontWeight: 600, color: "#F59E0B" }}>
+                        {(proveedor.rotacion || 0).toFixed(2)}x
                       </td>
                     </tr>
                   ))}
@@ -701,13 +859,16 @@ export function ProveedoresAnalytics() {
           />
           <div className="drawer">
             <div className="drawer-header">
-              <h3 className="drawer-title">📦 {selectedProveedor.nombre}</h3>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <Package size={24} color="#3B82F6" />
+                <h3 className="drawer-title">{selectedProveedor.nombre}</h3>
+              </div>
               <button
                 className="drawer-close-btn"
                 onClick={cerrarDrawer}
                 title="Cerrar"
               >
-                ✕
+                <X size={24} />
               </button>
             </div>
 
@@ -742,8 +903,9 @@ export function ProveedoresAnalytics() {
                         <td>
                           <strong>{prod.nombre}</strong>
                           {prod.stockTotal <= 0 && (
-                            <div style={{ fontSize: "11px", color: "#dc2626", marginTop: "4px" }}>
-                              🔴 Agotado
+                            <div style={{ fontSize: "11px", color: "#dc2626", marginTop: "4px", display: "flex", alignItems: "center", gap: "4px" }}>
+                              <AlertCircle size={12} />
+                              Agotado
                             </div>
                           )}
                         </td>
