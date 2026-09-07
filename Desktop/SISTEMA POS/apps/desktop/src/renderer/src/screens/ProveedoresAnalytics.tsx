@@ -24,6 +24,9 @@ import {
   AlertTriangle,
   AlertCircle,
   X,
+  CheckCircle,
+  BarChart3,
+  Percent,
 } from "lucide-react";
 
 interface Insight {
@@ -78,6 +81,8 @@ interface AnalyticsData {
   graficoDistribucion: DistribucionItem[];
   graficoComparativo?: GraficoComparativoItem[];
   graficoTendencia?: GraficoTendenciaItem[];
+  graficoMargenes?: Array<{ nombre: string; margen: number }>;
+  graficoRotacion?: Array<{ nombre: string; rotacion: number }>;
   ranking: RankingItem[];
 }
 
@@ -248,29 +253,34 @@ const styles = `
   }
 
   .ranking-table thead {
-    background: #3B82F6;
+    background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
     color: white;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
   }
 
   .ranking-table th {
-    padding: 14px 16px;
+    padding: 16px 18px;
     text-align: left;
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
-    font-size: 12px;
-    letter-spacing: 0.4px;
+    font-size: 11px;
+    letter-spacing: 0.6px;
     cursor: pointer;
     user-select: none;
     transition: all 0.2s;
+    white-space: nowrap;
+    backdrop-filter: blur(10px);
   }
 
   .ranking-table th:hover {
-    background: #2563EB;
+    background: rgba(255, 255, 255, 0.15);
+    transform: scale(1.02);
   }
 
   .ranking-table th::after {
     content: " ↕";
     opacity: 0.5;
+    margin-left: 4px;
   }
 
   .ranking-table th.sorted-asc::after {
@@ -284,23 +294,34 @@ const styles = `
   }
 
   .ranking-table td {
-    padding: 14px 16px;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    padding: 16px 18px;
+    border-bottom: 1px solid #E2E8F0;
     color: #0f172a;
+    font-size: 13px;
   }
 
   .ranking-table tbody tr {
     cursor: pointer;
     transition: all 0.2s ease;
+    background: #FFFFFF;
   }
 
   .ranking-table tbody tr:hover {
-    background: rgba(59, 130, 246, 0.08);
+    background: linear-gradient(90deg, rgba(59, 130, 246, 0.08) 0%, rgba(6, 182, 212, 0.04) 100%);
     transform: translateX(4px);
+    box-shadow: inset 4px 0 0 #3B82F6;
+  }
+
+  .ranking-table tbody tr:nth-child(even) {
+    background: #F8FAFC;
+  }
+
+  .ranking-table tbody tr:nth-child(even):hover {
+    background: linear-gradient(90deg, rgba(59, 130, 246, 0.12) 0%, rgba(6, 182, 212, 0.06) 100%);
   }
 
   .ranking-table tbody tr:last-child td {
-    border-bottom: none;
+    border-bottom: 1px solid #E2E8F0;
   }
 
   .currency {
@@ -499,6 +520,17 @@ interface ProductoDetalle {
   utilidadPotencial: number;
 }
 
+function getIconForInsight(iconName: string) {
+  const iconMap: { [key: string]: any } = {
+    "dollar-sign": DollarSign,
+    "trending-up": TrendingUp,
+    "alert-triangle": AlertTriangle,
+    "check-circle": CheckCircle,
+  };
+  const IconComponent = iconMap[iconName] || AlertCircle;
+  return <IconComponent size={24} />;
+}
+
 export function ProveedoresAnalytics() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -628,7 +660,9 @@ export function ProveedoresAnalytics() {
           <div className="insights-grid">
             {data.insights.map((insight) => (
               <div key={insight.id} className="insight-card">
-                <div className="insight-icon">{insight.icon}</div>
+                <div className="insight-icon" style={{ color: insight.tipo === "warning" ? "#F59E0B" : insight.tipo === "success" ? "#10B981" : "#3B82F6" }}>
+                  {getIconForInsight(insight.icon)}
+                </div>
                 <div className="insight-titulo">{insight.titulo}</div>
                 <div className="insight-descripcion">{insight.descripcion}</div>
               </div>
@@ -785,6 +819,79 @@ export function ProveedoresAnalytics() {
               </ResponsiveContainer>
             </div>
           )}
+
+          {/* MARGENES Y ROTACION */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(500px, 1fr))", gap: "24px", marginBottom: "32px" }}>
+            {data.graficoMargenes && data.graficoMargenes.length > 0 && (
+              <div className="powerbi-section">
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
+                  <Percent size={20} color="#3B82F6" />
+                  <h3 className="section-title">Margen Bruto por Proveedor</h3>
+                </div>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart
+                    data={data.graficoMargenes}
+                    margin={{ top: 20, right: 30, left: 0, bottom: 20 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                    <XAxis
+                      dataKey="nombre"
+                      tick={{ fontSize: 11 }}
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                    />
+                    <YAxis tick={{ fontSize: 12 }} label={{ value: "%", angle: -90, position: "insideLeft" }} />
+                    <Tooltip
+                      formatter={(value: number) => `${value.toFixed(1)}%`}
+                      contentStyle={{
+                        background: "#FFFFFF",
+                        border: "1px solid #E2E8F0",
+                        borderRadius: "8px",
+                        fontSize: "12px",
+                      }}
+                    />
+                    <Bar dataKey="margen" fill="#F59E0B" radius={[8, 8, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
+            {data.graficoRotacion && data.graficoRotacion.length > 0 && (
+              <div className="powerbi-section">
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
+                  <BarChart3 size={20} color="#3B82F6" />
+                  <h3 className="section-title">Rotación de Inventario</h3>
+                </div>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart
+                    data={data.graficoRotacion}
+                    margin={{ top: 20, right: 30, left: 0, bottom: 20 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                    <XAxis
+                      dataKey="nombre"
+                      tick={{ fontSize: 11 }}
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                    />
+                    <YAxis tick={{ fontSize: 12 }} label={{ value: "veces", angle: -90, position: "insideLeft" }} />
+                    <Tooltip
+                      formatter={(value: number) => `${value.toFixed(2)}x`}
+                      contentStyle={{
+                        background: "#FFFFFF",
+                        border: "1px solid #E2E8F0",
+                        borderRadius: "8px",
+                        fontSize: "12px",
+                      }}
+                    />
+                    <Bar dataKey="rotacion" fill="#10B981" radius={[8, 8, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
 
           {/* TABLE */}
           <div className="table-section">

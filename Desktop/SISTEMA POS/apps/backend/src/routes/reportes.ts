@@ -339,7 +339,7 @@ export async function reportesRoutes(app: FastifyInstance) {
           : 0;
         insights.push({
           id: "insight-1",
-          icon: "💰",
+          icon: "dollar-sign",
           titulo: "Mayor Inversión",
           descripcion: `${mayor.nombre} concentra el ${porcentajeMayor}% del inventario ($${(mayor.costo / 1000000).toFixed(1)}M)`,
           tipo: "info",
@@ -352,7 +352,7 @@ export async function reportesRoutes(app: FastifyInstance) {
         );
         insights.push({
           id: "insight-2",
-          icon: "📈",
+          icon: "trending-up",
           titulo: "Mayor Rentabilidad",
           descripcion: `${masRentable.nombre} lidera con ${masRentable.margenPorcentaje}% de margen bruto`,
           tipo: "success",
@@ -364,7 +364,7 @@ export async function reportesRoutes(app: FastifyInstance) {
         if (conPocosStock.length > 0) {
           insights.push({
             id: "insight-3",
-            icon: "🚨",
+            icon: "alert-triangle",
             titulo: "Stock Bajo",
             descripcion: `${conPocosStock.length} proveedor(es) con menos de 100 unidades en inventario`,
             tipo: "warning",
@@ -372,7 +372,7 @@ export async function reportesRoutes(app: FastifyInstance) {
         } else {
           insights.push({
             id: "insight-3",
-            icon: "✅",
+            icon: "check-circle",
             titulo: "Inventario Saludable",
             descripcion: `Todos los proveedores tienen stock adecuado (${ranking.reduce((sum, p) => sum + p.unidades, 0)} unidades totales)`,
             tipo: "success",
@@ -414,6 +414,26 @@ export async function reportesRoutes(app: FastifyInstance) {
         });
       }
 
+      // Gráfico Márgenes: Top 10 proveedores con su margen bruto
+      interface GraficoMargenesItem {
+        nombre: string;
+        margen: number;
+      }
+      const graficoMargenes: GraficoMargenesItem[] = top10.map((prov) => ({
+        nombre: prov.nombre,
+        margen: Number(prov.margenPorcentaje.toFixed(1)),
+      }));
+
+      // Gráfico Rotación: Top 10 proveedores con su rotación
+      interface GraficoRotacionItem {
+        nombre: string;
+        rotacion: number;
+      }
+      const graficoRotacion: GraficoRotacionItem[] = top10.map((prov) => ({
+        nombre: prov.nombre,
+        rotacion: prov.rotacion || 0,
+      }));
+
       console.log(`✅ ANALYTICS: Real data ready for empresa ${empresaId}`);
       reply.send({
         insights,
@@ -421,6 +441,8 @@ export async function reportesRoutes(app: FastifyInstance) {
         graficoDistribucion,
         graficoComparativo,
         graficoTendencia,
+        graficoMargenes,
+        graficoRotacion,
         ranking,
       });
     } catch (error: any) {
