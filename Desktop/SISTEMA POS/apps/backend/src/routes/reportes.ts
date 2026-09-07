@@ -381,7 +381,7 @@ export async function reportesRoutes(app: FastifyInstance) {
       }
 
       const { empresaId } = request.user;
-      const { proveedorId } = request.params as { proveedorId: string };
+      const { proveedorId } = request.params as any;
 
       console.log(`📦 DRILL-DOWN: Fetching products for proveedor ${proveedorId} en empresa ${empresaId}`);
 
@@ -437,7 +437,7 @@ export async function reportesRoutes(app: FastifyInstance) {
       console.error("❌ DRILL-DOWN ERROR:", {
         error: error.message,
         stack: error.stack,
-        proveedorId: request.params.proveedorId,
+        proveedorId: (request.params as any).proveedorId,
       });
 
       // Fallback: array vacío (seguridad)
