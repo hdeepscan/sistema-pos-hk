@@ -226,30 +226,41 @@ export async function reportesRoutes(app: FastifyInstance) {
         rotacion?: number;
       }
 
-      // Precargar datos de ventas históricas por proveedor
-      // Para simplificar, usamos mock data de rotación basado en el inventario
+      // Precargar datos de ventas históricas REALES por proveedor
+      // Consultar todas las ventas históricas de la empresa
+      const ventasReales = await prisma.venta.findMany({
+        where: { empresaId },
+        include: {
+          items: {
+            include: {
+              producto: {
+                include: {
+                  proveedor: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      console.log(`📊 ANALYTICS: Found ${ventasReales.length} total sales for empresa ${empresaId}`);
+
+      // Agrupar ventas por proveedor
       const ventasPorProveedor = new Map<string, { unidades: number; valor: number }>();
 
-      // Calcular ventas históricas simuladas basadas en inventario (evita error TS2615)
-      for (const proveedor of proveedores) {
-        let totalUnidadesVendidas = 0;
-        let totalValorVendido = 0;
-
-        for (const producto of proveedor.productos) {
-          // Simulamos que se vendió entre 30-70% del inventario actual
-          const stockActual = producto.inventario.reduce((sum, inv) => sum + inv.cantidad, 0);
-          const unidadesVendidas = Math.round(stockActual * (0.3 + Math.random() * 0.4));
-          const valorVendido = unidadesVendidas * Number(producto.precio);
-
-          totalUnidadesVendidas += unidadesVendidas;
-          totalValorVendido += valorVendido;
+      for (const venta of ventasReales) {
+        for (const item of venta.items) {
+          if (item.producto?.proveedorId) {
+            const provId = item.producto.proveedorId;
+            const actual = ventasPorProveedor.get(provId) || { unidades: 0, valor: 0 };
+            actual.unidades += item.cantidad;
+            actual.valor += item.cantidad * Number(item.precioUnitario);
+            ventasPorProveedor.set(provId, actual);
+          }
         }
-
-        ventasPorProveedor.set(proveedor.id, {
-          unidades: totalUnidadesVendidas,
-          valor: Math.round(totalValorVendido),
-        });
       }
+
+      console.log(`💰 ANALYTICS: Processed sales data for ${ventasPorProveedor.size} providers`);
 
       const ranking: ProveedorCalculo[] = proveedores
         .map((prov) => {
@@ -400,19 +411,31 @@ export async function reportesRoutes(app: FastifyInstance) {
         "Ventas Históricas": prov.valorVendido || 0,
       }));
 
-      // Gráfico Tendencia: Últimos 6 meses (simulado por seguridad)
+      // Gráfico Tendencia: Últimos 6 meses (DATOS REALES)
       const graficoTendencia: GraficoTendenciaItem[] = [];
       const mesActual = new Date().getMonth();
       const anioActual = new Date().getFullYear();
+
+      // Agrupar ventas reales por mes
+      const ventasPorMes = new Map<string, number>();
+
       for (let i = 5; i >= 0; i--) {
         const fecha = new Date(anioActual, mesActual - i, 1);
+        const siguienteMes = new Date(anioActual, mesActual - i + 1, 1);
         const mesNombre = fecha.toLocaleDateString("es-CO", { month: "short" });
-        const ventasMes = ranking.reduce((sum, p) => sum + (p.valorVendido || 0), 0) * (0.7 + Math.random() * 0.6);
+
+        // Sumar todas las ventas de este mes
+        const ventasMesReal = ventasReales
+          .filter(v => v.fecha >= fecha && v.fecha < siguienteMes)
+          .reduce((sum, v) => sum + Number(v.total), 0);
+
         graficoTendencia.push({
           mes: mesNombre,
-          ventas: Math.round(ventasMes),
+          ventas: Math.round(ventasMesReal),
         });
       }
+
+      console.log(`📈 ANALYTICS: Tendencia calculada con datos reales: ${graficoTendencia.length} meses`);
 
       // Gráfico Márgenes: Top 10 proveedores con su margen bruto
       interface GraficoMargenesItem {
