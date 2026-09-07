@@ -249,8 +249,14 @@ const styles = `
     color: #0f172a;
   }
 
+  .ranking-table tbody tr {
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
   .ranking-table tbody tr:hover {
-    background: rgba(59, 130, 246, 0.04);
+    background: rgba(59, 130, 246, 0.08);
+    transform: translateX(4px);
   }
 
   .ranking-table tbody tr:last-child td {
@@ -265,6 +271,118 @@ const styles = `
   .percentage {
     font-weight: 600;
     color: #10B981;
+  }
+
+  /* ===== DRAWER ===== */
+  .drawer-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.5);
+    z-index: 999;
+  }
+
+  .drawer {
+    position: fixed;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 600px;
+    background: #FFFFFF;
+    box-shadow: -10px 0 40px rgba(0, 0, 0, 0.15);
+    animation: slideInRight 0.3s ease;
+    overflow-y: auto;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+  }
+
+  @keyframes slideInRight {
+    from {
+      transform: translateX(100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+
+  .drawer-header {
+    padding: 24px;
+    border-bottom: 1px solid #E2E8F0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .drawer-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #0f172a;
+    font-family: "Montserrat", sans-serif;
+    margin: 0;
+  }
+
+  .drawer-close-btn {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #64748b;
+    transition: all 0.2s;
+  }
+
+  .drawer-close-btn:hover {
+    color: #0f172a;
+  }
+
+  .drawer-content {
+    padding: 24px;
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .drawer-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .drawer-table thead {
+    background: #3B82F6;
+    color: white;
+  }
+
+  .drawer-table th {
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.4px;
+  }
+
+  .drawer-table td {
+    padding: 12px;
+    border-bottom: 1px solid #E2E8F0;
+    color: #0f172a;
+  }
+
+  .drawer-table tbody tr:hover {
+    background: rgba(59, 130, 246, 0.04);
+  }
+
+  .drawer-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .stock-alert {
+    background: rgba(239, 68, 68, 0.1);
+    border-left: 3px solid #dc2626;
+  }
+
+  .stock-alert td {
+    color: #dc2626;
+    font-weight: 600;
   }
 
   .loading {
@@ -312,6 +430,17 @@ const styles = `
   }
 `;
 
+interface ProductoDetalle {
+  id: string;
+  nombre: string;
+  sku: string;
+  stockTotal: number;
+  costoUnitario: number;
+  precioVenta: number;
+  valorInventarioCosto: number;
+  utilidadPotencial: number;
+}
+
 export function ProveedoresAnalytics() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -320,6 +449,13 @@ export function ProveedoresAnalytics() {
     key: keyof RankingItem;
     direction: "asc" | "desc";
   } | null>(null);
+  const [selectedProveedor, setSelectedProveedor] = useState<{
+    id: string;
+    nombre: string;
+  } | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [productosDetalle, setProductosDetalle] = useState<ProductoDetalle[]>([]);
+  const [cargandoDetalle, setCargandoDetalle] = useState(false);
 
   useEffect(() => {
     cargarDatos();
@@ -349,6 +485,31 @@ export function ProveedoresAnalytics() {
       currency: "COP",
       minimumFractionDigits: 0,
     }).format(valor);
+  }
+
+  async function abrirDrawerProveedor(proveedor: RankingItem) {
+    setSelectedProveedor({ id: proveedor.id, nombre: proveedor.nombre });
+    setIsDrawerOpen(true);
+    setCargandoDetalle(true);
+
+    try {
+      const { data } = await api.get<ProductoDetalle[]>(
+        `/reportes/analisis-proveedores/${proveedor.id}/productos`
+      );
+      console.log(`✅ Productos detalle cargados para ${proveedor.nombre}:`, data);
+      setProductosDetalle(data);
+    } catch (err: any) {
+      console.error(`❌ Error cargando detalle de ${proveedor.nombre}:`, err);
+      setProductosDetalle([]);
+    } finally {
+      setCargandoDetalle(false);
+    }
+  }
+
+  function cerrarDrawer() {
+    setIsDrawerOpen(false);
+    setSelectedProveedor(null);
+    setProductosDetalle([]);
   }
 
   function ordenarTabla(key: keyof RankingItem) {
@@ -500,7 +661,11 @@ export function ProveedoresAnalytics() {
                 </thead>
                 <tbody>
                   {rankingOrdenado.map((proveedor) => (
-                    <tr key={proveedor.id}>
+                    <tr
+                      key={proveedor.id}
+                      onClick={() => abrirDrawerProveedor(proveedor)}
+                      title={`Click para ver detalles de ${proveedor.nombre}`}
+                    >
                       <td>
                         <strong>{proveedor.nombre}</strong>
                       </td>
@@ -522,6 +687,87 @@ export function ProveedoresAnalytics() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* DRAWER: Detalle de Productos */}
+      {isDrawerOpen && selectedProveedor && (
+        <>
+          <div
+            className="drawer-overlay"
+            onClick={cerrarDrawer}
+          />
+          <div className="drawer">
+            <div className="drawer-header">
+              <h3 className="drawer-title">📦 {selectedProveedor.nombre}</h3>
+              <button
+                className="drawer-close-btn"
+                onClick={cerrarDrawer}
+                title="Cerrar"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="drawer-content">
+              {cargandoDetalle ? (
+                <div style={{ textAlign: "center", padding: "40px", color: "#64748b" }}>
+                  Cargando productos...
+                </div>
+              ) : productosDetalle.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "40px", color: "#64748b" }}>
+                  No hay productos para este proveedor
+                </div>
+              ) : (
+                <table className="drawer-table">
+                  <thead>
+                    <tr>
+                      <th>Producto</th>
+                      <th>SKU</th>
+                      <th>Stock</th>
+                      <th>Costo Unit.</th>
+                      <th>Precio Venta</th>
+                      <th>Val. Invertido</th>
+                      <th>Utilidad</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {productosDetalle.map((prod) => (
+                      <tr
+                        key={prod.id}
+                        className={prod.stockTotal <= 0 ? "stock-alert" : ""}
+                      >
+                        <td>
+                          <strong>{prod.nombre}</strong>
+                          {prod.stockTotal <= 0 && (
+                            <div style={{ fontSize: "11px", color: "#dc2626", marginTop: "4px" }}>
+                              🔴 Agotado
+                            </div>
+                          )}
+                        </td>
+                        <td>{prod.sku}</td>
+                        <td>
+                          {prod.stockTotal === 0 ? (
+                            <span style={{ color: "#dc2626", fontWeight: 600 }}>0</span>
+                          ) : (
+                            prod.stockTotal.toLocaleString()
+                          )}
+                        </td>
+                        <td>{formatearMoneda(prod.costoUnitario)}</td>
+                        <td>{formatearMoneda(prod.precioVenta)}</td>
+                        <td style={{ fontWeight: 600 }}>
+                          {formatearMoneda(prod.valorInventarioCosto)}
+                        </td>
+                        <td style={{ fontWeight: 600, color: "#10B981" }}>
+                          {formatearMoneda(prod.utilidadPotencial)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         </>

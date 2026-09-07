@@ -194,7 +194,7 @@ export async function reportesRoutes(app: FastifyInstance) {
       }
 
       const { empresaId } = request.user;
-      console.log(`📦 ANALYTICS: Fetchin data for empresa ${empresaId}`);
+      console.log(`📦 ANALYTICS: Fetching data for empresa ${empresaId}`);
 
       // Obtener proveedores de esta empresa con sus productos e inventario
       const proveedores = await prisma.proveedor.findMany({
@@ -370,6 +370,78 @@ export async function reportesRoutes(app: FastifyInstance) {
         graficoDistribucion: [],
         ranking: [],
       });
+    }
+  });
+
+  // 📦 GET /reportes/analisis-proveedores/:proveedorId/productos - Detalle de Productos del Proveedor
+  app.get("/reportes/analisis-proveedores/:proveedorId/productos", async (request, reply) => {
+    try {
+      if (!request.user.permisos.includes("reportes.ver")) {
+        return reply.code(403).send({ error: "No tienes permiso para ver reportes" });
+      }
+
+      const { empresaId } = request.user;
+      const { proveedorId } = request.params as { proveedorId: string };
+
+      console.log(`📦 DRILL-DOWN: Fetching products for proveedor ${proveedorId} en empresa ${empresaId}`);
+
+      // CRÍTICO: Filtrar por proveedorId AND empresaId para seguridad
+      const productos = await prisma.producto.findMany({
+        where: {
+          proveedorId: proveedorId,
+          empresaId: empresaId, // ← SEGURIDAD: Solo ver productos de esta empresa
+        },
+        include: {
+          inventario: true, // InventarioSucursal
+        },
+      });
+
+      console.log(`📦 DRILL-DOWN: Found ${productos.length} products for proveedor ${proveedorId}`);
+
+      // Mapear y calcular valores
+      interface ProductoDetalle {
+        id: string;
+        nombre: string;
+        sku: string;
+        stockTotal: number;
+        costoUnitario: number;
+        precioVenta: number;
+        valorInventarioCosto: number;
+        utilidadPotencial: number;
+      }
+
+      const productosDetallados: ProductoDetalle[] = productos.map((prod) => {
+        // Sumar inventario de todas las sucursales
+        const stockTotal = prod.inventario.reduce((sum, inv) => sum + inv.cantidad, 0);
+        const costoUnitario = Number(prod.costo);
+        const precioVenta = Number(prod.precio);
+        const valorInventarioCosto = stockTotal * costoUnitario;
+        const utilidadUnitaria = precioVenta - costoUnitario;
+        const utilidadPotencial = stockTotal * utilidadUnitaria;
+
+        return {
+          id: prod.id,
+          nombre: prod.nombre,
+          sku: prod.sku,
+          stockTotal,
+          costoUnitario: Math.round(costoUnitario),
+          precioVenta: Math.round(precioVenta),
+          valorInventarioCosto: Math.round(valorInventarioCosto),
+          utilidadPotencial: Math.round(utilidadPotencial),
+        };
+      });
+
+      console.log(`✅ DRILL-DOWN: Products ready for proveedor ${proveedorId}`);
+      reply.send(productosDetallados);
+    } catch (error: any) {
+      console.error("❌ DRILL-DOWN ERROR:", {
+        error: error.message,
+        stack: error.stack,
+        proveedorId: request.params.proveedorId,
+      });
+
+      // Fallback: array vacío (seguridad)
+      reply.send([]);
     }
   });
 }
