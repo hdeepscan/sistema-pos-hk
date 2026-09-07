@@ -267,30 +267,45 @@ const styles = `
     letter-spacing: 0.6px;
     cursor: pointer;
     user-select: none;
-    transition: all 0.2s;
+    transition: all 0.3s ease;
     white-space: nowrap;
     backdrop-filter: blur(10px);
+    color: #FFFFFF;
+    position: relative;
   }
 
   .ranking-table th:hover {
-    background: rgba(255, 255, 255, 0.15);
-    transform: scale(1.02);
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.05);
+    box-shadow: inset 0 -3px 0 rgba(255, 255, 255, 0.5);
   }
 
   .ranking-table th::after {
     content: " ↕";
-    opacity: 0.5;
-    margin-left: 4px;
+    opacity: 0.6;
+    margin-left: 6px;
+    font-size: 14px;
+    display: inline-block;
+    transition: all 0.2s;
+  }
+
+  .ranking-table th:hover::after {
+    opacity: 1;
+    transform: scale(1.2);
   }
 
   .ranking-table th.sorted-asc::after {
     content: " ↑";
     opacity: 1;
+    color: #FEF08A;
+    font-weight: 900;
   }
 
   .ranking-table th.sorted-desc::after {
     content: " ↓";
     opacity: 1;
+    color: #FEF08A;
+    font-weight: 900;
   }
 
   .ranking-table td {
@@ -302,14 +317,32 @@ const styles = `
 
   .ranking-table tbody tr {
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     background: #FFFFFF;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .ranking-table tbody tr::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: transparent;
+    transition: all 0.25s ease;
+  }
+
+  .ranking-table tbody tr:hover::before {
+    background: linear-gradient(180deg, #3B82F6 0%, #06B6D4 100%);
+    width: 4px;
   }
 
   .ranking-table tbody tr:hover {
-    background: linear-gradient(90deg, rgba(59, 130, 246, 0.08) 0%, rgba(6, 182, 212, 0.04) 100%);
-    transform: translateX(4px);
-    box-shadow: inset 4px 0 0 #3B82F6;
+    background: linear-gradient(90deg, rgba(59, 130, 246, 0.12) 0%, rgba(6, 182, 212, 0.06) 100%);
+    transform: translateX(6px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15), inset 4px 0 0 #3B82F6;
   }
 
   .ranking-table tbody tr:nth-child(even) {
@@ -317,11 +350,22 @@ const styles = `
   }
 
   .ranking-table tbody tr:nth-child(even):hover {
-    background: linear-gradient(90deg, rgba(59, 130, 246, 0.12) 0%, rgba(6, 182, 212, 0.06) 100%);
+    background: linear-gradient(90deg, rgba(59, 130, 246, 0.15) 0%, rgba(6, 182, 212, 0.08) 100%);
   }
 
   .ranking-table tbody tr:last-child td {
     border-bottom: 1px solid #E2E8F0;
+  }
+
+  .ranking-table tbody tr td {
+    position: relative;
+  }
+
+  .ranking-table tbody tr:hover .click-indicator {
+    opacity: 1 !important;
+    background: rgba(59, 130, 246, 0.3) !important;
+    transform: translateX(3px);
+    color: #2563EB !important;
   }
 
   .currency {
@@ -925,8 +969,26 @@ export function ProveedoresAnalytics() {
                       onClick={() => abrirDrawerProveedor(proveedor)}
                       title={`Click para ver detalles de ${proveedor.nombre}`}
                     >
-                      <td>
-                        <strong>{proveedor.nombre}</strong>
+                      <td style={{ position: "relative" }}>
+                        <strong style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          {proveedor.nombre}
+                          <span style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            width: "18px",
+                            height: "18px",
+                            background: "rgba(59, 130, 246, 0.15)",
+                            borderRadius: "4px",
+                            fontSize: "12px",
+                            color: "#3B82F6",
+                            fontWeight: 600,
+                            opacity: 0.7,
+                            transition: "all 0.2s"
+                          }} className="click-indicator">
+                            →
+                          </span>
+                        </strong>
                       </td>
                       <td>{proveedor.productos}</td>
                       <td>{proveedor.unidades.toLocaleString()}</td>
