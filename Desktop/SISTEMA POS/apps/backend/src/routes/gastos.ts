@@ -37,11 +37,11 @@ export async function gastosRoutes(app: FastifyInstance) {
     // Calcular totales por clasificación
     const totalCostos = gastos
       .filter((g) => g.clasificacion === "COSTO")
-      .reduce((sum, g) => sum + (g.monto || 0), 0);
+      .reduce((sum, g) => sum + Number(g.monto || 0), 0);
 
     const totalGastos = gastos
       .filter((g) => g.clasificacion === "GASTO")
-      .reduce((sum, g) => sum + (g.monto || 0), 0);
+      .reduce((sum, g) => sum + Number(g.monto || 0), 0);
 
     return { gastos, totalCostos, totalGastos };
   });
