@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import {
   Lock,
   Unlock,
@@ -14,6 +16,8 @@ import {
   Minus,
   Printer,
   History,
+  Download,
+  ArrowRightLeft,
 } from "lucide-react";
 
 const styles = `
@@ -156,6 +160,94 @@ export default function Caja() {
     }
   }
 
+  function generarPDFCierre() {
+    const doc = new jsPDF("p", "mm", "a4");
+    const fecha = new Date().toLocaleDateString("es-CO");
+    const hora = new Date().toLocaleTimeString("es-CO");
+
+    // Encabezado
+    doc.setFontSize(18);
+    doc.text("CIERRE DE CAJA", 105, 15, { align: "center" });
+    doc.setFontSize(14);
+    doc.text("TICKET Z", 105, 23, { align: "center" });
+
+    doc.setFontSize(10);
+    doc.text(`Fecha: ${fecha}`, 15, 35);
+    doc.text(`Hora: ${hora}`, 15, 42);
+    doc.text(`Cajero: ${turno?.usuario || "N/A"}`, 15, 49);
+
+    // Tabla de desglose
+    doc.setFontSize(12);
+    doc.text("DESGLOSE POR MÉTODO DE PAGO", 15, 60);
+
+    const tableData = [
+      [
+        "Método",
+        "Esperado",
+        "Reportado",
+        "Diferencia",
+      ],
+      [
+        "EFECTIVO",
+        `$${(canales?.efectivo?.esperado || 0).toLocaleString()}`,
+        `$${cierre.reportadoEfectivo || 0}`,
+        `$${(parseFloat(cierre.reportadoEfectivo || "0") - (canales?.efectivo?.esperado || 0)).toLocaleString()}`,
+      ],
+      [
+        "TARJETA",
+        `$${(canales?.tarjeta?.esperado || 0).toLocaleString()}`,
+        `$${cierre.reportadoTarjeta || 0}`,
+        `$${(parseFloat(cierre.reportadoTarjeta || "0") - (canales?.tarjeta?.esperado || 0)).toLocaleString()}`,
+      ],
+      [
+        "TRANSFERENCIA",
+        `$${(canales?.transferencia?.esperado || 0).toLocaleString()}`,
+        `$${cierre.reportadoTransferencia || 0}`,
+        `$${(parseFloat(cierre.reportadoTransferencia || "0") - (canales?.transferencia?.esperado || 0)).toLocaleString()}`,
+      ],
+      [
+        "CRÉDITO",
+        `$${(canales?.credito?.esperado || 0).toLocaleString()}`,
+        `$${cierre.reportadoCredito || 0}`,
+        `$${(parseFloat(cierre.reportadoCredito || "0") - (canales?.credito?.esperado || 0)).toLocaleString()}`,
+      ],
+      [
+        "OTRO",
+        `$${(canales?.otro?.esperado || 0).toLocaleString()}`,
+        `$${cierre.reportadoOtro || 0}`,
+        `$${(parseFloat(cierre.reportadoOtro || "0") - (canales?.otro?.esperado || 0)).toLocaleString()}`,
+      ],
+    ];
+
+    autoTable(doc, {
+      head: [tableData[0]],
+      body: tableData.slice(1),
+      startY: 68,
+      margin: { left: 15, right: 15 },
+      styles: { fontSize: 9, cellPadding: 5 },
+      headStyles: { fillColor: [59, 130, 246], textColor: [255, 255, 255], fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+    });
+
+    // Resumen final
+    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    doc.setFontSize(11);
+    doc.text("RESUMEN FINAL", 15, finalY);
+    doc.setFontSize(10);
+    doc.text(`Total Ventas: $${(totales?.ventasTotales || 0).toLocaleString()}`, 15, finalY + 7);
+    doc.text(`Total Ingresos: $${(totales?.ingresos || 0).toLocaleString()}`, 15, finalY + 14);
+    doc.text(`Total Egresos: $${(totales?.egresos || 0).toLocaleString()}`, 15, finalY + 21);
+
+    // Pie de página
+    doc.setFontSize(8);
+    doc.text("--- FIN DE TICKET ---", 105, finalY + 35, { align: "center" });
+    doc.text("Gracias por su visita", 105, finalY + 42, { align: "center" });
+
+    // Descargar automáticamente
+    const nombreArchivo = `Cierre_Caja_${fecha.replace(/\//g, "-")}.pdf`;
+    doc.save(nombreArchivo);
+  }
+
   async function cerrarCaja() {
     try {
       setLoading(true);
@@ -168,8 +260,8 @@ export default function Caja() {
         observaciones: cierre.observaciones || undefined,
       };
       await api.post("/caja/cerrar", payload);
-      alert("Caja cerrada. Imprimiendo ticket Z...");
-      imprimirTicketZ();
+      alert("Caja cerrada. Descargando PDF...");
+      generarPDFCierre();
       setMostrarModal(false);
       setCierre({
         reportadoEfectivo: "",
@@ -371,7 +463,7 @@ export default function Caja() {
           {/* Botones de acción */}
           <div className="caja-buttons">
             <button className="caja-btn caja-btn-secondary" onClick={() => setMostrarMovimiento(true)}>
-              <Plus size={16} /> Movimiento
+              <ArrowRightLeft size={16} /> Movimiento
             </button>
             <button className="caja-btn caja-btn-primary" onClick={() => setMostrarModal(true)}>
               <Lock size={16} /> Cerrar Caja
