@@ -1,1 +1,1 @@
-web: node apps/backend/dist/server.js
+web: cd apps/backend && npx prisma migrate deploy && node dist/server.js
