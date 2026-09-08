@@ -629,7 +629,8 @@ export default function Reportes() {
             </div>
           </div>
 
-          {/* Gráfico de Comparación Ventas vs Costos */}
+          {/* Gráfico de Comparación Ventas vs Costos - Top 10 */}
+          <h4 style={{ margin: "20px 0 16px", fontSize: 14, fontWeight: 600, color: "#0f172a" }}>Top 10: Ventas vs Costos</h4>
           <ResponsiveContainer width="100%" height={300}>
             <ComposedChart data={(resumen.proveedores || []).slice(0, 10)}>
               <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
@@ -642,6 +643,37 @@ export default function Reportes() {
               <Line type="monotone" dataKey="margenPorcentaje" name="% Margen" stroke="#F59E0B" strokeWidth={2} yAxisId="right" />
             </ComposedChart>
           </ResponsiveContainer>
+
+          {/* Todos los Proveedores - Bar Chart Horizontal */}
+          {(resumen.proveedores?.length ?? 0) > 10 && (
+            <>
+              <h4 style={{ margin: "30px 0 16px", fontSize: 14, fontWeight: 600, color: "#0f172a" }}>Todos los Proveedores - Ranking Completo</h4>
+              <ResponsiveContainer width="100%" height={Math.max(400, (resumen.proveedores?.length ?? 0) * 25)}>
+                <BarChart
+                  data={(resumen.proveedores || []).map((p) => ({
+                    ...p,
+                    nombreCorto: p.nombre.length > 20 ? p.nombre.substring(0, 17) + "..." : p.nombre,
+                  }))}
+                  layout="vertical"
+                  margin={{ top: 5, right: 30, left: 280, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                  <XAxis type="number" tick={{ fontSize: 11 }} />
+                  <YAxis dataKey="nombreCorto" type="category" tick={{ fontSize: 11 }} width={270} />
+                  <Tooltip
+                    formatter={(value, name) => {
+                      if (name === "margenPorcentaje") return [(value as number).toFixed(1) + "%", name];
+                      return [formatoMoneda(value as number), name];
+                    }}
+                  />
+                  <Legend />
+                  <Bar dataKey="valorVendido" name="Ventas" fill="#22C55E" radius={[0, 8, 8, 0]} />
+                  <Bar dataKey="costo" name="Costo" fill="#EF4444" radius={[0, 8, 8, 0]} />
+                  <Bar dataKey="utilidad" name="Utilidad" fill="#3B82F6" radius={[0, 8, 8, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </>
+          )}
         </div>
       )}
 
