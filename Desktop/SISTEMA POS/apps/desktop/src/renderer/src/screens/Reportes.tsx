@@ -8,6 +8,7 @@ import type { ColumnaExport } from "../lib/export";
 
 interface Resumen {
   totalVentas: number;
+  totalCostos: number;
   totalGastos: number;
   costoVentas: number;
   utilidadBruta: number;
@@ -128,6 +129,8 @@ export default function Reportes() {
   const margenBruto = resumen ? (resumen.utilidadBruta / resumen.totalVentas) * 100 : 0;
   const margenNeto = resumen ? ((resumen.utilidadBruta - resumen.totalGastos) / resumen.totalVentas) * 100 : 0;
   const costoVentasPct = resumen ? (resumen.costoVentas / resumen.totalVentas) * 100 : 0;
+  const costosMaterialesPct = resumen ? (resumen.totalCostos / resumen.totalVentas) * 100 : 0;
+  const gastosOperacionalesPct = resumen ? (resumen.totalGastos / resumen.totalVentas) * 100 : 0;
 
   return (
     <div>
@@ -426,6 +429,17 @@ export default function Reportes() {
                   </div>
                 </div>
 
+                <div className="stat-card" style={{ borderLeft: "4px solid #DC2626", animation: "fadeIn 0.6s ease 0.55s both", background: "linear-gradient(135deg, rgba(220, 38, 38, 0.05) 0%, rgba(220, 38, 38, 0.02) 100%)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, color: "#DC2626" }}>
+                    {Iconos.paquete}
+                    <div className="label">Costos Materiales</div>
+                  </div>
+                  <div className="value negative">{formatoMoneda(resumen.totalCostos)}</div>
+                  <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: 8 }}>
+                    {costosMaterialesPct.toFixed(1)}% del total
+                  </div>
+                </div>
+
                 <div className="stat-card" style={{ borderLeft: "4px solid #06B6D4", animation: "fadeIn 0.6s ease 0.6s both", background: "linear-gradient(135deg, rgba(6, 182, 212, 0.05) 0%, rgba(6, 182, 212, 0.02) 100%)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, color: "#06B6D4" }}>
                     {Iconos.grafico}
@@ -433,7 +447,7 @@ export default function Reportes() {
                   </div>
                   <div className="value negative">{formatoMoneda(resumen.totalGastos)}</div>
                   <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: 8 }}>
-                    + Meta Ads: {formatoMoneda(resumen.gastoPauta)}
+                    {gastosOperacionalesPct.toFixed(1)}% del total + Meta Ads: {formatoMoneda(resumen.gastoPauta)}
                   </div>
                 </div>
 

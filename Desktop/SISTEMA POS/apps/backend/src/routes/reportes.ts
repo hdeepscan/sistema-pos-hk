@@ -76,13 +76,24 @@ export async function reportesRoutes(app: FastifyInstance) {
     ]);
 
     const totalVentas = ventas.reduce((acc, v) => acc + Number(v.total), 0);
-    const totalGastos = gastos.reduce((acc, g) => acc + Number(g.monto), 0);
+
+    // Separar gastos por clasificación
+    const totalCostos = gastos
+      .filter((g) => g.clasificacion === "COSTO")
+      .reduce((acc, g) => acc + Number(g.monto), 0);
+
+    const totalGastos = gastos
+      .filter((g) => g.clasificacion === "GASTO")
+      .reduce((acc, g) => acc + Number(g.monto), 0);
+
     // Los items de "venta libre" no tienen producto (ni costo asociado).
     const costoVentas = ventas.reduce(
       (acc, v) => acc + v.items.reduce((a, i) => a + i.cantidad * Number(i.producto?.costo ?? 0), 0),
       0
     );
-    const utilidadBruta = totalVentas - costoVentas - totalGastos;
+
+    // Utilidad bruta = Ventas - (Costo de Productos + Costos materiales)
+    const utilidadBruta = totalVentas - costoVentas - totalCostos;
     const unidadesVendidas = ventas.reduce(
       (acc, v) => acc + v.items.reduce((a, i) => a + i.cantidad, 0),
       0
@@ -165,6 +176,7 @@ export async function reportesRoutes(app: FastifyInstance) {
     return {
       rango: { inicio: inicio.toISOString(), fin: fin.toISOString() },
       totalVentas,
+      totalCostos,
       totalGastos,
       costoVentas,
       utilidadBruta,
