@@ -1221,16 +1221,40 @@ model TurnoCaja {
   estado            EstadoTurnoCaja     @default(ABIERTA)
   saldoInicial      Decimal             @db.Decimal(14, 2)
 
-  // Calculados automáticamente al cerrar
+  // Ventas por método de pago (sumadas en tiempo real)
   ventasEfectivo    Decimal             @db.Decimal(14, 2) @default(0)
   ventasTarjeta     Decimal             @db.Decimal(14, 2) @default(0)
   ventasTransferencia Decimal           @db.Decimal(14, 2) @default(0)
+  ventasCredito     Decimal             @db.Decimal(14, 2) @default(0)
+  ventasOtro        Decimal             @db.Decimal(14, 2) @default(0)
+
   ingresos          Decimal             @db.Decimal(14, 2) @default(0)
   egresos           Decimal             @db.Decimal(14, 2) @default(0)
 
+  // EFECTIVO: Cierre ciego (saldo inicial + ventas efectivo + ingresos - egresos)
   esperadoEfectivo  Decimal             @db.Decimal(14, 2) @default(0)
-  reportadoEfectivo Decimal?            @db.Decimal(14, 2) // Lo que el cajero dice que hay
-  diferencia        Decimal?            @db.Decimal(14, 2) // reportado - esperado
+  reportadoEfectivo Decimal?            @db.Decimal(14, 2) // Lo que el cajero contó
+  diferenciaEfectivo Decimal?           @db.Decimal(14, 2) // reportado - esperado
+
+  // TARJETA
+  esperadoTarjeta   Decimal             @db.Decimal(14, 2) @default(0)
+  reportadoTarjeta  Decimal?            @db.Decimal(14, 2) // Monto en datáfono
+  diferenciaTarjeta Decimal?            @db.Decimal(14, 2)
+
+  // TRANSFERENCIA
+  esperadoTransferencia Decimal         @db.Decimal(14, 2) @default(0)
+  reportadoTransferencia Decimal?       @db.Decimal(14, 2) // Monto visto en banco
+  diferenciaTransferencia Decimal?      @db.Decimal(14, 2)
+
+  // CRÉDITO (Fiado)
+  esperadoCredito   Decimal             @db.Decimal(14, 2) @default(0)
+  reportadoCredito  Decimal?            @db.Decimal(14, 2) // Monto reportado
+  diferenciaCredito Decimal?            @db.Decimal(14, 2)
+
+  // OTRO
+  esperadoOtro      Decimal             @db.Decimal(14, 2) @default(0)
+  reportadoOtro     Decimal?            @db.Decimal(14, 2) // Monto reportado
+  diferenciaOtro    Decimal?            @db.Decimal(14, 2)
 
   observaciones     String?
 
