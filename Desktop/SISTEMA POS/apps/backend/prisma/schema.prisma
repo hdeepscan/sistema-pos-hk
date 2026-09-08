@@ -1219,7 +1219,7 @@ model TurnoCaja {
   usuarioCierre     Usuario?            @relation("TurnoCajaCierre", fields: [usuarioCierreId], references: [id])
 
   estado            EstadoTurnoCaja     @default(ABIERTA)
-  saldoInicial      Decimal             @db.Decimal(14, 2)
+  saldoInicial      Decimal             @db.Decimal(14, 2) @default(0)
 
   // Ventas por método de pago (sumadas en tiempo real)
   ventasEfectivo    Decimal             @db.Decimal(14, 2) @default(0)
