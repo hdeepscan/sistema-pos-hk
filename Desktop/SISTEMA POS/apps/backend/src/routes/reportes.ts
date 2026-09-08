@@ -173,6 +173,56 @@ export async function reportesRoutes(app: FastifyInstance) {
     const gastoPauta = Number(gastoPautaAgg._sum.gasto ?? 0);
     const roas = gastoPauta > 0 ? totalVentas / gastoPauta : null;
 
+    // ANÁLISIS DE PROVEEDORES EN EL PERÍODO
+    const proveedoresMap = new Map<
+      string,
+      { id: string; nombre: string; productos: number; valorVendido: number; costo: number; utilidad: number; margenPorcentaje: number }
+    >();
+
+    // Obtener todos los proveedores de la empresa
+    const proveedoresData = await prisma.proveedor.findMany({
+      where: { empresaId },
+      include: { productos: { where: { empresaId } } },
+    });
+
+    // Inicializar cada proveedor
+    for (const prov of proveedoresData) {
+      proveedoresMap.set(prov.id, {
+        id: prov.id,
+        nombre: prov.nombre,
+        productos: prov.productos.length,
+        valorVendido: 0,
+        costo: 0,
+        utilidad: 0,
+        margenPorcentaje: 0,
+      });
+    }
+
+    // Calcular ventas y costos reales por proveedor basados en los items vendidos en el período
+    for (const venta of ventas) {
+      for (const item of venta.items) {
+        if (item.producto?.proveedorId) {
+          const provData = proveedoresMap.get(item.producto.proveedorId);
+          if (provData) {
+            const valorItem = item.cantidad * Number(item.precioUnitario);
+            const costoItem = item.cantidad * Number(item.producto.costo ?? 0);
+            provData.valorVendido += valorItem;
+            provData.costo += costoItem;
+          }
+        }
+      }
+    }
+
+    // Calcular utilidad y margen por proveedor
+    const proveedores = Array.from(proveedoresMap.values())
+      .map((prov) => ({
+        ...prov,
+        utilidad: prov.valorVendido - prov.costo,
+        margenPorcentaje: prov.valorVendido > 0 ? ((prov.valorVendido - prov.costo) / prov.valorVendido) * 100 : 0,
+      }))
+      .filter((prov) => prov.valorVendido > 0)
+      .sort((a, b) => b.utilidad - a.utilidad);
+
     return {
       rango: { inicio: inicio.toISOString(), fin: fin.toISOString() },
       totalVentas,
@@ -190,6 +240,7 @@ export async function reportesRoutes(app: FastifyInstance) {
       ventasPorMetodoPago,
       ventasPorSucursal,
       ventasPorCanal,
+      proveedores,
       comparacion: {
         totalVentasAnterior: periodoAnterior.totalVentas,
         variacionVentas: variacionPorcentual(totalVentas, periodoAnterior.totalVentas),
