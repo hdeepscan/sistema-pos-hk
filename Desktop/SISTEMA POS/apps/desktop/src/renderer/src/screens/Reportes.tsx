@@ -19,7 +19,7 @@ import {
   Area,
   ComposedChart,
 } from "recharts";
-import { TrendingUp, DollarSign, ShoppingCart, Package, Zap, Award, Calendar, Filter } from "lucide-react";
+import { TrendingUp, DollarSign, ShoppingCart, Package, Zap, Award, Calendar, Filter, Users } from "lucide-react";
 
 interface Resumen {
   totalVentas: number;
@@ -37,6 +37,17 @@ interface Resumen {
   ventasPorMetodoPago: { metodoPago: string; total: number }[];
   ventasPorSucursal: { sucursalId: string; sucursalNombre: string; total: number }[];
   ventasPorCanal?: { canal: string; total: number; cantidad: number; unidades: number; ticketPromedio: number; porcentajeVentas: number }[];
+  gastosDesglosados?: { tipo: string; monto: number }[];
+  costosDesglosados?: { tipo: string; monto: number }[];
+  proveedores?: {
+    id: string;
+    nombre: string;
+    productos: number;
+    valorVendido: number;
+    costo: number;
+    utilidad: number;
+    margenPorcentaje: number;
+  }[];
   comparacion: { totalVentasAnterior: number; variacionVentas: number | null; variacionNumeroVentas: number | null };
 }
 
@@ -58,7 +69,6 @@ function formatoMoneda(valor: number) {
   return new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(valor);
 }
 
-// Componente KPI Card mejorado con Sparkline
 function KPICard({
   titulo,
   valor,
@@ -106,7 +116,6 @@ function KPICard({
   );
 }
 
-// Componente Product Card con imagen
 function ProductCard({
   nombre,
   cantidad,
@@ -231,6 +240,19 @@ export default function Reportes() {
   const margenBruto = resumen ? (resumen.utilidadBruta / resumen.totalVentas) * 100 : 0;
   const margenNeto = resumen ? ((resumen.utilidadBruta - resumen.totalGastos) / resumen.totalVentas) * 100 : 0;
   const sparklineData = resumen.ventasPorDia.slice(-7).map((d) => ({ value: d.total }));
+
+  // Preparar datos de métodos de pago (arreglando el problema de "total")
+  const datosMetodosPago = (resumen.ventasPorMetodoPago || []).map((m) => ({
+    name: m.metodoPago,
+    value: m.total,
+  }));
+
+  // Preparar datos para gráfico de costos y gastos
+  const costoGastoData = [
+    { nombre: "Costo de Productos", valor: resumen.costoVentas, color: "#EF4444" },
+    { nombre: "Costos Materiales", valor: resumen.totalCostos, color: "#DC2626" },
+    { nombre: "Gastos Operacionales", valor: resumen.totalGastos, color: "#F87171" },
+  ];
 
   return (
     <div style={{ background: "#F8FAFC", minHeight: "100vh", padding: 32 }}>
@@ -408,15 +430,16 @@ export default function Reportes() {
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
-                data={(resumen.ventasPorMetodoPago || []).map((m, i) => ({ ...m, total: m.total }))}
+                data={datosMetodosPago}
                 cx="50%"
                 cy="50%"
                 innerRadius={60}
                 outerRadius={100}
                 paddingAngle={2}
-                dataKey="total"
+                dataKey="value"
+                nameKey="name"
               >
-                {(resumen.ventasPorMetodoPago || []).map((_, i) => (
+                {datosMetodosPago.map((_, i) => (
                   <Cell key={`cell-${i}`} fill={COLORES[i % COLORES.length]} />
                 ))}
               </Pie>
@@ -425,6 +448,51 @@ export default function Reportes() {
             </PieChart>
           </ResponsiveContainer>
         </div>
+      </div>
+
+      {/* ANÁLISIS DE COSTOS Y GASTOS */}
+      <div
+        style={{
+          background: "#FFFFFF",
+          borderRadius: 12,
+          padding: 24,
+          border: "1px solid #E2E8F0",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+          marginBottom: 32,
+        }}
+      >
+        <h3 style={{ margin: "0 0 20px", display: "flex", alignItems: "center", gap: 8, fontSize: 16, fontWeight: 700, color: "#0f172a" }}>
+          <Zap size={20} color="#EF4444" /> Desglose de Costos y Gastos
+        </h3>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 16, marginBottom: 24 }}>
+          {costoGastoData.map((item) => (
+            <div
+              key={item.nombre}
+              style={{
+                background: `linear-gradient(135deg, ${item.color}15 0%, ${item.color}05 100%)`,
+                border: `1px solid ${item.color}40`,
+                borderRadius: 8,
+                padding: 16,
+              }}
+            >
+              <div style={{ fontSize: 13, fontWeight: 600, color: item.color, marginBottom: 8 }}>{item.nombre}</div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: "#0f172a" }}>{formatoMoneda(item.valor)}</div>
+              <div style={{ fontSize: 12, color: "#64748b", marginTop: 8 }}>
+                {((item.valor / resumen.totalVentas) * 100).toFixed(1)}% del total
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <ResponsiveContainer width="100%" height={300}>
+          <BarChart data={costoGastoData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+            <XAxis dataKey="nombre" angle={-15} textAnchor="end" height={80} tick={{ fontSize: 12 }} />
+            <YAxis tick={{ fontSize: 12 }} />
+            <Tooltip formatter={(value) => formatoMoneda(value as number)} />
+            <Bar dataKey="valor" fill="#3B82F6" radius={[8, 8, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
       </div>
 
       {/* TOP PRODUCTOS */}
@@ -500,6 +568,79 @@ export default function Reportes() {
               <Tooltip formatter={(value) => formatoMoneda(value as number)} />
               <Bar dataKey="total" fill="#3B82F6" radius={[8, 8, 0, 0]} />
             </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* ANÁLISIS DE PROVEEDORES */}
+      {(resumen.proveedores?.length ?? 0) > 0 && (
+        <div
+          style={{
+            background: "#FFFFFF",
+            borderRadius: 12,
+            padding: 24,
+            border: "1px solid #E2E8F0",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+            marginBottom: 32,
+          }}
+        >
+          <h3 style={{ margin: "0 0 20px", display: "flex", alignItems: "center", gap: 8, fontSize: 16, fontWeight: 700, color: "#0f172a" }}>
+            <Users size={20} color="#EC4899" /> Rendimiento de Proveedores
+          </h3>
+
+          {/* Top 5 Proveedores */}
+          <div style={{ marginBottom: 24 }}>
+            <h4 style={{ margin: "0 0 16px", fontSize: 14, fontWeight: 600, color: "#0f172a" }}>Top 5 Proveedores Más Rentables</h4>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 12 }}>
+              {(resumen.proveedores || []).slice(0, 5).map((prov, idx) => (
+                <div
+                  key={prov.id}
+                  style={{
+                    background: "#F8FAFC",
+                    border: "1px solid #E2E8F0",
+                    borderRadius: 8,
+                    padding: 16,
+                    borderLeft: `4px solid ${COLORES[idx % COLORES.length]}`,
+                  }}
+                >
+                  <div style={{ fontWeight: 700, color: "#0f172a", marginBottom: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {idx + 1}. {prov.nombre}
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>Ventas</div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: "#22C55E" }}>{formatoMoneda(prov.valorVendido)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>Utilidad</div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: "#3B82F6" }}>{formatoMoneda(prov.utilidad)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>Margen</div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: "#F59E0B" }}>{prov.margenPorcentaje.toFixed(1)}%</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>Productos</div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: "#8B5CF6" }}>{prov.productos}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Gráfico de Comparación Ventas vs Costos */}
+          <ResponsiveContainer width="100%" height={300}>
+            <ComposedChart data={(resumen.proveedores || []).slice(0, 10)}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+              <XAxis dataKey="nombre" angle={-45} textAnchor="end" height={100} tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 12 }} />
+              <Tooltip formatter={(value) => formatoMoneda(value as number)} />
+              <Legend />
+              <Bar dataKey="valorVendido" name="Ventas" fill="#22C55E" radius={[8, 8, 0, 0]} />
+              <Bar dataKey="costo" name="Costo" fill="#EF4444" radius={[8, 8, 0, 0]} />
+              <Line type="monotone" dataKey="margenPorcentaje" name="% Margen" stroke="#F59E0B" strokeWidth={2} yAxisId="right" />
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       )}
