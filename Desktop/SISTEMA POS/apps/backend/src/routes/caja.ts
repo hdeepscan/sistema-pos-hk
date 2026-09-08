@@ -4,7 +4,7 @@ import { prisma } from "../lib/prisma.js";
 export async function cajaRoutes(app: FastifyInstance) {
   app.addHook("preHandler", app.authenticate);
 
-  app.post<{ Body: { montoInicial: number } }>("/caja/abrir", async (req, reply) => {
+  app.post<{ Body: { saldoInicial: number } }>("/caja/abrir", async (req, reply) => {
     try {
       const { empresaId, usuarioId } = req.user;
       const sucursal = await prisma.sucursal.findFirst({ where: { empresaId, activo: true } });
@@ -15,7 +15,7 @@ export async function cajaRoutes(app: FastifyInstance) {
           empresaId,
           sucursalId: sucursal.id,
           usuarioAperturaId: usuarioId,
-          montoInicial: parseFloat(req.body.montoInicial.toString()),
+          saldoInicial: parseFloat(req.body.saldoInicial.toString()),
         },
       });
 
@@ -49,12 +49,12 @@ export async function cajaRoutes(app: FastifyInstance) {
         else if (v.metodoPago === "TARJETA") ventasTarjeta += Number(v.total);
       }
 
-      const esperadoEfectivo = Number(turno.montoInicial) + ventasEfectivo;
+      const esperadoEfectivo = Number(turno.saldoInicial) + ventasEfectivo;
 
       reply.send({
         estado: "ABIERTA",
         turno: { id: turno.id, usuario: turno.usuarioApertura.nombre },
-        montoInicial: Number(turno.montoInicial),
+        saldoInicial: Number(turno.saldoInicial),
         ventasEfectivo,
         ventasTarjeta,
         esperadoEfectivo,
@@ -64,7 +64,7 @@ export async function cajaRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post<{ Body: { montoContado: number } }>("/caja/cerrar", async (req, reply) => {
+  app.post<{ Body: { reportadoEfectivo: number } }>("/caja/cerrar", async (req, reply) => {
     try {
       const { empresaId, usuarioId } = req.user;
       const turno = await prisma.turnoCaja.findFirst({
@@ -84,15 +84,15 @@ export async function cajaRoutes(app: FastifyInstance) {
       let ventasEfectivo = 0;
       for (const v of ventas) if (v.metodoPago === "EFECTIVO") ventasEfectivo += Number(v.total);
 
-      const totalEsperado = Number(turno.montoInicial) + ventasEfectivo;
-      const diferencia = parseFloat(req.body.montoContado.toString()) - totalEsperado;
+      const esperadoEfectivo = Number(turno.saldoInicial) + ventasEfectivo;
+      const diferencia = parseFloat(req.body.reportadoEfectivo.toString()) - esperadoEfectivo;
 
       await prisma.turnoCaja.update({
         where: { id: turno.id },
         data: {
           ventasEfectivo,
-          totalEsperado,
-          montoContado: parseFloat(req.body.montoContado.toString()),
+          esperadoEfectivo,
+          reportadoEfectivo: parseFloat(req.body.reportadoEfectivo.toString()),
           diferencia,
           usuarioCierreId: usuarioId,
           fechaCierre: new Date(),
