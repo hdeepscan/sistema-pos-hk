@@ -458,7 +458,7 @@ export default function Reportes() {
                   </h4>
                   <p style={{ margin: 0, fontSize: "12px", color: "var(--text-muted)" }}>Tendencia de ventas diarias en el período</p>
                 </div>
-                <LineChart datos={resumen.ventasPorDia.map((d) => ({ etiqueta: d.fecha, valor: d.total }))} />
+                <LineChart datos={(resumen.ventasPorDia || []).map((d) => ({ etiqueta: d.fecha, valor: d.total }))} />
               </div>
 
               {/* ANÁLISIS POR MÉTODO Y SUCURSAL */}
@@ -471,7 +471,7 @@ export default function Reportes() {
                     </h4>
                     <p style={{ margin: 0, fontSize: "12px", color: "var(--text-muted)" }}>Distribución de pagos</p>
                   </div>
-                  <DonutChart datos={resumen.ventasPorMetodoPago.map((m) => ({ etiqueta: m.metodoPago, valor: m.total }))} />
+                  <DonutChart datos={(resumen.ventasPorMetodoPago || []).map((m) => ({ etiqueta: m.metodoPago, valor: m.total }))} />
                 </div>
 
                 <div className="card" style={{ animation: "fadeIn 0.8s ease 0.2s both", background: "linear-gradient(135deg, rgba(249, 115, 22, 0.03) 0%, rgba(20, 184, 166, 0.02) 100%)", borderTop: "2px solid rgba(249, 115, 22, 0.1)" }}>
@@ -482,14 +482,14 @@ export default function Reportes() {
                     </h4>
                     <p style={{ margin: 0, fontSize: "12px", color: "var(--text-muted)" }}>Rendimiento de cada sucursal</p>
                   </div>
-                  <BarraHorizontal datos={resumen.ventasPorSucursal.map((s) => ({ etiqueta: s.sucursalNombre, valor: s.total }))} />
+                  <BarraHorizontal datos={(resumen.ventasPorSucursal || []).map((s) => ({ etiqueta: s.sucursalNombre, valor: s.total }))} />
                 </div>
               </div>
             </>
           )}
 
           {/* TAB: CANALES */}
-          {activeTab === "canales" && resumen.ventasPorCanal && (
+          {activeTab === "canales" && (resumen.ventasPorCanal?.length ?? 0) > 0 && (
             <>
               <div style={{ marginBottom: 24 }}>
                 <h3 style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 8, background: "linear-gradient(90deg, var(--brand) 0%, var(--accent) 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
@@ -497,7 +497,7 @@ export default function Reportes() {
                   Análisis Detallado por Canal de Venta
                 </h3>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16 }}>
-                  {resumen.ventasPorCanal.map((c, idx) => (
+                  {(resumen.ventasPorCanal || []).map((c, idx) => (
                     <div key={c.canal} className="stat-card" style={{ animation: `fadeIn 0.6s ease ${idx * 0.1}s both`, background: "linear-gradient(135deg, rgba(34, 197, 94, 0.04) 0%, rgba(20, 184, 166, 0.02) 100%)", borderTop: "2px solid rgba(34, 197, 94, 0.15)" }}>
                       <div style={{ marginBottom: 12 }}>
                         <h4 style={{ margin: 0, fontSize: 14, fontWeight: 600, background: "linear-gradient(90deg, var(--brand) 0%, var(--accent) 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>{c.canal}</h4>
@@ -529,13 +529,13 @@ export default function Reportes() {
                 </div>
               </div>
 
-              {resumen.ventasPorCanal && resumen.ventasPorCanal.length > 0 && (
+              {(resumen.ventasPorCanal?.length ?? 0) > 0 && (
                 <div className="card" style={{ animation: "fadeIn 0.8s ease", background: "linear-gradient(180deg, rgba(34, 197, 94, 0.03) 0%, rgba(20, 184, 166, 0.02) 100%)", borderTop: "2px solid rgba(34, 197, 94, 0.1)" }}>
                   <h4 style={{ margin: "0 0 16px", display: "flex", alignItems: "center", gap: 8 }}>
                     {Iconos.grafico}
                     Comparativa de Canales
                   </h4>
-                  <DonutChart datos={resumen.ventasPorCanal.map((c) => ({ etiqueta: c.canal, valor: c.total }))} />
+                  <DonutChart datos={(resumen.ventasPorCanal || []).map((c) => ({ etiqueta: c.canal, valor: c.total }))} />
                 </div>
               )}
             </>
@@ -556,7 +556,7 @@ export default function Reportes() {
                   nombreArchivo="productos-mas-vendidos"
                   titulo="Productos más vendidos"
                   columnas={COLUMNAS_PRODUCTOS_VENDIDOS}
-                  filas={resumen.productosMasVendidos}
+                  filas={resumen.productosMasVendidos || []}
                 />
               </div>
 
@@ -582,7 +582,7 @@ export default function Reportes() {
                     </tr>
                   </thead>
                   <tbody>
-                    {resumen.productosMasVendidos.slice(0, 10).map((p, i) => (
+                    {(resumen.productosMasVendidos || []).slice(0, 10).map((p, i) => (
                       <tr key={p.productoId} style={{ borderBottom: "1px solid var(--border)", transition: "all 150ms ease", background: i % 2 === 0 ? "rgba(34, 197, 94, 0.02)" : "transparent" }}>
                         <td style={{ padding: "12px" }}>
                           <div style={{ width: 28, height: 28, borderRadius: 6, background: `linear-gradient(135deg, var(--brand) 0%, #10B981 100%)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: 700, color: "#fff" }}>
@@ -619,7 +619,7 @@ export default function Reportes() {
                     {Iconos.dinero}
                     Métodos de Pago
                   </h4>
-                  <DonutChart datos={resumen.ventasPorMetodoPago.map((m) => ({ etiqueta: m.metodoPago, valor: m.total }))} />
+                  <DonutChart datos={(resumen.ventasPorMetodoPago || []).map((m) => ({ etiqueta: m.metodoPago, valor: m.total }))} />
                 </div>
 
                 <div className="card" style={{ animation: "fadeIn 0.6s ease 0.1s both", background: "linear-gradient(135deg, rgba(249, 115, 22, 0.03) 0%, rgba(20, 184, 166, 0.02) 100%)", borderTop: "2px solid rgba(249, 115, 22, 0.1)" }}>
@@ -627,7 +627,7 @@ export default function Reportes() {
                     {Iconos.paquete}
                     Sucursales
                   </h4>
-                  <BarraHorizontal datos={resumen.ventasPorSucursal.map((s) => ({ etiqueta: s.sucursalNombre, valor: s.total }))} />
+                  <BarraHorizontal datos={(resumen.ventasPorSucursal || []).map((s) => ({ etiqueta: s.sucursalNombre, valor: s.total }))} />
                 </div>
               </div>
 
@@ -644,10 +644,10 @@ export default function Reportes() {
                     nombreArchivo="ventas-por-dia"
                     titulo="Ventas por día"
                     columnas={COLUMNAS_VENTAS_DIA}
-                    filas={resumen.ventasPorDia}
+                    filas={resumen.ventasPorDia || []}
                   />
                 </div>
-                <LineChart datos={resumen.ventasPorDia.map((d) => ({ etiqueta: d.fecha, valor: d.total }))} />
+                <LineChart datos={(resumen.ventasPorDia || []).map((d) => ({ etiqueta: d.fecha, valor: d.total }))} />
               </div>
             </>
           )}
