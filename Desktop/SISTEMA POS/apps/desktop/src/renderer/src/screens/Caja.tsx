@@ -479,47 +479,47 @@ export default function Caja() {
                 </button>
                 <h2 style={{ marginBottom: "24px", fontSize: "20px", fontWeight: 700 }}>Registrar Movimiento</h2>
 
-                <div style={{ marginBottom: "16px" }}>
-                  <label style={{ display: "block", marginBottom: "8px", fontSize: "12px", fontWeight: 600, color: "#64748b" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 16 }}>
+                  <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
                     Tipo
                   </label>
                   <select
-                    className="form-select"
                     value={movimientoForm.tipo}
                     onChange={(e) => setMovimientoForm({ ...movimientoForm, tipo: e.target.value as "INGRESO" | "EGRESO" })}
                     disabled={loading}
+                    style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }}
                   >
                     <option value="INGRESO">➕ Ingreso (Sencillo)</option>
                     <option value="EGRESO">➖ Egreso (Pago)</option>
                   </select>
                 </div>
 
-                <div style={{ marginBottom: "16px" }}>
-                  <label style={{ display: "block", marginBottom: "8px", fontSize: "12px", fontWeight: 600, color: "#64748b" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 16 }}>
+                  <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
                     Monto
                   </label>
                   <input
                     type="number"
-                    className="form-input"
                     placeholder="Ej. 50000"
                     value={movimientoForm.monto}
                     onChange={(e) => setMovimientoForm({ ...movimientoForm, monto: e.target.value })}
                     step="0.01"
                     disabled={loading}
+                    style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }}
                   />
                 </div>
 
-                <div style={{ marginBottom: "24px" }}>
-                  <label style={{ display: "block", marginBottom: "8px", fontSize: "12px", fontWeight: 600, color: "#64748b" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 24 }}>
+                  <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
                     Concepto
                   </label>
                   <input
                     type="text"
-                    className="form-input"
                     placeholder="Ej. Pago de agua, Sencillo, etc."
                     value={movimientoForm.concepto}
                     onChange={(e) => setMovimientoForm({ ...movimientoForm, concepto: e.target.value })}
                     disabled={loading}
+                    style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }}
                   />
                 </div>
 
@@ -556,111 +556,112 @@ export default function Caja() {
                 <h2 style={{ marginBottom: "24px", fontSize: "20px", fontWeight: 700 }}>Arqueo Multicanal</h2>
 
                 {/* EFECTIVO */}
-                <div style={{ background: "#f8fafc", padding: "16px", borderRadius: "8px", marginBottom: "16px" }}>
-                  <div style={{ fontSize: "12px", color: "#64748b", fontWeight: 600, marginBottom: "12px" }}>💵 EFECTIVO (Cierre Ciego)</div>
+                <div style={{ background: "#f8fafc", padding: "16px", borderRadius: "8px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: 4 }}>
+                  <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+                    💵 EFECTIVO (Cierre Ciego)
+                  </label>
                   <input
                     type="number"
-                    className="form-input"
                     placeholder="Monto contado"
                     value={cierre.reportadoEfectivo}
                     onChange={(e) => setCierre({ ...cierre, reportadoEfectivo: e.target.value })}
                     step="0.01"
                     disabled={loading}
+                    style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }}
                   />
                 </div>
 
                 {/* TARJETA */}
-                <div style={{ background: "#f8fafc", padding: "16px", borderRadius: "8px", marginBottom: "16px" }}>
-                  <div style={{ fontSize: "12px", color: "#64748b", fontWeight: 600, marginBottom: "4px" }}>
-                    <CreditCard size={14} style={{ display: "inline", marginRight: "4px" }} />
+                <div style={{ background: "#f8fafc", padding: "16px", borderRadius: "8px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: 4 }}>
+                  <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
+                    <CreditCard size={14} />
                     TARJETA
-                  </div>
-                  <div style={{ fontSize: "14px", fontWeight: 700, color: "#1e293b", marginBottom: "12px" }}>
+                  </label>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#1e293b", marginBottom: 4 }}>
                     Esperado: ${(canales?.tarjeta?.esperado || 0).toLocaleString()}
                   </div>
                   <input
                     type="number"
-                    className="form-input"
                     placeholder="Monto en datáfono"
                     value={cierre.reportadoTarjeta}
                     onChange={(e) => setCierre({ ...cierre, reportadoTarjeta: e.target.value })}
                     step="0.01"
                     disabled={loading}
+                    style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }}
                   />
                 </div>
 
                 {/* TRANSFERENCIA */}
-                <div style={{ background: "#f8fafc", padding: "16px", borderRadius: "8px", marginBottom: "16px" }}>
-                  <div style={{ fontSize: "12px", color: "#64748b", fontWeight: 600, marginBottom: "4px" }}>
-                    <Send size={14} style={{ display: "inline", marginRight: "4px" }} />
+                <div style={{ background: "#f8fafc", padding: "16px", borderRadius: "8px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: 4 }}>
+                  <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
+                    <Send size={14} />
                     TRANSFERENCIA
-                  </div>
-                  <div style={{ fontSize: "14px", fontWeight: 700, color: "#1e293b", marginBottom: "12px" }}>
+                  </label>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#1e293b", marginBottom: 4 }}>
                     Esperado: ${(canales?.transferencia?.esperado || 0).toLocaleString()}
                   </div>
                   <input
                     type="number"
-                    className="form-input"
                     placeholder="Monto verificado"
                     value={cierre.reportadoTransferencia}
                     onChange={(e) => setCierre({ ...cierre, reportadoTransferencia: e.target.value })}
                     step="0.01"
                     disabled={loading}
+                    style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }}
                   />
                 </div>
 
                 {/* CRÉDITO */}
-                <div style={{ background: "#f8fafc", padding: "16px", borderRadius: "8px", marginBottom: "16px" }}>
-                  <div style={{ fontSize: "12px", color: "#64748b", fontWeight: 600, marginBottom: "4px" }}>
-                    <TrendingUp size={14} style={{ display: "inline", marginRight: "4px" }} />
+                <div style={{ background: "#f8fafc", padding: "16px", borderRadius: "8px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: 4 }}>
+                  <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
+                    <TrendingUp size={14} />
                     CRÉDITO (Fiado)
-                  </div>
-                  <div style={{ fontSize: "14px", fontWeight: 700, color: "#1e293b", marginBottom: "12px" }}>
+                  </label>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#1e293b", marginBottom: 4 }}>
                     Esperado: ${(canales?.credito?.esperado || 0).toLocaleString()}
                   </div>
                   <input
                     type="number"
-                    className="form-input"
                     placeholder="Monto reportado"
                     value={cierre.reportadoCredito}
                     onChange={(e) => setCierre({ ...cierre, reportadoCredito: e.target.value })}
                     step="0.01"
                     disabled={loading}
+                    style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }}
                   />
                 </div>
 
                 {/* OTRO */}
-                <div style={{ background: "#f8fafc", padding: "16px", borderRadius: "8px", marginBottom: "16px" }}>
-                  <div style={{ fontSize: "12px", color: "#64748b", fontWeight: 600, marginBottom: "4px" }}>
-                    <Smartphone size={14} style={{ display: "inline", marginRight: "4px" }} />
+                <div style={{ background: "#f8fafc", padding: "16px", borderRadius: "8px", marginBottom: "16px", display: "flex", flexDirection: "column", gap: 4 }}>
+                  <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
+                    <Smartphone size={14} />
                     OTRO
-                  </div>
-                  <div style={{ fontSize: "14px", fontWeight: 700, color: "#1e293b", marginBottom: "12px" }}>
+                  </label>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#1e293b", marginBottom: 4 }}>
                     Esperado: ${(canales?.otro?.esperado || 0).toLocaleString()}
                   </div>
                   <input
                     type="number"
-                    className="form-input"
                     placeholder="Monto reportado"
                     value={cierre.reportadoOtro}
                     onChange={(e) => setCierre({ ...cierre, reportadoOtro: e.target.value })}
                     step="0.01"
                     disabled={loading}
+                    style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }}
                   />
                 </div>
 
                 {/* OBSERVACIONES */}
-                <div style={{ marginBottom: "24px" }}>
-                  <label style={{ display: "block", marginBottom: "8px", fontSize: "12px", fontWeight: 600, color: "#64748b" }}>
+                <div style={{ marginBottom: "24px", display: "flex", flexDirection: "column", gap: 4 }}>
+                  <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
                     Observaciones
                   </label>
                   <textarea
-                    className="form-input"
                     placeholder="Notas sobre el cierre"
                     value={cierre.observaciones}
                     onChange={(e) => setCierre({ ...cierre, observaciones: e.target.value })}
                     disabled={loading}
-                    style={{ height: "80px", resize: "none", paddingTop: "12px" }}
+                    style={{ width: "100%", height: 80, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14, resize: "none", fontFamily: "inherit" }}
                   />
                 </div>
 

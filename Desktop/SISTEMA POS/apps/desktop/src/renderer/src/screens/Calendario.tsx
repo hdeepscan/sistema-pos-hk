@@ -441,57 +441,73 @@ export default function Calendario() {
         <div className="modal-backdrop">
           <div className="card" style={{ width: 520, maxWidth: "94vw" }}>
             <h4 style={{ marginTop: 0 }}>{editandoId ? "Editar evento" : "Nuevo evento"}</h4>
-            <form className="grid-form" onSubmit={guardar}>
-              <label>
-                Titulo
-                <input value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} required />
-              </label>
-              <label>
-                Descripcion
-                <textarea rows={2} value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} />
-              </label>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                <label>
-                  Fecha
-                  <input type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} required />
+            <form style={{ display: "flex", flexDirection: "column", gap: 12 }} onSubmit={guardar}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+                  Titulo
                 </label>
-                <label>
-                  Hora (opcional)
-                  <input type="time" value={form.hora} onChange={(e) => setForm({ ...form, hora: e.target.value })} />
+                <input value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} required style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+                  Descripcion
                 </label>
-                <label>
-                  Tipo
-                  <select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}>
+                <textarea rows={2} value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} style={{ width: "100%", padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14, fontFamily: "inherit" }} />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+                    Fecha
+                  </label>
+                  <input type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} required style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+                    Hora (opcional)
+                  </label>
+                  <input type="time" value={form.hora} onChange={(e) => setForm({ ...form, hora: e.target.value })} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+                    Tipo
+                  </label>
+                  <select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }}>
                     {TIPOS.map((t) => (
                       <option key={t} value={t}>{t}</option>
                     ))}
                   </select>
-                </label>
-                <label>
-                  Prioridad
-                  <select value={form.prioridad} onChange={(e) => setForm({ ...form, prioridad: e.target.value as Evento["prioridad"] })}>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+                    Prioridad
+                  </label>
+                  <select value={form.prioridad} onChange={(e) => setForm({ ...form, prioridad: e.target.value as Evento["prioridad"] })} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }}>
                     {PRIORIDADES.map((p) => (
                       <option key={p} value={p}>{p}</option>
                     ))}
                   </select>
-                </label>
-                <label>
-                  Estado
-                  <select value={form.estado} onChange={(e) => setForm({ ...form, estado: e.target.value as Evento["estado"] })}>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+                    Estado
+                  </label>
+                  <select value={form.estado} onChange={(e) => setForm({ ...form, estado: e.target.value as Evento["estado"] })} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }}>
                     {ESTADOS.map((s) => (
                       <option key={s} value={s}>{etiquetaEstado[s]}</option>
                     ))}
                   </select>
-                </label>
-                <label>
-                  Responsable
-                  <select value={form.responsableId} onChange={(e) => setForm({ ...form, responsableId: e.target.value })}>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+                    Responsable
+                  </label>
+                  <select value={form.responsableId} onChange={(e) => setForm({ ...form, responsableId: e.target.value })} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }}>
                     <option value="">Sin asignar</option>
                     {usuarios.map((u) => (
                       <option key={u.id} value={u.id}>{u.nombre}</option>
                     ))}
                   </select>
-                </label>
+                </div>
               </div>
               {error && <span className="error-text">{error}</span>}
               <div style={{ display: "flex", gap: 8 }}>

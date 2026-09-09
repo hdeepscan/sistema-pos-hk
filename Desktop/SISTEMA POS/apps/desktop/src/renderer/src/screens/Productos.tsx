@@ -781,32 +781,41 @@ function DetalleProducto({
 
       {/* Informacion general */}
       <Seccion icono={<IconoInfo />} titulo="Informacion general" subtitulo="Nombre, categoria, marca, proveedor y descripcion">
-        <div className="grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <label>
-            Nombre
-            <input value={nombre} onChange={(e) => setNombre(e.target.value)} />
-          </label>
-          <label>
-            Categoria
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              Nombre
+            </label>
+            <input value={nombre} onChange={(e) => setNombre(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              Categoria
+            </label>
             <input
               list="categorias-detalle"
               value={categoria}
               onChange={(e) => setCategoria(e.target.value)}
               placeholder="Escribe o elige una existente"
+              style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }}
             />
             <datalist id="categorias-detalle">
               {categorias.map((c) => (
                 <option key={c} value={c} />
               ))}
             </datalist>
-          </label>
-          <label>
-            Marca
-            <input value={marca} onChange={(e) => setMarca(e.target.value)} />
-          </label>
-          <label>
-            Proveedor
-            <select value={proveedorId} onChange={(e) => setProveedorId(e.target.value)}>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              Marca
+            </label>
+            <input value={marca} onChange={(e) => setMarca(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              Proveedor
+            </label>
+            <select value={proveedorId} onChange={(e) => setProveedorId(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }}>
               <option value="">Sin proveedor</option>
               {proveedores.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -814,45 +823,59 @@ function DetalleProducto({
                 </option>
               ))}
             </select>
-          </label>
-          <label style={{ gridColumn: "1 / -1" }}>
-            Descripcion
-            <textarea rows={3} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} style={{ width: "100%" }} />
-          </label>
-          <label style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, gridColumn: "1 / -1" }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              Descripcion
+            </label>
+            <textarea rows={3} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} style={{ width: "100%", padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14, fontFamily: "inherit" }} />
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, gridColumn: "1 / -1" }}>
             <input type="checkbox" checked={activo} onChange={(e) => setActivo(e.target.checked)} style={{ width: "auto" }} />
-            Producto activo (visible en el POS)
-          </label>
+            <label style={{ fontSize: 14, fontWeight: 500, margin: 0 }}>Producto activo (visible en el POS)</label>
+          </div>
         </div>
       </Seccion>
 
       {/* Precios, impuestos e identificadores */}
       <Seccion icono={<IconoPrecio />} titulo="Precios e identificadores" subtitulo="Costo, precio, impuesto, SKU y codigo de barras">
-        <div className="grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-          <label>
-            Precio de compra (costo)
-            <input type="number" step="0.01" value={costo} onChange={(e) => setCosto(e.target.value)} />
-          </label>
-          <label>
-            Precio de venta
-            <input type="number" step="0.01" value={precio} onChange={(e) => setPrecio(e.target.value)} />
-          </label>
-          <label>
-            Impuesto (%)
-            <input type="number" step="0.01" value={impuesto} onChange={(e) => setImpuesto(e.target.value)} />
-          </label>
-          <label>
-            SKU
-            <input value={sku} onChange={(e) => setSku(e.target.value)} />
-          </label>
-          <label>
-            Codigo de barras
-            <input value={codigoBarras} onChange={(e) => setCodigoBarras(e.target.value)} placeholder="Si lo dejas vacio se usa el SKU" />
-          </label>
-          <label>
-            Stock minimo (aviso reposicion)
-            <input type="number" min={0} value={stockMinimo} onChange={(e) => setStockMinimo(e.target.value)} />
-          </label>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              Precio de compra (costo)
+            </label>
+            <input type="number" step="0.01" value={costo} onChange={(e) => setCosto(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              Precio de venta
+            </label>
+            <input type="number" step="0.01" value={precio} onChange={(e) => setPrecio(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              Impuesto (%)
+            </label>
+            <input type="number" step="0.01" value={impuesto} onChange={(e) => setImpuesto(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              SKU
+            </label>
+            <input value={sku} onChange={(e) => setSku(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              Codigo de barras
+            </label>
+            <input value={codigoBarras} onChange={(e) => setCodigoBarras(e.target.value)} placeholder="Si lo dejas vacio se usa el SKU" style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              Stock minimo (aviso reposicion)
+            </label>
+            <input type="number" min={0} value={stockMinimo} onChange={(e) => setStockMinimo(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
+          </div>
         </div>
       </Seccion>
 
@@ -1348,11 +1371,13 @@ function VariantesCard({ producto, onActualizado }: { producto: ProductoDetalle;
       )}
 
       {mostrarForm && (
-        <form className="grid-form" onSubmit={guardar} style={{ marginBottom: 12, maxWidth: 360 }}>
+        <form style={{ marginBottom: 12, maxWidth: 360, display: "flex", flexDirection: "column", gap: 12 }}>
           {opciones.length > 0 ? (
             opciones.map((o) => (
-              <label key={o.name}>
-                {o.name}
+              <div key={o.name} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+                  {o.name}
+                </label>
                 <select
                   value={modoOtro[o.name] ? "__otro__" : valores[o.name] ?? ""}
                   onChange={(e) => {
@@ -1365,6 +1390,7 @@ function VariantesCard({ producto, onActualizado }: { producto: ProductoDetalle;
                     }
                   }}
                   required
+                  style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }}
                 >
                   <option value="">Selecciona {o.name}...</option>
                   {o.values.map((v) => (
@@ -1376,33 +1402,41 @@ function VariantesCard({ producto, onActualizado }: { producto: ProductoDetalle;
                 </select>
                 {modoOtro[o.name] && (
                   <input
-                    style={{ marginTop: 6 }}
                     placeholder={`Nuevo ${o.name}`}
                     value={valores[o.name] ?? ""}
                     onChange={(e) => setValores((p) => ({ ...p, [o.name]: e.target.value }))}
                     required
+                    style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }}
                   />
                 )}
-              </label>
+              </div>
             ))
           ) : (
-            <label>
-              Valor de la variante
-              <input value={valores.__unico ?? ""} onChange={(e) => setValores({ __unico: e.target.value })} required />
-            </label>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+                Valor de la variante
+              </label>
+              <input value={valores.__unico ?? ""} onChange={(e) => setValores({ __unico: e.target.value })} required style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
+            </div>
           )}
-          <label>
-            SKU nuevo
-            <input value={sku} onChange={(e) => setSku(e.target.value)} required />
-          </label>
-          <label>
-            Codigo de barras (opcional)
-            <input value={codigoBarras} onChange={(e) => setCodigoBarras(e.target.value)} />
-          </label>
-          <label>
-            Precio
-            <input type="number" step="0.01" value={precio} onChange={(e) => setPrecio(e.target.value)} required />
-          </label>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              SKU nuevo
+            </label>
+            <input value={sku} onChange={(e) => setSku(e.target.value)} required style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              Codigo de barras (opcional)
+            </label>
+            <input value={codigoBarras} onChange={(e) => setCodigoBarras(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              Precio
+            </label>
+            <input type="number" step="0.01" value={precio} onChange={(e) => setPrecio(e.target.value)} required style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
+          </div>
           {error && <span className="error-text">{error}</span>}
           <button type="submit" disabled={guardando}>
             {guardando ? "Creando..." : "Crear variante"}

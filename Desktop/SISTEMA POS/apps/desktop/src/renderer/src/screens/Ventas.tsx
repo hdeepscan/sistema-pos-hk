@@ -335,10 +335,12 @@ export default function Ventas() {
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "flex-end" }}>
-          <label>
-            Sucursal
-            <select value={filtroSucursal} onChange={(e) => setFiltroSucursal(e.target.value)}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 16, alignItems: "flex-start" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              Sucursal
+            </label>
+            <select value={filtroSucursal} onChange={(e) => setFiltroSucursal(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }}>
               <option value="">Todas</option>
               {sucursales.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -346,26 +348,36 @@ export default function Ventas() {
                 </option>
               ))}
             </select>
-          </label>
-          <label>
-            Desde
-            <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} />
-          </label>
-          <label>
-            Hasta
-            <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} />
-          </label>
-          <label>
-            Monto minimo
-            <input type="number" placeholder="0" value={montoMin} onChange={(e) => setMontoMin(e.target.value)} style={{ width: 100 }} />
-          </label>
-          <label>
-            Monto maximo
-            <input type="number" placeholder="Sin limite" value={montoMax} onChange={(e) => setMontoMax(e.target.value)} style={{ width: 110 }} />
-          </label>
-          <label>
-            Cliente
-            <select value={filtroClienteId} onChange={(e) => setFiltroClienteId(e.target.value)}>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              Desde
+            </label>
+            <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              Hasta
+            </label>
+            <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              Monto minimo
+            </label>
+            <input type="number" placeholder="0" value={montoMin} onChange={(e) => setMontoMin(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              Monto maximo
+            </label>
+            <input type="number" placeholder="Sin limite" value={montoMax} onChange={(e) => setMontoMax(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              Cliente
+            </label>
+            <select value={filtroClienteId} onChange={(e) => setFiltroClienteId(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }}>
               <option value="">Todos</option>
               {clientes.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -373,10 +385,12 @@ export default function Ventas() {
                 </option>
               ))}
             </select>
-          </label>
-          <label>
-            Cajero
-            <select value={filtroUsuarioId} onChange={(e) => setFiltroUsuarioId(e.target.value)}>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              Cajero
+            </label>
+            <select value={filtroUsuarioId} onChange={(e) => setFiltroUsuarioId(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }}>
               <option value="">Todos</option>
               {cajeros.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -384,10 +398,12 @@ export default function Ventas() {
                 </option>
               ))}
             </select>
-          </label>
-          <label>
-            Metodo de pago
-            <select value={filtroMetodoPago} onChange={(e) => setFiltroMetodoPago(e.target.value)}>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              Metodo de pago
+            </label>
+            <select value={filtroMetodoPago} onChange={(e) => setFiltroMetodoPago(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }}>
               <option value="">Todos</option>
               <option value="EFECTIVO">Efectivo</option>
               <option value="TARJETA">Tarjeta</option>
@@ -395,30 +411,36 @@ export default function Ventas() {
               <option value="CREDITO">Credito</option>
               <option value="OTRO">Otro</option>
             </select>
-          </label>
-          <label>
-            Canal de venta
-            <select value={filtroCanal} onChange={(e) => setFiltroCanal(e.target.value)}>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              Canal de venta
+            </label>
+            <select value={filtroCanal} onChange={(e) => setFiltroCanal(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }}>
               <option value="">Todos</option>
               <option value="PUNTO_DE_VENTA">Punto de venta</option>
               <option value="SHOPIFY">Shopify</option>
               <option value="WHATSAPP">WhatsApp</option>
               <option value="OTRO">Otro</option>
             </select>
-          </label>
-          <label>
-            Estado
-            <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              Estado
+            </label>
+            <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }}>
               <option value="">Todos</option>
               <option value="Pagada">Pagada</option>
               <option value="Vigente">Vigente</option>
               <option value="Proximo a vencer">Proximo a vencer</option>
               <option value="Vencido">Vencido</option>
             </select>
-          </label>
-          <button className="secondary" type="button" onClick={limpiarFiltros}>
-            Limpiar filtros
-          </button>
+          </div>
+          <div style={{ display: "flex", alignItems: "flex-end" }}>
+            <button className="secondary" type="button" onClick={limpiarFiltros} style={{ width: "100%", height: 42 }}>
+              Limpiar filtros
+            </button>
+          </div>
         </div>
       </div>
 

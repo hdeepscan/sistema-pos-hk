@@ -268,31 +268,43 @@ function FormularioCliente({
     <div className="modal-backdrop">
       <div className="card">
         <h4 style={{ marginBottom: 12 }}>{cliente ? "Editar cliente" : "Nuevo cliente"}</h4>
-        <form className="grid-form" onSubmit={guardar}>
-          <label>
-            Nombre
-            <input value={nombre} onChange={(e) => setNombre(e.target.value)} required />
-          </label>
-          <label>
-            Telefono / celular
-            <input value={telefono} onChange={(e) => setTelefono(e.target.value)} />
-          </label>
-          <label>
-            Correo electronico
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-          </label>
-          <label>
-            Cedula
-            <input value={cedula} onChange={(e) => setCedula(e.target.value)} />
-          </label>
-          <label>
-            Ciudad
-            <input value={ciudad} onChange={(e) => setCiudad(e.target.value)} />
-          </label>
-          <label>
-            Direccion
-            <input value={direccion} onChange={(e) => setDireccion(e.target.value)} />
-          </label>
+        <form style={{ display: "flex", flexDirection: "column", gap: 12 }} onSubmit={guardar}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              Nombre
+            </label>
+            <input value={nombre} onChange={(e) => setNombre(e.target.value)} required style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              Telefono / celular
+            </label>
+            <input value={telefono} onChange={(e) => setTelefono(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              Correo electronico
+            </label>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              Cedula
+            </label>
+            <input value={cedula} onChange={(e) => setCedula(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              Ciudad
+            </label>
+            <input value={ciudad} onChange={(e) => setCiudad(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              Direccion
+            </label>
+            <input value={direccion} onChange={(e) => setDireccion(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
+          </div>
           <p style={{ fontSize: 12, color: "var(--text-muted)", margin: 0 }}>
             Todos estos campos son opcionales excepto el nombre — te sirven para segmentar tu base de clientes
             (ej. por ciudad) si mas adelante quieres conectarla a un CRM.
@@ -347,9 +359,11 @@ function RegistrarAbono({
         <p style={{ color: "var(--text-muted)", marginTop: 0, marginBottom: 12 }}>
           Saldo pendiente actual: ${cliente.saldoPendiente.toLocaleString("es-CO")}
         </p>
-        <form className="grid-form" onSubmit={guardar}>
-          <label>
-            Monto a abonar
+        <form style={{ display: "flex", flexDirection: "column", gap: 12 }} onSubmit={guardar}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              Monto a abonar
+            </label>
             <input
               type="number"
               min={1}
@@ -357,8 +371,9 @@ function RegistrarAbono({
               value={monto}
               onChange={(e) => setMonto(e.target.value)}
               required
+              style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }}
             />
-          </label>
+          </div>
           {error && <span className="error-text">{error}</span>}
           <div style={{ display: "flex", gap: 8 }}>
             <button type="submit" disabled={guardando}>
