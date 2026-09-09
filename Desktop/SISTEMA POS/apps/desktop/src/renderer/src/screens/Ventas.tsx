@@ -302,11 +302,18 @@ export default function Ventas() {
     return estado ? ESTADOS_CREDITO[estado] ?? estado : "Vigente";
   }
 
-  const ventasFiltradas = filtroEstado ? ventas.filter((v) => estadoDe(v) === filtroEstado) : ventas;
+  const ventasFiltradas = useMemo(() => {
+    let resultado = ventas;
+    if (filtroEstado) {
+      resultado = resultado.filter((v) => estadoDe(v) === filtroEstado);
+    }
+    return resultado;
+  }, [ventas, filtroEstado]);
+
   const totalListado = ventasFiltradas.reduce((acc, v) => acc + Number(v.total), 0);
 
-  function limpiarFiltros() {
-    setFiltroSucursal("");
+  const limpiarFiltros = useCallback(() => {
+    setFiltroSucursal(sucursalActivaId ?? "");
     setDesde("");
     setHasta("");
     setMontoMin("");
@@ -316,7 +323,7 @@ export default function Ventas() {
     setFiltroMetodoPago("");
     setFiltroCanal("");
     setFiltroEstado("");
-  }
+  }, [sucursalActivaId]);
 
   return (
     <div>
