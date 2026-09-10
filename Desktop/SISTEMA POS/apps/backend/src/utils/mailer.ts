@@ -153,166 +153,222 @@ export async function enviarCorreoBienvenida(usuario: { nombre: string; email: s
 }
 
 /**
- * Plantilla: Confirmación de venta (Diseño Premium)
+ * Plantilla: Confirmación de venta (Diseño Luxury Premium)
+ * Plantilla responsive con imágenes reales de productos e inline CSS
  */
 export async function enviarCorreoVenta(
-  venta: { id: string; consecutivo: number; total: number; metodoPago: string; items: any[] },
+  venta: { id: string; consecutivo: number; total: number; metodoPago: string; items: any[]; cliente?: { nombre: string } },
   emailDestino: string,
   esAdmin: boolean = false
 ): Promise<void> {
-  // Construir filas de productos con imágenes y alternancia de colores
-  const productosHTML = venta.items
-    .map(
-      (item, index) => {
-        const imagenHTML = item.producto?.imagenUrl
-          ? `<div style="text-align: center; margin-bottom: 8px;"><img src="${item.producto.imagenUrl}" style="max-width: 80px; max-height: 80px; border-radius: 4px;" alt="${item.producto.nombre}"></div>`
-          : '';
+  // Utilidad: Formatear moneda colombiana
+  const formatMoneda = (cantidad: number): string => {
+    return Number(cantidad).toLocaleString('es-CO', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    });
+  };
 
-        return `<tr style="background-color: ${index % 2 === 0 ? '#f8fafc' : '#ffffff'}; border-bottom: 1px solid #e2e8f0;">
-          <td style="padding: 14px 12px; text-align: left; font-size: 14px; color: #1e293b;">
-            ${imagenHTML}
-            <strong>${item.cantidad}x</strong> ${item.producto?.nombre || item.descripcionLibre || 'Producto'}
-          </td>
-          <td style="padding: 14px 12px; text-align: right; font-size: 14px; color: #1e293b;">
-            $${Number(item.precioUnitario).toLocaleString('es-CO')}
+  // Variables dinámicas
+  const nombreCliente = venta.cliente?.nombre || 'Cliente';
+  const numeroTransaccion = String(venta.consecutivo).padStart(6, '0');
+  const metodoPago = venta.metodoPago || 'Efectivo';
+  const totalFormateado = formatMoneda(venta.total);
+
+  // Construir HTML de productos dinámicamente
+  let itemsHtml = '';
+
+  venta.items.forEach((item) => {
+    const nombreProducto = item.producto?.nombre || item.nombre || 'Producto';
+    const cantidad = item.cantidad || 1;
+    const precioUnitario = item.precioUnitario || item.precio || 0;
+    const totalItem = cantidad * precioUnitario;
+    const imagenUrl = item.producto?.imagenUrl || item.imagenUrl;
+
+    // Generar HTML para la miniatura
+    let imagenHTML: string;
+    if (imagenUrl) {
+      imagenHTML = `<img src="${imagenUrl}" alt="${nombreProducto}" width="48" height="48" style="display:block; width:48px; height:48px; object-fit:cover; border-radius:6px; border:1px solid #e2e8f0;">`;
+    } else {
+      // Placeholder gris elegante con inicial del producto
+      const inicial = nombreProducto.charAt(0).toUpperCase();
+      imagenHTML = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="48" style="width:48px; height:48px; background-color:#f1f5f9; border:1px solid #e2e8f0; border-radius:6px;">
+        <tr><td align="center" valign="middle" height="46" style="height:46px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:16px; font-weight:600; color:#94a3b8;">${inicial}</td></tr>
+      </table>`;
+    }
+
+    itemsHtml += `
+        <tr>
+          <td class="px" style="padding:0 40px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%; border-bottom:1px solid #eef2f7;">
+              <tr>
+                <td width="48" valign="middle" style="width:48px; padding:16px 0;">
+                  ${imagenHTML}
+                </td>
+                <td valign="middle" style="padding:16px 0 16px 14px;">
+                  <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:14px; line-height:20px; font-weight:600; color:#0f172a;">${nombreProducto}</div>
+                  <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:12px; line-height:18px; color:#5a6579; padding-top:3px;">${cantidad} × $${formatMoneda(precioUnitario)}</div>
+                </td>
+                <td align="right" valign="middle" style="padding:16px 0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:14px; line-height:20px; font-weight:600; color:#0f172a; white-space:nowrap;">
+                  $${formatMoneda(totalItem)}
+                </td>
+              </tr>
+            </table>
           </td>
         </tr>`;
-      }
-    )
-    .join('');
+  });
 
-  const titulo = esAdmin ? 'Nueva venta registrada' : 'Gracias por tu compra';
-  const subtitulo = esAdmin ? 'Detalles de la transacción' : 'Tu compra ha sido procesada exitosamente';
-
-  const html = `
-<!DOCTYPE html>
-<html>
+  // Plantilla HTML principal (responsive, inline CSS)
+  const html = `<!DOCTYPE html>
+<html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${titulo}</title>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
+<title>Confirmación de compra — Centrala POS</title>
+<!--[if mso]>
+<xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml>
+<![endif]-->
+<style>
+  @media only screen and (max-width:620px) {
+    .wrap { width:100% !important; }
+    .px { padding-left:22px !important; padding-right:22px !important; }
+    .amount { font-size:32px !important; }
+    .txn { font-size:34px !important; }
+    .hide-sm { display:none !important; }
+  }
+</style>
 </head>
-<body style="font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: linear-gradient(135deg, #f0f4f8 0%, #f9fafb 100%); margin: 0; padding: 20px;">
+<body style="margin:0; padding:0; background-color:#eef2f7;">
+<span style="display:none; font-size:1px; color:#eef2f7; line-height:1px; max-height:0; max-width:0; opacity:0; overflow:hidden;">Tu compra ha sido confirmada. Transacción #${numeroTransaccion} · ${venta.items.length} productos · Total $${totalFormateado} pagado con ${metodoPago}.</span>
 
-  <!-- Contenedor Principal -->
-  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 40px rgba(59, 130, 246, 0.1);">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#eef2f7;">
+  <tr>
+    <td align="center" style="padding:28px 12px 44px 12px;">
 
-    <!-- Header Premium -->
-    <div style="background: linear-gradient(135deg, #3B82F6 0%, #2563EB 50%, #1D4ED8 100%); padding: 50px 30px; text-align: center; color: white; position: relative; overflow: hidden;">
-      <div style="position: absolute; top: -50px; right: -50px; width: 200px; height: 200px; background: rgba(255,255,255,0.1); border-radius: 50%;"></div>
-      <div style="position: relative; z-index: 1;">
-        <div style="font-size: 32px; font-weight: 800; letter-spacing: -1px; margin-bottom: 4px; line-height: 1;">
-          CENTRALA POS
-        </div>
-        <div style="font-size: 11px; opacity: 0.95; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 600;">
-          Gestión Empresarial Integrada
-        </div>
-      </div>
-    </div>
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" class="wrap" style="width:600px; max-width:600px; background-color:#ffffff; border:1px solid #e2e8f0; border-radius:12px; overflow:hidden;">
 
-    <!-- Contenido -->
-    <div style="padding: 40px 30px;">
+        <!-- Header Ejecutivo -->
+        <tr>
+          <td bgcolor="#0f172a" style="background-color:#0f172a; padding:34px 40px 32px 40px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;">
+              <tr>
+                <td align="left" valign="middle" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:20px; line-height:24px; mso-line-height-rule:exactly; font-weight:600; letter-spacing:3px; color:#ffffff;">
+                  CENTRALA
+                  <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:9px; line-height:14px; mso-line-height-rule:exactly; font-weight:600; letter-spacing:3px; color:#93a3bb; padding-top:5px;">
+                    POS · GESTIÓN EMPRESARIAL
+                  </div>
+                </td>
+                <td align="right" valign="middle" class="hide-sm" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:11px; line-height:16px; mso-line-height-rule:exactly; color:#93a3bb;">
+                  Recibo electrónico<br>
+                  <span style="color:#ffffff; font-weight:600;">${new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
 
-      <!-- Título Principal -->
-      <div style="text-align: center; margin-bottom: 36px;">
-        <h1 style="margin: 0 0 6px 0; font-size: 28px; color: #0f172a; font-weight: 800; line-height: 1.2;">
-          ${titulo}
-        </h1>
-        <p style="margin: 0; font-size: 14px; color: #64748b; font-weight: 500; line-height: 1.4;">
-          ${subtitulo}
-        </p>
-      </div>
+        <!-- Título Principal -->
+        <tr>
+          <td class="px" style="padding:40px 40px 0 40px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+              <tr>
+                <td align="left" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:26px; line-height:32px; mso-line-height-rule:exactly; font-weight:700; letter-spacing:-0.4px; color:#0f172a; padding-bottom:8px;">
+                  Gracias por tu compra, ${nombreCliente}
+                </td>
+              </tr>
+              <tr>
+                <td align="left" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:15px; line-height:23px; mso-line-height-rule:exactly; color:#5a6579; padding-bottom:30px;">
+                  Tu pago fue procesado exitosamente. Este es el detalle de tu transacción.
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
 
-      <!-- Número de Transacción - Tarjeta Destacada -->
-      <div style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-radius: 16px; padding: 28px; margin-bottom: 36px; text-align: center; border: 2px solid #bfdbfe; position: relative;">
-        <div style="font-size: 10px; color: #3B82F6; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; font-weight: 700;">
-          Número de Transacción
-        </div>
-        <div style="font-size: 40px; font-weight: 800; color: #3B82F6; font-family: 'Courier New', monospace; letter-spacing: 2px;">
-          #${venta.consecutivo}
-        </div>
-      </div>
+        <!-- Tarjeta de Transacción y Estado -->
+        <tr>
+          <td class="px" style="padding:0 40px 34px 40px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%; background-color:#f8fafc; border:1px solid #e2e8f0; border-radius:10px;">
+              <tr>
+                <td width="50%" align="left" style="width:50%; padding:20px 22px 20px 22px; border-right:1px solid #e2e8f0;">
+                  <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:10px; line-height:14px; mso-line-height-rule:exactly; font-weight:600; letter-spacing:1.6px; color:#8794aa; padding-bottom:6px;">TRANSACCIÓN</div>
+                  <div class="txn" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:30px; line-height:34px; mso-line-height-rule:exactly; font-weight:700; letter-spacing:-0.5px; color:#0f172a;">#${numeroTransaccion}</div>
+                </td>
+                <td width="50%" align="left" style="width:50%; padding:20px 22px 20px 22px;">
+                  <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:10px; line-height:14px; mso-line-height-rule:exactly; font-weight:600; letter-spacing:1.6px; color:#8794aa; padding-bottom:6px;">ESTADO</div>
+                  <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:14px; line-height:20px; mso-line-height-rule:exactly; font-weight:600; color:#0f172a;">
+                    <span style="display:inline-block; width:8px; height:8px; background-color:#1a9c55; border-radius:8px;">&nbsp;</span>&nbsp; Pago confirmado
+                  </div>
+                  <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:12px; line-height:18px; color:#5a6579; padding-top:4px;">${metodoPago}</div>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
 
-      <!-- Tabla de Productos Limpia -->
-      <div style="margin-bottom: 36px;">
-        <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: #3B82F6; margin-bottom: 14px; letter-spacing: 0.8px;">
-          Productos Comprados
-        </div>
-        <table style="width: 100%; border-collapse: collapse;">
-          <tbody>
-            <tr style="border-bottom: 2px solid #e0e7ff; background-color: #f8fafc;">
-              <th style="padding: 12px 0; text-align: left; font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px;">
-                Descripción
-              </th>
-              <th style="padding: 12px 0; text-align: right; font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px;">
-                Precio
-              </th>
-            </tr>
-            ${productosHTML}
-          </tbody>
-        </table>
-      </div>
+        <!-- Productos Comprados -->
+        <tr>
+          <td class="px" style="padding:0 40px 6px 40px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;">
+              <tr>
+                <td align="left" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:10px; line-height:14px; mso-line-height-rule:exactly; font-weight:600; letter-spacing:1.6px; color:#8794aa; border-bottom:1px solid #e2e8f0; padding-bottom:12px;">
+                  PRODUCTOS
+                </td>
+                <td align="right" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:10px; line-height:14px; mso-line-height-rule:exactly; font-weight:600; letter-spacing:1.6px; color:#8794aa; border-bottom:1px solid #e2e8f0; padding-bottom:12px;">
+                  IMPORTE
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
 
-      <!-- Resumen de Pago - Bloque Limpio -->
-      <div style="background-color: #f0f4f8; border-radius: 14px; padding: 28px; margin-bottom: 32px; border-left: 5px solid #3B82F6;">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 28px;">
-          <div>
-            <div style="font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 700; margin-bottom: 10px; letter-spacing: 0.8px;">
-              Total a Pagar
+        <!-- Filas dinámicas de productos -->
+        ${itemsHtml}
+
+        <!-- Totales -->
+        <tr>
+          <td class="px" style="padding:20px 40px 30px 40px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%; background-color:#f8fafc; border:1px solid #e2e8f0; border-radius:10px;">
+              <tr>
+                <td style="padding:22px 24px 8px 24px;">
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;">
+                    <tr>
+                      <td align="left" valign="bottom" style="padding-top:14px;">
+                        <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:10px; line-height:14px; mso-line-height-rule:exactly; font-weight:600; letter-spacing:1.6px; color:#8794aa; padding-bottom:4px;">TOTAL PAGADO</div>
+                        <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:13px; line-height:18px; color:#5a6579;">${metodoPago} · Aprobado</div>
+                      </td>
+                      <td align="right" valign="bottom" class="amount" style="padding-top:14px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:34px; line-height:38px; mso-line-height-rule:exactly; font-weight:700; letter-spacing:-0.8px; color:#0f172a; white-space:nowrap;">
+                        $${totalFormateado}
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+              <tr><td style="height:16px; font-size:0; line-height:0;">&nbsp;</td></tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td align="center" style="background-color:#f8fafc; border-top:1px solid #e2e8f0; padding:26px 40px 30px 40px;">
+            <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:11px; line-height:16px; mso-line-height-rule:exactly; font-weight:600; letter-spacing:2.4px; color:#0f172a; padding-bottom:8px;">CENTRALA ERP</div>
+            <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:11px; line-height:17px; mso-line-height-rule:exactly; color:#8794aa;">
+              Correo automático generado por Centrala POS.
             </div>
-            <div style="font-size: 36px; font-weight: 800; color: #3B82F6; line-height: 1;">
-              $${Number(venta.total).toLocaleString('es-CO')}
-            </div>
-          </div>
-          <div style="border-left: 2px solid #e2e8f0; padding-left: 28px;">
-            <div style="font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 700; margin-bottom: 10px; letter-spacing: 0.8px;">
-              Método de Pago
-            </div>
-            <div style="font-size: 16px; font-weight: 700; color: #1e293b; line-height: 1.4;">
-              ${venta.metodoPago}
-            </div>
-          </div>
-        </div>
-      </div>
+          </td>
+        </tr>
 
-      <!-- Mensaje Informativo -->
-      <div style="background-color: #f0fdf4; border-left: 5px solid #22C55E; border-radius: 8px; padding: 18px; margin-bottom: 32px;">
-        <p style="margin: 0; font-size: 13px; color: #166534; line-height: 1.6; font-weight: 500;">
-          ${
-            esAdmin
-              ? '<strong>Notificación de venta registrada.</strong> Accede a tu panel de administración para gestionar estados, inventario y análisis de ventas en tiempo real.'
-              : '<strong>Tu compra ha sido confirmada.</strong> Si necesitas ayuda o tienes preguntas sobre tu pedido, nuestro equipo de soporte está disponible para asistirte.'
-          }
-        </p>
-      </div>
+      </table>
 
-    </div>
-
-    <!-- Footer Profesional -->
-    <div style="background-color: #f8fafc; padding: 36px 30px; border-top: 1px solid #e5e7eb; text-align: center;">
-      <div style="margin-bottom: 24px;">
-        <p style="margin: 0 0 12px 0; font-size: 13px; color: #1e293b; font-weight: 700; letter-spacing: 0.5px;">
-          CENTRALA ERP
-        </p>
-        <p style="margin: 0; font-size: 13px; color: #64748b; line-height: 1.8; font-weight: 500;">
-          Sistema profesional de gestión empresarial<br>
-          <strong style="color: #0f172a;">www.centrala.com.co</strong>
-        </p>
-      </div>
-      <div style="border-top: 1px solid #e5e7eb; padding-top: 16px;">
-        <p style="margin: 0; font-size: 11px; color: #94a3b8; line-height: 1.6;">
-          © 2026 Centrala ERP. Todos los derechos reservados.<br>
-          <em>Correo automatizado. Por favor, no respondas a este mensaje.</em>
-        </p>
-      </div>
-    </div>
-
-  </div>
-
+    </td>
+  </tr>
+</table>
 </body>
-</html>
-`;
+</html>`;
 
-  await enviarCorreo(emailDestino, `${esAdmin ? 'Nueva Venta Registrada' : 'Tu Compra Confirmada'} - #${venta.consecutivo}`, html);
+  await enviarCorreo(emailDestino, `Confirmación de Compra - #${numeroTransaccion}`, html);
 }
