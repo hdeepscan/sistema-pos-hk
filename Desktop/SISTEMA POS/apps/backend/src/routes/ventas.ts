@@ -585,8 +585,10 @@ export async function ventasRoutes(app: FastifyInstance) {
     // Si existe email de notificaciones, enviar al admin
     const empresaConfig = await prisma.empresa.findUnique({
       where: { id: empresaId },
-      select: { emailNotificacionesVentas: true, nombre: true, logoUrl: true }
+      select: { emailNotificacionesVentas: true, nombre: true }
     });
+    // Logo URL: usar desde env variable o fallback a undefined
+    const logoUrl = process.env.LOGO_URL;
     console.log("--> Email de notificaciones configurado:", empresaConfig?.emailNotificacionesVentas);
 
     if (empresaConfig?.emailNotificacionesVentas) {
@@ -602,7 +604,7 @@ export async function ventasRoutes(app: FastifyInstance) {
             cliente: venta.cliente,
             empresa: {
               nombre: empresaConfig.nombre,
-              logoUrl: empresaConfig.logoUrl
+              logoUrl: logoUrl
             }
           },
           empresaConfig.emailNotificacionesVentas,
