@@ -12,10 +12,12 @@ if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS || !EMAIL_FROM) {
 }
 
 // Crear transporter
+// Puerto 465 = SMTPS (secure: true)
+// Puerto 587 = SMTP + STARTTLS (secure: false, pero con tls habilitado)
 const transporter = nodemailer.createTransport({
   host: SMTP_HOST,
   port: SMTP_PORT,
-  secure: true, // Puerto 465 requiere secure: true
+  secure: SMTP_PORT === 465, // true solo para puerto 465, false para 587 (usa STARTTLS)
   auth: {
     user: SMTP_USER,
     pass: SMTP_PASS,
