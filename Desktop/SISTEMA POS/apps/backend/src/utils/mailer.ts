@@ -1,76 +1,100 @@
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
-// Validar variables de entorno
+// Usar Resend API en lugar de SMTP directo (evita bloqueos de firewall en Railway)
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const EMAIL_FROM = process.env.EMAIL_FROM || 'centrala_correos@centrala.com.co';
+
+// Fallback a SMTP si Resend no está configurado
 const SMTP_HOST = process.env.SMTP_HOST;
-const SMTP_PORT = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 465;
+const SMTP_PORT = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587;
 const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASS = process.env.SMTP_PASS;
-const EMAIL_FROM = process.env.EMAIL_FROM;
 
-if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS || !EMAIL_FROM) {
-  console.warn('⚠️ SMTP variables not fully configured. Email features will be disabled.');
+let resendClient: Resend | null = null;
+let useResend = false;
+
+if (RESEND_API_KEY) {
+  resendClient = new Resend(RESEND_API_KEY);
+  useResend = true;
+  console.log('✅ Email: Usando Resend API (HTTP/HTTPS)');
+} else if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
+  console.warn('⚠️ Email: Ni Resend ni SMTP están configurados. Email features deshabilitados.');
+} else {
+  console.log('✅ Email: Usando SMTP directo');
 }
 
-// Crear transporter
-// Puerto 465 = SMTPS (secure: true)
-// Puerto 587 = SMTP + STARTTLS (secure: false, pero con tls habilitado)
-const transporter = nodemailer.createTransport({
-  host: SMTP_HOST,
-  port: SMTP_PORT,
-  secure: SMTP_PORT === 465, // true solo para puerto 465, false para 587 (usa STARTTLS)
-  auth: {
-    user: SMTP_USER,
-    pass: SMTP_PASS,
-  },
-  tls: {
-    rejectUnauthorized: false, // Para cPanel y redes restrictivas
-  },
-});
-
-// Función auxiliar para enviar correos (fire and forget)
+/**
+ * Enviar correo usando Resend o SMTP (fallback)
+ */
 async function enviarCorreo(destinatario: string, asunto: string, html: string): Promise<void> {
-  console.log(`\n[NODEMAILER DEBUG] Intentando enviar email...`);
+  console.log(`\n[MAILER DEBUG] Intentando enviar email...`);
   console.log(`  → Destinatario: ${destinatario}`);
   console.log(`  → Asunto: ${asunto}`);
-
-  if (!EMAIL_FROM) {
-    console.warn('❌ EMAIL_FROM not configured, skipping email send');
-    return;
-  }
-
-  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
-    console.warn('❌ SMTP configuration incomplete:', {
-      SMTP_HOST: SMTP_HOST ? '✓' : '✗',
-      SMTP_USER: SMTP_USER ? '✓' : '✗',
-      SMTP_PASS: SMTP_PASS ? '✓' : '✗',
-      SMTP_PORT: SMTP_PORT,
-    });
-    return;
-  }
+  console.log(`  → Método: ${useResend ? 'Resend API' : 'SMTP'}`);
 
   try {
-    console.log(`  → Conectando a SMTP: ${SMTP_HOST}:${SMTP_PORT}...`);
-    const resultado = await transporter.sendMail({
-      from: EMAIL_FROM,
-      to: destinatario,
-      subject: asunto,
-      html: html,
-    });
-    console.log(`✅ Email enviado exitosamente`);
-    console.log(`  → Message ID: ${resultado.messageId}`);
-    console.log(`[NODEMAILER DEBUG] ✅ Completado\n`);
+    if (useResend && resendClient) {
+      // Usar Resend API (HTTP/HTTPS - siempre funciona en Railway)
+      console.log(`  → Conectando a Resend API...`);
+      const resultado = await resendClient.emails.send({
+        from: EMAIL_FROM,
+        to: destinatario,
+        subject: asunto,
+        html: html,
+      });
+
+      if (resultado.error) {
+        console.error(`❌ Error de Resend:`, resultado.error);
+        return;
+      }
+
+      console.log(`✅ Email enviado exitosamente vía Resend`);
+      console.log(`  → Message ID: ${resultado.data?.id}`);
+      console.log(`[MAILER DEBUG] ✅ Completado\n`);
+    } else if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
+      // Fallback a SMTP
+      const nodemailer = await import('nodemailer');
+      const transporter = nodemailer.default.createTransport({
+        host: SMTP_HOST,
+        port: SMTP_PORT,
+        secure: SMTP_PORT === 465, // true para 465 (SMTPS), false para 587 (STARTTLS)
+        auth: {
+          user: SMTP_USER,
+          pass: SMTP_PASS,
+        },
+        tls: {
+          rejectUnauthorized: false,
+        },
+      });
+
+      console.log(`  → Conectando a SMTP: ${SMTP_HOST}:${SMTP_PORT}...`);
+      const resultado = await transporter.sendMail({
+        from: EMAIL_FROM,
+        to: destinatario,
+        subject: asunto,
+        html: html,
+      });
+
+      console.log(`✅ Email enviado exitosamente vía SMTP`);
+      console.log(`  → Message ID: ${resultado.messageId}`);
+      console.log(`[MAILER DEBUG] ✅ Completado\n`);
+    } else {
+      console.warn(`❌ No hay método de envío configurado (Resend o SMTP)`);
+    }
   } catch (error: any) {
-    console.error(`\n❌ ERROR AL ENVIAR EMAIL DE VENTA:`);
+    console.error(`\n❌ ERROR AL ENVIAR EMAIL:`);
     console.error(`  → Destinatario: ${destinatario}`);
     console.error(`  → Error Type: ${error?.code || error?.name || 'Unknown'}`);
     console.error(`  → Error Message: ${error?.message}`);
     console.error(`  → Full Error:`, error);
-    console.error(`[NODEMAILER DEBUG] ❌ Error completado\n`);
-    // NO lanzes la excepción - el sistema debe continuar funcionando
+    console.error(`[MAILER DEBUG] ❌ Error completado\n`);
+    // NO lanzar excepción - el sistema debe continuar funcionando
   }
 }
 
-// Plantilla: Bienvenida de usuario
+/**
+ * Plantilla: Bienvenida de usuario
+ */
 export async function enviarCorreoBienvenida(usuario: { nombre: string; email: string }, contrasenaPlana: string): Promise<void> {
   const html = `
 <!DOCTYPE html>
@@ -111,7 +135,7 @@ export async function enviarCorreoBienvenida(usuario: { nombre: string; email: s
       </div>
 
       <p>Accede al sistema aquí:</p>
-      <a href="https://tu-dominio.com/login" class="button">Acceder a Centrala ERP</a>
+      <a href="https://centrala.up.railway.app/login" class="button">Acceder a Centrala ERP</a>
 
       <p style="margin-top: 30px;">Si tienes alguna pregunta o necesitas asistencia, no dudes en contactar a nuestro equipo de soporte.</p>
     </div>
@@ -128,7 +152,9 @@ export async function enviarCorreoBienvenida(usuario: { nombre: string; email: s
   await enviarCorreo(usuario.email, '¡Bienvenido a Centrala ERP! 🚀', html);
 }
 
-// Plantilla: Confirmación de venta
+/**
+ * Plantilla: Confirmación de venta
+ */
 export async function enviarCorreoVenta(
   venta: { id: string; consecutivo: number; total: number; metodoPago: string; items: any[] },
   emailDestino: string,
