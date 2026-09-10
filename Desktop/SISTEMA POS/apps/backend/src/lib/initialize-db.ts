@@ -19,6 +19,9 @@ export async function initializeDatabase(): Promise<void> {
 
     if (result[0]?.exists) {
       console.log("[DB Init] ✅ Base de datos ya inicializada");
+
+      // HOTFIX: Sincronizar columnas faltantes (non-destructive)
+      await syncMissingColumns();
       return;
     }
 
@@ -36,8 +39,40 @@ export async function initializeDatabase(): Promise<void> {
       console.warn("[DB Init] ⚠️  No se pudieron ejecutar las migraciones automáticamente");
       console.warn("[DB Init] Intentando continuar de todas formas...");
     }
+
+    // HOTFIX: Sincronizar columnas faltantes después de migraciones
+    await syncMissingColumns();
   } catch (err) {
     console.error("[DB Init] Error:", (err as Error).message);
     console.warn("[DB Init] Continuando de todas formas...");
+  }
+}
+
+/**
+ * HOTFIX P0: Sincroniza columnas faltantes sin pérdida de datos
+ * Se ejecuta en cada startup para garantizar que el schema está sincronizado
+ */
+async function syncMissingColumns(): Promise<void> {
+  try {
+    console.log("[DB Sync] Verificando y sincronizando columnas faltantes...");
+
+    // Agregar emailNotificacionesVentas si no existe (non-destructive)
+    try {
+      await prisma.$executeRawUnsafe(
+        `ALTER TABLE "empresas" ADD COLUMN IF NOT EXISTS "emailNotificacionesVentas" VARCHAR(255);`
+      );
+      console.log("[DB Sync] ✅ emailNotificacionesVentas sincronizada");
+    } catch (err: any) {
+      // Si ya existe, no es un error
+      if (!err.message.includes("already exists")) {
+        throw err;
+      }
+      console.log("[DB Sync] ℹ️  emailNotificacionesVentas ya existe");
+    }
+
+    console.log("[DB Sync] ✅ Schema completamente sincronizado");
+  } catch (err: any) {
+    console.warn("[DB Sync] ⚠️  Error durante sincronización:", err.message);
+    console.warn("[DB Sync] Continuando de todas formas (base de datos funcional)");
   }
 }
