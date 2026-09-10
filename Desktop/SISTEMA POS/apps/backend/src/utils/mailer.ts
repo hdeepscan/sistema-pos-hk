@@ -153,91 +153,164 @@ export async function enviarCorreoBienvenida(usuario: { nombre: string; email: s
 }
 
 /**
- * Plantilla: Confirmación de venta
+ * Plantilla: Confirmación de venta (Diseño Premium)
  */
 export async function enviarCorreoVenta(
   venta: { id: string; consecutivo: number; total: number; metodoPago: string; items: any[] },
   emailDestino: string,
   esAdmin: boolean = false
 ): Promise<void> {
+  // Construir filas de productos con alternancia de colores
   const productosHTML = venta.items
     .map(
-      (item) =>
-        `<tr style="border-bottom: 1px solid #e2e8f0;">
-          <td style="padding: 10px; text-align: left;">${item.cantidad}x ${item.producto?.nombre || item.descripcionLibre || 'Producto'}</td>
-          <td style="padding: 10px; text-align: right;">$${Number(item.precioUnitario).toLocaleString('es-CO')}</td>
+      (item, index) =>
+        `<tr style="background-color: ${index % 2 === 0 ? '#f8fafc' : '#ffffff'}; border-bottom: 1px solid #e2e8f0;">
+          <td style="padding: 14px 12px; text-align: left; font-size: 14px; color: #1e293b;">
+            <strong>${item.cantidad}x</strong> ${item.producto?.nombre || item.descripcionLibre || 'Producto'}
+          </td>
+          <td style="padding: 14px 12px; text-align: right; font-size: 14px; color: #1e293b;">
+            $${Number(item.precioUnitario).toLocaleString('es-CO')}
+          </td>
         </tr>`
     )
     .join('');
 
   const titulo = esAdmin ? '¡Nueva venta registrada!' : '¡Gracias por tu compra!';
   const subtitulo = esAdmin ? 'Detalles de la transacción' : 'Tu compra ha sido procesada exitosamente';
+  const iconoTitulo = esAdmin ? '📊' : '✅';
 
   const html = `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
-  <style>
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f5f5; margin: 0; padding: 0; }
-    .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 40px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-    .header { text-align: center; border-bottom: 3px solid #22C55E; padding-bottom: 20px; margin-bottom: 30px; }
-    .header h1 { color: #0f172a; margin: 0; font-size: 28px; }
-    .subheader { color: #64748b; font-size: 14px; margin-top: 5px; }
-    .content { color: #1e293b; line-height: 1.6; }
-    .venta-numero { background-color: #f0fdf4; padding: 16px; border-radius: 6px; margin-bottom: 20px; text-align: center; }
-    .venta-numero p { margin: 0; color: #64748b; font-size: 12px; }
-    .venta-numero strong { display: block; font-size: 24px; color: #22C55E; margin-top: 5px; }
-    table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-    .total-row { background-color: #f0fdf4; }
-    .total-row td { padding: 16px; font-weight: 700; color: #0f172a; border-top: 2px solid #22C55E; }
-    .metodo-pago { background-color: #eff6ff; border-left: 4px solid #3B82F6; padding: 16px; margin: 20px 0; border-radius: 4px; }
-    .footer { text-align: center; color: #94a3b8; font-size: 12px; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 20px; }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${titulo}</title>
 </head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>${titulo}</h1>
-      <p class="subheader">${subtitulo}</p>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif; background-color: #f3f4f6; margin: 0; padding: 20px;">
+
+  <!-- Contenedor Principal -->
+  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);">
+
+    <!-- Header con Degradado -->
+    <div style="background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%); padding: 40px 30px; text-align: center; color: white;">
+      <div style="font-size: 28px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 8px;">
+        CENTRALA POS
+      </div>
+      <div style="font-size: 12px; opacity: 0.9; text-transform: uppercase; letter-spacing: 1px;">
+        Sistema de Gestión Empresarial
+      </div>
     </div>
 
-    <div class="content">
-      <div class="venta-numero">
-        <p>Número de Transacción</p>
-        <strong>#${venta.consecutivo}</strong>
+    <!-- Contenido Principal -->
+    <div style="padding: 40px 30px;">
+
+      <!-- Título y Subtítulo -->
+      <div style="text-align: center; margin-bottom: 32px;">
+        <div style="font-size: 32px; margin-bottom: 8px;">${iconoTitulo}</div>
+        <h1 style="margin: 0 0 8px 0; font-size: 24px; color: #0f172a; font-weight: 700;">
+          ${titulo}
+        </h1>
+        <p style="margin: 0; font-size: 14px; color: #64748b;">
+          ${subtitulo}
+        </p>
       </div>
 
-      <p><strong>Productos:</strong></p>
-      <table>
-        <tbody>
-          ${productosHTML}
-          <tr class="total-row">
-            <td style="text-align: left;">TOTAL</td>
-            <td style="text-align: right;">$${Number(venta.total).toLocaleString('es-CO')}</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <div class="metodo-pago">
-        <p style="margin: 0 0 8px 0;"><strong>Método de Pago:</strong></p>
-        <p style="margin: 0; font-size: 14px;">${venta.metodoPago}</p>
+      <!-- Tarjeta de Número de Transacción -->
+      <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dbeafe 100%); border-radius: 12px; padding: 24px; margin-bottom: 32px; text-align: center; border-left: 4px solid #22C55E;">
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
+          Número de Transacción
+        </div>
+        <div style="font-size: 32px; font-weight: 800; color: #22C55E; font-family: 'Courier New', monospace;">
+          #${venta.consecutivo.toString().padStart(6, '0')}
+        </div>
       </div>
 
-      <p style="margin-top: 30px;">${
-        esAdmin
-          ? 'Revisa los detalles de esta transacción en tu panel de administración.'
-          : 'Gracias por confiar en nosotros. Si tienes alguna pregunta sobre tu compra, contáctanos.'
-      }</p>
+      <!-- Tabla de Productos -->
+      <div style="margin-bottom: 32px;">
+        <div style="font-size: 13px; font-weight: 700; text-transform: uppercase; color: #64748b; margin-bottom: 12px; letter-spacing: 0.5px;">
+          Productos Comprados
+        </div>
+        <table style="width: 100%; border-collapse: collapse; background-color: #f8fafc; border-radius: 8px; overflow: hidden;">
+          <tbody>
+            <tr style="border-bottom: 2px solid #e2e8f0;">
+              <th style="padding: 12px; text-align: left; font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase; background-color: #f1f5f9;">
+                Descripción
+              </th>
+              <th style="padding: 12px; text-align: right; font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase; background-color: #f1f5f9;">
+                Precio
+              </th>
+            </tr>
+            ${productosHTML}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Resumen de Pago -->
+      <div style="background-color: #f8fafc; border-radius: 12px; padding: 24px; margin-bottom: 32px; border-left: 4px solid #3B82F6;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+          <!-- Total -->
+          <div>
+            <div style="font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 700; margin-bottom: 8px; letter-spacing: 0.5px;">
+              Total a Pagar
+            </div>
+            <div style="font-size: 28px; font-weight: 800; color: #22C55E;">
+              $${Number(venta.total).toLocaleString('es-CO')}
+            </div>
+          </div>
+          <!-- Método de Pago -->
+          <div>
+            <div style="font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 700; margin-bottom: 8px; letter-spacing: 0.5px;">
+              Método de Pago
+            </div>
+            <div style="font-size: 16px; font-weight: 700; color: #1e293b;">
+              ${venta.metodoPago === 'EFECTIVO' ? '💵' : venta.metodoPago === 'TARJETA' ? '💳' : venta.metodoPago === 'TRANSFERENCIA' ? '🏦' : '📱'} ${venta.metodoPago}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mensaje Personalizado -->
+      <div style="background-color: #f0f9ff; border-radius: 8px; padding: 16px; border-left: 4px solid #3B82F6; margin-bottom: 32px;">
+        <p style="margin: 0; font-size: 13px; color: #1e293b; line-height: 1.6;">
+          ${
+            esAdmin
+              ? '📊 <strong>Esta es una notificación de venta.</strong> Revisa los detalles en tu panel de administración para actualizar estados de pedidos, inventario y análisis de ventas.'
+              : '🙏 <strong>¡Gracias por tu compra!</strong> Si tienes preguntas o necesitas ayuda con tu pedido, no dudes en contactar a nuestro equipo de soporte. Estamos aquí para ayudarte.'
+          }
+        </p>
+      </div>
+
     </div>
 
-    <div class="footer">
-      <p>© 2026 Centrala ERP. Todos los derechos reservados.</p>
+    <!-- Footer -->
+    <div style="background-color: #f8fafc; padding: 32px 30px; text-align: center; border-top: 1px solid #e2e8f0;">
+      <div style="margin-bottom: 20px;">
+        <p style="margin: 0 0 8px 0; font-size: 12px; color: #475569; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
+          Centrala ERP
+        </p>
+        <p style="margin: 0; font-size: 13px; color: #64748b; line-height: 1.8;">
+          Sistema integral de gestión empresarial<br>
+          <strong style="color: #1e293b;">🌐 www.centrala.com.co</strong><br>
+          <strong style="color: #1e293b;">📞 Soporte: +57 (300) XXXXX</strong>
+        </p>
+      </div>
+      <div style="border-top: 1px solid #e2e8f0; padding-top: 16px; font-size: 11px; color: #94a3b8;">
+        <p style="margin: 0;">
+          © 2026 Centrala ERP. Todos los derechos reservados.<br>
+          <em>Este correo fue enviado automáticamente. Por favor no respondas a este mensaje.</em>
+        </p>
+      </div>
     </div>
+
   </div>
+
+  <!-- Espaciador inferior -->
+  <div style="height: 20px;"></div>
+
 </body>
 </html>
 `;
 
-  await enviarCorreo(emailDestino, `${esAdmin ? 'Nueva Venta Registrada' : 'Tu Compra'} - #${venta.consecutivo}`, html);
+  await enviarCorreo(emailDestino, `${esAdmin ? '📊 Nueva Venta Registrada' : '✅ Tu Compra'} - #${venta.consecutivo}`, html);
 }
