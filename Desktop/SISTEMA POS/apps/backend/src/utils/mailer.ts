@@ -177,6 +177,9 @@ export async function enviarCorreoVenta(
     });
   };
 
+  // Logo URL: usar desde env variable o fallback a Centrala
+  const logoUrl = process.env.LOGO_URL || 'https://centrala.com.co/logo.png';
+
   // Variables dinámicas
   const nombreCliente = venta.cliente?.nombre || 'Cliente';
   const numeroTransaccion = String(venta.consecutivo).padStart(6, '0');
@@ -264,7 +267,7 @@ export async function enviarCorreoVenta(
             <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;">
               <tr>
                 <td align="left" valign="middle" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:20px; line-height:24px; mso-line-height-rule:exactly; font-weight:600; letter-spacing:3px; color:#ffffff;">
-                  ${venta.empresa?.logoUrl ? `<img src="${venta.empresa.logoUrl}" alt="${venta.empresa.nombre || 'Centrala'}" width="120" style="display:block; margin-bottom:12px; border:0; height:auto; max-width:100%;">` : ''}
+                  <img src="${logoUrl}" alt="Centrala POS" width="140" style="display:block; margin-bottom:8px; border:0; width:140px; height:auto;">
                   ${venta.empresa?.nombre || 'CENTRALA'}
                   <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:9px; line-height:14px; mso-line-height-rule:exactly; font-weight:600; letter-spacing:3px; color:#93a3bb; padding-top:5px;">
                     POS · GESTIÓN EMPRESARIAL
