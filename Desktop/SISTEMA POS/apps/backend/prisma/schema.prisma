@@ -112,6 +112,9 @@ model Empresa {
   pesosPorPunto Decimal? @db.Decimal(12, 2)
   valorPunto    Decimal? @db.Decimal(12, 2)
 
+  // Notificaciones de ventas por email
+  emailNotificacionesVentas String?  @db.VarChar(255)
+
   usuarios       Usuario[]
   sucursales     Sucursal[]
   productos      Producto[]

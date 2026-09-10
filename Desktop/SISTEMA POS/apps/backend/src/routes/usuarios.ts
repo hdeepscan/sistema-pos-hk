@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma.js";
 import { hashPassword } from "../lib/password.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
 import { mensajeDeValidacion } from "../lib/errores.js";
+import { enviarCorreoBienvenida } from "../utils/mailer.js";
 
 function permisosDe(usuario: { rol: keyof typeof PERMISOS_POR_ROL; permisos: string[] }) {
   return usuario.permisos.length > 0 ? usuario.permisos : PERMISOS_POR_ROL[usuario.rol];
@@ -67,6 +68,14 @@ export async function usuariosRoutes(app: FastifyInstance) {
         permisos: parsed.data.permisos ?? [],
       },
     });
+
+    // Fire and forget - enviar correo de bienvenida
+    if (usuario.email) {
+      enviarCorreoBienvenida(
+        { nombre: usuario.nombre, email: usuario.email },
+        parsed.data.password
+      ).catch((err) => console.error('Error enviando correo de bienvenida:', err));
+    }
 
     registrarAuditoria({
       empresaId,

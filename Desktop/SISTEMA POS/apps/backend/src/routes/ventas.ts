@@ -8,6 +8,7 @@ import { enviarEventoCompraAMeta } from "../lib/meta.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
 import { mensajeDeValidacion } from "../lib/errores.js";
 import { crearAsientoDesdeVenta } from "./contabilidad.js";
+import { enviarCorreoVenta } from "../utils/mailer.js";
 
 const MS_DIA = 24 * 60 * 60 * 1000;
 
@@ -525,6 +526,56 @@ export async function ventasRoutes(app: FastifyInstance) {
         clienteTelefono: cliente?.telefono,
       });
     })();
+
+    // Fire and forget - enviar correos de venta en paralelo
+    const emailsAEnviar: Promise<void>[] = [];
+
+    // Si la venta tiene cliente con email, enviar al cliente
+    if (clienteId) {
+      const cliente = await prisma.cliente.findUnique({
+        where: { id: clienteId },
+        select: { email: true }
+      });
+      if (cliente?.email) {
+        emailsAEnviar.push(
+          enviarCorreoVenta(
+            {
+              id: venta.id,
+              consecutivo: venta.consecutivo,
+              total: Number(venta.total),
+              metodoPago,
+              items: items
+            },
+            cliente.email,
+            false
+          ).catch((err) => console.error('Error enviando correo al cliente:', err))
+        );
+      }
+    }
+
+    // Si existe email de notificaciones, enviar al admin
+    const empresaConfig = await prisma.empresa.findUnique({
+      where: { id: empresaId },
+      select: { emailNotificacionesVentas: true }
+    });
+    if (empresaConfig?.emailNotificacionesVentas) {
+      emailsAEnviar.push(
+        enviarCorreoVenta(
+          {
+            id: venta.id,
+            consecutivo: venta.consecutivo,
+            total: Number(venta.total),
+            metodoPago,
+            items: items
+          },
+          empresaConfig.emailNotificacionesVentas,
+          true
+        ).catch((err) => console.error('Error enviando correo al admin:', err))
+      );
+    }
+
+    // Enviar en paralelo sin bloquear
+    Promise.all(emailsAEnviar).catch(() => {});
 
     return reply.code(201).send({ ...venta, subtotal, puntosSaldo });
   });
