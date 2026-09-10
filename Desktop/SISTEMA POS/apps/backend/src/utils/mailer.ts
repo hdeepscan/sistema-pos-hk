@@ -157,7 +157,15 @@ export async function enviarCorreoBienvenida(usuario: { nombre: string; email: s
  * Plantilla responsive con imágenes reales de productos e inline CSS
  */
 export async function enviarCorreoVenta(
-  venta: { id: string; consecutivo: number; total: number; metodoPago: string; items: any[]; cliente?: { nombre: string } },
+  venta: {
+    id: string;
+    consecutivo: number;
+    total: number;
+    metodoPago: string;
+    items: any[];
+    cliente?: { nombre: string };
+    empresa?: { nombre: string; logoUrl?: string };
+  },
   emailDestino: string,
   esAdmin: boolean = false
 ): Promise<void> {
@@ -256,7 +264,8 @@ export async function enviarCorreoVenta(
             <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;">
               <tr>
                 <td align="left" valign="middle" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:20px; line-height:24px; mso-line-height-rule:exactly; font-weight:600; letter-spacing:3px; color:#ffffff;">
-                  CENTRALA
+                  ${venta.empresa?.logoUrl ? `<img src="${venta.empresa.logoUrl}" alt="${venta.empresa.nombre || 'Centrala'}" width="120" style="display:block; margin-bottom:12px; border:0; height:auto; max-width:100%;">` : ''}
+                  ${venta.empresa?.nombre || 'CENTRALA'}
                   <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:9px; line-height:14px; mso-line-height-rule:exactly; font-weight:600; letter-spacing:3px; color:#93a3bb; padding-top:5px;">
                     POS · GESTIÓN EMPRESARIAL
                   </div>

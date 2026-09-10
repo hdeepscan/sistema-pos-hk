@@ -400,7 +400,22 @@ export async function ventasRoutes(app: FastifyInstance) {
             })),
           },
         },
-        include: { items: true },
+        include: {
+          items: {
+            include: {
+              producto: {
+                select: {
+                  id: true,
+                  nombre: true,
+                  imagenUrl: true,
+                  sku: true,
+                  costo: true,
+                }
+              }
+            }
+          },
+          cliente: true
+        },
       });
 
       // Solo los items de inventario mueven stock; los de venta libre no.
@@ -543,42 +558,34 @@ export async function ventasRoutes(app: FastifyInstance) {
     });
 
     // Si la venta tiene cliente con email, enviar al cliente
-    if (clienteId) {
-      const cliente = await prisma.cliente.findUnique({
-        where: { id: clienteId },
-        select: { email: true, nombre: true }
-      });
-      console.log("--> Cliente encontrado:", cliente);
-      console.log("--> Datos del cliente para email:", cliente?.email);
-
-      if (cliente?.email) {
-        console.log(`--> 📧 Encolando email para cliente: ${cliente.email}`);
-        emailsAEnviar.push(
-          enviarCorreoVenta(
-            {
-              id: venta.id,
-              consecutivo: venta.consecutivo,
-              total: Number(venta.total),
-              metodoPago,
-              items: items
-            },
-            cliente.email,
-            false
-          ).catch((err) => {
-            console.error('❌ Error enviando correo al cliente:', err);
-          })
-        );
-      } else {
-        console.log("--> ⚠️ Cliente NO tiene email registrado");
-      }
+    if (venta.cliente?.email) {
+      console.log("--> Cliente encontrado:", venta.cliente);
+      console.log("--> Datos del cliente para email:", venta.cliente.email);
+      console.log(`--> 📧 Encolando email para cliente: ${venta.cliente.email}`);
+      emailsAEnviar.push(
+        enviarCorreoVenta(
+          {
+            id: venta.id,
+            consecutivo: venta.consecutivo,
+            total: Number(venta.total),
+            metodoPago,
+            items: venta.items,
+            cliente: venta.cliente
+          },
+          venta.cliente.email,
+          false
+        ).catch((err) => {
+          console.error('❌ Error enviando correo al cliente:', err);
+        })
+      );
     } else {
-      console.log("--> ℹ️ Venta sin cliente seleccionado");
+      console.log("--> ℹ️ Cliente sin email o venta sin cliente seleccionado");
     }
 
     // Si existe email de notificaciones, enviar al admin
     const empresaConfig = await prisma.empresa.findUnique({
       where: { id: empresaId },
-      select: { emailNotificacionesVentas: true, nombre: true }
+      select: { emailNotificacionesVentas: true, nombre: true, logoUrl: true }
     });
     console.log("--> Email de notificaciones configurado:", empresaConfig?.emailNotificacionesVentas);
 
@@ -591,7 +598,12 @@ export async function ventasRoutes(app: FastifyInstance) {
             consecutivo: venta.consecutivo,
             total: Number(venta.total),
             metodoPago,
-            items: items
+            items: venta.items,
+            cliente: venta.cliente,
+            empresa: {
+              nombre: empresaConfig.nombre,
+              logoUrl: empresaConfig.logoUrl
+            }
           },
           empresaConfig.emailNotificacionesVentas,
           true
