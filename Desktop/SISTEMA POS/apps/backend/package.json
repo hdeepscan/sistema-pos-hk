@@ -12,7 +12,8 @@
     "migrate:deploy": "prisma migrate deploy",
     "prisma:generate": "prisma generate",
     "prisma:studio": "prisma studio",
-    "seed:lifetime": "tsx src/scripts/createLifetimeUser.ts"
+    "seed:lifetime": "tsx src/scripts/createLifetimeUser.ts",
+    "emergency:fix-schema": "tsx src/scripts/emergencyFixSchema.ts"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",
