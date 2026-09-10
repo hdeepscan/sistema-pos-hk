@@ -160,24 +160,29 @@ export async function enviarCorreoVenta(
   emailDestino: string,
   esAdmin: boolean = false
 ): Promise<void> {
-  // Construir filas de productos con alternancia de colores
+  // Construir filas de productos con imágenes y alternancia de colores
   const productosHTML = venta.items
     .map(
-      (item, index) =>
-        `<tr style="background-color: ${index % 2 === 0 ? '#f8fafc' : '#ffffff'}; border-bottom: 1px solid #e2e8f0;">
+      (item, index) => {
+        const imagenHTML = item.producto?.imagenUrl
+          ? `<div style="text-align: center; margin-bottom: 8px;"><img src="${item.producto.imagenUrl}" style="max-width: 80px; max-height: 80px; border-radius: 4px;" alt="${item.producto.nombre}"></div>`
+          : '';
+
+        return `<tr style="background-color: ${index % 2 === 0 ? '#f8fafc' : '#ffffff'}; border-bottom: 1px solid #e2e8f0;">
           <td style="padding: 14px 12px; text-align: left; font-size: 14px; color: #1e293b;">
+            ${imagenHTML}
             <strong>${item.cantidad}x</strong> ${item.producto?.nombre || item.descripcionLibre || 'Producto'}
           </td>
           <td style="padding: 14px 12px; text-align: right; font-size: 14px; color: #1e293b;">
             $${Number(item.precioUnitario).toLocaleString('es-CO')}
           </td>
-        </tr>`
+        </tr>`;
+      }
     )
     .join('');
 
-  const titulo = esAdmin ? '¡Nueva venta registrada!' : '¡Gracias por tu compra!';
+  const titulo = esAdmin ? 'Nueva venta registrada' : 'Gracias por tu compra';
   const subtitulo = esAdmin ? 'Detalles de la transacción' : 'Tu compra ha sido procesada exitosamente';
-  const iconoTitulo = esAdmin ? '📊' : '✅';
 
   const html = `
 <!DOCTYPE html>
@@ -186,8 +191,9 @@ export async function enviarCorreoVenta(
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${titulo}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif; background-color: #f3f4f6; margin: 0; padding: 20px;">
+<body style="font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: #f3f4f6; margin: 0; padding: 20px;">
 
   <!-- Contenedor Principal -->
   <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);">
@@ -207,22 +213,21 @@ export async function enviarCorreoVenta(
 
       <!-- Título y Subtítulo -->
       <div style="text-align: center; margin-bottom: 32px;">
-        <div style="font-size: 32px; margin-bottom: 8px;">${iconoTitulo}</div>
-        <h1 style="margin: 0 0 8px 0; font-size: 24px; color: #0f172a; font-weight: 700;">
+        <h1 style="margin: 0 0 8px 0; font-size: 26px; color: #0f172a; font-weight: 700;">
           ${titulo}
         </h1>
-        <p style="margin: 0; font-size: 14px; color: #64748b;">
+        <p style="margin: 0; font-size: 14px; color: #64748b; font-weight: 500;">
           ${subtitulo}
         </p>
       </div>
 
       <!-- Tarjeta de Número de Transacción -->
-      <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dbeafe 100%); border-radius: 12px; padding: 24px; margin-bottom: 32px; text-align: center; border-left: 4px solid #22C55E;">
-        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
+      <div style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-radius: 12px; padding: 24px; margin-bottom: 32px; text-align: center; border-left: 4px solid #3B82F6;">
+        <div style="font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; font-weight: 600;">
           Número de Transacción
         </div>
-        <div style="font-size: 32px; font-weight: 800; color: #22C55E; font-family: 'Courier New', monospace;">
-          #${venta.consecutivo.toString().padStart(6, '0')}
+        <div style="font-size: 36px; font-weight: 800; color: #3B82F6; font-family: 'Courier New', monospace;">
+          #${venta.consecutivo}
         </div>
       </div>
 
@@ -247,36 +252,36 @@ export async function enviarCorreoVenta(
       </div>
 
       <!-- Resumen de Pago -->
-      <div style="background-color: #f8fafc; border-radius: 12px; padding: 24px; margin-bottom: 32px; border-left: 4px solid #3B82F6;">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+      <div style="background-color: #eff6ff; border-radius: 12px; padding: 24px; margin-bottom: 32px; border-left: 4px solid #3B82F6;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
           <!-- Total -->
           <div>
-            <div style="font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 700; margin-bottom: 8px; letter-spacing: 0.5px;">
+            <div style="font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 600; margin-bottom: 8px; letter-spacing: 0.5px;">
               Total a Pagar
             </div>
-            <div style="font-size: 28px; font-weight: 800; color: #22C55E;">
+            <div style="font-size: 32px; font-weight: 800; color: #3B82F6;">
               $${Number(venta.total).toLocaleString('es-CO')}
             </div>
           </div>
           <!-- Método de Pago -->
           <div>
-            <div style="font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 700; margin-bottom: 8px; letter-spacing: 0.5px;">
+            <div style="font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 600; margin-bottom: 8px; letter-spacing: 0.5px;">
               Método de Pago
             </div>
             <div style="font-size: 16px; font-weight: 700; color: #1e293b;">
-              ${venta.metodoPago === 'EFECTIVO' ? '💵' : venta.metodoPago === 'TARJETA' ? '💳' : venta.metodoPago === 'TRANSFERENCIA' ? '🏦' : '📱'} ${venta.metodoPago}
+              ${venta.metodoPago}
             </div>
           </div>
         </div>
       </div>
 
       <!-- Mensaje Personalizado -->
-      <div style="background-color: #f0f9ff; border-radius: 8px; padding: 16px; border-left: 4px solid #3B82F6; margin-bottom: 32px;">
-        <p style="margin: 0; font-size: 13px; color: #1e293b; line-height: 1.6;">
+      <div style="background-color: #eff6ff; border-radius: 8px; padding: 16px; border-left: 4px solid #3B82F6; margin-bottom: 32px;">
+        <p style="margin: 0; font-size: 13px; color: #1e293b; line-height: 1.6; font-weight: 500;">
           ${
             esAdmin
-              ? '📊 <strong>Esta es una notificación de venta.</strong> Revisa los detalles en tu panel de administración para actualizar estados de pedidos, inventario y análisis de ventas.'
-              : '🙏 <strong>¡Gracias por tu compra!</strong> Si tienes preguntas o necesitas ayuda con tu pedido, no dudes en contactar a nuestro equipo de soporte. Estamos aquí para ayudarte.'
+              ? '<strong>Esta es una notificación de venta.</strong> Revisa los detalles en tu panel de administración para actualizar estados de pedidos, inventario y análisis de ventas.'
+              : '<strong>Gracias por tu compra.</strong> Si tienes preguntas o necesitas ayuda con tu pedido, no dudes en contactar a nuestro equipo de soporte. Estamos aquí para ayudarte.'
           }
         </p>
       </div>
@@ -289,10 +294,10 @@ export async function enviarCorreoVenta(
         <p style="margin: 0 0 8px 0; font-size: 12px; color: #475569; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
           Centrala ERP
         </p>
-        <p style="margin: 0; font-size: 13px; color: #64748b; line-height: 1.8;">
+        <p style="margin: 0; font-size: 13px; color: #64748b; line-height: 1.8; font-weight: 500;">
           Sistema integral de gestión empresarial<br>
-          <strong style="color: #1e293b;">🌐 www.centrala.com.co</strong><br>
-          <strong style="color: #1e293b;">📞 Soporte: +57 (300) XXXXX</strong>
+          <strong style="color: #1e293b;">www.centrala.com.co</strong><br>
+          <strong style="color: #1e293b;">Soporte: +57 (300) XXXXX</strong>
         </p>
       </div>
       <div style="border-top: 1px solid #e2e8f0; padding-top: 16px; font-size: 11px; color: #94a3b8;">
