@@ -193,56 +193,59 @@ export async function enviarCorreoVenta(
   <title>${titulo}</title>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
-<body style="font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: #f3f4f6; margin: 0; padding: 20px;">
+<body style="font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: linear-gradient(135deg, #f0f4f8 0%, #f9fafb 100%); margin: 0; padding: 20px;">
 
   <!-- Contenedor Principal -->
-  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);">
+  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 40px rgba(59, 130, 246, 0.1);">
 
-    <!-- Header con Degradado -->
-    <div style="background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%); padding: 40px 30px; text-align: center; color: white;">
-      <div style="font-size: 28px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 8px;">
-        CENTRALA POS
-      </div>
-      <div style="font-size: 12px; opacity: 0.9; text-transform: uppercase; letter-spacing: 1px;">
-        Sistema de Gestión Empresarial
+    <!-- Header Premium -->
+    <div style="background: linear-gradient(135deg, #3B82F6 0%, #2563EB 50%, #1D4ED8 100%); padding: 50px 30px; text-align: center; color: white; position: relative; overflow: hidden;">
+      <div style="position: absolute; top: -50px; right: -50px; width: 200px; height: 200px; background: rgba(255,255,255,0.1); border-radius: 50%;"></div>
+      <div style="position: relative; z-index: 1;">
+        <div style="font-size: 32px; font-weight: 800; letter-spacing: -1px; margin-bottom: 4px; line-height: 1;">
+          CENTRALA POS
+        </div>
+        <div style="font-size: 11px; opacity: 0.95; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 600;">
+          Gestión Empresarial Integrada
+        </div>
       </div>
     </div>
 
-    <!-- Contenido Principal -->
+    <!-- Contenido -->
     <div style="padding: 40px 30px;">
 
-      <!-- Título y Subtítulo -->
-      <div style="text-align: center; margin-bottom: 32px;">
-        <h1 style="margin: 0 0 8px 0; font-size: 26px; color: #0f172a; font-weight: 700;">
+      <!-- Título Principal -->
+      <div style="text-align: center; margin-bottom: 36px;">
+        <h1 style="margin: 0 0 6px 0; font-size: 28px; color: #0f172a; font-weight: 800; line-height: 1.2;">
           ${titulo}
         </h1>
-        <p style="margin: 0; font-size: 14px; color: #64748b; font-weight: 500;">
+        <p style="margin: 0; font-size: 14px; color: #64748b; font-weight: 500; line-height: 1.4;">
           ${subtitulo}
         </p>
       </div>
 
-      <!-- Tarjeta de Número de Transacción -->
-      <div style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-radius: 12px; padding: 24px; margin-bottom: 32px; text-align: center; border-left: 4px solid #3B82F6;">
-        <div style="font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; font-weight: 600;">
+      <!-- Número de Transacción - Tarjeta Destacada -->
+      <div style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-radius: 16px; padding: 28px; margin-bottom: 36px; text-align: center; border: 2px solid #bfdbfe; position: relative;">
+        <div style="font-size: 10px; color: #3B82F6; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; font-weight: 700;">
           Número de Transacción
         </div>
-        <div style="font-size: 36px; font-weight: 800; color: #3B82F6; font-family: 'Courier New', monospace;">
+        <div style="font-size: 40px; font-weight: 800; color: #3B82F6; font-family: 'Courier New', monospace; letter-spacing: 2px;">
           #${venta.consecutivo}
         </div>
       </div>
 
-      <!-- Tabla de Productos -->
-      <div style="margin-bottom: 32px;">
-        <div style="font-size: 13px; font-weight: 700; text-transform: uppercase; color: #64748b; margin-bottom: 12px; letter-spacing: 0.5px;">
+      <!-- Tabla de Productos Limpia -->
+      <div style="margin-bottom: 36px;">
+        <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: #3B82F6; margin-bottom: 14px; letter-spacing: 0.8px;">
           Productos Comprados
         </div>
-        <table style="width: 100%; border-collapse: collapse; background-color: #f8fafc; border-radius: 8px; overflow: hidden;">
+        <table style="width: 100%; border-collapse: collapse;">
           <tbody>
-            <tr style="border-bottom: 2px solid #e2e8f0;">
-              <th style="padding: 12px; text-align: left; font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase; background-color: #f1f5f9;">
+            <tr style="border-bottom: 2px solid #e0e7ff; background-color: #f8fafc;">
+              <th style="padding: 12px 0; text-align: left; font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px;">
                 Descripción
               </th>
-              <th style="padding: 12px; text-align: right; font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase; background-color: #f1f5f9;">
+              <th style="padding: 12px 0; text-align: right; font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px;">
                 Precio
               </th>
             </tr>
@@ -251,71 +254,65 @@ export async function enviarCorreoVenta(
         </table>
       </div>
 
-      <!-- Resumen de Pago -->
-      <div style="background-color: #eff6ff; border-radius: 12px; padding: 24px; margin-bottom: 32px; border-left: 4px solid #3B82F6;">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-          <!-- Total -->
+      <!-- Resumen de Pago - Bloque Limpio -->
+      <div style="background-color: #f0f4f8; border-radius: 14px; padding: 28px; margin-bottom: 32px; border-left: 5px solid #3B82F6;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 28px;">
           <div>
-            <div style="font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 600; margin-bottom: 8px; letter-spacing: 0.5px;">
+            <div style="font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 700; margin-bottom: 10px; letter-spacing: 0.8px;">
               Total a Pagar
             </div>
-            <div style="font-size: 32px; font-weight: 800; color: #3B82F6;">
+            <div style="font-size: 36px; font-weight: 800; color: #3B82F6; line-height: 1;">
               $${Number(venta.total).toLocaleString('es-CO')}
             </div>
           </div>
-          <!-- Método de Pago -->
-          <div>
-            <div style="font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 600; margin-bottom: 8px; letter-spacing: 0.5px;">
+          <div style="border-left: 2px solid #e2e8f0; padding-left: 28px;">
+            <div style="font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 700; margin-bottom: 10px; letter-spacing: 0.8px;">
               Método de Pago
             </div>
-            <div style="font-size: 16px; font-weight: 700; color: #1e293b;">
+            <div style="font-size: 16px; font-weight: 700; color: #1e293b; line-height: 1.4;">
               ${venta.metodoPago}
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Mensaje Personalizado -->
-      <div style="background-color: #eff6ff; border-radius: 8px; padding: 16px; border-left: 4px solid #3B82F6; margin-bottom: 32px;">
-        <p style="margin: 0; font-size: 13px; color: #1e293b; line-height: 1.6; font-weight: 500;">
+      <!-- Mensaje Informativo -->
+      <div style="background-color: #f0fdf4; border-left: 5px solid #22C55E; border-radius: 8px; padding: 18px; margin-bottom: 32px;">
+        <p style="margin: 0; font-size: 13px; color: #166534; line-height: 1.6; font-weight: 500;">
           ${
             esAdmin
-              ? '<strong>Esta es una notificación de venta.</strong> Revisa los detalles en tu panel de administración para actualizar estados de pedidos, inventario y análisis de ventas.'
-              : '<strong>Gracias por tu compra.</strong> Si tienes preguntas o necesitas ayuda con tu pedido, no dudes en contactar a nuestro equipo de soporte. Estamos aquí para ayudarte.'
+              ? '<strong>Notificación de venta registrada.</strong> Accede a tu panel de administración para gestionar estados, inventario y análisis de ventas en tiempo real.'
+              : '<strong>Tu compra ha sido confirmada.</strong> Si necesitas ayuda o tienes preguntas sobre tu pedido, nuestro equipo de soporte está disponible para asistirte.'
           }
         </p>
       </div>
 
     </div>
 
-    <!-- Footer -->
-    <div style="background-color: #f8fafc; padding: 32px 30px; text-align: center; border-top: 1px solid #e2e8f0;">
-      <div style="margin-bottom: 20px;">
-        <p style="margin: 0 0 8px 0; font-size: 12px; color: #475569; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
-          Centrala ERP
+    <!-- Footer Profesional -->
+    <div style="background-color: #f8fafc; padding: 36px 30px; border-top: 1px solid #e5e7eb; text-align: center;">
+      <div style="margin-bottom: 24px;">
+        <p style="margin: 0 0 12px 0; font-size: 13px; color: #1e293b; font-weight: 700; letter-spacing: 0.5px;">
+          CENTRALA ERP
         </p>
         <p style="margin: 0; font-size: 13px; color: #64748b; line-height: 1.8; font-weight: 500;">
-          Sistema integral de gestión empresarial<br>
-          <strong style="color: #1e293b;">www.centrala.com.co</strong><br>
-          <strong style="color: #1e293b;">Soporte: +57 (300) XXXXX</strong>
+          Sistema profesional de gestión empresarial<br>
+          <strong style="color: #0f172a;">www.centrala.com.co</strong>
         </p>
       </div>
-      <div style="border-top: 1px solid #e2e8f0; padding-top: 16px; font-size: 11px; color: #94a3b8;">
-        <p style="margin: 0;">
+      <div style="border-top: 1px solid #e5e7eb; padding-top: 16px;">
+        <p style="margin: 0; font-size: 11px; color: #94a3b8; line-height: 1.6;">
           © 2026 Centrala ERP. Todos los derechos reservados.<br>
-          <em>Este correo fue enviado automáticamente. Por favor no respondas a este mensaje.</em>
+          <em>Correo automatizado. Por favor, no respondas a este mensaje.</em>
         </p>
       </div>
     </div>
 
   </div>
 
-  <!-- Espaciador inferior -->
-  <div style="height: 20px;"></div>
-
 </body>
 </html>
 `;
 
-  await enviarCorreo(emailDestino, `${esAdmin ? '📊 Nueva Venta Registrada' : '✅ Tu Compra'} - #${venta.consecutivo}`, html);
+  await enviarCorreo(emailDestino, `${esAdmin ? 'Nueva Venta Registrada' : 'Tu Compra Confirmada'} - #${venta.consecutivo}`, html);
 }
