@@ -13,7 +13,8 @@
     "prisma:generate": "prisma generate",
     "prisma:studio": "prisma studio",
     "seed:lifetime": "tsx src/scripts/createLifetimeUser.ts",
-    "emergency:fix-schema": "tsx src/scripts/emergencyFixSchema.ts"
+    "emergency:fix-schema": "tsx src/scripts/emergencyFixSchema.ts",
+    "reset:test-user": "tsx src/scripts/resetTestUser.ts"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",
