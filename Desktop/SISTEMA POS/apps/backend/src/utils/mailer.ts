@@ -27,21 +27,43 @@ const transporter = nodemailer.createTransport({
 
 // Función auxiliar para enviar correos (fire and forget)
 async function enviarCorreo(destinatario: string, asunto: string, html: string): Promise<void> {
+  console.log(`\n[NODEMAILER DEBUG] Intentando enviar email...`);
+  console.log(`  → Destinatario: ${destinatario}`);
+  console.log(`  → Asunto: ${asunto}`);
+
   if (!EMAIL_FROM) {
-    console.warn('EMAIL_FROM not configured, skipping email send');
+    console.warn('❌ EMAIL_FROM not configured, skipping email send');
+    return;
+  }
+
+  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
+    console.warn('❌ SMTP configuration incomplete:', {
+      SMTP_HOST: SMTP_HOST ? '✓' : '✗',
+      SMTP_USER: SMTP_USER ? '✓' : '✗',
+      SMTP_PASS: SMTP_PASS ? '✓' : '✗',
+      SMTP_PORT: SMTP_PORT,
+    });
     return;
   }
 
   try {
-    await transporter.sendMail({
+    console.log(`  → Conectando a SMTP: ${SMTP_HOST}:${SMTP_PORT}...`);
+    const resultado = await transporter.sendMail({
       from: EMAIL_FROM,
       to: destinatario,
       subject: asunto,
       html: html,
     });
-    console.log(`✅ Email enviado a: ${destinatario}`);
-  } catch (error) {
-    console.error(`❌ Error enviando email a ${destinatario}:`, error);
+    console.log(`✅ Email enviado exitosamente`);
+    console.log(`  → Message ID: ${resultado.messageId}`);
+    console.log(`[NODEMAILER DEBUG] ✅ Completado\n`);
+  } catch (error: any) {
+    console.error(`\n❌ ERROR AL ENVIAR EMAIL DE VENTA:`);
+    console.error(`  → Destinatario: ${destinatario}`);
+    console.error(`  → Error Type: ${error?.code || error?.name || 'Unknown'}`);
+    console.error(`  → Error Message: ${error?.message}`);
+    console.error(`  → Full Error:`, error);
+    console.error(`[NODEMAILER DEBUG] ❌ Error completado\n`);
     // NO lanzes la excepción - el sistema debe continuar funcionando
   }
 }

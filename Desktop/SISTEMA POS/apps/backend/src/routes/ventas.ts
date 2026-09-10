@@ -530,13 +530,29 @@ export async function ventasRoutes(app: FastifyInstance) {
     // Fire and forget - enviar correos de venta en paralelo
     const emailsAEnviar: Promise<void>[] = [];
 
+    // 🔍 LOGGING DIAGNOSTICO
+    console.log("\n[VENTAS EMAIL DEBUG]");
+    console.log("--> Venta registrada con clienteId:", clienteId);
+    console.log("--> Venta ID:", venta.id);
+    console.log("--> Venta Consecutivo:", venta.consecutivo);
+    console.log("--> SMTP Config check:", {
+      SMTP_HOST: process.env.SMTP_HOST,
+      SMTP_PORT: process.env.SMTP_PORT,
+      SMTP_USER: process.env.SMTP_USER,
+      EMAIL_FROM: process.env.EMAIL_FROM
+    });
+
     // Si la venta tiene cliente con email, enviar al cliente
     if (clienteId) {
       const cliente = await prisma.cliente.findUnique({
         where: { id: clienteId },
-        select: { email: true }
+        select: { email: true, nombre: true }
       });
+      console.log("--> Cliente encontrado:", cliente);
+      console.log("--> Datos del cliente para email:", cliente?.email);
+
       if (cliente?.email) {
+        console.log(`--> 📧 Encolando email para cliente: ${cliente.email}`);
         emailsAEnviar.push(
           enviarCorreoVenta(
             {
@@ -548,17 +564,26 @@ export async function ventasRoutes(app: FastifyInstance) {
             },
             cliente.email,
             false
-          ).catch((err) => console.error('Error enviando correo al cliente:', err))
+          ).catch((err) => {
+            console.error('❌ Error enviando correo al cliente:', err);
+          })
         );
+      } else {
+        console.log("--> ⚠️ Cliente NO tiene email registrado");
       }
+    } else {
+      console.log("--> ℹ️ Venta sin cliente seleccionado");
     }
 
     // Si existe email de notificaciones, enviar al admin
     const empresaConfig = await prisma.empresa.findUnique({
       where: { id: empresaId },
-      select: { emailNotificacionesVentas: true }
+      select: { emailNotificacionesVentas: true, nombre: true }
     });
+    console.log("--> Email de notificaciones configurado:", empresaConfig?.emailNotificacionesVentas);
+
     if (empresaConfig?.emailNotificacionesVentas) {
+      console.log(`--> 📧 Encolando email para admin: ${empresaConfig.emailNotificacionesVentas}`);
       emailsAEnviar.push(
         enviarCorreoVenta(
           {
@@ -570,12 +595,18 @@ export async function ventasRoutes(app: FastifyInstance) {
           },
           empresaConfig.emailNotificacionesVentas,
           true
-        ).catch((err) => console.error('Error enviando correo al admin:', err))
+        ).catch((err) => {
+          console.error('❌ Error enviando correo al admin:', err);
+        })
       );
+    } else {
+      console.log("--> ℹ️ No hay email de notificaciones configurado");
     }
 
+    console.log(`--> Total emails a enviar: ${emailsAEnviar.length}`);
     // Enviar en paralelo sin bloquear
     Promise.all(emailsAEnviar).catch(() => {});
+    console.log("[VENTAS EMAIL DEBUG] ✅ Emails encolados\n");
 
     return reply.code(201).send({ ...venta, subtotal, puntosSaldo });
   });
