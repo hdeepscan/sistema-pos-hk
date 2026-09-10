@@ -95,7 +95,7 @@ export async function diagnosticRoutes(app: FastifyInstance) {
   });
 
   /**
-   * Endpoint de salud del SMTP
+   * Endpoint de salud del SMTP (con timeout para no bloquear)
    * GET /diagnostic/smtp-health
    */
   app.get("/diagnostic/smtp-health", async (request, reply) => {
@@ -108,33 +108,51 @@ export async function diagnosticRoutes(app: FastifyInstance) {
     const health: any = {
       configured: !!(SMTP_HOST && SMTP_USER && SMTP_PASS && EMAIL_FROM),
       variables: {
-        SMTP_HOST: !!SMTP_HOST,
+        SMTP_HOST: SMTP_HOST ? "***" : null,
         SMTP_PORT: SMTP_PORT,
-        SMTP_USER: !!SMTP_USER,
-        SMTP_PASS: !!SMTP_PASS,
-        EMAIL_FROM: !!EMAIL_FROM,
+        SMTP_USER: SMTP_USER ? "***" : null,
+        SMTP_PASS: SMTP_PASS ? "***" : null,
+        EMAIL_FROM: EMAIL_FROM || null,
       },
     };
 
-    if (health.configured) {
-      try {
-        const transporter = nodemailer.createTransport({
-          host: SMTP_HOST,
-          port: SMTP_PORT,
-          secure: true,
-          auth: { user: SMTP_USER, pass: SMTP_PASS },
-          tls: { rejectUnauthorized: false },
-        });
-
-        health.connection = await transporter.verify();
-        return reply.send(health);
-      } catch (err: any) {
-        health.connection = false;
-        health.error = err?.message;
-        return reply.code(500).send(health);
-      }
+    // Si no está configurado, responde inmediatamente
+    if (!health.configured) {
+      return reply.code(400).send({
+        ...health,
+        status: "UNCONFIGURED",
+        message: "Missing SMTP configuration variables",
+      });
     }
 
-    return reply.code(400).send(health);
+    // Verificación con timeout de 5 segundos
+    try {
+      const transporter = nodemailer.createTransport({
+        host: SMTP_HOST,
+        port: SMTP_PORT,
+        secure: true,
+        auth: { user: SMTP_USER, pass: SMTP_PASS },
+        tls: { rejectUnauthorized: false },
+        connectionUrl: `smtps://${SMTP_USER}:${SMTP_PASS}@${SMTP_HOST}:${SMTP_PORT}`,
+      });
+
+      // Usar Promise.race con timeout
+      const verifyWithTimeout = Promise.race([
+        transporter.verify(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("SMTP verify timeout")), 5000)
+        ),
+      ]);
+
+      const connection = await verifyWithTimeout;
+      health.connection = !!connection;
+      health.status = "OK";
+      return reply.send(health);
+    } catch (err: any) {
+      health.connection = false;
+      health.status = "ERROR";
+      health.error = err?.message || "Unknown error";
+      return reply.code(500).send(health);
+    }
   });
 }
