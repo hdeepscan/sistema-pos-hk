@@ -133,7 +133,6 @@ export async function diagnosticRoutes(app: FastifyInstance) {
         secure: true,
         auth: { user: SMTP_USER, pass: SMTP_PASS },
         tls: { rejectUnauthorized: false },
-        connectionUrl: `smtps://${SMTP_USER}:${SMTP_PASS}@${SMTP_HOST}:${SMTP_PORT}`,
       });
 
       // Usar Promise.race con timeout
