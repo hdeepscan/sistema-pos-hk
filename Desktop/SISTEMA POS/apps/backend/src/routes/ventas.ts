@@ -9,6 +9,7 @@ import { registrarAuditoria } from "../lib/auditoria.js";
 import { mensajeDeValidacion } from "../lib/errores.js";
 import { crearAsientoDesdeVenta } from "./contabilidad.js";
 import { enviarCorreoVenta } from "../utils/mailer.js";
+import { syncMultipleStocksToShopify } from "../lib/shopify-stock-sync.js";
 
 const MS_DIA = 24 * 60 * 60 * 1000;
 
@@ -621,6 +622,16 @@ export async function ventasRoutes(app: FastifyInstance) {
     // Enviar en paralelo sin bloquear
     Promise.all(emailsAEnviar).catch(() => {});
     console.log("[VENTAS EMAIL DEBUG] ✅ Emails encolados\n");
+
+    // 🔄 TRIGGER: Sincronizar stock a Shopify (fire-and-forget)
+    const productosAActualizar = venta.items
+      .map(item => item.productoId)
+      .filter(Boolean) as string[];
+
+    if (productosAActualizar.length > 0) {
+      console.log(`[SHOPIFY SYNC] Encolando sincronización de ${productosAActualizar.length} productos`);
+      void syncMultipleStocksToShopify(productosAActualizar, sucursalId);
+    }
 
     return reply.code(201).send({ ...venta, subtotal, puntosSaldo });
   });
