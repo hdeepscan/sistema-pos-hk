@@ -445,6 +445,7 @@ export async function shopifyRoutes(app: FastifyInstance) {
                   input: {
                     name: 'available',
                     reason: 'CENTRALA_POS_FORCE_UPDATE',
+                    ignoreCompareQuantity: true,
                     quantities: [
                       {
                         inventoryItemId: formatGid(producto.shopifyInventoryItemId!, 'InventoryItem'),

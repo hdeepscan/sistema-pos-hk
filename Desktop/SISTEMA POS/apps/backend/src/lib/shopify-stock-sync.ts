@@ -93,6 +93,7 @@ export async function syncProductStockToShopify(
       input: {
         name: "available",
         reason: "POS_STOCK_UPDATE",
+        ignoreCompareQuantity: true,
         quantities: [
           {
             inventoryItemId: formatGid(producto.shopifyInventoryItemId, 'InventoryItem'),
