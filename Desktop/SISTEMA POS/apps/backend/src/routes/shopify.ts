@@ -409,35 +409,27 @@ export async function shopifyRoutes(app: FastifyInstance) {
 
       const stockMap = new Map(inventarios.map(inv => [inv.productoId, inv.cantidad]));
 
-      // Preparar batch de actualizaciones para Shopify GraphQL con locationId y GIDs formateados
-      const cantidadesParaActualizar = productosConShopify.map(p => ({
-        inventoryItemId: formatGid(p.shopifyInventoryItemId!, 'InventoryItem'),
-        locationId: formatGid(location.shopifyLocationId, 'Location'),
-        quantity: stockMap.get(p.id) ?? 0,
-      }));
-
-      // Enviar a Shopify en batches (máximo 100 items por batch)
-      const BATCH_SIZE = 100;
+      // Procesar cada producto individualmente para evitar rollback de batch completo
       let productosActualizados = 0;
       let erroresDetalle: Array<{ producto: string; error: string }> = [];
 
-      for (let i = 0; i < cantidadesParaActualizar.length; i += BATCH_SIZE) {
-        const batch = cantidadesParaActualizar.slice(i, i + BATCH_SIZE);
-
-        try {
-          const mutation = `
-            mutation inventorySetQuantities($input: InventorySetQuantitiesInput!) {
-              inventorySetQuantities(input: $input) {
-                inventoryAdjustmentGroup {
-                  id
-                }
-                userErrors {
-                  field
-                  message
-                }
-              }
+      const mutation = `
+        mutation inventorySetQuantities($input: InventorySetQuantitiesInput!) {
+          inventorySetQuantities(input: $input) {
+            inventoryAdjustmentGroup {
+              id
             }
-          `;
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+      `;
+
+      for (const producto of productosConShopify) {
+        try {
+          const cantidad = stockMap.get(producto.id) ?? 0;
 
           const response = await fetch(
             `https://${config.shopDomain}/admin/api/2024-01/graphql.json`,
@@ -453,7 +445,13 @@ export async function shopifyRoutes(app: FastifyInstance) {
                   input: {
                     name: 'available',
                     reason: 'CENTRALA_POS_FORCE_UPDATE',
-                    quantities: batch,
+                    quantities: [
+                      {
+                        inventoryItemId: formatGid(producto.shopifyInventoryItemId!, 'InventoryItem'),
+                        locationId: formatGid(location.shopifyLocationId, 'Location'),
+                        quantity: cantidad,
+                      },
+                    ],
                   },
                 },
               }),
@@ -464,22 +462,22 @@ export async function shopifyRoutes(app: FastifyInstance) {
 
           if (data.errors || data.data?.inventorySetQuantities?.userErrors?.length) {
             const errores = data.errors || data.data?.inventorySetQuantities?.userErrors;
-            request.log.error(`[shopify-force-push] Error en batch ${Math.floor(i / BATCH_SIZE) + 1}: ${JSON.stringify(errores)}`);
+            request.log.warn(`[shopify-force-push] Advertencia para ${producto.nombre}: ${JSON.stringify(errores)}`);
 
             erroresDetalle.push({
-              producto: `Batch ${Math.floor(i / BATCH_SIZE) + 1}`,
-              error: JSON.stringify(errores).slice(0, 100),
+              producto: producto.nombre,
+              error: JSON.stringify(errores).slice(0, 150),
             });
           } else {
-            productosActualizados += batch.length;
-            request.log.info(`[shopify-force-push] Batch ${Math.floor(i / BATCH_SIZE) + 1} completado: ${batch.length} items`);
+            productosActualizados++;
+            request.log.info(`[shopify-force-push] ✅ ${producto.nombre}: ${cantidad} unidades sincronizadas`);
           }
         } catch (err) {
           const mensaje = err instanceof Error ? err.message : 'Error desconocido';
-          request.log.error(`[shopify-force-push] Error procesando batch: ${mensaje}`);
+          request.log.warn(`[shopify-force-push] Advertencia para ${producto.nombre}: ${mensaje}`);
           erroresDetalle.push({
-            producto: `Batch ${Math.floor(i / BATCH_SIZE) + 1}`,
-            error: mensaje,
+            producto: producto.nombre,
+            error: mensaje.slice(0, 150),
           });
         }
       }
