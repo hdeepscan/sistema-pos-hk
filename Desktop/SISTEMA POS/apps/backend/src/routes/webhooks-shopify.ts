@@ -16,7 +16,8 @@ function verificarFirmaWebhook(request: FastifyRequest, secret: string): boolean
   }
 
   // Crear cuerpo en buffer
-  const body = request.rawBody || Buffer.alloc(0);
+  const rawRequest = request as any;
+  const body = rawRequest.rawBody || Buffer.from(JSON.stringify(request.body));
 
   // Calcular HMAC
   const calculada = crypto
@@ -38,30 +39,14 @@ export async function webhooksShopifyRoutes(app: FastifyInstance) {
    * POST /webhooks/shopify/orders-create
    * Se ejecuta cuando se crea una orden en Shopify
    */
-  app.post<{
-    Body: {
-      id: number;
-      shop: { name: string; myshopify_domain: string };
-      line_items: Array<{
-        id: number;
-        sku?: string;
-        variant_id: number;
-        quantity: number;
-        title: string;
-      }>;
-      total_price: string;
-      currency: string;
-      created_at: string;
-    };
-  }>('/webhooks/shopify/orders-create', async (request: FastifyRequest, reply: FastifyReply) => {
+  app.post('/webhooks/shopify/orders-create', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const shopDomain = request.headers['x-shopify-shop-api-version']
-        ? (request.body.shop?.myshopify_domain || 'desconocido')
-        : 'desconocido';
+      const body: any = request.body;
+      const shopDomain = body.shop?.myshopify_domain || 'desconocido';
 
       console.log(`[webhooks-shopify/orders-create] 📦 Orden recibida de ${shopDomain}`);
-      console.log(`[webhooks-shopify/orders-create] Order ID: ${request.body.id}`);
-      console.log(`[webhooks-shopify/orders-create] Items: ${request.body.line_items.length}`);
+      console.log(`[webhooks-shopify/orders-create] Order ID: ${body.id}`);
+      console.log(`[webhooks-shopify/orders-create] Items: ${body.line_items?.length || 0}`);
 
       // 1. Verificar firma HMAC
       const secret = process.env.SHOPIFY_WEBHOOK_SECRET;
@@ -80,13 +65,13 @@ export async function webhooksShopifyRoutes(app: FastifyInstance) {
 
       // 2. Buscar empresa por dominio Shopify
       const shopifyConfig = await prisma.shopifyConfig.findFirst({
-        where: { shopDomain: request.body.shop?.myshopify_domain || '' },
+        where: { shopDomain: body.shop?.myshopify_domain || '' },
         select: { empresaId: true, shopDomain: true },
       });
 
       if (!shopifyConfig) {
         console.warn(
-          `[webhooks-shopify] ⚠️ No se encontró empresa para dominio: ${request.body.shop?.myshopify_domain}`
+          `[webhooks-shopify] ⚠️ No se encontró empresa para dominio: ${body.shop?.myshopify_domain}`
         );
         // Retornar 200 de todas formas para no reintentar
         return reply.code(200).send({ ok: true, warning: 'Empresa no encontrada' });
@@ -95,7 +80,7 @@ export async function webhooksShopifyRoutes(app: FastifyInstance) {
       console.log(`[webhooks-shopify] Empresa encontrada: ${shopifyConfig.empresaId}`);
 
       // 3. Convertir line_items al formato esperado
-      const lineItems = request.body.line_items.map((item) => ({
+      const lineItems = (body.line_items || []).map((item: any) => ({
         sku: item.sku,
         variantId: String(item.variant_id),
         quantity: item.quantity,
@@ -119,8 +104,11 @@ export async function webhooksShopifyRoutes(app: FastifyInstance) {
         data: {
           empresaId: shopifyConfig.empresaId,
           tipo: 'orders/create',
-          respuestaAPI: JSON.stringify(request.body),
-          resultado: JSON.stringify(resultado),
+          shopifyResourceId: String(body.id),
+          shopifyResourceGid: body.admin_graphql_api_id || undefined,
+          datos: JSON.stringify(body),
+          procesado: resultado.errores.length === 0,
+          procesoError: resultado.errores.length > 0 ? resultado.errores.join('; ') : undefined,
         },
       }).catch((err) => {
         console.error('[webhooks-shopify] Error registrando evento:', err);
@@ -146,10 +134,9 @@ export async function webhooksShopifyRoutes(app: FastifyInstance) {
    * POST /webhooks/shopify/orders-updated
    * Se ejecuta cuando se actualiza una orden (cambios de dirección, etc)
    */
-  app.post<{
-    Body: any;
-  }>('/webhooks/shopify/orders-updated', async (request: FastifyRequest, reply: FastifyReply) => {
+  app.post('/webhooks/shopify/orders-updated', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
+      const body: any = request.body;
       console.log('[webhooks-shopify/orders-updated] 📝 Orden actualizada');
 
       const secret = process.env.SHOPIFY_WEBHOOK_SECRET;
@@ -162,7 +149,8 @@ export async function webhooksShopifyRoutes(app: FastifyInstance) {
         data: {
           empresaId: 'unknown', // Se puede mejorar extrayendo del body
           tipo: 'orders/updated',
-          respuestaAPI: JSON.stringify(request.body),
+          shopifyResourceId: String(body.id || 'unknown'),
+          datos: JSON.stringify(body),
         },
       }).catch(() => {});
 
@@ -177,10 +165,9 @@ export async function webhooksShopifyRoutes(app: FastifyInstance) {
    * POST /webhooks/shopify/products-create
    * Se ejecuta cuando se crea un producto en Shopify (para futuros features)
    */
-  app.post<{
-    Body: any;
-  }>('/webhooks/shopify/products-create', async (request: FastifyRequest, reply: FastifyReply) => {
+  app.post('/webhooks/shopify/products-create', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
+      const body: any = request.body;
       console.log('[webhooks-shopify/products-create] 🆕 Producto creado');
 
       const secret = process.env.SHOPIFY_WEBHOOK_SECRET;
@@ -193,7 +180,8 @@ export async function webhooksShopifyRoutes(app: FastifyInstance) {
         data: {
           empresaId: 'unknown',
           tipo: 'products/create',
-          respuestaAPI: JSON.stringify(request.body),
+          shopifyResourceId: String(body.id || 'unknown'),
+          datos: JSON.stringify(body),
         },
       }).catch(() => {});
 
