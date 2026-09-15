@@ -435,7 +435,7 @@ export async function shopifyRoutes(app: FastifyInstance) {
 
           if (data.errors || data.data?.inventorySetQuantities?.userErrors?.length) {
             const errores = data.errors || data.data?.inventorySetQuantities?.userErrors;
-            request.log.error(`[shopify-force-push] Error en batch ${Math.floor(i / BATCH_SIZE) + 1}:`, errores);
+            request.log.error(`[shopify-force-push] Error en batch ${Math.floor(i / BATCH_SIZE) + 1}: ${JSON.stringify(errores)}`);
 
             erroresDetalle.push({
               producto: `Batch ${Math.floor(i / BATCH_SIZE) + 1}`,
@@ -447,7 +447,7 @@ export async function shopifyRoutes(app: FastifyInstance) {
           }
         } catch (err) {
           const mensaje = err instanceof Error ? err.message : 'Error desconocido';
-          request.log.error(`[shopify-force-push] Error procesando batch:`, mensaje);
+          request.log.error(`[shopify-force-push] Error procesando batch: ${mensaje}`);
           erroresDetalle.push({
             producto: `Batch ${Math.floor(i / BATCH_SIZE) + 1}`,
             error: mensaje,
@@ -478,7 +478,7 @@ export async function shopifyRoutes(app: FastifyInstance) {
       });
     } catch (error) {
       const mensaje = error instanceof Error ? error.message : 'Error desconocido';
-      request.log.error(`[shopify-force-push] Error crítico:`, mensaje);
+      request.log.error(`[shopify-force-push] Error crítico: ${mensaje}`);
       return reply.code(500).send({ error: mensaje });
     }
   });
