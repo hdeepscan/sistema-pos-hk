@@ -327,6 +327,162 @@ export async function shopifyRoutes(app: FastifyInstance) {
     }
   });
 
+  // Forzar sincronización de inventario: Centrala POS → Shopify
+  app.post("/shopify/force-push-inventory", async (request, reply) => {
+    const { empresaId } = request.user;
+
+    try {
+      request.log.info(`[shopify-force-push] Iniciando force-push de inventario para empresa ${empresaId}`);
+
+      // Obtener configuración de Shopify
+      const config = await prisma.shopifyConfig.findUnique({
+        where: { empresaId },
+        select: { shopDomain: true, accessToken: true, sucursalEcommerceId: true },
+      });
+
+      if (!config?.accessToken) {
+        return reply.code(400).send({ error: "Tienda Shopify no conectada. Realiza la conexión primero." });
+      }
+
+      // Obtener todos los productos con inventoryItemId en Shopify
+      const productosConShopify = await prisma.producto.findMany({
+        where: {
+          empresaId,
+          shopifyInventoryItemId: { not: null },
+        },
+        select: {
+          id: true,
+          nombre: true,
+          shopifyInventoryItemId: true,
+        },
+      });
+
+      request.log.info(`[shopify-force-push] Encontrados ${productosConShopify.length} productos para sincronizar`);
+
+      if (productosConShopify.length === 0) {
+        return reply.code(200).send({
+          exito: true,
+          productosActualizados: 0,
+          mensaje: "No hay productos vinculados a Shopify",
+        });
+      }
+
+      // Obtener stock actual de cada producto en la sucursal ecommerce
+      const inventarios = await prisma.inventarioSucursal.findMany({
+        where: {
+          sucursalId: config.sucursalEcommerceId,
+          productoId: { in: productosConShopify.map(p => p.id) },
+        },
+        select: {
+          productoId: true,
+          cantidad: true,
+        },
+      });
+
+      const stockMap = new Map(inventarios.map(inv => [inv.productoId, inv.cantidad]));
+
+      // Preparar batch de actualizaciones para Shopify GraphQL
+      const cantidadesParaActualizar = productosConShopify.map(p => ({
+        inventoryItemId: p.shopifyInventoryItemId!,
+        availableQuantity: stockMap.get(p.id) ?? 0,
+      }));
+
+      // Enviar a Shopify en batches (máximo 100 items por batch)
+      const BATCH_SIZE = 100;
+      let productosActualizados = 0;
+      let erroresDetalle: Array<{ producto: string; error: string }> = [];
+
+      for (let i = 0; i < cantidadesParaActualizar.length; i += BATCH_SIZE) {
+        const batch = cantidadesParaActualizar.slice(i, i + BATCH_SIZE);
+
+        try {
+          const mutation = `
+            mutation inventorySetQuantities($input: InventorySetQuantitiesInput!) {
+              inventorySetQuantities(input: $input) {
+                inventoryItems {
+                  id
+                  sku
+                }
+                userErrors {
+                  field
+                  message
+                }
+              }
+            }
+          `;
+
+          const response = await fetch(
+            `https://${config.shopDomain}/admin/api/2024-01/graphql.json`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Shopify-Access-Token': config.accessToken,
+              },
+              body: JSON.stringify({
+                query: mutation,
+                variables: {
+                  input: {
+                    reason: 'CENTRALA_POS_FORCE_UPDATE',
+                    quantities: batch,
+                  },
+                },
+              }),
+            }
+          );
+
+          const data: any = await response.json();
+
+          if (data.errors || data.data?.inventorySetQuantities?.userErrors?.length) {
+            const errores = data.errors || data.data?.inventorySetQuantities?.userErrors;
+            request.log.error(`[shopify-force-push] Error en batch ${Math.floor(i / BATCH_SIZE) + 1}:`, errores);
+
+            erroresDetalle.push({
+              producto: `Batch ${Math.floor(i / BATCH_SIZE) + 1}`,
+              error: JSON.stringify(errores).slice(0, 100),
+            });
+          } else {
+            productosActualizados += batch.length;
+            request.log.info(`[shopify-force-push] Batch ${Math.floor(i / BATCH_SIZE) + 1} completado: ${batch.length} items`);
+          }
+        } catch (err) {
+          const mensaje = err instanceof Error ? err.message : 'Error desconocido';
+          request.log.error(`[shopify-force-push] Error procesando batch:`, mensaje);
+          erroresDetalle.push({
+            producto: `Batch ${Math.floor(i / BATCH_SIZE) + 1}`,
+            error: mensaje,
+          });
+        }
+      }
+
+      // Registrar en auditoría
+      await prisma.shopifyWebhookEvent.create({
+        data: {
+          empresaId,
+          tipo: 'force_push_inventory',
+          shopifyResourceId: 'bulk_update',
+          datos: JSON.stringify({
+            productosActualizados,
+            totalProductos: productosConShopify.length,
+            timestamp: new Date().toISOString(),
+          }),
+        },
+      }).catch(() => {});
+
+      return reply.code(200).send({
+        exito: true,
+        productosActualizados,
+        totalProductos: productosConShopify.length,
+        erroresDetalle: erroresDetalle.length > 0 ? erroresDetalle : undefined,
+        mensaje: `✅ ${productosActualizados} productos sincronizados correctamente`,
+      });
+    } catch (error) {
+      const mensaje = error instanceof Error ? error.message : 'Error desconocido';
+      request.log.error(`[shopify-force-push] Error crítico:`, mensaje);
+      return reply.code(500).send({ error: mensaje });
+    }
+  });
+
   // Procesar cola de sincronización (FASE 4)
   app.post("/shopify/procesar-cola", async (request, reply) => {
     const { empresaId } = request.user;

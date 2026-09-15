@@ -27,6 +27,8 @@ export default function ShopifySetupWizard() {
   // Paso 2: Mapeo e Importación
   const [importando, setImportando] = useState(false);
   const [tokenValido, setTokenValido] = useState(false);
+  const [forzandoPush, setForzandoPush] = useState(false);
+  const [resultadoPush, setResultadoPush] = useState<any>(null);
 
   // Paso 3: Automatización
   const [sincronizacionActiva, setSincronizacionActiva] = useState(false);
@@ -100,6 +102,20 @@ export default function ShopifySetupWizard() {
       setError(err.response?.data?.error || 'Error importando productos');
     } finally {
       setImportando(false);
+    }
+  };
+
+  const handleForzarPushInventario = async () => {
+    try {
+      setForzandoPush(true);
+      setError(null);
+      const { data } = await api.post('/shopify/force-push-inventory');
+      setResultadoPush(data);
+      setMensaje(`✅ ${data.productosActualizados}/${data.totalProductos} productos sincronizados`);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Error forzando push de inventario');
+    } finally {
+      setForzandoPush(false);
     }
   };
 
@@ -275,11 +291,44 @@ export default function ShopifySetupWizard() {
               </Button>
 
               <Button
+                onClick={handleForzarPushInventario}
+                disabled={forzandoPush}
+                className="w-full bg-orange-600 hover:bg-orange-700 text-white py-3"
+              >
+                {forzandoPush ? (
+                  <>
+                    <Spinner className="mr-2" size="sm" />
+                    Sincronizando...
+                  </>
+                ) : (
+                  <>
+                    🔄 Forzar Stock de Centrala ➔ Shopify
+                  </>
+                )}
+              </Button>
+
+              <Button
                 variant="outline"
                 className="w-full py-3"
               >
                 Vincular por SKU
               </Button>
+
+              {resultadoPush && (
+                <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                  <p className="text-sm text-green-900 dark:text-green-200">
+                    <strong>✅ Resultado:</strong> {resultadoPush.productosActualizados}/{resultadoPush.totalProductos} productos sincronizados
+                  </p>
+                  {resultadoPush.erroresDetalle?.length > 0 && (
+                    <div className="mt-2 text-xs text-orange-800 dark:text-orange-200">
+                      <strong>Advertencias:</strong>
+                      {resultadoPush.erroresDetalle.map((err: any, i: number) => (
+                        <div key={i}>• {err.producto}: {err.error}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
