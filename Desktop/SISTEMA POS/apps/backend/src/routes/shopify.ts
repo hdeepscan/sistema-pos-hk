@@ -444,7 +444,7 @@ export async function shopifyRoutes(app: FastifyInstance) {
                 variables: {
                   input: {
                     name: 'available',
-                    reason: 'CENTRALA_POS_FORCE_UPDATE',
+                    reason: 'correction',
                     ignoreCompareQuantity: true,
                     quantities: [
                       {

@@ -92,7 +92,7 @@ export async function syncProductStockToShopify(
     const variables = {
       input: {
         name: "available",
-        reason: "POS_STOCK_UPDATE",
+        reason: "correction",
         ignoreCompareQuantity: true,
         quantities: [
           {
