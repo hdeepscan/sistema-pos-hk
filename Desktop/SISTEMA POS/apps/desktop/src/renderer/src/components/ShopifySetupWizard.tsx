@@ -420,6 +420,20 @@ export default function ShopifySetupWizard() {
           >
             <strong>⚙️ Próximo paso:</strong> Después de importar, podrás activar la sincronización automática en tiempo real.
           </div>
+
+          <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              onClick={() => setPaso(3)}
+              style={{
+                ...buttonStyle,
+                backgroundColor: '#a855f7',
+                color: 'white',
+                width: 'auto',
+              }}
+            >
+              Continuar al Paso 3 <ArrowRight size={18} />
+            </button>
+          </div>
         </div>
       )}
 
