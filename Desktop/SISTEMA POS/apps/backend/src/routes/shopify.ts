@@ -462,12 +462,25 @@ export async function shopifyRoutes(app: FastifyInstance) {
           const data: any = await response.json();
 
           if (data.errors || data.data?.inventorySetQuantities?.userErrors?.length) {
-            const errores = data.errors || data.data?.inventorySetQuantities?.userErrors;
-            request.log.warn(`[shopify-force-push] Advertencia para ${producto.nombre}: ${JSON.stringify(errores)}`);
+            let mensajeError = "Error desconocido de Shopify";
+            const userErrors = data.data?.inventorySetQuantities?.userErrors;
+
+            if (userErrors && userErrors.length > 0) {
+              mensajeError = userErrors.map((e: any) => {
+                if (e.message.includes("could not be found")) {
+                  return "El producto ya no existe en Shopify (fue eliminado).";
+                }
+                return e.message;
+              }).join(" | ");
+            } else if (data.errors) {
+              mensajeError = data.errors[0]?.message || "Error interno de GraphQL";
+            }
+
+            request.log.warn(`[shopify-force-push] Advertencia para ${producto.nombre}: ${mensajeError}`);
 
             erroresDetalle.push({
               producto: producto.nombre,
-              error: JSON.stringify(errores).slice(0, 150),
+              error: mensajeError,
             });
           } else {
             productosActualizados++;
