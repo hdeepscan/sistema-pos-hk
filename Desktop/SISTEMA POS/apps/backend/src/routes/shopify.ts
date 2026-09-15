@@ -16,6 +16,10 @@ function enmascarar(secreto: string) {
   return secreto.length <= 4 ? "****" : `${"*".repeat(secreto.length - 4)}${secreto.slice(-4)}`;
 }
 
+function formatGid(id: string, resource: string): string {
+  return id.includes('gid://') ? id : `gid://shopify/${resource}/${id}`;
+}
+
 export async function shopifyRoutes(app: FastifyInstance) {
   // OAuth 2.0: Callback - NO requiere autenticación
   // IMPORTANTE: Registrar ANTES del hook de autenticación
@@ -405,10 +409,10 @@ export async function shopifyRoutes(app: FastifyInstance) {
 
       const stockMap = new Map(inventarios.map(inv => [inv.productoId, inv.cantidad]));
 
-      // Preparar batch de actualizaciones para Shopify GraphQL con locationId
+      // Preparar batch de actualizaciones para Shopify GraphQL con locationId y GIDs formateados
       const cantidadesParaActualizar = productosConShopify.map(p => ({
-        inventoryItemId: p.shopifyInventoryItemId!,
-        locationId: location.shopifyLocationId,
+        inventoryItemId: formatGid(p.shopifyInventoryItemId!, 'InventoryItem'),
+        locationId: formatGid(location.shopifyLocationId, 'Location'),
         quantity: stockMap.get(p.id) ?? 0,
       }));
 

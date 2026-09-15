@@ -1,5 +1,9 @@
 import { prisma } from './prisma.js';
 
+function formatGid(id: string, resource: string): string {
+  return id.includes('gid://') ? id : `gid://shopify/${resource}/${id}`;
+}
+
 /**
  * Sincroniza el stock de un producto POS hacia Shopify
  * Función de fuego y olvido (fire-and-forget) - no bloquea la venta
@@ -91,8 +95,8 @@ export async function syncProductStockToShopify(
         reason: "POS_STOCK_UPDATE",
         quantities: [
           {
-            inventoryItemId: producto.shopifyInventoryItemId,
-            locationId: location.shopifyLocationId,
+            inventoryItemId: formatGid(producto.shopifyInventoryItemId, 'InventoryItem'),
+            locationId: formatGid(location.shopifyLocationId, 'Location'),
             quantity: cantidadActual,
           },
         ],
