@@ -128,7 +128,9 @@ export async function shopifyRoutes(app: FastifyInstance) {
     });
     if (!sucursal) return reply.code(404).send({ error: "Sucursal no encontrada" });
 
-    const shopDomain = normalizarDominio(parsed.data.shopDomain);
+    let shopDomain = normalizarDominio(parsed.data.shopDomain);
+    // Limpiar duplicaciones de .myshopify.com
+    shopDomain = shopDomain.replace(/(\.myshopify\.com)+$/i, '') + '.myshopify.com';
     const problemaDominio = validarDominioShopify(shopDomain);
     if (problemaDominio) return reply.code(400).send({ error: problemaDominio });
 
@@ -334,14 +336,36 @@ export async function shopifyRoutes(app: FastifyInstance) {
     try {
       request.log.info(`[shopify-force-push] Iniciando force-push de inventario para empresa ${empresaId}`);
 
-      // Obtener configuración de Shopify
-      const config = await prisma.shopifyConfig.findUnique({
+      // Obtener configuración de Shopify y limpiar dominio
+      let config = await prisma.shopifyConfig.findUnique({
         where: { empresaId },
-        select: { shopDomain: true, accessToken: true, sucursalEcommerceId: true },
+        select: { shopDomain: true, accessToken: true, sucursalEcommerceId: true, id: true },
       });
 
       if (!config?.accessToken) {
         return reply.code(400).send({ error: "Tienda Shopify no conectada. Realiza la conexión primero." });
+      }
+
+      // Limpiar dominio si tiene duplicaciones
+      const domainLimpio = config.shopDomain.replace(/(\.myshopify\.com)+$/i, '') + '.myshopify.com';
+      if (domainLimpio !== config.shopDomain) {
+        await prisma.shopifyConfig.update({
+          where: { id: config.id },
+          data: { shopDomain: domainLimpio },
+        });
+        config = { ...config, shopDomain: domainLimpio };
+      }
+
+      // Obtener locationId válido (primera ubicación activa)
+      const location = await prisma.shopifyLocation.findFirst({
+        where: { empresaId, activa: true },
+        select: { shopifyLocationId: true },
+      });
+
+      if (!location?.shopifyLocationId) {
+        return reply.code(400).send({
+          error: "No hay ubicación (location) configurada en Shopify. Sincroniza primero con /shopify/sync-inicial"
+        });
       }
 
       // Obtener todos los productos con inventoryItemId en Shopify
@@ -381,10 +405,11 @@ export async function shopifyRoutes(app: FastifyInstance) {
 
       const stockMap = new Map(inventarios.map(inv => [inv.productoId, inv.cantidad]));
 
-      // Preparar batch de actualizaciones para Shopify GraphQL
+      // Preparar batch de actualizaciones para Shopify GraphQL con locationId
       const cantidadesParaActualizar = productosConShopify.map(p => ({
         inventoryItemId: p.shopifyInventoryItemId!,
-        availableQuantity: stockMap.get(p.id) ?? 0,
+        locationId: location.shopifyLocationId,
+        quantity: stockMap.get(p.id) ?? 0,
       }));
 
       // Enviar a Shopify en batches (máximo 100 items por batch)
@@ -422,6 +447,7 @@ export async function shopifyRoutes(app: FastifyInstance) {
                 query: mutation,
                 variables: {
                   input: {
+                    name: 'available',
                     reason: 'CENTRALA_POS_FORCE_UPDATE',
                     quantities: batch,
                   },

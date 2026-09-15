@@ -54,7 +54,23 @@ export async function syncProductStockToShopify(
 
     const cantidadActual = inventario?.cantidad ?? 0;
 
-    // 4. Enviar a Shopify GraphQL API
+    // 4. Obtener locationId válido (primera ubicación activa de la tienda)
+    const location = await prisma.shopifyLocation.findFirst({
+      where: {
+        empresaId: producto.empresaId,
+        activa: true,
+      },
+      select: { shopifyLocationId: true },
+    });
+
+    if (!location?.shopifyLocationId) {
+      console.error(
+        `[shopify-stock-sync] ❌ No hay ubicación (location) configurada en Shopify para empresa ${producto.empresaId}`
+      );
+      return;
+    }
+
+    // 5. Enviar a Shopify GraphQL API
     const mutation = `
       mutation inventorySetQuantities($input: InventorySetQuantitiesInput!) {
         inventorySetQuantities(input: $input) {
@@ -71,11 +87,13 @@ export async function syncProductStockToShopify(
 
     const variables = {
       input: {
+        name: "available",
         reason: "POS_STOCK_UPDATE",
         quantities: [
           {
             inventoryItemId: producto.shopifyInventoryItemId,
-            availableQuantity: cantidadActual,
+            locationId: location.shopifyLocationId,
+            quantity: cantidadActual,
           },
         ],
       },
@@ -107,7 +125,7 @@ export async function syncProductStockToShopify(
       `[shopify-stock-sync] ✅ Stock sincronizado para ${producto.nombre}: ${cantidadActual} unidades`
     );
 
-    // 5. Registrar en cola de sincronización para auditoría
+    // 6. Registrar en cola de sincronización para auditoría
     await prisma.shopifySyncQueue.create({
       data: {
         empresaId: producto.empresaId,
