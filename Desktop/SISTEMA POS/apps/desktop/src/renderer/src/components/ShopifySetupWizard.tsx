@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { api } from '../lib/api';
-import { Card, Button, Input, Select, Alert, Spinner } from '../components/ui';
 import { ArrowRight, Check, Zap, Link2, Settings } from 'lucide-react';
 
 type Paso = 1 | 2 | 3;
@@ -16,7 +15,6 @@ export default function ShopifySetupWizard() {
   const [paso, setPaso] = useState<Paso>(1);
   const [config, setConfig] = useState<ConfigShopify | null>(null);
   const [cargando, setCargando] = useState(true);
-  const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mensaje, setMensaje] = useState<string | null>(null);
 
@@ -26,7 +24,6 @@ export default function ShopifySetupWizard() {
 
   // Paso 2: Mapeo e Importación
   const [importando, setImportando] = useState(false);
-  const [tokenValido, setTokenValido] = useState(false);
   const [forzandoPush, setForzandoPush] = useState(false);
   const [resultadoPush, setResultadoPush] = useState<any>(null);
 
@@ -46,7 +43,6 @@ export default function ShopifySetupWizard() {
       setConfig(data);
       if (data.conectado) {
         setSubdominio(data.shopDomain || '');
-        setTokenValido(true);
         // Avanzar al siguiente paso si ya está conectado
         setPaso(2);
       }
@@ -74,9 +70,9 @@ export default function ShopifySetupWizard() {
 
       await api.post('/shopify/config', {
         shopDomain: dominio,
-        sucursalEcommerceId: '', // Será elegido en paso 2
-        clientId: '', // Backend los gestiona
-        clientSecret: '', // Backend los gestiona
+        sucursalEcommerceId: '',
+        clientId: '',
+        clientSecret: '',
       });
 
       // Iniciar OAuth
@@ -121,46 +117,110 @@ export default function ShopifySetupWizard() {
 
   if (cargando) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <Spinner />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+        <div>Cargando...</div>
       </div>
     );
   }
 
+  const baseStyle = {
+    padding: '24px',
+    maxWidth: '800px',
+    margin: '0 auto',
+    fontFamily: 'system-ui, -apple-system, sans-serif',
+  };
+
+  const titleStyle: React.CSSProperties = {
+    fontSize: '30px',
+    fontWeight: 'bold',
+    marginBottom: '8px',
+  };
+
+  const subtitleStyle: React.CSSProperties = {
+    fontSize: '16px',
+    color: '#666',
+    marginBottom: '32px',
+  };
+
+  const stepIndicatorStyle: React.CSSProperties = {
+    display: 'flex',
+    gap: '8px',
+    marginBottom: '32px',
+  };
+
+  const cardStyle: React.CSSProperties = {
+    border: '1px solid #ddd',
+    borderRadius: '8px',
+    padding: '32px',
+    marginTop: '24px',
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '8px 12px',
+    border: '1px solid #ddd',
+    borderRadius: '6px',
+    fontSize: '14px',
+    boxSizing: 'border-box',
+  };
+
+  const buttonStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '12px',
+    marginTop: '12px',
+    border: 'none',
+    borderRadius: '6px',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+  };
+
+  const alertStyle: React.CSSProperties = {
+    padding: '12px',
+    borderRadius: '6px',
+    marginBottom: '16px',
+    fontSize: '14px',
+  };
+
   return (
-    <div className="w-full max-w-2xl mx-auto p-6">
+    <div style={baseStyle}>
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-          Configuración de Shopify
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          Sincroniza tu tienda Shopify con Centrala POS en 3 pasos
-        </p>
-      </div>
+      <h1 style={titleStyle}>Configuración de Shopify</h1>
+      <p style={subtitleStyle}>Sincroniza tu tienda Shopify con Centrala POS en 3 pasos</p>
 
       {/* Indicador de Pasos */}
-      <div className="flex gap-2 mb-8">
+      <div style={stepIndicatorStyle}>
         {[1, 2, 3].map((p) => (
-          <div key={p} className="flex items-center gap-2">
+          <div key={p} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div
-              className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
-                p < paso
-                  ? 'bg-green-500 text-white'
-                  : p === paso
-                    ? 'bg-purple-600 text-white'
-                    : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-              }`}
+              style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                color: 'white',
+                backgroundColor:
+                  p < paso ? '#22c55e' : p === paso ? '#7c3aed' : '#ddd',
+              }}
             >
               {p < paso ? <Check size={20} /> : p}
             </div>
             {p < 3 && (
               <div
-                className={`w-8 h-1 ${
-                  p < paso
-                    ? 'bg-green-500'
-                    : 'bg-gray-200 dark:bg-gray-700'
-                }`}
+                style={{
+                  width: '32px',
+                  height: '4px',
+                  backgroundColor:
+                    p < paso ? '#22c55e' : '#ddd',
+                }}
               />
             )}
           </div>
@@ -168,289 +228,383 @@ export default function ShopifySetupWizard() {
       </div>
 
       {/* Mensajes */}
-      {error && <Alert type="error" className="mb-6">{error}</Alert>}
-      {mensaje && <Alert type="success" className="mb-6">{mensaje}</Alert>}
+      {error && (
+        <div style={{ ...alertStyle, backgroundColor: '#fee2e2', color: '#991b1b' }}>
+          {error}
+        </div>
+      )}
+      {mensaje && (
+        <div style={{ ...alertStyle, backgroundColor: '#dcfce7', color: '#166534' }}>
+          {mensaje}
+        </div>
+      )}
 
       {/* PASO 1: CONEXIÓN */}
       {paso === 1 && (
-        <Card className="p-8">
-          <div className="mb-6 flex items-start gap-4">
-            <div className="p-3 bg-purple-100 dark:bg-purple-900 rounded-lg">
-              <Link2 className="text-purple-600 dark:text-purple-400" size={24} />
+        <div style={cardStyle}>
+          <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
+            <div
+              style={{
+                padding: '12px',
+                backgroundColor: '#ede9fe',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              <Link2 size={24} color="#7c3aed" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+              <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '8px' }}>
                 Paso 1: Conecta tu tienda Shopify
               </h2>
-              <p className="text-gray-600 dark:text-gray-400">
+              <p style={{ fontSize: '14px', color: '#666' }}>
                 Autoriza a Centrala POS para acceder a tu tienda
               </p>
             </div>
           </div>
 
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Subdominio de tu tienda
-              </label>
-              <div className="flex gap-2">
-                <Input
-                  type="text"
-                  placeholder="mi-tienda"
-                  value={subdominio}
-                  onChange={(e) => setSubdominio(e.target.value)}
-                  className="flex-1"
-                />
-                <span className="flex items-center text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-3 rounded-lg">
-                  .myshopify.com
-                </span>
+          <div style={{ marginTop: '24px' }}>
+            <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>
+              Subdominio de tu tienda
+            </label>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input
+                type="text"
+                placeholder="mi-tienda"
+                value={subdominio}
+                onChange={(e) => setSubdominio(e.target.value)}
+                style={{ ...inputStyle, flex: 1 }}
+              />
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  color: '#666',
+                  backgroundColor: '#f3f4f6',
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                .myshopify.com
               </div>
-              <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
-                Por ejemplo: si tu tienda es "mi-tienda.myshopify.com", escribe "mi-tienda"
-              </p>
             </div>
+            <p style={{ fontSize: '12px', color: '#999', marginTop: '8px' }}>
+              Por ejemplo: si tu tienda es "mi-tienda.myshopify.com", escribe "mi-tienda"
+            </p>
 
-            <Button
+            <button
               onClick={handleConectarShopify}
               disabled={conectandoOAuth}
-              className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 font-semibold"
+              style={{
+                ...buttonStyle,
+                backgroundColor: '#7c3aed',
+                color: 'white',
+              }}
             >
-              {conectandoOAuth ? (
-                <>
-                  <Spinner className="mr-2" size="sm" />
-                  Conectando...
-                </>
-              ) : (
-                <>
-                  Conectar con Shopify
-                  <ArrowRight className="ml-2" size={18} />
-                </>
-              )}
-            </Button>
+              {conectandoOAuth ? 'Conectando...' : <>Conectar con Shopify</>}
+            </button>
 
-            <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-              <p className="text-sm text-blue-900 dark:text-blue-200">
-                <strong>ℹ️ Nota:</strong> Se abrirá una ventana de Shopify para que autorices la conexión.
-                Asegúrate de estar logged en tu cuenta de Shopify.
-              </p>
+            <div
+              style={{
+                backgroundColor: '#eff6ff',
+                border: '1px solid #bfdbfe',
+                borderRadius: '6px',
+                padding: '12px',
+                marginTop: '16px',
+                fontSize: '12px',
+                color: '#1e40af',
+              }}
+            >
+              <strong>ℹ️ Nota:</strong> Se abrirá una ventana de Shopify para que autorices la conexión.
+              Asegúrate de estar logged en tu cuenta de Shopify.
             </div>
           </div>
-        </Card>
+        </div>
       )}
 
       {/* PASO 2: MAPEO E IMPORTACIÓN */}
       {paso === 2 && (
-        <Card className="p-8">
-          <div className="mb-6 flex items-start gap-4">
-            <div className="p-3 bg-blue-100 dark:bg-blue-900 rounded-lg">
-              <Zap className="text-blue-600 dark:text-blue-400" size={24} />
+        <div style={cardStyle}>
+          <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
+            <div
+              style={{
+                padding: '12px',
+                backgroundColor: '#dbeafe',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              <Zap size={24} color="#2563eb" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+              <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '8px' }}>
                 Paso 2: Importa tus productos
               </h2>
-              <p className="text-gray-600 dark:text-gray-400">
+              <p style={{ fontSize: '14px', color: '#666' }}>
                 Vincula tu inventario de Shopify con Centrala POS
               </p>
             </div>
           </div>
 
-          <div className="space-y-6">
-            {/* Estado de Token */}
-            <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
-              <div className="flex items-center gap-2 text-green-900 dark:text-green-200">
-                <Check size={20} />
-                <span>
-                  <strong>Tienda conectada:</strong> {subdominio}.myshopify.com
-                </span>
-              </div>
+          <div style={{ backgroundColor: '#dcfce7', border: '1px solid #86efac', borderRadius: '6px', padding: '12px', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', gap: '8px', color: '#166534' }}>
+              <Check size={20} />
+              <span>
+                <strong>Tienda conectada:</strong> {subdominio}.myshopify.com
+              </span>
             </div>
+          </div>
 
-            {/* Opciones de importación */}
-            <div className="space-y-3">
-              <h3 className="font-semibold text-gray-900 dark:text-white">
-                Opciones de sincronización:
-              </h3>
+          <button
+            onClick={handleImportarProductos}
+            disabled={importando}
+            style={{
+              ...buttonStyle,
+              backgroundColor: '#2563eb',
+              color: 'white',
+            }}
+          >
+            {importando ? 'Importando...' : <>Importar Productos y Stock</>}
+          </button>
 
-              <Button
-                onClick={handleImportarProductos}
-                disabled={importando}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3"
-              >
-                {importando ? (
-                  <>
-                    <Spinner className="mr-2" size="sm" />
-                    Importando...
-                  </>
-                ) : (
-                  <>
-                    Importar Productos y Stock
-                    <ArrowRight className="ml-2" size={18} />
-                  </>
-                )}
-              </Button>
+          <button
+            onClick={handleForzarPushInventario}
+            disabled={forzandoPush}
+            style={{
+              ...buttonStyle,
+              backgroundColor: '#ea580c',
+              color: 'white',
+            }}
+          >
+            {forzandoPush ? 'Sincronizando...' : '🔄 Forzar Stock de Centrala ➔ Shopify'}
+          </button>
 
-              <Button
-                onClick={handleForzarPushInventario}
-                disabled={forzandoPush}
-                className="w-full bg-orange-600 hover:bg-orange-700 text-white py-3"
-              >
-                {forzandoPush ? (
-                  <>
-                    <Spinner className="mr-2" size="sm" />
-                    Sincronizando...
-                  </>
-                ) : (
-                  <>
-                    🔄 Forzar Stock de Centrala ➔ Shopify
-                  </>
-                )}
-              </Button>
-
-              <Button
-                variant="outline"
-                className="w-full py-3"
-              >
-                Vincular por SKU
-              </Button>
-
-              {resultadoPush && (
-                <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                  <p className="text-sm text-green-900 dark:text-green-200">
-                    <strong>✅ Resultado:</strong> {resultadoPush.productosActualizados}/{resultadoPush.totalProductos} productos sincronizados
-                  </p>
-                  {resultadoPush.erroresDetalle?.length > 0 && (
-                    <div className="mt-2 text-xs text-orange-800 dark:text-orange-200">
-                      <strong>Advertencias:</strong>
-                      {resultadoPush.erroresDetalle.map((err: any, i: number) => (
-                        <div key={i}>• {err.producto}: {err.error}</div>
-                      ))}
-                    </div>
-                  )}
+          {resultadoPush && (
+            <div
+              style={{
+                backgroundColor: '#dcfce7',
+                border: '1px solid #86efac',
+                borderRadius: '6px',
+                padding: '12px',
+                marginTop: '12px',
+                fontSize: '12px',
+                color: '#166534',
+              }}
+            >
+              <p>
+                <strong>✅ Resultado:</strong> {resultadoPush.productosActualizados}/{resultadoPush.totalProductos} productos sincronizados
+              </p>
+              {resultadoPush.erroresDetalle?.length > 0 && (
+                <div style={{ marginTop: '8px' }}>
+                  <strong>Advertencias:</strong>
+                  {resultadoPush.erroresDetalle.map((err: any, i: number) => (
+                    <div key={i}>• {err.producto}: {err.error}</div>
+                  ))}
                 </div>
               )}
             </div>
+          )}
 
-            <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
-              <p className="text-sm text-amber-900 dark:text-amber-200">
-                <strong>⚙️ Próximo paso:</strong> Después de importar, podrás activar la
-                sincronización automática en tiempo real.
-              </p>
-            </div>
+          <div
+            style={{
+              backgroundColor: '#fef3c7',
+              border: '1px solid #fcd34d',
+              borderRadius: '6px',
+              padding: '12px',
+              marginTop: '16px',
+              fontSize: '12px',
+              color: '#92400e',
+            }}
+          >
+            <strong>⚙️ Próximo paso:</strong> Después de importar, podrás activar la sincronización automática en tiempo real.
           </div>
-        </Card>
+        </div>
       )}
 
       {/* PASO 3: AUTOMATIZACIÓN */}
       {paso === 3 && (
-        <Card className="p-8">
-          <div className="mb-6 flex items-start gap-4">
-            <div className="p-3 bg-green-100 dark:bg-green-900 rounded-lg">
-              <Settings className="text-green-600 dark:text-green-400" size={24} />
+        <div style={cardStyle}>
+          <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
+            <div
+              style={{
+                padding: '12px',
+                backgroundColor: '#dcfce7',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              <Settings size={24} color="#22c55e" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+              <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '8px' }}>
                 Paso 3: Activa automatización
               </h2>
-              <p className="text-gray-600 dark:text-gray-400">
+              <p style={{ fontSize: '14px', color: '#666' }}>
                 Configura la sincronización en tiempo real
               </p>
             </div>
           </div>
 
-          <div className="space-y-6">
-            {/* Toggle 1: Sincronización de Stock */}
-            <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-semibold text-gray-900 dark:text-white">
-                    Sincronización de Stock en Tiempo Real
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    Cuando realizas una venta en POS, el stock se actualiza automáticamente en Shopify
-                  </p>
-                </div>
-                <label className="relative inline-block w-12 h-6 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={sincronizacionActiva}
-                    onChange={(e) => setSincronizacionActiva(e.target.checked)}
-                    className="sr-only"
-                  />
-                  <div className={`absolute inset-0 rounded-full transition-colors ${
-                    sincronizacionActiva ? 'bg-green-500' : 'bg-gray-300'
-                  }`} />
-                  <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                    sincronizacionActiva ? 'translate-x-6' : ''
-                  }`} />
-                </label>
+          {/* Toggle 1 */}
+          <div style={{ border: '1px solid #ddd', borderRadius: '6px', padding: '16px', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ fontWeight: '600', marginBottom: '4px' }}>
+                  Sincronización de Stock en Tiempo Real
+                </h3>
+                <p style={{ fontSize: '12px', color: '#666', margin: '4px 0 0 0' }}>
+                  Cuando realizas una venta en POS, el stock se actualiza automáticamente en Shopify
+                </p>
               </div>
+              <label style={{ position: 'relative', display: 'inline-block', width: '48px', height: '24px' }}>
+                <input
+                  type="checkbox"
+                  checked={sincronizacionActiva}
+                  onChange={(e) => setSincronizacionActiva(e.target.checked)}
+                  style={{ opacity: 0, width: 0, height: 0 }}
+                />
+                <div
+                  style={{
+                    position: 'absolute',
+                    cursor: 'pointer',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: sincronizacionActiva ? '#22c55e' : '#ccc',
+                    transition: 'background-color 0.3s',
+                    borderRadius: '24px',
+                  }}
+                />
+                <div
+                  style={{
+                    position: 'absolute',
+                    content: '',
+                    height: '16px',
+                    width: '16px',
+                    left: sincronizacionActiva ? '26px' : '4px',
+                    bottom: '4px',
+                    backgroundColor: 'white',
+                    transition: 'left 0.3s',
+                    borderRadius: '50%',
+                  }}
+                />
+              </label>
             </div>
-
-            {/* Toggle 2: Webhooks de Órdenes */}
-            <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-semibold text-gray-900 dark:text-white">
-                    Descuento Automático de Stock desde Web
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    Cuando se realiza una venta en Shopify, el stock se descuenta automáticamente en POS
-                  </p>
-                </div>
-                <label className="relative inline-block w-12 h-6 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={webhooksActivos}
-                    onChange={(e) => setWebhooksActivos(e.target.checked)}
-                    className="sr-only"
-                  />
-                  <div className={`absolute inset-0 rounded-full transition-colors ${
-                    webhooksActivos ? 'bg-green-500' : 'bg-gray-300'
-                  }`} />
-                  <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                    webhooksActivos ? 'translate-x-6' : ''
-                  }`} />
-                </label>
-              </div>
-            </div>
-
-            {/* Información del Webhook */}
-            <div className="bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 rounded-lg p-4">
-              <h4 className="font-semibold text-indigo-900 dark:text-indigo-200 mb-2">
-                🔗 URL del Webhook:
-              </h4>
-              <div className="bg-white dark:bg-gray-800 rounded p-3 font-mono text-sm text-gray-700 dark:text-gray-300 break-all">
-                https://sistema-pos-hk.up.railway.app/webhooks/shopify/orders-create
-              </div>
-              <p className="text-xs text-indigo-800 dark:text-indigo-300 mt-3">
-                Configura esta URL en tu panel de Shopify (Admin → Apps → Webhooks) para eventos
-                "Order Created" y "Order Updated".
-              </p>
-            </div>
-
-            {/* Estado Final */}
-            <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
-              <h4 className="font-semibold text-green-900 dark:text-green-200 mb-2">
-                ✅ Configuración completada
-              </h4>
-              <p className="text-sm text-green-800 dark:text-green-300">
-                Tu tienda Shopify está vinculada con Centrala POS. La sincronización bidireccional
-                está activa y lista para funcionar.
-              </p>
-            </div>
-
-            <Button
-              onClick={() => {
-                setMensaje(null);
-                setError(null);
-              }}
-              className="w-full bg-green-600 hover:bg-green-700 text-white py-3"
-            >
-              ✅ Completado - Volver al Dashboard
-            </Button>
           </div>
-        </Card>
+
+          {/* Toggle 2 */}
+          <div style={{ border: '1px solid #ddd', borderRadius: '6px', padding: '16px', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ fontWeight: '600', marginBottom: '4px' }}>
+                  Descuento Automático de Stock desde Web
+                </h3>
+                <p style={{ fontSize: '12px', color: '#666', margin: '4px 0 0 0' }}>
+                  Cuando se realiza una venta en Shopify, el stock se descuenta automáticamente en POS
+                </p>
+              </div>
+              <label style={{ position: 'relative', display: 'inline-block', width: '48px', height: '24px' }}>
+                <input
+                  type="checkbox"
+                  checked={webhooksActivos}
+                  onChange={(e) => setWebhooksActivos(e.target.checked)}
+                  style={{ opacity: 0, width: 0, height: 0 }}
+                />
+                <div
+                  style={{
+                    position: 'absolute',
+                    cursor: 'pointer',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: webhooksActivos ? '#22c55e' : '#ccc',
+                    transition: 'background-color 0.3s',
+                    borderRadius: '24px',
+                  }}
+                />
+                <div
+                  style={{
+                    position: 'absolute',
+                    content: '',
+                    height: '16px',
+                    width: '16px',
+                    left: webhooksActivos ? '26px' : '4px',
+                    bottom: '4px',
+                    backgroundColor: 'white',
+                    transition: 'left 0.3s',
+                    borderRadius: '50%',
+                  }}
+                />
+              </label>
+            </div>
+          </div>
+
+          {/* Webhook URL */}
+          <div
+            style={{
+              backgroundColor: '#eef2ff',
+              border: '1px solid #c7d2fe',
+              borderRadius: '6px',
+              padding: '12px',
+              marginBottom: '12px',
+            }}
+          >
+            <h4 style={{ color: '#4338ca', marginBottom: '8px' }}>🔗 URL del Webhook:</h4>
+            <div
+              style={{
+                backgroundColor: 'white',
+                borderRadius: '4px',
+                padding: '8px',
+                fontSize: '12px',
+                color: '#374151',
+                wordBreak: 'break-all',
+                fontFamily: 'monospace',
+              }}
+            >
+              https://sistema-pos-hk.up.railway.app/webhooks/shopify/orders-create
+            </div>
+            <p style={{ fontSize: '11px', color: '#4338ca', marginTop: '8px' }}>
+              Configura esta URL en tu panel de Shopify (Admin → Apps → Webhooks) para eventos
+              "Order Created" y "Order Updated".
+            </p>
+          </div>
+
+          {/* Estado Final */}
+          <div
+            style={{
+              backgroundColor: '#dcfce7',
+              border: '1px solid #86efac',
+              borderRadius: '6px',
+              padding: '12px',
+              marginBottom: '12px',
+            }}
+          >
+            <h4 style={{ color: '#166534', marginBottom: '4px' }}>✅ Configuración completada</h4>
+            <p style={{ fontSize: '12px', color: '#166534', margin: 0 }}>
+              Tu tienda Shopify está vinculada con Centrala POS. La sincronización bidireccional está activa y lista para funcionar.
+            </p>
+          </div>
+
+          <button
+            onClick={() => {
+              setMensaje(null);
+              setError(null);
+            }}
+            style={{
+              ...buttonStyle,
+              backgroundColor: '#22c55e',
+              color: 'white',
+            }}
+          >
+            ✅ Completado - Volver al Dashboard
+          </button>
+        </div>
       )}
     </div>
   );
