@@ -63,10 +63,9 @@ export default function ShopifySetupWizard() {
       setConectandoOAuth(true);
       setError(null);
 
-      // Guardar dominio
-      const dominio = subdominio.includes('.myshopify.com')
-        ? subdominio
-        : `${subdominio}.myshopify.com`;
+      // Guardar dominio - limpiar sufijo si existe y luego agregarlo
+      const dominioLimpio = subdominio.replace(/\.myshopify\.com$/i, '').trim();
+      const dominio = `${dominioLimpio}.myshopify.com`;
 
       await api.post('/shopify/config', {
         shopDomain: dominio,

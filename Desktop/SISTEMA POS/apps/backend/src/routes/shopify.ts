@@ -399,9 +399,8 @@ export async function shopifyRoutes(app: FastifyInstance) {
           const mutation = `
             mutation inventorySetQuantities($input: InventorySetQuantitiesInput!) {
               inventorySetQuantities(input: $input) {
-                inventoryItems {
+                inventoryAdjustmentGroup {
                   id
-                  sku
                 }
                 userErrors {
                   field

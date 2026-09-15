@@ -58,14 +58,8 @@ export async function syncProductStockToShopify(
     const mutation = `
       mutation inventorySetQuantities($input: InventorySetQuantitiesInput!) {
         inventorySetQuantities(input: $input) {
-          inventoryItems {
+          inventoryAdjustmentGroup {
             id
-            inventoryLevel(locationId: "gid://shopify/Location/1") {
-              quantities {
-                available
-                reserved
-              }
-            }
           }
           userErrors {
             field
