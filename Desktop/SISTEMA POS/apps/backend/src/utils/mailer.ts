@@ -384,3 +384,103 @@ export async function enviarCorreoVenta(
 
   await enviarCorreo(emailDestino, `Confirmación de Compra - #${numeroTransaccion}`, html);
 }
+
+/**
+ * Plantilla: Recibo de abono a crédito
+ */
+export async function enviarCorreoAbono(
+  cliente: { nombre: string; email: string },
+  empresa: { nombre: string },
+  abono: {
+    monto: number;
+    fecha: Date;
+  },
+  saldoRestante: number
+): Promise<void> {
+  const formatMoneda = (cantidad: number): string => {
+    return Number(cantidad).toLocaleString('es-CO', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    });
+  };
+
+  const montoFormateado = formatMoneda(abono.monto);
+  const saldoFormateado = formatMoneda(saldoRestante);
+  const fechaFormateada = new Date(abono.fecha).toLocaleDateString('es-ES', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f5f5; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 40px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .header { text-align: center; border-bottom: 3px solid #10b981; padding-bottom: 20px; margin-bottom: 30px; }
+    .header h1 { color: #0f172a; margin: 0; font-size: 28px; }
+    .subheader { color: #64748b; font-size: 14px; margin-top: 5px; }
+    .content { color: #1e293b; line-height: 1.6; }
+    .success-badge { display: inline-block; background-color: #d1fae5; border: 1px solid #10b981; color: #065f46; padding: 8px 12px; border-radius: 4px; font-size: 13px; font-weight: 600; margin-bottom: 20px; }
+    .transaction-details { background-color: #f0fdf4; border-left: 4px solid #10b981; padding: 16px; margin: 20px 0; border-radius: 4px; }
+    .transaction-details p { margin: 10px 0; font-size: 14px; }
+    .transaction-details .amount { font-size: 24px; font-weight: 700; color: #10b981; margin: 10px 0; }
+    .balance-warning { background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; margin: 20px 0; border-radius: 4px; }
+    .balance-warning p { margin: 8px 0; font-size: 14px; color: #78350f; }
+    .footer { text-align: center; color: #94a3b8; font-size: 12px; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 20px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Recibo de Abono</h1>
+      <p class="subheader">${empresa.nombre}</p>
+    </div>
+
+    <div class="content">
+      <p>Hola <strong>${cliente.nombre}</strong>,</p>
+
+      <p>Confirmamos que hemos recibido tu pago exitosamente. Este es el detalle de tu transacción:</p>
+
+      <span class="success-badge">✓ Pago Confirmado</span>
+
+      <div class="transaction-details">
+        <p><strong>Monto Abonado:</strong></p>
+        <div class="amount">$${montoFormateado}</div>
+
+        <p style="margin-top: 14px;"><strong>Fecha de Transacción:</strong></p>
+        <p>${fechaFormateada}</p>
+
+        <p style="margin-top: 14px;"><strong>Saldo Restante:</strong></p>
+        <p style="font-size: 18px; font-weight: 600; color: #1e293b;">$${saldoFormateado}</p>
+      </div>
+
+      ${saldoRestante > 0 ? `
+      <div class="balance-warning">
+        <p><strong>⚠️ Saldo Pendiente de Pago</strong></p>
+        <p>Aún tienes un saldo de <strong>$${saldoFormateado}</strong> por pagar. Realiza tu próximo abono cuando estés listo.</p>
+      </div>
+      ` : `
+      <div style="background-color: #d1fae5; border-left: 4px solid #10b981; padding: 16px; margin: 20px 0; border-radius: 4px;">
+        <p><strong style="color: #065f46;">✓ Saldo Saldado</strong></p>
+        <p style="color: #065f46;">¡Felicidades! Has completado el pago de tu crédito. Gracias por tu confianza.</p>
+      </div>
+      `}
+
+      <p style="margin-top: 30px;">Si tienes alguna pregunta o necesitas ayuda, no dudes en contactarnos.</p>
+    </div>
+
+    <div class="footer">
+      <p>© 2026 ${empresa.nombre}. Todos los derechos reservados.</p>
+      <p>Este correo fue enviado automáticamente. Por favor no respondas a este mensaje.</p>
+    </div>
+  </div>
+</body>
+</html>
+`;
+
+  await enviarCorreo(cliente.email, `Recibo de abono - ${empresa.nombre}`, html);
+}

@@ -4,6 +4,7 @@ import type { EstadoCredito } from "@sistema-pos/shared";
 import { prisma } from "../lib/prisma.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
 import { mensajeDeValidacion } from "../lib/errores.js";
+import { enviarCorreoAbono } from "../utils/mailer.js";
 
 const MS_DIA = 24 * 60 * 60 * 1000;
 const DIAS_PROXIMO_A_VENCER = 5;
@@ -223,6 +224,41 @@ export async function creditosRoutes(app: FastifyInstance) {
       entidadId: abono.id,
       detalle: `Abono de $${monto} al crédito ${venta.consecutivo}`,
     });
+
+    // Enviar recibo por correo de forma asincrónica (no bloquea la respuesta)
+    (async () => {
+      try {
+        const [cliente, empresa, abonosPorCliente] = await Promise.all([
+          prisma.cliente.findUnique({
+            where: { id: venta.clienteId! },
+            select: { nombre: true, email: true },
+          }),
+          prisma.empresa.findUnique({
+            where: { id: empresaId },
+            select: { nombre: true },
+          }),
+          prisma.abono.aggregate({
+            where: { clienteId: venta.clienteId! },
+            _sum: { monto: true },
+          }),
+        ]);
+
+        if (cliente?.email && empresa) {
+          const montoAbonado = Number(abonosPorCliente._sum.monto ?? 0);
+          const saldoRestante = Math.max(0, venta.total - montoAbonado);
+
+          await enviarCorreoAbono(
+            { nombre: cliente.nombre, email: cliente.email },
+            { nombre: empresa.nombre },
+            { monto, fecha: abono.fecha },
+            saldoRestante
+          );
+        }
+      } catch (error) {
+        console.error("❌ Error enviando recibo de abono:", error);
+        // No lanzar excepción - el abono ya se creó exitosamente
+      }
+    })();
 
     return abono;
   });
