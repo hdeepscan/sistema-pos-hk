@@ -206,37 +206,67 @@ async function procesarPagoAprobado(transaccion: any) {
 
     if (!esRenovacion) {
       // Registro nuevo: crear usuario y sucursal
-      // 2a. Hashear contraseña
-      const passwordHash = await bcrypt.hash(adminPassword, 10);
-
-      // 2b. Crear usuario admin
-      // NOTA: ADMIN tiene acceso total (ver usePermiso en frontend)
-      // No necesita permisos específicos en el array
-      usuario = await prisma.usuario.create({
-        data: {
-          empresaId: empresa.id,
-          nombre: adminNombre,
-          email: adminEmail,
-          passwordHash,
-          rol: "ADMIN",
-          activo: true,
-          permisos: [], // Array vacío - ADMIN tiene acceso total por su rol
-        },
+      // 2a. Verificar si el usuario ya existe por email
+      const usuarioExistente = await prisma.usuario.findUnique({
+        where: { email: adminEmail },
       });
 
-      console.log(`✅ Usuario creado: ${usuario.id}`);
+      if (usuarioExistente) {
+        console.log(`ℹ️ Usuario ya existe: ${usuarioExistente.id} (${adminEmail})`);
+        usuario = usuarioExistente;
+      } else {
+        // 2b. Generar contraseña aleatoria de 8 caracteres
+        const plainPassword = Math.random().toString(36).slice(-8);
 
-      // 2c. Crear sucursal por defecto
-      await prisma.sucursal.create({
-        data: {
-          empresaId: empresa.id,
-          nombre: "Sucursal Principal",
-          tipo: "FISICA",
-          activo: true,
-        },
-      });
+        // 2c. Hashear contraseña
+        const passwordHash = await bcrypt.hash(plainPassword, 10);
 
-      console.log(`✅ Sucursal creada`);
+        // 2d. Crear usuario admin
+        // NOTA: ADMIN tiene acceso total (ver usePermiso en frontend)
+        // No necesita permisos específicos en el array
+        usuario = await prisma.usuario.create({
+          data: {
+            empresaId: empresa.id,
+            nombre: adminNombre,
+            email: adminEmail,
+            passwordHash,
+            rol: "ADMIN",
+            activo: true,
+            permisos: [], // Array vacío - ADMIN tiene acceso total por su rol
+          },
+        });
+
+        console.log(`✅ Usuario creado: ${usuario.id}`);
+
+        // 2e. Crear sucursal por defecto
+        await prisma.sucursal.create({
+          data: {
+            empresaId: empresa.id,
+            nombre: "Sucursal Principal",
+            tipo: "FISICA",
+            activo: true,
+          },
+        });
+
+        console.log(`✅ Sucursal creada`);
+
+        // 2f. Enviar email de bienvenida con credenciales generadas
+        try {
+          console.log(`📧 Intentando enviar email de bienvenida a: ${adminEmail}`);
+          await enviarEmailBienvenida(
+            adminEmail,
+            empresaNombre,
+            adminNombre,
+            plainPassword
+          );
+          console.log(`✉️ Email de bienvenida enviado exitosamente a ${adminEmail}`);
+        } catch (emailError: any) {
+          console.error("⚠️ Error enviando email de bienvenida (cuenta creada correctamente):", {
+            email: adminEmail,
+            mensaje: emailError?.message,
+          });
+        }
+      }
     } else {
       // Renovación: solo obtener usuario existente para referencia
       usuario = await prisma.usuario.findFirst({
@@ -259,28 +289,6 @@ async function procesarPagoAprobado(transaccion: any) {
     console.log(`✅ Pago actualizado: COMPLETADO`);
 
     console.log(`🎉 Registro completado para: ${empresaNombre} (${adminEmail})`);
-
-    // 6. Enviar email con credenciales (AISLADO: no afecta si falla)
-    // Este bloque se ejecuta DESPUÉS del commit de usuario/empresa/sucursal
-    // Si falla, solo falla el email, no la creación de la cuenta
-    try {
-      console.log(`📧 Intentando enviar email a: ${adminEmail}`);
-      await enviarEmailBienvenida(
-        adminEmail,
-        empresaNombre,
-        adminNombre,
-        adminPassword
-      );
-      console.log(`✉️ Email enviado exitosamente a ${adminEmail}`);
-    } catch (emailError: any) {
-      console.error("⚠️ Error enviando email (cuenta creada correctamente):", {
-        email: adminEmail,
-        mensaje: emailError?.message,
-        codigo: emailError?.code,
-        stack: emailError?.stack?.substring(0, 200),
-      });
-      // No fallar ni revertir si falla el email - la cuenta ya está creada
-    }
   } catch (error: any) {
     console.error("❌ Error CRÍTICO procesando pago aprobado:", {
       mensaje: error?.message,
