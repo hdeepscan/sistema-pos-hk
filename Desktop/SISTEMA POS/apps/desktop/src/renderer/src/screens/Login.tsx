@@ -7,7 +7,6 @@ import logo from "../assets/CENTRALA.pdf.png";
 import { mensajeError } from "../lib/errores";
 import { IconoOjo, IconoOjoTachado } from "../lib/iconos";
 import { electronAPI } from "../lib/electron-api";
-import CheckoutPage from "./CheckoutPage";
 
 const loginStyles = `
   .login-container {
@@ -476,7 +475,7 @@ const loginStyles = `
 
 export default function Login() {
   const navigate = useNavigate();
-  const [modo, setModo] = useState<"login" | "registro" | "checkout">("login");
+  const [modo, setModo] = useState<"login" | "registro">("login");
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mostrarPassword, setMostrarPassword] = useState(false);
@@ -584,6 +583,8 @@ export default function Login() {
 
     setCargando(true);
     try {
+      console.log("📝 Iniciando registro con:", { empresaNombre, adminNombre, adminEmail: email });
+
       const resp = await api.post("/auth/registro-empresa", {
         empresaNombre,
         adminNombre,
@@ -591,8 +592,12 @@ export default function Login() {
         adminPassword: password,
       });
 
+      console.log("✅ Respuesta del servidor:", resp.data);
+
       // Auto-login: guardar token y datos de sesión
-      if (resp.data.token) {
+      if (resp.data?.token && resp.data?.usuario && resp.data?.empresa) {
+        console.log("🔐 Token recibido, guardando sesión...");
+
         const { setSesion } = useSesionStore.getState();
         setSesion({
           token: resp.data.token,
@@ -602,19 +607,33 @@ export default function Login() {
 
         // Guardar token en localStorage para persistencia
         localStorage.setItem("token", resp.data.token);
+        localStorage.setItem("usuario", JSON.stringify(resp.data.usuario));
+        localStorage.setItem("empresa", JSON.stringify(resp.data.empresa));
 
-        // Redirigir al dashboard (aplicación principal)
-        navigate("/");
+        console.log("✅ Sesión guardada, redirigiendo al dashboard...");
+
+        // Redirigir al dashboard (aplicación principal) - SIN pasar por checkout
+        setTimeout(() => {
+          navigate("/");
+        }, 500);
+      } else {
+        console.error("❌ Respuesta incompleta del servidor:", resp.data);
+        setError("Respuesta del servidor incompleta. Por favor intenta de nuevo.");
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || "Error en el registro");
+      console.error("❌ Error en registro:", {
+        status: err.response?.status,
+        data: err.response?.data,
+        message: err.message,
+      });
+      setError(
+        err.response?.data?.error ||
+        err.message ||
+        "Error procesando el registro. Por favor intenta de nuevo."
+      );
     } finally {
       setCargando(false);
     }
-  }
-
-  if (modo === "checkout") {
-    return <CheckoutPage onBack={() => setModo("registro")} isRegistration={true} />;
   }
 
   return (
