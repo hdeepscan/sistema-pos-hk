@@ -15,6 +15,31 @@ import { SubscriptionCard } from "../components/SubscriptionCard";
 import { SubscriptionGuard } from "../components/SubscriptionGuard";
 import { TrialBanner } from "../components/TrialBanner";
 import { ModalSuscripcion } from "../components/ModalSuscripcion";
+import {
+  ShoppingCart,
+  ReceiptText,
+  Wallet,
+  Bell,
+  Package,
+  Layers,
+  Users,
+  CreditCard,
+  FileText,
+  Truck,
+  TrendingDown,
+  Landmark,
+  Calendar,
+  BarChart3,
+  UserCog,
+  History,
+  Settings,
+  Printer,
+  DatabaseBackup,
+  ShoppingBag,
+  Megaphone,
+  BookOpen,
+  LogOut,
+} from "lucide-react";
 
 const INTERVALO_CREDITOS_MS = 5 * 60 * 1000;
 
@@ -214,56 +239,139 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
         </div>
 
         <div className="sidebar-section-label">Operacion</div>
-        <NavLink to="/pos" data-module="pos">Punto de venta</NavLink>
-        {puedeVerVentas && <NavLink to="/ventas" data-module="ventas">Ventas</NavLink>}
-        <NavLink to="/caja" data-module="caja">Caja</NavLink>
-        <NavLink to="/notificaciones" data-module="notificaciones">
-          Notificaciones
-          {alertasCobro > 0 && (
-            <span className="badge warning" style={{ marginLeft: 6 }}>
-              {alertasCobro}
-            </span>
-          )}
+        <NavLink to="/pos" data-module="pos" className="flex items-center gap-3">
+          <ShoppingCart size={20} className="flex-shrink-0" />
+          <span>Punto de venta</span>
+        </NavLink>
+        {puedeVerVentas && (
+          <NavLink to="/ventas" data-module="ventas" className="flex items-center gap-3">
+            <ReceiptText size={20} className="flex-shrink-0" />
+            <span>Ventas</span>
+          </NavLink>
+        )}
+        <NavLink to="/caja" data-module="caja" className="flex items-center gap-3">
+          <Wallet size={20} className="flex-shrink-0" />
+          <span>Caja</span>
+        </NavLink>
+        <NavLink to="/notificaciones" data-module="notificaciones" className="flex items-center gap-3">
+          <Bell size={20} className="flex-shrink-0" />
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1 }}>
+            <span>Notificaciones</span>
+            {alertasCobro > 0 && (
+              <span className="badge warning" style={{ marginLeft: "auto" }}>
+                {alertasCobro}
+              </span>
+            )}
+          </div>
         </NavLink>
 
         <div className="sidebar-section-label">Catalogo</div>
         {puedeAdministrarProductos && (
           <>
-            <NavLink to="/productos" data-module="productos">Productos</NavLink>
-            <NavLink to="/colecciones" data-module="colecciones">Colecciones</NavLink>
+            <NavLink to="/productos" data-module="productos" className="flex items-center gap-3">
+              <Package size={20} className="flex-shrink-0" />
+              <span>Productos</span>
+            </NavLink>
+            <NavLink to="/colecciones" data-module="colecciones" className="flex items-center gap-3">
+              <Layers size={20} className="flex-shrink-0" />
+              <span>Colecciones</span>
+            </NavLink>
           </>
         )}
 
         <div className="sidebar-section-label">Negocio</div>
-        {puedeAdministrarClientes && <NavLink to="/clientes" data-module="clientes">Clientes</NavLink>}
-        {puedeVerCreditos && (
-          <NavLink to="/creditos" data-module="creditos">
-            Creditos{creditosVencidos > 0 && <span className="badge danger" style={{ marginLeft: 6 }}>{creditosVencidos}</span>}
+        {puedeAdministrarClientes && (
+          <NavLink to="/clientes" data-module="clientes" className="flex items-center gap-3">
+            <Users size={20} className="flex-shrink-0" />
+            <span>Clientes</span>
           </NavLink>
         )}
-        <NavLink to="/cotizaciones" data-module="cotizaciones">Cotizaciones</NavLink>
-        <NavLink to="/proveedores" data-module="proveedores">Proveedores</NavLink>
-        {puedeAdministrarGastos && <NavLink to="/gastos" data-module="gastos">Gastos</NavLink>}
-        <NavLink to="/cuentas-bancarias" data-module="cuentas">Cuentas bancarias</NavLink>
-        <NavLink to="/calendario" data-module="calendario">
-          Calendario
-          {eventosHoy > 0 && <span className="badge warning" style={{ marginLeft: 6 }}>{eventosHoy}</span>}
+        {puedeVerCreditos && (
+          <NavLink to="/creditos" data-module="creditos" className="flex items-center gap-3">
+            <CreditCard size={20} className="flex-shrink-0" />
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1 }}>
+              <span>Creditos</span>
+              {creditosVencidos > 0 && <span className="badge danger" style={{ marginLeft: "auto" }}>{creditosVencidos}</span>}
+            </div>
+          </NavLink>
+        )}
+        <NavLink to="/cotizaciones" data-module="cotizaciones" className="flex items-center gap-3">
+          <FileText size={20} className="flex-shrink-0" />
+          <span>Cotizaciones</span>
         </NavLink>
-        {puedeVerReportes && <NavLink to="/reportes" data-module="reportes">Reportes</NavLink>}
+        <NavLink to="/proveedores" data-module="proveedores" className="flex items-center gap-3">
+          <Truck size={20} className="flex-shrink-0" />
+          <span>Proveedores</span>
+        </NavLink>
+        {puedeAdministrarGastos && (
+          <NavLink to="/gastos" data-module="gastos" className="flex items-center gap-3">
+            <TrendingDown size={20} className="flex-shrink-0" />
+            <span>Gastos</span>
+          </NavLink>
+        )}
+        <NavLink to="/cuentas-bancarias" data-module="cuentas" className="flex items-center gap-3">
+          <Landmark size={20} className="flex-shrink-0" />
+          <span>Cuentas bancarias</span>
+        </NavLink>
+        <NavLink to="/calendario" data-module="calendario" className="flex items-center gap-3">
+          <Calendar size={20} className="flex-shrink-0" />
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1 }}>
+            <span>Calendario</span>
+            {eventosHoy > 0 && <span className="badge warning" style={{ marginLeft: "auto" }}>{eventosHoy}</span>}
+          </div>
+        </NavLink>
+        {puedeVerReportes && (
+          <NavLink to="/reportes" data-module="reportes" className="flex items-center gap-3">
+            <BarChart3 size={20} className="flex-shrink-0" />
+            <span>Reportes</span>
+          </NavLink>
+        )}
 
         <div className="sidebar-section-label">Sistema</div>
-        {puedeAdministrarUsuarios && <NavLink to="/usuarios" data-module="usuarios">Usuarios</NavLink>}
-        {(puedeAdministrarUsuarios || puedeAdministrarConfiguracion) && <NavLink to="/auditoria" data-module="auditoria">Auditoria</NavLink>}
-        <NavLink to="/configuracion" data-module="configuracion">Configuracion</NavLink>
-        {puedeAdministrarConfiguracion && <NavLink to="/plantilla-recibo" data-module="plantilla">Plantilla del recibo</NavLink>}
-        {puedeAdministrarConfiguracion && <NavLink to="/backups" data-module="backups">Copias de seguridad</NavLink>}
-        <NavLink to="/shopify" data-module="shopify">Shopify</NavLink>
-        <NavLink to="/meta-ads" data-module="metaads">Meta Ads</NavLink>
+        {puedeAdministrarUsuarios && (
+          <NavLink to="/usuarios" data-module="usuarios" className="flex items-center gap-3">
+            <UserCog size={20} className="flex-shrink-0" />
+            <span>Usuarios</span>
+          </NavLink>
+        )}
+        {(puedeAdministrarUsuarios || puedeAdministrarConfiguracion) && (
+          <NavLink to="/auditoria" data-module="auditoria" className="flex items-center gap-3">
+            <History size={20} className="flex-shrink-0" />
+            <span>Auditoria</span>
+          </NavLink>
+        )}
+        <NavLink to="/configuracion" data-module="configuracion" className="flex items-center gap-3">
+          <Settings size={20} className="flex-shrink-0" />
+          <span>Configuracion</span>
+        </NavLink>
+        {puedeAdministrarConfiguracion && (
+          <NavLink to="/plantilla-recibo" data-module="plantilla" className="flex items-center gap-3">
+            <Printer size={20} className="flex-shrink-0" />
+            <span>Plantilla del recibo</span>
+          </NavLink>
+        )}
+        {puedeAdministrarConfiguracion && (
+          <NavLink to="/backups" data-module="backups" className="flex items-center gap-3">
+            <DatabaseBackup size={20} className="flex-shrink-0" />
+            <span>Copias de seguridad</span>
+          </NavLink>
+        )}
+        <NavLink to="/shopify" data-module="shopify" className="flex items-center gap-3">
+          <ShoppingBag size={20} className="flex-shrink-0" />
+          <span>Shopify</span>
+        </NavLink>
+        <NavLink to="/meta-ads" data-module="metaads" className="flex items-center gap-3">
+          <Megaphone size={20} className="flex-shrink-0" />
+          <span>Meta Ads</span>
+        </NavLink>
 
         {puedeVerContabilidad && (
           <>
             <div className="sidebar-section-label">Contabilidad</div>
-            <NavLink to="/contabilidad">Contabilidad</NavLink>
+            <NavLink to="/contabilidad" className="flex items-center gap-3">
+              <BookOpen size={20} className="flex-shrink-0" />
+              <span>Contabilidad</span>
+            </NavLink>
           </>
         )}
 
@@ -274,8 +382,9 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
           <ThemeToggle />
         </div>
 
-        <button className="secondary" onClick={cerrarSesion} type="button" style={{ marginTop: 0, width: "100%" }}>
-          Cerrar sesion
+        <button className="secondary" onClick={cerrarSesion} type="button" style={{ marginTop: 0, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+          <LogOut size={20} />
+          <span>Cerrar sesion</span>
         </button>
       </aside>}
       {/* Si está en mobile, no mostrar sidebar */}
