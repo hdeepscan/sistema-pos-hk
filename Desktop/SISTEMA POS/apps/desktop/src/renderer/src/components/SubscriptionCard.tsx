@@ -43,6 +43,9 @@ export function SubscriptionCard({ fechaVencimiento, planSuscripcion, onRenewCli
 
   if (!fechaVencimiento || !timeLeft) return null;
 
+  // No mostrar tarjeta durante trial - el TrialBanner ya lo muestra
+  if (planSuscripcion === "TRIAL") return null;
+
   const isExpired = timeLeft.total <= 0;
   const isAlmostExpired = timeLeft.total <= 2;
 
