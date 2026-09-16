@@ -59,6 +59,66 @@ export async function authRoutes(app: FastifyInstance) {
     });
 
     const token = app.jwt.sign({ usuarioId: usuario.id, empresaId: empresa.id, rol: usuario.rol });
+
+    // Enviar correo de bienvenida con accesos
+    try {
+      const { Resend } = await import("resend");
+      const resend = new Resend(process.env.RESEND_API_KEY);
+
+      const htmlContent = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+          <h2 style="color: #333; text-align: center;">¡Bienvenido a Centrala POS!</h2>
+
+          <p style="color: #666; font-size: 14px; line-height: 1.6;">
+            Hola <strong>${usuario.nombre}</strong>,
+          </p>
+
+          <p style="color: #666; font-size: 14px; line-height: 1.6;">
+            Gracias por registrarte en Centrala POS. Tu prueba de <strong>48 horas gratis</strong> ha comenzado.
+            Durante este período, tendrás acceso completo a todas las características de nuestro sistema de punto de venta.
+          </p>
+
+          <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <p style="margin: 0 0 10px 0; color: #999; font-size: 12px;">TUS CREDENCIALES DE ACCESO</p>
+            <p style="margin: 0 0 15px 0; font-family: monospace; font-size: 14px; color: #333;">
+              <strong>Usuario:</strong> ${adminEmail}
+            </p>
+            <p style="margin: 0; font-family: monospace; font-size: 14px; background: #fff; padding: 10px; border-radius: 3px; color: #333;">
+              <strong>Contraseña:</strong> ${adminPassword}
+            </p>
+          </div>
+
+          <p style="color: #666; font-size: 13px;">
+            <strong>⏳ Importante:</strong> Tu período de prueba vence en 48 horas. Recuerda elegir un plan antes de que finalice para seguir disfrutando de Centrala POS sin interrupciones.
+          </p>
+
+          <div style="text-align: center; margin-top: 20px;">
+            <a href="https://sistema-pos-hk.up.railway.app" style="display: inline-block; background: #3B82F6; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Acceder a Centrala POS</a>
+          </div>
+
+          <div style="border-top: 1px solid #e0e0e0; margin-top: 20px; padding-top: 15px; color: #999; font-size: 12px;">
+            <p style="margin: 0;">Empresa: <strong>${empresaNombre}</strong></p>
+            <p style="margin: 5px 0 0 0;">Si tienes preguntas, estamos aquí para ayudarte.</p>
+          </div>
+        </div>
+      `;
+
+      await resend.emails.send({
+        from: process.env.EMAIL_FROM || "noreply@centrala-pos.com",
+        to: adminEmail,
+        subject: "¡Bienvenido a Centrala! Tu prueba de 48h ha comenzado",
+        html: htmlContent,
+      });
+
+      console.log("✅ Email de bienvenida enviado exitosamente a:", adminEmail);
+    } catch (emailError: any) {
+      console.error("⚠️ Error enviando email de bienvenida (registro completado):", {
+        email: adminEmail,
+        mensaje: emailError?.message,
+      });
+      // No interrumpir el registro si Resend falla
+    }
+
     return reply.code(201).send({
       token,
       usuario: {
