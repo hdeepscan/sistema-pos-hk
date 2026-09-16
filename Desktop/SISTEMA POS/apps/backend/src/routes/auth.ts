@@ -17,9 +17,14 @@ export async function authRoutes(app: FastifyInstance) {
     }
     const { empresaNombre, adminNombre, adminEmail, adminPassword } = parsed.data;
 
-    const existente = await prisma.usuario.findUnique({ where: { email: adminEmail } });
-    if (existente) {
+    const usuarioExistente = await prisma.usuario.findUnique({ where: { email: adminEmail } });
+    if (usuarioExistente) {
       return reply.code(409).send({ error: "Ya existe un usuario con ese email" });
+    }
+
+    const empresaExistente = await prisma.empresa.findFirst({ where: { nombre: empresaNombre } });
+    if (empresaExistente) {
+      return reply.code(409).send({ error: "El nombre de la empresa ya está registrado" });
     }
 
     const passwordHash = await hashPassword(adminPassword);

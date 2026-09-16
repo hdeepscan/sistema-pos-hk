@@ -608,6 +608,7 @@ export default function Login() {
       }
     } catch (err: any) {
       setError(err.response?.data?.error || "Error en el registro");
+    } finally {
       setCargando(false);
     }
   }
