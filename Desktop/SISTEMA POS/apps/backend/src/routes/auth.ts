@@ -128,7 +128,13 @@ export async function authRoutes(app: FastifyInstance) {
         rol: usuario.rol,
         permisos: permisosDe(usuario),
       },
-      empresa: { id: empresa.id, nombre: empresa.nombre },
+      empresa: {
+        id: empresa.id,
+        nombre: empresa.nombre,
+        plan: empresa.plan,
+        planSuscripcion: empresa.planSuscripcion,
+        fechaVencimiento: empresa.fechaVencimiento,
+      },
       sucursales: [
         {
           id: sucursal.id,
