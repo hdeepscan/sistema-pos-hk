@@ -38,6 +38,7 @@ import Calendario from "./screens/Calendario";
 import Contabilidad from "./screens/Contabilidad";
 import Cotizaciones from "./screens/Cotizaciones";
 import CheckoutPage from "./screens/CheckoutPage";
+import { ModalSuscripcion } from "./components/ModalSuscripcion";
 
 export default function App() {
   const { token, sucursalActivaId, hidratado, setApiBaseUrl, setSesion, setSucursalActiva, setHidratado } =
@@ -203,6 +204,7 @@ export default function App() {
     return (
       <Routes>
         <Route path="/checkout" element={<CheckoutPage />} />
+        <Route path="/suscripcion" element={<CheckoutPage isRegistration={false} />} />
         <Route path="*" element={<SeleccionSucursal />} />
       </Routes>
     );
@@ -216,6 +218,9 @@ export default function App() {
 
   return (
     <>
+      {/* Modal de suscripción - Trial vencido */}
+      <ModalSuscripcion />
+
       {/* Bloqueo de licencia vencida - Capa superior */}
       <LicenseBlockOverlay />
 

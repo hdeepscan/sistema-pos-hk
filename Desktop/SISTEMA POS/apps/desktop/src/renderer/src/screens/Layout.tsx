@@ -13,6 +13,7 @@ import { MobileMenu } from "../components/MobileMenu";
 import { ToastContainer } from "../components/ToastContainer";
 import { SubscriptionCard } from "../components/SubscriptionCard";
 import { SubscriptionGuard } from "../components/SubscriptionGuard";
+import { TrialBanner } from "../components/TrialBanner";
 
 const INTERVALO_CREDITOS_MS = 5 * 60 * 1000;
 
@@ -152,6 +153,9 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
   return (
     <SubscriptionGuard>
       <div className="app-shell">
+        {/* Trial Banner */}
+        <TrialBanner />
+
         {/* Toast Container - Notificaciones Globales */}
         <ToastContainer />
 
