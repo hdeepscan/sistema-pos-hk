@@ -659,21 +659,6 @@ export default function Login() {
             {modo === "login" ? "Bienvenido a tu punto de venta" : "Inicia tu negocio hoy"}
           </p>
 
-          {modo === "registro" && (
-            <div style={{
-              background: "linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%)",
-              border: "1px solid #0ea5e9",
-              borderRadius: "8px",
-              padding: "12px 16px",
-              marginBottom: "20px",
-              textAlign: "center",
-              fontSize: "13px",
-              color: "#0369a1"
-            }}>
-              <span style={{ fontWeight: "600" }}>✓ 48 horas gratis</span> • Sin tarjeta de crédito • Acceso completo
-            </div>
-          )}
-
           {/* Error */}
           {error && (
             <div className="login-error">
