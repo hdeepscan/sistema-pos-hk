@@ -71,6 +71,7 @@ export default async function adminRoutes(app: FastifyInstance) {
           fechaRegistro: true,
           usuarios: {
             select: {
+              id: true,
               email: true,
               nombre: true,
             },
@@ -87,6 +88,7 @@ export default async function adminRoutes(app: FastifyInstance) {
         estado: c.estado,
         tipo_licencia: c.tipo_licencia,
         dias_restantes: c.dias_restantes,
+        usuario_admin_id: c.usuarios?.[0]?.id || null,
         email_admin: c.usuarios?.[0]?.email || "N/A",
         nombre_admin: c.usuarios?.[0]?.nombre || "N/A",
         fecha_creacion: c.fechaRegistro,
@@ -465,6 +467,138 @@ export default async function adminRoutes(app: FastifyInstance) {
         clienteId: (request.params as any).id,
       });
       reply.code(500).send({ error: "Error eliminando empresa" });
+    }
+  });
+
+  // ✉️ POST /admin/usuarios/:usuarioId/enviar-correo - Enviar correo a usuario
+  app.post(
+    "/usuarios/:usuarioId/enviar-correo",
+    { preHandler: [app.authenticate, verificarSuperAdmin] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const { usuarioId } = request.params as any;
+      const { tipoPlantilla, asunto, mensaje } = request.body as any;
+
+      console.log("✉️ SEND EMAIL REQUEST:", {
+        usuarioId,
+        tipoPlantilla,
+        superAdminId: (request as any).superAdmin?.id,
+      });
+
+      // Obtener usuario destino
+      const usuario = await prisma.usuario.findUnique({
+        where: { id: usuarioId },
+        select: { id: true, email: true, nombre: true, empresa: { select: { nombre: true } } },
+      });
+
+      if (!usuario) {
+        console.error("❌ USER NOT FOUND:", { usuarioId });
+        return reply.code(404).send({ error: "Usuario no encontrado" });
+      }
+
+      let htmlContent = "";
+      let finalAsunto = asunto;
+      let passwordGenerado = null;
+
+      if (tipoPlantilla === "CREDENCIALES") {
+        // Generar nueva contraseña temporal
+        passwordGenerado = Math.random().toString(36).slice(-8);
+        const passwordHash = await bcrypt.hash(passwordGenerado, 10);
+
+        // Actualizar usuario con nueva contraseña
+        await prisma.usuario.update({
+          where: { id: usuarioId },
+          data: { passwordHash },
+        });
+
+        finalAsunto = "Tus nuevas credenciales de acceso";
+        htmlContent = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+            <h2 style="color: #333; text-align: center;">¡Bienvenido a Centrala POS!</h2>
+            <p style="color: #666; font-size: 14px;">
+              Hola <strong>${usuario.nombre}</strong>,
+            </p>
+            <p style="color: #666; font-size: 14px;">
+              Tu administrador ha generado nuevas credenciales de acceso a la plataforma.
+            </p>
+            <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+              <p style="margin: 0 0 10px 0; color: #999; font-size: 12px;">USUARIO</p>
+              <p style="margin: 0 0 15px 0; font-family: monospace; font-size: 16px; color: #333;"><strong>${usuario.email}</strong></p>
+              <p style="margin: 0 0 10px 0; color: #999; font-size: 12px;">CONTRASEÑA TEMPORAL</p>
+              <p style="margin: 0; font-family: monospace; font-size: 16px; background: #fff; padding: 10px; border-radius: 3px; color: #e74c3c;"><strong>${passwordGenerado}</strong></p>
+            </div>
+            <p style="color: #666; font-size: 13px;">
+              <strong>⚠️ Importante:</strong> Esta es una contraseña temporal. Te recomendamos cambiarla la primera vez que inicies sesión.
+            </p>
+            <div style="text-align: center; margin-top: 20px;">
+              <a href="https://sistema-pos-hk.up.railway.app/login" style="display: inline-block; background: #3B82F6; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Iniciar Sesión</a>
+            </div>
+          </div>
+        `;
+      } else {
+        // Plantilla de aviso o personalizado
+        htmlContent = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+            <h2 style="color: #333;">${finalAsunto}</h2>
+            <div style="color: #666; font-size: 14px; line-height: 1.6; margin: 20px 0;">
+              ${mensaje.replace(/\n/g, "<br>")}
+            </div>
+            <div style="border-top: 1px solid #e0e0e0; margin-top: 20px; padding-top: 15px; color: #999; font-size: 12px;">
+              <p style="margin: 0;">Empresa: <strong>${usuario.empresa?.nombre}</strong></p>
+              <p style="margin: 5px 0 0 0;">Enviado desde Centrala POS Admin</p>
+            </div>
+          </div>
+        `;
+      }
+
+      // Enviar correo con Resend
+      try {
+        const { Resend } = await import("resend");
+        const resend = new Resend(process.env.RESEND_API_KEY);
+
+        await resend.emails.send({
+          from: process.env.EMAIL_FROM || "noreply@centrala-pos.com",
+          to: usuario.email,
+          subject: finalAsunto,
+          html: htmlContent,
+        });
+
+        console.log("✅ EMAIL SENT SUCCESSFULLY:", {
+          usuarioId,
+          usuarioEmail: usuario.email,
+          tipoPlantilla,
+        });
+
+        // Registrar en auditoría
+        await prisma.adminAuditoria.create({
+          data: {
+            super_admin_id: (request as any).superAdmin.id,
+            accion: `ENVIAR_CORREO_${tipoPlantilla}`,
+            entidad: "usuarios",
+            entidad_id: usuarioId,
+            detalles: JSON.stringify({ asunto: finalAsunto, destino: usuario.email }),
+          },
+        });
+
+        reply.send({
+          success: true,
+          mensaje: `Correo enviado exitosamente a ${usuario.email}`,
+          passwordGenerado: tipoPlantilla === "CREDENCIALES" ? "✓ Contraseña generada y enviada" : null,
+        });
+      } catch (emailError: any) {
+        console.error("❌ EMAIL SEND FAILED:", {
+          error: emailError.message,
+          usuarioEmail: usuario.email,
+        });
+        reply.code(500).send({ error: "Error enviando correo: " + emailError.message });
+      }
+    } catch (error: any) {
+      console.error("❌ SEND EMAIL ERROR:", {
+        error: error.message,
+        stack: error.stack,
+        usuarioId: (request.params as any).usuarioId,
+      });
+      reply.code(500).send({ error: "Error procesando solicitud de correo" });
     }
   });
 

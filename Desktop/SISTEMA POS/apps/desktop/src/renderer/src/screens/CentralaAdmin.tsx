@@ -693,6 +693,10 @@ export default function CentralaAdmin() {
   const [busqueda, setBusqueda] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [selectedClientForEmail, setSelectedClientForEmail] = useState<any>(null);
+  const [emailFormData, setEmailFormData] = useState({ tipoPlantilla: "CREDENCIALES", asunto: "", mensaje: "" });
+  const [enviadoCorreo, setEnviadoCorreo] = useState(false);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
 
   // Modals
@@ -938,6 +942,42 @@ export default function CentralaAdmin() {
       setError(
         err.response?.data?.error || `Error eliminando empresa: ${err.message}`
       );
+    }
+  }
+
+  async function handleSendEmail() {
+    if (!selectedClientForEmail) return;
+
+    try {
+      setCargando(true);
+      console.log("📧 SEND EMAIL REQUEST:", {
+        usuarioEmail: selectedClientForEmail.adminEmail,
+        tipoPlantilla: emailFormData.tipoPlantilla,
+      });
+
+      const { data } = await api.post(
+        `/admin/usuarios/${selectedClientForEmail.usuarioId}/enviar-correo`,
+        {
+          tipoPlantilla: emailFormData.tipoPlantilla,
+          asunto: emailFormData.asunto,
+          mensaje: emailFormData.mensaje,
+        }
+      );
+
+      console.log("✅ EMAIL SENT:", data);
+      setEnviadoCorreo(true);
+      setTimeout(() => {
+        setShowEmailModal(false);
+        setEnviadoCorreo(false);
+        setEmailFormData({ tipoPlantilla: "CREDENCIALES", asunto: "", mensaje: "" });
+        setSelectedClientForEmail(null);
+        alert("Correo enviado exitosamente a " + selectedClientForEmail.adminEmail);
+      }, 1500);
+    } catch (err: any) {
+      console.error("❌ EMAIL SEND FAILED:", err);
+      setError(err.response?.data?.error || "Error enviando correo");
+    } finally {
+      setCargando(false);
     }
   }
 
@@ -1230,6 +1270,25 @@ export default function CentralaAdmin() {
                               </div>
 
                               <div
+                                className="action-menu-item"
+                                onClick={() => {
+                                  // Obtener el usuario admin de la empresa
+                                  const adminEmail = cliente.email_admin;
+                                  const adminNombre = cliente.nombre_admin;
+                                  setSelectedClientForEmail({
+                                    id: cliente.id,
+                                    nombre: cliente.nombre,
+                                    adminEmail,
+                                    adminNombre
+                                  });
+                                  setShowEmailModal(true);
+                                  setOpenActionsMenu(null);
+                                }}
+                              >
+                                <span>✉️</span> Enviar Correo
+                              </div>
+
+                              <div
                                 className="action-menu-item danger"
                                 onClick={() => {
                                   const confirmed = window.confirm(
@@ -1507,6 +1566,134 @@ export default function CentralaAdmin() {
                   ))
                 )}
               </div>
+            </div>
+          </>
+        )}
+
+        {/* MODAL: Enviar Correo */}
+        {showEmailModal && selectedClientForEmail && (
+          <>
+            <div
+              className="modal-overlay"
+              onClick={() => !enviadoCorreo && setShowEmailModal(false)}
+            />
+            <div className="modal">
+              <div className="modal-header">
+                <h2 className="modal-title">✉️ Enviar Correo</h2>
+                <button
+                  className="modal-close"
+                  onClick={() => !enviadoCorreo && setShowEmailModal(false)}
+                  disabled={enviadoCorreo}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {enviadoCorreo ? (
+                <div style={{ padding: "40px", textAlign: "center" }}>
+                  <div style={{ fontSize: "48px", marginBottom: "16px" }}>✅</div>
+                  <p style={{ color: "#16a34a", fontWeight: "bold", fontSize: "16px" }}>
+                    Correo enviado exitosamente
+                  </p>
+                  <p style={{ color: "#666", marginTop: "8px", fontSize: "14px" }}>
+                    a {selectedClientForEmail.adminEmail}
+                  </p>
+                </div>
+              ) : (
+                <div className="modal-content">
+                  <div className="form-group">
+                    <label className="form-label">Empresa</label>
+                    <p style={{ color: "#0f172a", fontWeight: "500", marginTop: "8px" }}>
+                      {selectedClientForEmail.nombre}
+                    </p>
+                    <p style={{ color: "#666", fontSize: "13px", marginTop: "4px" }}>
+                      Administrador: {selectedClientForEmail.adminNombre} ({selectedClientForEmail.adminEmail})
+                    </p>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Tipo de Plantilla</label>
+                    <select
+                      className="form-select"
+                      value={emailFormData.tipoPlantilla}
+                      onChange={(e) => {
+                        setEmailFormData({
+                          ...emailFormData,
+                          tipoPlantilla: e.target.value,
+                          asunto: "",
+                          mensaje: "",
+                        });
+                      }}
+                    >
+                      <option value="CREDENCIALES">Reenviar Credenciales (Generar nueva contraseña)</option>
+                      <option value="AVISO">Aviso del Sistema</option>
+                      <option value="PERSONALIZADO">Mensaje Personalizado</option>
+                    </select>
+                  </div>
+
+                  {emailFormData.tipoPlantilla === "CREDENCIALES" && (
+                    <div style={{
+                      background: "#eff6ff",
+                      border: "1px solid #bfdbfe",
+                      borderRadius: "6px",
+                      padding: "12px",
+                      marginBottom: "16px",
+                      color: "#1e40af",
+                      fontSize: "13px"
+                    }}>
+                      ⚠️ Esta acción generará una nueva contraseña aleatoria y se la enviará al cliente por correo.
+                    </div>
+                  )}
+
+                  {emailFormData.tipoPlantilla !== "CREDENCIALES" && (
+                    <>
+                      <div className="form-group">
+                        <label className="form-label">Asunto</label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="Ej: Actualización importante"
+                          value={emailFormData.asunto}
+                          onChange={(e) =>
+                            setEmailFormData({ ...emailFormData, asunto: e.target.value })
+                          }
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label">Mensaje</label>
+                        <textarea
+                          className="form-input"
+                          placeholder="Escribe tu mensaje..."
+                          rows={6}
+                          value={emailFormData.mensaje}
+                          onChange={(e) =>
+                            setEmailFormData({ ...emailFormData, mensaje: e.target.value })
+                          }
+                          style={{ resize: "vertical" }}
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  <div className="modal-actions">
+                    <button
+                      className="btn-secondary"
+                      onClick={() => setShowEmailModal(false)}
+                      disabled={enviadoCorreo}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      className="btn-primary"
+                      onClick={handleSendEmail}
+                      disabled={cargando || (emailFormData.tipoPlantilla !== "CREDENCIALES" && (!emailFormData.asunto || !emailFormData.mensaje))}
+                    >
+                      {cargando ? "Enviando..." : "Enviar Correo"}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </>
         )}
