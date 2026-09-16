@@ -14,6 +14,7 @@ import { ToastContainer } from "../components/ToastContainer";
 import { SubscriptionCard } from "../components/SubscriptionCard";
 import { SubscriptionGuard } from "../components/SubscriptionGuard";
 import { TrialBanner } from "../components/TrialBanner";
+import { ModalSuscripcion } from "../components/ModalSuscripcion";
 
 const INTERVALO_CREDITOS_MS = 5 * 60 * 1000;
 
@@ -25,6 +26,7 @@ interface LayoutProps extends PropsWithChildren {
 export default function Layout({ children, isMobile = false, setIsMobile }: LayoutProps) {
   const { empresa, sucursales, sucursalActivaId, usuario, logout } = useSesionStore();
   const [mostrarMenuVistaToggle, setMostrarMenuVistaToggle] = useState(false);
+  const [showSuscripcionModal, setShowSuscripcionModal] = useState(false);
   const puedeVerCreditos = usePermiso("creditos.administrar");
   const puedeAdministrarUsuarios = usePermiso("usuarios.administrar");
   const puedeVerVentas = usePermiso("ventas.ver");
@@ -152,10 +154,26 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
 
   return (
     <SubscriptionGuard>
-      <div className="app-shell">
-        {/* Trial Banner */}
-        <TrialBanner />
+      {/* Trial Banner - Ancho completo encima de todo */}
+      <TrialBanner onUpgradeClick={() => setShowSuscripcionModal(true)} />
 
+      {/* Modal de Suscripción */}
+      {showSuscripcionModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 9999 }}>
+          <ModalSuscripcion />
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: "rgba(0,0,0,0.5)",
+              cursor: "pointer"
+            }}
+            onClick={() => setShowSuscripcionModal(false)}
+          />
+        </div>
+      )}
+
+      <div className="app-shell">
         {/* Toast Container - Notificaciones Globales */}
         <ToastContainer />
 

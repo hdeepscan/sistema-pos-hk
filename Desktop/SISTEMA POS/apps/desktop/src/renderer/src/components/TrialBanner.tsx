@@ -1,9 +1,11 @@
 import { useSesionStore } from "../lib/store";
-import { useNavigate } from "react-router-dom";
 
-export function TrialBanner() {
+interface TrialBannerProps {
+  onUpgradeClick?: () => void;
+}
+
+export function TrialBanner({ onUpgradeClick }: TrialBannerProps = {}) {
   const { empresa } = useSesionStore();
-  const navigate = useNavigate();
 
   if (!empresa?.fechaVencimiento || empresa.planSuscripcion !== "TRIAL") {
     return null;
@@ -23,51 +25,23 @@ export function TrialBanner() {
     return null;
   }
 
+  const handleUpgradeClick = () => {
+    if (onUpgradeClick) {
+      onUpgradeClick();
+    }
+  };
+
   return (
-    <div style={{
-      background: "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
-      color: "#78350f",
-      padding: "14px 20px",
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      borderBottom: "3px solid #d97706",
-      fontSize: "14px",
-      fontWeight: "500",
-      boxShadow: "0 4px 12px rgba(251, 191, 36, 0.15)"
-    }}>
-      <span>
-        <span style={{ marginRight: "8px", fontSize: "16px" }}>⏳</span>
-        Estás disfrutando de tu prueba gratis. Te quedan <strong style={{ fontSize: "16px" }}>{horas} horas</strong>.
-      </span>
+    <div className="w-full bg-yellow-500 text-yellow-900 px-4 py-3 flex items-center justify-between gap-4 text-sm font-medium z-50 border-b-2 border-yellow-600 shadow-md">
+      <div className="flex items-center gap-2">
+        <span className="text-lg">⏳</span>
+        <span>
+          Estás disfrutando de tu prueba gratis. Te quedan <strong className="text-base">{horas} horas</strong>.
+        </span>
+      </div>
       <button
-        onClick={() => navigate("/suscripcion")}
-        style={{
-          background: "linear-gradient(135deg, #16a34a 0%, #15803d 100%)",
-          color: "white",
-          border: "none",
-          padding: "8px 24px",
-          borderRadius: "6px",
-          cursor: "pointer",
-          fontWeight: "700",
-          fontSize: "13px",
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-          boxShadow: "0 4px 12px rgba(22, 163, 74, 0.3)",
-          transition: "all 0.2s ease",
-          whiteSpace: "nowrap"
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = "linear-gradient(135deg, #15803d 0%, #166534 100%)";
-          e.currentTarget.style.boxShadow = "0 6px 16px rgba(22, 163, 74, 0.4)";
-          e.currentTarget.style.transform = "translateY(-2px)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = "linear-gradient(135deg, #16a34a 0%, #15803d 100%)";
-          e.currentTarget.style.boxShadow = "0 4px 12px rgba(22, 163, 74, 0.3)";
-          e.currentTarget.style.transform = "translateY(0)";
-        }}
+        onClick={handleUpgradeClick}
+        className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md font-bold text-sm whitespace-nowrap transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg"
       >
         <span>💳</span>
         Elegir Plan

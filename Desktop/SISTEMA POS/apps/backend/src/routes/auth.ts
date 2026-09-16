@@ -93,7 +93,7 @@ export async function authRoutes(app: FastifyInstance) {
           </p>
 
           <div style="text-align: center; margin-top: 20px;">
-            <a href="https://sistema-pos-hk.up.railway.app" style="display: inline-block; background: #3B82F6; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Acceder a Centrala POS</a>
+            <a href="https://centrala.up.railway.app" style="display: inline-block; background: #3B82F6; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Acceder a Centrala POS</a>
           </div>
 
           <div style="border-top: 1px solid #e0e0e0; margin-top: 20px; padding-top: 15px; color: #999; font-size: 12px;">
