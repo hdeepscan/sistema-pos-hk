@@ -391,6 +391,83 @@ export default async function adminRoutes(app: FastifyInstance) {
     }
   });
 
+  // 🗑️ DELETE /admin/clientes/:id - Borrado definitivo (Hard Delete)
+  app.delete(
+    "/clientes/:id",
+    { preHandler: [app.authenticate, verificarSuperAdmin] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const { id } = request.params as any;
+
+      console.log("🗑️ HARD DELETE REQUEST:", {
+        clienteId: id,
+        superAdminId: (request as any).superAdmin?.id,
+      });
+
+      const empresa = await prisma.empresa.findUnique({ where: { id } });
+      if (!empresa) {
+        console.error("❌ CLIENT NOT FOUND FOR DELETE:", { clienteId: id });
+        return reply.code(404).send({ error: "Empresa no encontrada" });
+      }
+
+      // Borrado en transacción para garantizar integridad
+      await prisma.$transaction(async (tx) => {
+        // 1. Borrar auditoría relacionada
+        await tx.adminAuditoria.deleteMany({
+          where: { entidad_id: id },
+        });
+
+        // 2. Borrar usuarios de la empresa
+        await tx.usuario.deleteMany({
+          where: { empresaId: id },
+        });
+
+        // 3. Borrar sucursales de la empresa
+        await tx.sucursal.deleteMany({
+          where: { empresaId: id },
+        });
+
+        // 4. Borrar la empresa
+        await tx.empresa.delete({
+          where: { id },
+        });
+      });
+
+      // Auditoría de la acción (en tabla separada si es necesario)
+      try {
+        await prisma.adminAuditoria.create({
+          data: {
+            super_admin_id: (request as any).superAdmin.id,
+            accion: "ELIMINAR_CLIENTE_DEFINITIVAMENTE",
+            entidad: "empresas",
+            entidad_id: id,
+            detalles: JSON.stringify({ nombre: empresa.nombre }),
+          },
+        });
+      } catch (auditError) {
+        // La auditoría falló, pero la empresa ya fue borrada
+        console.warn("⚠️ Auditoría de hard delete falló:", auditError);
+      }
+
+      console.log("✅ CLIENT DELETED SUCCESSFULLY:", {
+        clienteId: id,
+        empresaNombre: empresa.nombre,
+      });
+
+      reply.send({
+        success: true,
+        mensaje: `Empresa "${empresa.nombre}" y todos sus datos han sido eliminados definitivamente.`,
+      });
+    } catch (error: any) {
+      console.error("❌ HARD DELETE ERROR:", {
+        error: error.message,
+        stack: error.stack,
+        clienteId: (request.params as any).id,
+      });
+      reply.code(500).send({ error: "Error eliminando empresa" });
+    }
+  });
+
   // 📋 GET /admin/auditoria - Ver logs de auditoría
   app.get(
     "/auditoria",

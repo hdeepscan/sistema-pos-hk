@@ -901,6 +901,46 @@ export default function CentralaAdmin() {
     }
   }
 
+  async function handleHardDelete(clienteId: string, clienteNombre: string) {
+    try {
+      console.log("🗑️ DELETE CLIENT REQUEST:", {
+        url: `/admin/clientes/${clienteId}`,
+        clienteId,
+        clienteNombre,
+      });
+
+      const { data } = await api.delete(`/admin/clientes/${clienteId}`);
+
+      console.log("✅ HARD DELETE SUCCESS:", data);
+
+      // Mostrar alerta de éxito
+      alert(`Empresa "${clienteNombre}" eliminada definitivamente.`);
+
+      // Actualizar estado local filtrando el cliente borrado
+      setClientes(clientes.filter((c) => c.id !== clienteId));
+
+      // Limpiar selección si la empresa borrada era la seleccionada
+      if (selectedClient?.id === clienteId) {
+        setSelectedClient(null);
+      }
+
+      // Recargar para asegurar sincronización
+      setTimeout(() => cargarClientes(), 500);
+    } catch (err: any) {
+      console.error("❌ HARD DELETE FAILED:", {
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        errorMessage: err.response?.data?.error,
+        fullResponse: err.response?.data,
+        clienteId,
+        axiosError: err.message,
+      });
+      setError(
+        err.response?.data?.error || `Error eliminando empresa: ${err.message}`
+      );
+    }
+  }
+
   async function handleLogout() {
     await electronAPI.setConfig({ token: null, empresaId: null });
     logout();
@@ -1187,6 +1227,21 @@ export default function CentralaAdmin() {
                                 }}
                               >
                                 <span>✏️</span> Editar Cliente
+                              </div>
+
+                              <div
+                                className="action-menu-item danger"
+                                onClick={() => {
+                                  const confirmed = window.confirm(
+                                    `¿Estás seguro de eliminar esta empresa y todos sus usuarios?\n\nEmpresa: ${cliente.nombre}\nEsta acción no se puede deshacer.`
+                                  );
+                                  if (confirmed) {
+                                    handleHardDelete(cliente.id, cliente.nombre);
+                                  }
+                                  setOpenActionsMenu(null);
+                                }}
+                              >
+                                <span>🗑️</span> Eliminar Definitivamente
                               </div>
                             </div>
                           )}
