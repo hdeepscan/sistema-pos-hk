@@ -535,8 +535,22 @@ export default async function adminRoutes(app: FastifyInstance) {
             </div>
           </div>
         `;
+      } else if (tipoPlantilla === "PERSONALIZADO" || tipoPlantilla === "HTML_PLANTILLA") {
+        // Plantillas personalizadas o HTML - respeta el HTML puro si se proporciona
+        const isHtml = mensaje && (mensaje.includes("<") && mensaje.includes(">"));
+        const contenido = isHtml ? mensaje : mensaje.replace(/\n/g, "<br>");
+
+        htmlContent = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+            ${isHtml ? contenido : `<h2 style="color: #333;">${finalAsunto}</h2><div style="color: #666; font-size: 14px; line-height: 1.6; margin: 20px 0;">${contenido}</div>`}
+            <div style="border-top: 1px solid #e0e0e0; margin-top: 20px; padding-top: 15px; color: #999; font-size: 12px;">
+              <p style="margin: 0;">Empresa: <strong>${usuario.empresa?.nombre}</strong></p>
+              <p style="margin: 5px 0 0 0;">Enviado desde Centrala POS Admin</p>
+            </div>
+          </div>
+        `;
       } else {
-        // Plantilla de aviso o personalizado
+        // Plantilla de AVISO (por compatibilidad con plantillas existentes)
         htmlContent = `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
             <h2 style="color: #333;">${finalAsunto}</h2>
