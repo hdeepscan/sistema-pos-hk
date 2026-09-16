@@ -1272,14 +1272,11 @@ export default function CentralaAdmin() {
                               <div
                                 className="action-menu-item"
                                 onClick={() => {
-                                  // Obtener el usuario admin de la empresa
-                                  const adminEmail = cliente.email_admin;
-                                  const adminNombre = cliente.nombre_admin;
                                   setSelectedClientForEmail({
-                                    id: cliente.id,
+                                    usuarioId: cliente.usuario_admin_id,
                                     nombre: cliente.nombre,
-                                    adminEmail,
-                                    adminNombre
+                                    adminEmail: cliente.email_admin,
+                                    adminNombre: cliente.nombre_admin
                                   });
                                   setShowEmailModal(true);
                                   setOpenActionsMenu(null);
@@ -1574,126 +1571,345 @@ export default function CentralaAdmin() {
         {showEmailModal && selectedClientForEmail && (
           <>
             <div
-              className="modal-overlay"
+              style={{
+                position: "fixed",
+                inset: 0,
+                backgroundColor: "rgba(0, 0, 0, 0.5)",
+                backdropFilter: "blur(4px)",
+                zIndex: 999,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center"
+              }}
               onClick={() => !enviadoCorreo && setShowEmailModal(false)}
             />
-            <div className="modal">
-              <div className="modal-header">
-                <h2 className="modal-title">✉️ Enviar Correo</h2>
-                <button
-                  className="modal-close"
-                  onClick={() => !enviadoCorreo && setShowEmailModal(false)}
-                  disabled={enviadoCorreo}
-                >
-                  ✕
-                </button>
-              </div>
-
-              {enviadoCorreo ? (
-                <div style={{ padding: "40px", textAlign: "center" }}>
-                  <div style={{ fontSize: "48px", marginBottom: "16px" }}>✅</div>
-                  <p style={{ color: "#16a34a", fontWeight: "bold", fontSize: "16px" }}>
-                    Correo enviado exitosamente
-                  </p>
-                  <p style={{ color: "#666", marginTop: "8px", fontSize: "14px" }}>
-                    a {selectedClientForEmail.adminEmail}
-                  </p>
-                </div>
-              ) : (
-                <div className="modal-content">
-                  <div className="form-group">
-                    <label className="form-label">Empresa</label>
-                    <p style={{ color: "#0f172a", fontWeight: "500", marginTop: "8px" }}>
-                      {selectedClientForEmail.nombre}
-                    </p>
-                    <p style={{ color: "#666", fontSize: "13px", marginTop: "4px" }}>
-                      Administrador: {selectedClientForEmail.adminNombre} ({selectedClientForEmail.adminEmail})
-                    </p>
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Tipo de Plantilla</label>
-                    <select
-                      className="form-select"
-                      value={emailFormData.tipoPlantilla}
-                      onChange={(e) => {
-                        setEmailFormData({
-                          ...emailFormData,
-                          tipoPlantilla: e.target.value,
-                          asunto: "",
-                          mensaje: "",
-                        });
+            <div
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 1000,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                pointerEvents: "none"
+              }}
+            >
+              <div
+                style={{
+                  backgroundColor: "white",
+                  borderRadius: "12px",
+                  boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)",
+                  width: "90%",
+                  maxWidth: "600px",
+                  maxHeight: "90vh",
+                  overflowY: "auto",
+                  pointerEvents: "auto"
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div style={{ padding: "24px", borderBottom: "1px solid #e5e7eb" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <h2 style={{ fontSize: "20px", fontWeight: "600", margin: 0 }}>✉️ Enviar Correo</h2>
+                    <button
+                      onClick={() => !enviadoCorreo && setShowEmailModal(false)}
+                      disabled={enviadoCorreo}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        fontSize: "20px",
+                        cursor: !enviadoCorreo ? "pointer" : "not-allowed",
+                        opacity: enviadoCorreo ? 0.5 : 1
                       }}
                     >
-                      <option value="CREDENCIALES">Reenviar Credenciales (Generar nueva contraseña)</option>
-                      <option value="AVISO">Aviso del Sistema</option>
-                      <option value="PERSONALIZADO">Mensaje Personalizado</option>
-                    </select>
-                  </div>
-
-                  {emailFormData.tipoPlantilla === "CREDENCIALES" && (
-                    <div style={{
-                      background: "#eff6ff",
-                      border: "1px solid #bfdbfe",
-                      borderRadius: "6px",
-                      padding: "12px",
-                      marginBottom: "16px",
-                      color: "#1e40af",
-                      fontSize: "13px"
-                    }}>
-                      ⚠️ Esta acción generará una nueva contraseña aleatoria y se la enviará al cliente por correo.
-                    </div>
-                  )}
-
-                  {emailFormData.tipoPlantilla !== "CREDENCIALES" && (
-                    <>
-                      <div className="form-group">
-                        <label className="form-label">Asunto</label>
-                        <input
-                          type="text"
-                          className="form-input"
-                          placeholder="Ej: Actualización importante"
-                          value={emailFormData.asunto}
-                          onChange={(e) =>
-                            setEmailFormData({ ...emailFormData, asunto: e.target.value })
-                          }
-                        />
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label">Mensaje</label>
-                        <textarea
-                          className="form-input"
-                          placeholder="Escribe tu mensaje..."
-                          rows={6}
-                          value={emailFormData.mensaje}
-                          onChange={(e) =>
-                            setEmailFormData({ ...emailFormData, mensaje: e.target.value })
-                          }
-                          style={{ resize: "vertical" }}
-                        />
-                      </div>
-                    </>
-                  )}
-
-                  <div className="modal-actions">
-                    <button
-                      className="btn-secondary"
-                      onClick={() => setShowEmailModal(false)}
-                      disabled={enviadoCorreo}
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      className="btn-primary"
-                      onClick={handleSendEmail}
-                      disabled={cargando || (emailFormData.tipoPlantilla !== "CREDENCIALES" && (!emailFormData.asunto || !emailFormData.mensaje))}
-                    >
-                      {cargando ? "Enviando..." : "Enviar Correo"}
+                      ✕
                     </button>
                   </div>
                 </div>
-              )}
+
+                {enviadoCorreo ? (
+                  <div style={{ padding: "48px 24px", textAlign: "center" }}>
+                    <div style={{ fontSize: "56px", marginBottom: "16px" }}>✅</div>
+                    <p style={{ color: "#16a34a", fontWeight: "600", fontSize: "16px", margin: 0 }}>
+                      Correo enviado exitosamente
+                    </p>
+                    <p style={{ color: "#666", marginTop: "8px", fontSize: "14px", margin: 0 }}>
+                      a {selectedClientForEmail?.adminEmail}
+                    </p>
+                  </div>
+                ) : (
+                  <div style={{ padding: "24px" }}>
+                    <div style={{ marginBottom: "20px" }}>
+                      <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "#666", marginBottom: "8px" }}>
+                        EMPRESA
+                      </label>
+                      <p style={{ color: "#0f172a", fontWeight: "500", margin: "0 0 4px 0", fontSize: "15px" }}>
+                        {selectedClientForEmail?.nombre}
+                      </p>
+                      <p style={{ color: "#666", fontSize: "13px", margin: 0 }}>
+                        Administrador: {selectedClientForEmail?.adminNombre} ({selectedClientForEmail?.adminEmail})
+                      </p>
+                    </div>
+
+                    <div style={{ marginBottom: "20px" }}>
+                      <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "#666", marginBottom: "8px" }}>
+                        TIPO DE PLANTILLA
+                      </label>
+                      <select
+                        value={emailFormData.tipoPlantilla}
+                        onChange={(e) => {
+                          setEmailFormData({
+                            ...emailFormData,
+                            tipoPlantilla: e.target.value,
+                            asunto: "",
+                            mensaje: ""
+                          });
+                        }}
+                        style={{
+                          width: "100%",
+                          padding: "10px 12px",
+                          borderRadius: "6px",
+                          border: "1px solid #d1d5db",
+                          fontSize: "14px",
+                          fontFamily: "inherit"
+                        }}
+                      >
+                        <option value="CREDENCIALES">Reenviar Credenciales (Generar nueva contraseña)</option>
+                        <option value="AVISO">Aviso del Sistema</option>
+                        <option value="PERSONALIZADO">Mensaje Personalizado (HTML)</option>
+                        <option value="HTML_PLANTILLA">Plantilla HTML Prediseñada</option>
+                      </select>
+                    </div>
+
+                    {emailFormData.tipoPlantilla === "CREDENCIALES" && (
+                      <div style={{
+                        background: "#eff6ff",
+                        border: "1px solid #bfdbfe",
+                        borderRadius: "6px",
+                        padding: "12px",
+                        marginBottom: "20px",
+                        color: "#1e40af",
+                        fontSize: "13px"
+                      }}>
+                        ⚠️ Esto generará una nueva contraseña y la enviará al administrador
+                      </div>
+                    )}
+
+                    {emailFormData.tipoPlantilla === "AVISO" && (
+                      <>
+                        <div style={{ marginBottom: "16px" }}>
+                          <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "#666", marginBottom: "8px" }}>
+                            ASUNTO
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Ej: Actualización importante"
+                            value={emailFormData.asunto}
+                            onChange={(e) =>
+                              setEmailFormData({ ...emailFormData, asunto: e.target.value })
+                            }
+                            style={{
+                              width: "100%",
+                              padding: "10px 12px",
+                              borderRadius: "6px",
+                              border: "1px solid #d1d5db",
+                              fontSize: "14px",
+                              fontFamily: "inherit",
+                              boxSizing: "border-box"
+                            }}
+                          />
+                        </div>
+
+                        <div style={{ marginBottom: "20px" }}>
+                          <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "#666", marginBottom: "8px" }}>
+                            MENSAJE
+                          </label>
+                          <textarea
+                            placeholder="Escribe tu mensaje..."
+                            rows={6}
+                            value={emailFormData.mensaje}
+                            onChange={(e) =>
+                              setEmailFormData({ ...emailFormData, mensaje: e.target.value })
+                            }
+                            style={{
+                              width: "100%",
+                              padding: "10px 12px",
+                              borderRadius: "6px",
+                              border: "1px solid #d1d5db",
+                              fontSize: "14px",
+                              fontFamily: "inherit",
+                              boxSizing: "border-box",
+                              resize: "vertical"
+                            }}
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {emailFormData.tipoPlantilla === "PERSONALIZADO" && (
+                      <>
+                        <div style={{ marginBottom: "16px" }}>
+                          <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "#666", marginBottom: "8px" }}>
+                            ASUNTO
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Ej: Información importante"
+                            value={emailFormData.asunto}
+                            onChange={(e) =>
+                              setEmailFormData({ ...emailFormData, asunto: e.target.value })
+                            }
+                            style={{
+                              width: "100%",
+                              padding: "10px 12px",
+                              borderRadius: "6px",
+                              border: "1px solid #d1d5db",
+                              fontSize: "14px",
+                              fontFamily: "inherit",
+                              boxSizing: "border-box"
+                            }}
+                          />
+                        </div>
+
+                        <div style={{ marginBottom: "20px" }}>
+                          <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "#666", marginBottom: "8px" }}>
+                            CONTENIDO HTML
+                          </label>
+                          <textarea
+                            placeholder="Puedes escribir HTML puro o texto simple..."
+                            rows={8}
+                            value={emailFormData.mensaje}
+                            onChange={(e) =>
+                              setEmailFormData({ ...emailFormData, mensaje: e.target.value })
+                            }
+                            style={{
+                              width: "100%",
+                              padding: "10px 12px",
+                              borderRadius: "6px",
+                              border: "1px solid #d1d5db",
+                              fontSize: "13px",
+                              fontFamily: "monospace",
+                              boxSizing: "border-box",
+                              resize: "vertical"
+                            }}
+                          />
+                          <small style={{ color: "#666", marginTop: "4px", display: "block" }}>
+                            Soporta HTML. Ej: &lt;h2&gt;Hola&lt;/h2&gt;&lt;p&gt;Tu mensaje&lt;/p&gt;
+                          </small>
+                        </div>
+                      </>
+                    )}
+
+                    {emailFormData.tipoPlantilla === "HTML_PLANTILLA" && (
+                      <>
+                        <div style={{ marginBottom: "16px" }}>
+                          <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "#666", marginBottom: "8px" }}>
+                            ASUNTO
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Ej: Bienvenido a Centrala"
+                            value={emailFormData.asunto}
+                            onChange={(e) =>
+                              setEmailFormData({ ...emailFormData, asunto: e.target.value })
+                            }
+                            style={{
+                              width: "100%",
+                              padding: "10px 12px",
+                              borderRadius: "6px",
+                              border: "1px solid #d1d5db",
+                              fontSize: "14px",
+                              fontFamily: "inherit",
+                              boxSizing: "border-box"
+                            }}
+                          />
+                        </div>
+
+                        <div style={{ marginBottom: "20px" }}>
+                          <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "#666", marginBottom: "8px" }}>
+                            CONTENIDO (Markdown/HTML)
+                          </label>
+                          <textarea
+                            placeholder="Selecciona una plantilla prediseñada o crea la tuya..."
+                            rows={8}
+                            value={emailFormData.mensaje}
+                            onChange={(e) =>
+                              setEmailFormData({ ...emailFormData, mensaje: e.target.value })
+                            }
+                            style={{
+                              width: "100%",
+                              padding: "10px 12px",
+                              borderRadius: "6px",
+                              border: "1px solid #d1d5db",
+                              fontSize: "13px",
+                              fontFamily: "monospace",
+                              boxSizing: "border-box",
+                              resize: "vertical"
+                            }}
+                          />
+                          <div style={{ marginTop: "8px", fontSize: "12px", color: "#666" }}>
+                            <button
+                              type="button"
+                              onClick={() => setEmailFormData({
+                                ...emailFormData,
+                                mensaje: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+  <h2 style="color: #0f172a; margin-top: 0;">Hola</h2>
+  <p style="color: #666; line-height: 1.6;">Tu mensaje aquí...</p>
+  <p style="color: #999; font-size: 12px; margin-top: 20px;">Equipo Centrala POS</p>
+</div>`
+                              })}
+                              style={{
+                                background: "#f3f4f6",
+                                border: "1px solid #d1d5db",
+                                padding: "4px 8px",
+                                borderRadius: "4px",
+                                cursor: "pointer",
+                                fontSize: "12px"
+                              }}
+                            >
+                              Usar plantilla básica
+                            </button>
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+                      <button
+                        onClick={() => setShowEmailModal(false)}
+                        disabled={enviadoCorreo}
+                        style={{
+                          padding: "10px 20px",
+                          borderRadius: "6px",
+                          border: "1px solid #d1d5db",
+                          background: "white",
+                          color: "#0f172a",
+                          cursor: "pointer",
+                          fontSize: "14px",
+                          fontWeight: "500"
+                        }}
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={handleSendEmail}
+                        disabled={cargando || (emailFormData.tipoPlantilla !== "CREDENCIALES" && (!emailFormData.asunto || !emailFormData.mensaje))}
+                        style={{
+                          padding: "10px 20px",
+                          borderRadius: "6px",
+                          border: "none",
+                          background: (cargando || (emailFormData.tipoPlantilla !== "CREDENCIALES" && (!emailFormData.asunto || !emailFormData.mensaje))) ? "#ccc" : "#3b82f6",
+                          color: "white",
+                          cursor: (cargando || (emailFormData.tipoPlantilla !== "CREDENCIALES" && (!emailFormData.asunto || !emailFormData.mensaje))) ? "not-allowed" : "pointer",
+                          fontSize: "14px",
+                          fontWeight: "500"
+                        }}
+                      >
+                        {cargando ? "Enviando..." : "Enviar Correo"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </>
         )}
