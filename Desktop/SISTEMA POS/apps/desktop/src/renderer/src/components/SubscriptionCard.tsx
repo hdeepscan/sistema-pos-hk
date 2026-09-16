@@ -4,9 +4,10 @@ import { useNavigate } from "react-router-dom";
 interface SubscriptionCardProps {
   fechaVencimiento?: string | Date;
   planSuscripcion?: string;
+  onRenewClick?: () => void;
 }
 
-export function SubscriptionCard({ fechaVencimiento, planSuscripcion }: SubscriptionCardProps) {
+export function SubscriptionCard({ fechaVencimiento, planSuscripcion, onRenewClick }: SubscriptionCardProps) {
   const navigate = useNavigate();
   const [timeLeft, setTimeLeft] = useState<{
     days: number;
@@ -96,7 +97,13 @@ export function SubscriptionCard({ fechaVencimiento, planSuscripcion }: Subscrip
 
       {/* Button */}
       <button
-        onClick={() => navigate("/checkout")}
+        onClick={() => {
+          if (onRenewClick) {
+            onRenewClick();
+          } else {
+            navigate("/checkout");
+          }
+        }}
         style={{
           width: "100%",
           padding: "10px 14px",

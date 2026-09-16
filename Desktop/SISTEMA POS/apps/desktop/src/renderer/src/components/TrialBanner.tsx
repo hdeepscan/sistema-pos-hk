@@ -15,35 +15,31 @@ export function TrialBanner({ onUpgradeClick }: TrialBannerProps = {}) {
   const vencimiento = new Date(empresa.fechaVencimiento);
 
   if (vencimiento <= ahora) {
-    return null; // Usar pantalla de bloqueo en su lugar
-  }
-
-  const diferencia = vencimiento.getTime() - ahora.getTime();
-  const horas = Math.ceil(diferencia / (1000 * 60 * 60));
-
-  if (horas <= 0) {
     return null;
   }
 
-  const handleUpgradeClick = () => {
+  const diferencia = vencimiento.getTime() - ahora.getTime();
+  const horasRestantes = Math.ceil(diferencia / (1000 * 60 * 60));
+
+  if (horasRestantes <= 0) {
+    return null;
+  }
+
+  const abrirModalSuscripcion = () => {
     if (onUpgradeClick) {
       onUpgradeClick();
     }
   };
 
   return (
-    <div className="w-full bg-yellow-500 text-yellow-900 px-4 py-3 flex items-center justify-between gap-4 text-sm font-medium z-50 border-b-2 border-yellow-600 shadow-md">
-      <div className="flex items-center gap-2">
-        <span className="text-lg">⏳</span>
-        <span>
-          Estás disfrutando de tu prueba gratis. Te quedan <strong className="text-base">{horas} horas</strong>.
-        </span>
-      </div>
+    <div className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white px-4 py-2.5 flex flex-wrap items-center justify-center gap-4 shadow-md relative z-50">
+      <span className="text-sm font-medium">
+        ⏳ Estás disfrutando de tu prueba gratis. Te quedan <strong className="font-bold">{horasRestantes} horas</strong>.
+      </span>
       <button
-        onClick={handleUpgradeClick}
-        className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md font-bold text-sm whitespace-nowrap transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg"
+        onClick={abrirModalSuscripcion}
+        className="bg-white text-orange-600 hover:bg-orange-50 px-5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all shadow-sm"
       >
-        <span>💳</span>
         Elegir Plan
       </button>
     </div>

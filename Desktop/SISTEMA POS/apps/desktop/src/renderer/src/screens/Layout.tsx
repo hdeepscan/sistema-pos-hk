@@ -204,6 +204,7 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
           <SubscriptionCard
             fechaVencimiento={empresa?.fechaVencimiento}
             planSuscripcion={empresa?.planSuscripcion}
+            onRenewClick={() => setShowSuscripcionModal(true)}
           />
         </div>
 
