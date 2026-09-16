@@ -27,7 +27,7 @@ interface SesionState {
     token: string;
     usuario: SesionState["usuario"];
     empresa: SesionState["empresa"];
-    sucursales: Sucursal[];
+    sucursales?: Sucursal[];
   }) => void;
   setSucursalActiva: (id: string) => void;
   setHidratado: () => void;
@@ -51,9 +51,9 @@ export const useSesionStore = create<SesionState>((set) => ({
       token,
       usuario,
       empresa,
-      sucursales,
+      sucursales: sucursales || [],
       // Auto-seta la primera sucursal como activa si hay sucursales
-      sucursalActivaId: sucursales.length > 0 ? sucursales[0].id : null
+      sucursalActivaId: (sucursales || []).length > 0 ? (sucursales || [])[0].id : null
     }),
   setSucursalActiva: (sucursalActivaId) => set({ sucursalActivaId }),
   setHidratado: () => set({ hidratado: true }),
