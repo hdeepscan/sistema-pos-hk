@@ -598,17 +598,22 @@ export default function Login() {
       if (resp.data?.token && resp.data?.usuario && resp.data?.empresa) {
         console.log("🔐 Token recibido, guardando sesión...");
 
+        const sucursales = resp.data?.sucursales || [];
+        console.log("📍 Sucursales recibidas:", sucursales.length);
+
         const { setSesion } = useSesionStore.getState();
         setSesion({
           token: resp.data.token,
           usuario: resp.data.usuario,
           empresa: resp.data.empresa,
+          sucursales,
         });
 
         // Guardar token en localStorage para persistencia
         localStorage.setItem("token", resp.data.token);
         localStorage.setItem("usuario", JSON.stringify(resp.data.usuario));
         localStorage.setItem("empresa", JSON.stringify(resp.data.empresa));
+        localStorage.setItem("sucursales", JSON.stringify(sucursales));
 
         console.log("✅ Sesión guardada, redirigiendo al dashboard...");
 

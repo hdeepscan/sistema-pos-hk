@@ -29,7 +29,7 @@ export async function authRoutes(app: FastifyInstance) {
 
     const passwordHash = await hashPassword(adminPassword);
 
-    const { empresa, usuario } = await prisma.$transaction(async (tx) => {
+    const { empresa, usuario, sucursal } = await prisma.$transaction(async (tx) => {
       // Crear empresa con free trial de 48 horas
       const trialEndsAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
       const empresa = await tx.empresa.create({
@@ -52,10 +52,10 @@ export async function authRoutes(app: FastifyInstance) {
         },
       });
       // Sucursal principal por defecto para poder empezar a operar de inmediato.
-      await tx.sucursal.create({
+      const sucursal = await tx.sucursal.create({
         data: { empresaId: empresa.id, nombre: "Principal", tipo: "FISICA", activo: true },
       });
-      return { empresa, usuario };
+      return { empresa, usuario, sucursal };
     });
 
     const token = app.jwt.sign({ usuarioId: usuario.id, empresaId: empresa.id, rol: usuario.rol });
@@ -69,6 +69,14 @@ export async function authRoutes(app: FastifyInstance) {
         permisos: permisosDe(usuario),
       },
       empresa: { id: empresa.id, nombre: empresa.nombre },
+      sucursales: [
+        {
+          id: sucursal.id,
+          nombre: sucursal.nombre,
+          tipo: sucursal.tipo,
+          activo: sucursal.activo,
+        },
+      ],
     });
   });
 
