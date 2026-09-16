@@ -582,14 +582,34 @@ export default function Login() {
       return;
     }
 
-    setRegistroDatos({
-      empresaNombre,
-      adminNombre,
-      adminEmail: email,
-      adminPassword: password,
-    });
+    setCargando(true);
+    try {
+      const resp = await api.post("/auth/registro-empresa", {
+        empresaNombre,
+        adminNombre,
+        adminEmail: email,
+        adminPassword: password,
+      });
 
-    setModo("checkout");
+      // Auto-login: guardar token y datos de sesión
+      if (resp.data.token) {
+        const { setSesion } = useSesionStore.getState();
+        setSesion({
+          token: resp.data.token,
+          usuario: resp.data.usuario,
+          empresa: resp.data.empresa,
+        });
+
+        // Guardar token en localStorage para persistencia
+        localStorage.setItem("token", resp.data.token);
+
+        // Redirigir al dashboard (aplicación principal)
+        navigate("/");
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.error || "Error en el registro");
+      setCargando(false);
+    }
   }
 
   if (modo === "checkout") {
