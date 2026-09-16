@@ -245,7 +245,7 @@ export async function creditosRoutes(app: FastifyInstance) {
 
         if (cliente?.email && empresa) {
           const montoAbonado = Number(abonosPorCliente._sum.monto ?? 0);
-          const saldoRestante = Math.max(0, venta.total - montoAbonado);
+          const saldoRestante = Math.max(0, Number(venta.total) - montoAbonado);
 
           await enviarCorreoAbono(
             { nombre: cliente.nombre, email: cliente.email },
