@@ -138,6 +138,7 @@ export default function Ventas() {
   const [filtroSucursal, setFiltroSucursal] = useState<string>(sucursalActivaId ?? "");
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
+  const [rangoFecha, setRangoFecha] = useState("personalizado");
   const [montoMin, setMontoMin] = useState("");
   const [montoMax, setMontoMax] = useState("");
   const [filtroClienteId, setFiltroClienteId] = useState("");
@@ -149,6 +150,48 @@ export default function Ventas() {
   const [seleccionada, setSeleccionada] = useState<Venta | null>(null);
   const [totalReal, setTotalReal] = useState(0);
   const [totalCartera, setTotalCartera] = useState(0);
+
+  const handleRangoFecha = (rango: string) => {
+    setRangoFecha(rango);
+
+    if (rango === "personalizado") {
+      // No hacer nada, dejar que el usuario edite manualmente
+      return;
+    }
+
+    const ahora = new Date();
+    const desdeStr = (fecha: Date) => fecha.toISOString().split("T")[0];
+
+    switch (rango) {
+      case "hoy":
+        setDesde(desdeStr(ahora));
+        setHasta(desdeStr(ahora));
+        break;
+      case "ayer":
+        const ayer = new Date(ahora);
+        ayer.setDate(ayer.getDate() - 1);
+        setDesde(desdeStr(ayer));
+        setHasta(desdeStr(ayer));
+        break;
+      case "ultimos_7":
+        const hace7 = new Date(ahora);
+        hace7.setDate(hace7.getDate() - 7);
+        setDesde(desdeStr(hace7));
+        setHasta(desdeStr(ahora));
+        break;
+      case "ultimos_15":
+        const hace15 = new Date(ahora);
+        hace15.setDate(hace15.getDate() - 15);
+        setDesde(desdeStr(hace15));
+        setHasta(desdeStr(ahora));
+        break;
+      case "este_mes":
+        const primeroDelMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+        setDesde(desdeStr(primeroDelMes));
+        setHasta(desdeStr(ahora));
+        break;
+    }
+  };
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -316,6 +359,7 @@ export default function Ventas() {
     setFiltroSucursal(sucursalActivaId ?? "");
     setDesde("");
     setHasta("");
+    setRangoFecha("personalizado");
     setMontoMin("");
     setMontoMax("");
     setFiltroClienteId("");
@@ -351,15 +395,34 @@ export default function Ventas() {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              Periodo
+            </label>
+            <select value={rangoFecha} onChange={(e) => handleRangoFecha(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }}>
+              <option value="personalizado">Personalizado</option>
+              <option value="hoy">Hoy</option>
+              <option value="ayer">Ayer</option>
+              <option value="ultimos_7">Últimos 7 días</option>
+              <option value="ultimos_15">Últimos 15 días</option>
+              <option value="este_mes">Este Mes</option>
+            </select>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
               Desde
             </label>
-            <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
+            <input type="date" value={desde} onChange={(e) => {
+              setDesde(e.target.value);
+              if (rangoFecha !== "personalizado") setRangoFecha("personalizado");
+            }} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
               Hasta
             </label>
-            <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
+            <input type="date" value={hasta} onChange={(e) => {
+              setHasta(e.target.value);
+              if (rangoFecha !== "personalizado") setRangoFecha("personalizado");
+            }} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
