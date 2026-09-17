@@ -14,7 +14,6 @@ import { ToastContainer } from "../components/ToastContainer";
 import { SubscriptionCard } from "../components/SubscriptionCard";
 import { SubscriptionGuard } from "../components/SubscriptionGuard";
 import { TrialBanner } from "../components/TrialBanner";
-import { ModalSuscripcion } from "../components/ModalSuscripcion";
 import {
   ShoppingCart,
   ReceiptText,
@@ -51,7 +50,6 @@ interface LayoutProps extends PropsWithChildren {
 export default function Layout({ children, isMobile = false, setIsMobile }: LayoutProps) {
   const { empresa, sucursales, sucursalActivaId, usuario, logout } = useSesionStore();
   const [mostrarMenuVistaToggle, setMostrarMenuVistaToggle] = useState(false);
-  const [showSuscripcionModal, setShowSuscripcionModal] = useState(false);
   const puedeVerCreditos = usePermiso("creditos.administrar");
   const puedeAdministrarUsuarios = usePermiso("usuarios.administrar");
   const puedeVerVentas = usePermiso("ventas.ver");
@@ -180,58 +178,8 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
   return (
     <SubscriptionGuard>
       {/* Trial Banner - Ancho completo encima de todo */}
-      <TrialBanner onUpgradeClick={() => setShowSuscripcionModal(true)} />
+      <TrialBanner onUpgradeClick={() => navigate("/suscripcion")} />
 
-      {/* Modal de Suscripción */}
-      {showSuscripcionModal && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          {(() => {
-            // Determinar si el trial ha vencido
-            const trialVencido = empresa?.fechaVencimiento && new Date(empresa.fechaVencimiento) <= new Date();
-
-            return (
-              <>
-                <div
-                  style={{
-                    position: "fixed",
-                    inset: 0,
-                    background: "rgba(0,0,0,0.5)",
-                    cursor: trialVencido ? "not-allowed" : "pointer",
-                    zIndex: 0
-                  }}
-                  onClick={() => !trialVencido && setShowSuscripcionModal(false)}
-                />
-                <ModalSuscripcion />
-                {!trialVencido && (
-                  <button
-                    onClick={() => setShowSuscripcionModal(false)}
-                    style={{
-                      position: "fixed",
-                      top: 20,
-                      right: 20,
-                      zIndex: 10000,
-                      background: "white",
-                      border: "none",
-                      borderRadius: "50%",
-                      width: 40,
-                      height: 40,
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 20,
-                      color: "#666"
-                    }}
-                    title="Cerrar modal"
-                  >
-                    ✕
-                  </button>
-                )}
-              </>
-            );
-          })()}
-        </div>
-      )}
 
       <div className="app-shell">
         {/* Toast Container - Notificaciones Globales */}
@@ -264,7 +212,7 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
           <SubscriptionCard
             fechaVencimiento={empresa?.fechaVencimiento}
             planSuscripcion={empresa?.planSuscripcion}
-            onRenewClick={() => setShowSuscripcionModal(true)}
+            onRenewClick={() => navigate("/suscripcion")}
           />
         </div>
 

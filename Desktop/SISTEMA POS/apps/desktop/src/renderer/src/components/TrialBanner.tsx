@@ -25,13 +25,9 @@ export function TrialBanner({ onUpgradeClick }: TrialBannerProps = {}) {
     return null;
   }
 
-  const abrirModalSuscripcion = () => {
-    console.log("[TrialBanner] Abriendo modal de suscripción...");
+  const abrirPaginaSuscripcion = () => {
     if (onUpgradeClick) {
-      console.log("[TrialBanner] Ejecutando callback onUpgradeClick");
       onUpgradeClick();
-    } else {
-      console.warn("[TrialBanner] No hay callback onUpgradeClick");
     }
   };
 
@@ -41,7 +37,7 @@ export function TrialBanner({ onUpgradeClick }: TrialBannerProps = {}) {
         ⏳ Estás disfrutando de tu prueba gratis. Te quedan <strong className="font-bold">{horasRestantes} horas</strong>.
       </span>
       <button
-        onClick={abrirModalSuscripcion}
+        onClick={abrirPaginaSuscripcion}
         className="bg-white text-orange-600 hover:bg-orange-50 px-5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all shadow-sm"
       >
         Elegir Plan
