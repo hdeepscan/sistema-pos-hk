@@ -397,7 +397,7 @@ export default function Ventas() {
             <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
               Periodo
             </label>
-            <select value={rangoFecha} onChange={(e) => handleRangoFecha(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }}>
+            <select value={rangoFecha} onChange={(e) => handleRangoFecha(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "2px solid #3B82F6", borderRadius: 8, fontSize: 14, backgroundColor: "#F0F9FF", color: "#0F172A", fontWeight: 500 }}>
               <option value="personalizado">Personalizado</option>
               <option value="hoy">Hoy</option>
               <option value="ayer">Ayer</option>
