@@ -100,13 +100,7 @@ export function SubscriptionCard({ fechaVencimiento, planSuscripcion, onRenewCli
 
       {/* Button */}
       <button
-        onClick={() => {
-          if (onRenewClick) {
-            onRenewClick();
-          } else {
-            navigate("/checkout");
-          }
-        }}
+        onClick={() => navigate("/suscripcion")}
         style={{
           width: "100%",
           padding: "10px 14px",
