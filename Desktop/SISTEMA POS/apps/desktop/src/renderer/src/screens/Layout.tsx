@@ -13,7 +13,6 @@ import { MobileMenu } from "../components/MobileMenu";
 import { ToastContainer } from "../components/ToastContainer";
 import { SubscriptionCard } from "../components/SubscriptionCard";
 import { SubscriptionGuard } from "../components/SubscriptionGuard";
-import { TrialBanner } from "../components/TrialBanner";
 import {
   ShoppingCart,
   ReceiptText,
@@ -175,11 +174,22 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
     logout();
   }
 
+  // Paywall estricto: bloquear acceso si la suscripción está vencida
+  if (empresa?.fechaVencimiento && new Date() >= new Date(empresa.fechaVencimiento)) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", padding: "20px", background: "#F8FAFC" }}>
+        <div style={{ maxWidth: "600px", textAlign: "center", background: "white", padding: "40px", borderRadius: "12px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}>
+          <h1 style={{ fontSize: "32px", fontWeight: 700, color: "#0F172A", margin: "0 0 16px 0" }}>Suscripción Requerida</h1>
+          <p style={{ fontSize: "16px", color: "#64748B", margin: "0 0 32px 0" }}>Tu acceso ha expirado. Elige un plan de pago para continuar usando Centrala POS.</p>
+          <a href="/suscripcion" style={{ display: "inline-block", background: "#3B82F6", color: "white", padding: "12px 30px", textDecoration: "none", borderRadius: "8px", fontWeight: "bold", marginBottom: "16px" }}>Ir a Planes de Suscripción</a>
+          <button onClick={() => logout()} style={{ display: "block", margin: "0 auto", background: "transparent", color: "#3B82F6", border: "1px solid #3B82F6", padding: "10px 20px", borderRadius: "8px", cursor: "pointer", fontWeight: "600" }}>Cerrar Sesión</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <SubscriptionGuard>
-      {/* Trial Banner - Ancho completo encima de todo */}
-      <TrialBanner onUpgradeClick={() => navigate("/suscripcion")} />
-
 
       <div className="app-shell">
         {/* Toast Container - Notificaciones Globales */}

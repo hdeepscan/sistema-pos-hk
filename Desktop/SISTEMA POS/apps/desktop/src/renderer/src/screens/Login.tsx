@@ -670,7 +670,7 @@ export default function Login() {
               fontSize: "13px",
               color: "#0369a1"
             }}>
-              <span style={{ fontWeight: "600" }}>✓ 48 horas gratis</span> • Sin tarjeta de crédito • Acceso completo
+              Planes de pago flexibles • Comienza hoy • Acceso completo
             </div>
           )}
 

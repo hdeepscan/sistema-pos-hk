@@ -73,10 +73,15 @@ export default function Suscripcion() {
   const estaEnTrial = empresa?.planSuscripcion === "TRIAL";
 
   const manejarPlan = (plan: Plan) => {
-    // TODO: Insertar link real de Wompi del plan
-    const urlWompi = "https://checkout.wompi.co/"; // Placeholder
-    console.log(`[Suscripcion] Abriendo pago para plan: ${plan.nombre}`);
-    window.open(urlWompi, "_blank");
+    // TODO: Reemplazar con URLs reales de Wompi para cada plan
+    const urlPorPlan: Record<string, string> = {
+      "mensual": "https://checkout.wompi.co/PLAN_MENSUAL_LINK",
+      "trimestral": "https://checkout.wompi.co/PLAN_TRIMESTRAL_LINK",
+      "anual": "https://checkout.wompi.co/PLAN_ANUAL_LINK",
+    };
+
+    const urlWompi = urlPorPlan[plan.id] || "https://checkout.wompi.co/";
+    window.location.href = urlWompi;
   };
 
   return (

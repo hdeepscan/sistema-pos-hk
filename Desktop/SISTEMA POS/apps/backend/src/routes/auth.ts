@@ -30,14 +30,13 @@ export async function authRoutes(app: FastifyInstance) {
     const passwordHash = await hashPassword(adminPassword);
 
     const { empresa, usuario, sucursal } = await prisma.$transaction(async (tx) => {
-      // Crear empresa con free trial de 48 horas
-      const trialEndsAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
+      // No hay free trial - usuario debe pagar inmediatamente para acceder
       const empresa = await tx.empresa.create({
         data: {
           nombre: empresaNombre,
-          planSuscripcion: "TRIAL",
-          plan: "TRIAL",
-          fechaVencimiento: trialEndsAt,
+          planSuscripcion: "UNPAID",
+          plan: "UNPAID",
+          fechaVencimiento: new Date(), // Vencido inmediatamente
           activo: true,
         },
       });
@@ -74,8 +73,8 @@ export async function authRoutes(app: FastifyInstance) {
           </p>
 
           <p style="color: #666; font-size: 14px; line-height: 1.6;">
-            Gracias por registrarte en Centrala POS. Tu prueba de <strong>48 horas gratis</strong> ha comenzado.
-            Durante este período, tendrás acceso completo a todas las características de nuestro sistema de punto de venta.
+            Gracias por registrarte en Centrala POS. Para acceder al dashboard y comenzar a usar el sistema,
+            necesitas completar tu pago eligiendo un plan de suscripción.
           </p>
 
           <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
@@ -89,7 +88,7 @@ export async function authRoutes(app: FastifyInstance) {
           </div>
 
           <p style="color: #666; font-size: 13px;">
-            <strong>⏳ Importante:</strong> Tu período de prueba vence en 48 horas. Recuerda elegir un plan antes de que finalice para seguir disfrutando de Centrala POS sin interrupciones.
+            <strong>💳 Acción requerida:</strong> Completa tu pago en Centrala POS para activar tu cuenta y comenzar a usar el sistema inmediatamente.
           </p>
 
           <div style="text-align: center; margin-top: 20px;">
@@ -106,7 +105,7 @@ export async function authRoutes(app: FastifyInstance) {
       await resend.emails.send({
         from: process.env.EMAIL_FROM || "noreply@centrala-pos.com",
         to: adminEmail,
-        subject: "¡Bienvenido a Centrala! Tu prueba de 48h ha comenzado",
+        subject: "¡Bienvenido a Centrala! Completa tu pago para activar tu cuenta",
         html: htmlContent,
       });
 
