@@ -218,9 +218,6 @@ export default function App() {
 
   return (
     <>
-      {/* Modal de suscripción - Trial vencido */}
-      <ModalSuscripcion />
-
       {/* Bloqueo de licencia vencida - Capa superior */}
       <LicenseBlockOverlay />
 
