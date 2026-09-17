@@ -58,11 +58,26 @@ export function ModalSuscripcion() {
     }
   };
 
-  // El modal se abre desde Layout.tsx cuando el usuario hace click en "Elegir Plan" o "Renovar Plan"
-  // No hay validaciones aquí - el modal simplemente muestra los planes disponibles
-  if (!empresa) {
+  // El modal SOLO debe mostrarse si:
+  // 1. Está en TRIAL (y se abre manualmente desde el botón "Elegir Plan")
+  // 2. O el trial ha vencido (bloqueante, sin forma de cerrar)
+  // NO debe mostrarse si tiene una suscripción activa
+  if (!empresa || empresa.planSuscripcion === null || empresa.planSuscripcion === undefined) {
     return null;
   }
+
+  // Si tiene una suscripción activa (no es TRIAL), no mostrar el modal
+  if (empresa.planSuscripcion && empresa.planSuscripcion !== "TRIAL") {
+    return null;
+  }
+
+  const ahora = new Date();
+  const vencimiento = new Date(empresa.fechaVencimiento || "");
+  const trialVencio = vencimiento <= ahora;
+
+  // Durante el trial activo, solo mostrar si el usuario lo abrió manualmente (Layout.tsx controla showSuscripcionModal)
+  // Cuando el trial vence, mostrar sin opción de cerrar (bloqueante)
+  // En este punto, Layout.tsx controla si debe estar visible o no mediante showSuscripcionModal
 
   return (
     <div style={{
