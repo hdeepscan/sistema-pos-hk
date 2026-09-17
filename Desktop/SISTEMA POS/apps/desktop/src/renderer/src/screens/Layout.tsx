@@ -185,40 +185,51 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
       {/* Modal de Suscripción */}
       {showSuscripcionModal && (
         <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div
-            style={{
-              position: "fixed",
-              inset: 0,
-              background: "rgba(0,0,0,0.5)",
-              cursor: "pointer",
-              zIndex: -1
-            }}
-            onClick={() => setShowSuscripcionModal(false)}
-          />
-          <ModalSuscripcion />
-          <button
-            onClick={() => setShowSuscripcionModal(false)}
-            style={{
-              position: "fixed",
-              top: 20,
-              right: 20,
-              zIndex: 10000,
-              background: "white",
-              border: "none",
-              borderRadius: "50%",
-              width: 40,
-              height: 40,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 20,
-              color: "#666"
-            }}
-            title="Cerrar modal"
-          >
-            ✕
-          </button>
+          {(() => {
+            // Determinar si el trial ha vencido
+            const trialVencido = empresa?.fechaVencimiento && new Date(empresa.fechaVencimiento) <= new Date();
+
+            return (
+              <>
+                <div
+                  style={{
+                    position: "fixed",
+                    inset: 0,
+                    background: "rgba(0,0,0,0.5)",
+                    cursor: trialVencido ? "not-allowed" : "pointer",
+                    zIndex: 0
+                  }}
+                  onClick={() => !trialVencido && setShowSuscripcionModal(false)}
+                />
+                <ModalSuscripcion />
+                {!trialVencido && (
+                  <button
+                    onClick={() => setShowSuscripcionModal(false)}
+                    style={{
+                      position: "fixed",
+                      top: 20,
+                      right: 20,
+                      zIndex: 10000,
+                      background: "white",
+                      border: "none",
+                      borderRadius: "50%",
+                      width: 40,
+                      height: 40,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 20,
+                      color: "#666"
+                    }}
+                    title="Cerrar modal"
+                  >
+                    ✕
+                  </button>
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
 
