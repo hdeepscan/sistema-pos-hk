@@ -26,8 +26,12 @@ export function TrialBanner({ onUpgradeClick }: TrialBannerProps = {}) {
   }
 
   const abrirModalSuscripcion = () => {
+    console.log("[TrialBanner] Abriendo modal de suscripción...");
     if (onUpgradeClick) {
+      console.log("[TrialBanner] Ejecutando callback onUpgradeClick");
       onUpgradeClick();
+    } else {
+      console.warn("[TrialBanner] No hay callback onUpgradeClick");
     }
   };
 

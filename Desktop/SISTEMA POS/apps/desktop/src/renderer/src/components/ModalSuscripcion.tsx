@@ -58,16 +58,10 @@ export function ModalSuscripcion() {
     }
   };
 
-  if (!empresa || empresa.planSuscripcion !== "TRIAL") {
+  // El modal se abre desde Layout.tsx cuando el usuario hace click en "Elegir Plan" o "Renovar Plan"
+  // No hay validaciones aquí - el modal simplemente muestra los planes disponibles
+  if (!empresa) {
     return null;
-  }
-
-  const ahora = new Date();
-  const vencimiento = new Date(empresa.fechaVencimiento || "");
-  const trialVencio = vencimiento <= ahora;
-
-  if (!trialVencio) {
-    return null; // Mostrar banner en su lugar
   }
 
   return (

@@ -101,9 +101,12 @@ export function SubscriptionCard({ fechaVencimiento, planSuscripcion, onRenewCli
       {/* Button */}
       <button
         onClick={() => {
+          console.log("[SubscriptionCard] Botón renovar presionado");
           if (onRenewClick) {
+            console.log("[SubscriptionCard] Ejecutando callback onRenewClick");
             onRenewClick();
           } else {
+            console.log("[SubscriptionCard] No hay callback, navegando a /checkout");
             navigate("/checkout");
           }
         }}
