@@ -57,14 +57,14 @@ export async function registerJwt(app: FastifyInstance) {
 
     const usuario = await prisma.usuario.findUnique({
       where: { id: request.user.usuarioId },
-      select: { activo: true, rol: true, permisos: true, es_super_admin: true, empresa: { select: { activo: true } } },
+      select: { activo: true, rol: true, permisos: true, empresa: { select: { activo: true } } },
     });
     if (!usuario || !usuario.activo || !usuario.empresa.activo) {
       return reply.code(401).send({ error: "Usuario inactivo o no encontrado" });
     }
 
     request.user.rol = usuario.rol;
-    request.user.es_super_admin = usuario.es_super_admin;
+    request.user.es_super_admin = false; // Default false hasta que migración se ejecute en Railway
     // Para roles administrativos (ADMIN, GERENTE, SUPERVISOR), siempre usa los permisos
     // del rol para garantizar sincronización automática cuando se agregan nuevos permisos.
     // Para CAJERO y BODEGA, permite personalizaciones.
