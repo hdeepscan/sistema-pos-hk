@@ -1,26 +1,7 @@
-import { useEffect, useState } from "react";
-import { api } from "../lib/api";
-import { BarChart3, Users, Building2, Globe, Languages, Smartphone } from "lucide-react";
-import { PieChart, Pie, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
+import { BarChart3, Users, Building2, Globe, Languages, Smartphone, TrendingUp } from "lucide-react";
+import { PieChart, Pie, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, LineChart, Line } from "recharts";
 
-interface Analytics {
-  totalUsuarios: number;
-  totalEmpresas: number;
-  zonasHorarias: Array<{ name: string; value: number }>;
-  idiomas: Array<{ name: string; value: number }>;
-  dispositivos: Array<{ name: string; value: number }>;
-  ultimosUsuarios: Array<{
-    id: string;
-    nombre: string;
-    email: string;
-    creadoEn: string;
-    zonaHoraria: string | null;
-    idioma: string | null;
-    dispositivo: string | null;
-    empresa: { nombre: string };
-  }>;
-}
-
+// 🎨 Colores para gráficos
 const COLORES = [
   "#3B82F6", // blue
   "#10B981", // green
@@ -30,43 +11,60 @@ const COLORES = [
   "#EC4899", // pink
 ];
 
+// 📊 DATOS MOCKEADOS - Dashboard Analytics
+const mockAnalytics = {
+  totalUsuarios: 145,
+  totalEmpresas: 48,
+  crecimientoMensual: 23,
+  dispositivosActivos: 312,
+
+  // 📱 Dispositivos
+  dispositivos: [
+    { name: "Windows", value: 85 },
+    { name: "Android", value: 42 },
+    { name: "macOS", value: 18 },
+    { name: "iOS", value: 12 },
+  ],
+
+  // 🌍 Zonas Horarias
+  zonasHorarias: [
+    { name: "UTC-5 (CO)", value: 98 },
+    { name: "UTC-6 (MX)", value: 28 },
+    { name: "UTC-4 (PA)", value: 12 },
+    { name: "UTC-7 (PE)", value: 7 },
+  ],
+
+  // 🌐 Idiomas
+  idiomas: [
+    { name: "Español", value: 128 },
+    { name: "Inglés", value: 12 },
+    { name: "Portugués", value: 5 },
+  ],
+
+  // 📈 Registros por Día
+  registrosDiarios: [
+    { date: "Lun 11", usuarios: 8 },
+    { date: "Mar 12", usuarios: 15 },
+    { date: "Mié 13", usuarios: 12 },
+    { date: "Jue 14", usuarios: 22 },
+    { date: "Vie 15", usuarios: 18 },
+    { date: "Sáb 16", usuarios: 5 },
+    { date: "Dom 17", usuarios: 3 },
+    { date: "Lun 18", usuarios: 14 },
+  ],
+
+  // 👥 Últimos usuarios
+  ultimosUsuarios: [
+    { id: "1", nombre: "Juan Pérez", email: "juan.perez@empresa.com", empresa: { nombre: "Zapatos HK" }, creadoEn: "2026-09-18", zonaHoraria: "UTC-5", dispositivo: "Windows" },
+    { id: "2", nombre: "María López", email: "maria.lopez@tienda.com", empresa: { nombre: "Accesorios Plus" }, creadoEn: "2026-09-17", zonaHoraria: "UTC-5", dispositivo: "Android" },
+    { id: "3", nombre: "Carlos Moreno", email: "carlos@negocios.com", empresa: { nombre: "Outlet 360" }, creadoEn: "2026-09-17", zonaHoraria: "UTC-6", dispositivo: "macOS" },
+    { id: "4", nombre: "Ana Torres", email: "ana.torres@store.com", empresa: { nombre: "Fashion Market" }, creadoEn: "2026-09-16", zonaHoraria: "UTC-5", dispositivo: "iOS" },
+    { id: "5", nombre: "David Morales", email: "david.morales@shop.com", empresa: { nombre: "Luxury Goods" }, creadoEn: "2026-09-16", zonaHoraria: "UTC-5", dispositivo: "Windows" },
+  ],
+};
+
 export default function SuperAdminAnalytics() {
-  const [analytics, setAnalytics] = useState<Analytics | null>(null);
-  const [cargando, setCargando] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    cargarAnalytics();
-  }, []);
-
-  async function cargarAnalytics() {
-    try {
-      setCargando(true);
-      const { data } = await api.get<Analytics>("/admin/analytics");
-      setAnalytics(data);
-    } catch (err: any) {
-      setError("Error al cargar analytics");
-      console.error(err);
-    } finally {
-      setCargando(false);
-    }
-  }
-
-  if (cargando) {
-    return (
-      <div style={{ padding: "40px", textAlign: "center" }}>
-        <div style={{ fontSize: "18px", color: "#64748B" }}>Cargando analytics...</div>
-      </div>
-    );
-  }
-
-  if (error || !analytics) {
-    return (
-      <div style={{ padding: "40px", textAlign: "center", color: "#EF4444" }}>
-        {error || "Error al cargar datos"}
-      </div>
-    );
-  }
+  const analytics = mockAnalytics;
 
   return (
     <div style={{ padding: "24px", background: "#F8FAFC", minHeight: "100vh" }}>
@@ -75,16 +73,16 @@ export default function SuperAdminAnalytics() {
         <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px" }}>
           <BarChart3 size={32} style={{ color: "#3B82F6" }} />
           <h1 style={{ margin: 0, fontSize: "28px", fontWeight: 700, color: "#0F172A" }}>
-            Dashboard de Analytics
+            📊 Analytics Dashboard
           </h1>
         </div>
         <p style={{ margin: "8px 0 0 0", color: "#64748B", fontSize: "14px" }}>
-          Visualización en tiempo real de usuarios, regiones e idiomas
+          Visión integral del sistema CENTRALA POS (Datos Simulados)
         </p>
       </div>
 
       {/* KPI Cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px", marginBottom: "32px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginBottom: "32px" }}>
         {/* Total Usuarios */}
         <div style={{ background: "white", borderRadius: "12px", padding: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -115,33 +113,18 @@ export default function SuperAdminAnalytics() {
           </div>
         </div>
 
-        {/* Zonas Horarias Únicas */}
+        {/* Crecimiento */}
         <div style={{ background: "white", borderRadius: "12px", padding: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <div>
               <p style={{ margin: 0, fontSize: "12px", color: "#64748B", fontWeight: 600, textTransform: "uppercase" }}>
-                Zonas Horarias
+                Crecimiento
               </p>
               <p style={{ margin: "8px 0 0 0", fontSize: "32px", fontWeight: 700, color: "#F59E0B" }}>
-                {analytics.zonasHorarias.length}
+                +{analytics.crecimientoMensual}%
               </p>
             </div>
-            <Globe size={32} style={{ color: "#F59E0B", opacity: 0.2 }} />
-          </div>
-        </div>
-
-        {/* Idiomas */}
-        <div style={{ background: "white", borderRadius: "12px", padding: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div>
-              <p style={{ margin: 0, fontSize: "12px", color: "#64748B", fontWeight: 600, textTransform: "uppercase" }}>
-                Idiomas
-              </p>
-              <p style={{ margin: "8px 0 0 0", fontSize: "32px", fontWeight: 700, color: "#8B5CF6" }}>
-                {analytics.idiomas.length}
-              </p>
-            </div>
-            <Languages size={32} style={{ color: "#8B5CF6", opacity: 0.2 }} />
+            <TrendingUp size={32} style={{ color: "#F59E0B", opacity: 0.2 }} />
           </div>
         </div>
 
@@ -150,10 +133,10 @@ export default function SuperAdminAnalytics() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <div>
               <p style={{ margin: 0, fontSize: "12px", color: "#64748B", fontWeight: 600, textTransform: "uppercase" }}>
-                Dispositivos
+                Dispositivos Activos
               </p>
               <p style={{ margin: "8px 0 0 0", fontSize: "32px", fontWeight: 700, color: "#EC4899" }}>
-                {analytics.dispositivos.length}
+                {analytics.dispositivosActivos}
               </p>
             </div>
             <Smartphone size={32} style={{ color: "#EC4899", opacity: 0.2 }} />
@@ -163,10 +146,36 @@ export default function SuperAdminAnalytics() {
 
       {/* Charts Grid */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))", gap: "24px", marginBottom: "32px" }}>
+        {/* Dispositivos Pie Chart */}
+        <div style={{ background: "white", borderRadius: "12px", padding: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
+          <h3 style={{ margin: "0 0 16px 0", fontSize: "16px", fontWeight: 600, color: "#0F172A" }}>
+            Distribución de Dispositivos
+          </h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie
+                data={analytics.dispositivos}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                label={({ name, value }) => `${name} ${value}%`}
+                outerRadius={80}
+                fill="#8884d8"
+                dataKey="value"
+              >
+                {analytics.dispositivos.map((_, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORES[index % COLORES.length]} />
+                ))}
+              </Pie>
+              <Tooltip formatter={(value) => `${value}%`} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+
         {/* Idiomas Pie Chart */}
         <div style={{ background: "white", borderRadius: "12px", padding: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
           <h3 style={{ margin: "0 0 16px 0", fontSize: "16px", fontWeight: 600, color: "#0F172A" }}>
-            Distribución de Idiomas
+            Preferencia de Idiomas
           </h3>
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
@@ -175,7 +184,7 @@ export default function SuperAdminAnalytics() {
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={({ name, value }) => `${name}: ${value}`}
+                label={({ name, value }) => `${name} ${value}%`}
                 outerRadius={80}
                 fill="#8884d8"
                 dataKey="value"
@@ -184,41 +193,41 @@ export default function SuperAdminAnalytics() {
                   <Cell key={`cell-${index}`} fill={COLORES[index % COLORES.length]} />
                 ))}
               </Pie>
-              <Tooltip />
+              <Tooltip formatter={(value) => `${value}%`} />
             </PieChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Dispositivos Bar Chart */}
-        <div style={{ background: "white", borderRadius: "12px", padding: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
-          <h3 style={{ margin: "0 0 16px 0", fontSize: "16px", fontWeight: 600, color: "#0F172A" }}>
-            Distribución de Dispositivos
-          </h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={analytics.dispositivos}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="value" fill="#3B82F6" radius={[8, 8, 0, 0]} />
-            </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      {/* Zonas Horarias Chart */}
+      {/* Zonas Horarias Bar Chart */}
       <div style={{ background: "white", borderRadius: "12px", padding: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", marginBottom: "32px" }}>
         <h3 style={{ margin: "0 0 16px 0", fontSize: "16px", fontWeight: 600, color: "#0F172A" }}>
-          Distribución de Zonas Horarias
+          Distribución por Zona Horaria
         </h3>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={analytics.zonasHorarias}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
+            <XAxis dataKey="name" />
             <YAxis />
             <Tooltip />
-            <Bar dataKey="value" fill="#10B981" radius={[8, 8, 0, 0]} />
+            <Bar dataKey="value" fill="#3B82F6" radius={[8, 8, 0, 0]} />
           </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Registros Diarios Line Chart */}
+      <div style={{ background: "white", borderRadius: "12px", padding: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", marginBottom: "32px" }}>
+        <h3 style={{ margin: "0 0 16px 0", fontSize: "16px", fontWeight: 600, color: "#0F172A" }}>
+          Nuevos Registros (Últimas 2 Semanas)
+        </h3>
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart data={analytics.registrosDiarios}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="date" />
+            <YAxis />
+            <Tooltip />
+            <Line type="monotone" dataKey="usuarios" stroke="#10B981" strokeWidth={2} dot={{ fill: "#10B981" }} />
+          </LineChart>
         </ResponsiveContainer>
       </div>
 
