@@ -610,7 +610,7 @@ export async function authRoutes(app: FastifyInstance) {
         success: true,
         mensaje: "Super Admin creado",
         credenciales: { email, password },
-        usuario: { id: user.id, email: user.email, es_super_admin: user.es_super_admin },
+        usuario: { id: user.id, email: user.email },
       });
     } catch (e: any) {
       return reply.code(500).send({ error: e.message });
