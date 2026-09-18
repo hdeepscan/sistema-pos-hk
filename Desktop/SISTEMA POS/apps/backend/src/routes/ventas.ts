@@ -79,8 +79,8 @@ export async function ventasRoutes(app: FastifyInstance) {
         ...(desde || hasta
           ? {
               fecha: {
-                ...(desde ? { gte: new Date(desde) } : {}),
-                ...(hasta ? { lte: new Date(`${hasta}T23:59:59.999`) } : {}),
+                ...(desde ? { gte: new Date(`${desde}T00:00:00.000Z`) } : {}),
+                ...(hasta ? { lte: new Date(`${hasta}T23:59:59.999Z`) } : {}),
               },
             }
           : {}),
@@ -187,8 +187,8 @@ export async function ventasRoutes(app: FastifyInstance) {
         ...(desde || hasta
           ? {
               fecha: {
-                ...(desde ? { gte: new Date(desde) } : {}),
-                ...(hasta ? { lte: new Date(`${hasta}T23:59:59.999`) } : {}),
+                ...(desde ? { gte: new Date(`${desde}T00:00:00.000Z`) } : {}),
+                ...(hasta ? { lte: new Date(`${hasta}T23:59:59.999Z`) } : {}),
               },
             }
           : {}),
