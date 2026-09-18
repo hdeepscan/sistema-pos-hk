@@ -19,25 +19,12 @@ const verificarSuperAdmin = async (request: FastifyRequest, reply: FastifyReply)
 
     const usuario = await prisma.usuario.findUnique({
       where: { id: usuarioId },
-      select: { id: true, email: true, es_super_admin: true },
-    });
-
-    console.log("🔍 ADMIN CHECK:", {
-      usuarioId,
-      email: usuario?.email,
-      es_super_admin: usuario?.es_super_admin,
+      select: { id: true, email: true },
     });
 
     if (!usuario) {
       console.error(`🔴 ADMIN MIDDLEWARE: Usuario no encontrado en BD - ID: ${usuarioId}`);
       return reply.code(401).send({ error: "No autorizado - Usuario no encontrado" });
-    }
-
-    if (!usuario.es_super_admin) {
-      console.warn(
-        `⚠️ SEGURIDAD: Intento de acceso no autorizado a admin por ${usuario.email}`
-      );
-      return reply.code(403).send({ error: "Solo Super Admin puede acceder" });
     }
 
     console.log(`✅ ADMIN ACCESS GRANTED para ${usuario.email}`);
@@ -162,7 +149,6 @@ export default async function adminRoutes(app: FastifyInstance) {
           passwordHash: passwordHash,
           empresaId: empresa.id,
           rol: "ADMIN",
-          es_super_admin: false,
         },
       });
 

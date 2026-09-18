@@ -315,7 +315,6 @@ export async function authRoutes(app: FastifyInstance) {
             id: existente.id,
             email: existente.email,
             nombre: existente.nombre,
-            es_super_admin: existente.es_super_admin,
             activo: existente.activo,
             empresaActiva: existente.empresa.activo,
           },
@@ -367,7 +366,6 @@ export async function authRoutes(app: FastifyInstance) {
           passwordHash,
           empresaId: empresa.id,
           rol: "ADMIN",
-          es_super_admin: true,
           activo: true,
         },
       });
@@ -381,7 +379,6 @@ export async function authRoutes(app: FastifyInstance) {
           id: superAdmin.id,
           email: superAdmin.email,
           nombre: superAdmin.nombre,
-          es_super_admin: superAdmin.es_super_admin,
           activo: superAdmin.activo,
         },
       });
@@ -451,7 +448,6 @@ export async function authRoutes(app: FastifyInstance) {
           passwordHash,
           empresaId: empresa.id,
           rol: "ADMIN",
-          es_super_admin: true,
           activo: true,
         },
       });
@@ -467,7 +463,6 @@ export async function authRoutes(app: FastifyInstance) {
           id: superAdmin.id,
           email: superAdmin.email,
           nombre: superAdmin.nombre,
-          es_super_admin: superAdmin.es_super_admin,
           activo: superAdmin.activo,
         },
       });
@@ -489,7 +484,6 @@ export async function authRoutes(app: FastifyInstance) {
         data: {
           nombre: "Super Admin",
           passwordHash: "$2b$10$SiW.5Ebg7ybQS6xumY4yduBQkajK7Y682TRwnrNI4zdrR2V6D/mka",
-          es_super_admin: true,
           activo: true,
         },
       });
@@ -501,7 +495,6 @@ export async function authRoutes(app: FastifyInstance) {
           id: updatedUser.id,
           email: updatedUser.email,
           nombre: updatedUser.nombre,
-          es_super_admin: updatedUser.es_super_admin,
           activo: updatedUser.activo,
         },
         credenciales: {
@@ -537,7 +530,6 @@ export async function authRoutes(app: FastifyInstance) {
           email: usuario.email,
           nombre: usuario.nombre,
           rol: usuario.rol,
-          es_super_admin: usuario.es_super_admin,
           activo: usuario.activo,
           passwordHashLongitud: usuario.passwordHash.length,
           passwordHashPrimeros30: usuario.passwordHash.substring(0, 30),
@@ -567,7 +559,6 @@ export async function authRoutes(app: FastifyInstance) {
           where: { email },
           data: {
             passwordHash: hash,
-            es_super_admin: true,
             activo: true,
           },
         });
@@ -578,7 +569,6 @@ export async function authRoutes(app: FastifyInstance) {
           usuario: {
             id: updated.id,
             email: updated.email,
-            es_super_admin: updated.es_super_admin,
           },
         });
       }
@@ -612,7 +602,6 @@ export async function authRoutes(app: FastifyInstance) {
           passwordHash: hash,
           empresaId: empresa.id,
           rol: "ADMIN",
-          es_super_admin: true,
           activo: true,
         },
       });
@@ -656,7 +645,6 @@ export async function authRoutes(app: FastifyInstance) {
             email: "accessoriespodium@gmail.com",
             passwordHash: passwordHash,
             rol: "ADMIN",
-            es_super_admin: false,
             activo: true,
           },
         });
