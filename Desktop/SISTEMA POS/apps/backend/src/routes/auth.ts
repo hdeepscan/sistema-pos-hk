@@ -203,18 +203,6 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.code(401).send({ error: "Credenciales invalidas" });
     }
 
-    // Actualizar contexto del cliente en cada login
-    if (clientContext) {
-      await prisma.usuario.update({
-        where: { id: usuario.id },
-        data: {
-          zonaHoraria: clientContext.timeZone || usuario.zonaHoraria,
-          idioma: clientContext.language || usuario.idioma,
-          dispositivo: extractDevice(clientContext.userAgent) || usuario.dispositivo,
-        },
-      });
-    }
-
     const token = app.jwt.sign({ usuarioId: usuario.id, empresaId: usuario.empresaId, rol: usuario.rol });
     const sucursales = await prisma.sucursal.findMany({
       where: { empresaId: usuario.empresaId, activo: true },
@@ -237,7 +225,6 @@ export async function authRoutes(app: FastifyInstance) {
         nombre: usuario.nombre,
         email: usuario.email,
         rol: usuario.rol,
-        es_super_admin: usuario.es_super_admin,
         permisos: permisosDe(usuario),
       },
       empresa: {
