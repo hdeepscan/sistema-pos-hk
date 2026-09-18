@@ -68,6 +68,15 @@ export async function ventasRoutes(app: FastifyInstance) {
         canal?: string;
         limit?: string;
       };
+    // Parsear fechas con offset UTC-5 (Colombia) para evitar desfase de zonas horarias
+    let startDate, endDate;
+    if (desde) {
+      startDate = new Date(`${desde}T00:00:00-05:00`);
+    }
+    if (hasta) {
+      endDate = new Date(`${hasta}T23:59:59-05:00`);
+    }
+
     return prisma.venta.findMany({
       where: {
         empresaId,
@@ -76,11 +85,11 @@ export async function ventasRoutes(app: FastifyInstance) {
         ...(usuarioId ? { usuarioId } : {}),
         ...(metodoPago ? { metodoPago: metodoPago as MetodoPago } : {}),
         ...(canal ? { canal: canal as CanalVenta } : {}),
-        ...(desde || hasta
+        ...(startDate || endDate
           ? {
               fecha: {
-                ...(desde ? { gte: new Date(`${desde}T00:00:00.000Z`) } : {}),
-                ...(hasta ? { lte: new Date(`${hasta}T23:59:59.999Z`) } : {}),
+                ...(startDate ? { gte: startDate } : {}),
+                ...(endDate ? { lte: endDate } : {}),
               },
             }
           : {}),
@@ -124,6 +133,15 @@ export async function ventasRoutes(app: FastifyInstance) {
         canal?: string;
       };
 
+    // Parsear fechas con offset UTC-5 (Colombia) para evitar desfase de zonas horarias
+    let startDate, endDate;
+    if (desde) {
+      startDate = new Date(`${desde}T00:00:00-05:00`);
+    }
+    if (hasta) {
+      endDate = new Date(`${hasta}T23:59:59-05:00`);
+    }
+
     // Construir el filtro base (mismo que en GET /ventas)
     const filtroBase = {
       empresaId,
@@ -132,11 +150,11 @@ export async function ventasRoutes(app: FastifyInstance) {
       ...(usuarioId ? { usuarioId } : {}),
       ...(metodoPago ? { metodoPago: metodoPago as MetodoPago } : {}),
       ...(canal ? { canal: canal as CanalVenta } : {}),
-      ...(desde || hasta
+      ...(startDate || endDate
         ? {
             fecha: {
-              ...(desde ? { gte: new Date(desde) } : {}),
-              ...(hasta ? { lte: new Date(`${hasta}T23:59:59.999`) } : {}),
+              ...(startDate ? { gte: startDate } : {}),
+              ...(endDate ? { lte: endDate } : {}),
             },
           }
         : {}),
@@ -184,11 +202,11 @@ export async function ventasRoutes(app: FastifyInstance) {
           // Solo si el cliente tiene créditos en el período
           id: { in: Array.from(clientesConCreditoEnRango) },
         },
-        ...(desde || hasta
+        ...(startDate || endDate
           ? {
               fecha: {
-                ...(desde ? { gte: new Date(`${desde}T00:00:00.000Z`) } : {}),
-                ...(hasta ? { lte: new Date(`${hasta}T23:59:59.999Z`) } : {}),
+                ...(startDate ? { gte: startDate } : {}),
+                ...(endDate ? { lte: endDate } : {}),
               },
             }
           : {}),
