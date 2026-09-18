@@ -39,6 +39,7 @@ import Contabilidad from "./screens/Contabilidad";
 import Cotizaciones from "./screens/Cotizaciones";
 import CheckoutPage from "./screens/CheckoutPage";
 import Suscripcion from "./screens/Suscripcion";
+import SuperAdminAnalytics from "./screens/SuperAdminAnalytics";
 
 export default function App() {
   const { token, sucursalActivaId, hidratado, setApiBaseUrl, setSesion, setSucursalActiva, setHidratado } =
@@ -257,6 +258,7 @@ export default function App() {
           <Route path="/contabilidad" element={<Contabilidad />} />
           <Route path="/cotizaciones" element={<Cotizaciones />} />
           <Route path="/checkout" element={<CheckoutPage />} />
+          <Route path="/admin/analytics" element={<SuperAdminAnalytics />} />
           <Route path="*" element={<Navigate to="/pos" replace />} />
         </Routes>
         </ErrorBoundary>

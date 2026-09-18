@@ -166,6 +166,11 @@ model Usuario {
   // Super Admin Dashboard: acceso especial para administración central
   es_super_admin Boolean  @default(false)
 
+  // Cliente Context: zona horaria, idioma, dispositivo capturados en auth
+  zonaHoraria  String?
+  idioma       String?
+  dispositivo  String?
+
   ventas          Venta[]
   movimientos     MovimientoInventario[]
   gastos          Gasto[]

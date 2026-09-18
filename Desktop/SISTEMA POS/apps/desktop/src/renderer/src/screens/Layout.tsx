@@ -37,6 +37,7 @@ import {
   Megaphone,
   BookOpen,
   LogOut,
+  LineChart,
 } from "lucide-react";
 
 const INTERVALO_CREDITOS_MS = 5 * 60 * 1000;
@@ -318,6 +319,16 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
             <BarChart3 size={20} className="flex-shrink-0" />
             <span>Reportes</span>
           </NavLink>
+        )}
+
+        {usuario?.es_super_admin && (
+          <>
+            <div className="sidebar-section-label">Admin</div>
+            <NavLink to="/admin/analytics" data-module="analytics" className="flex items-center gap-3">
+              <LineChart size={20} className="flex-shrink-0" />
+              <span>Analytics</span>
+            </NavLink>
+          </>
         )}
 
         <div className="sidebar-section-label">Sistema</div>

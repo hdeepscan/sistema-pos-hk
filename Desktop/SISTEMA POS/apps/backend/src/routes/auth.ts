@@ -17,12 +17,23 @@ export async function authRoutes(app: FastifyInstance) {
     }
     const { empresaNombre, adminNombre, adminEmail, adminPassword, clientContext } = request.body as any;
 
+    // Extraer dispositivo del user agent
+    const extractDevice = (ua: string): string => {
+      if (!ua) return "Unknown";
+      if (ua.includes("Windows")) return "Windows";
+      if (ua.includes("Mac")) return "macOS";
+      if (ua.includes("Linux")) return "Linux";
+      if (ua.includes("Android")) return "Android";
+      if (ua.includes("iPhone") || ua.includes("iPad")) return "iOS";
+      return "Other";
+    };
+
     // Log contexto del cliente (zona horaria, idioma, dispositivo)
     if (clientContext) {
       console.log("🌐 Contexto del cliente en registro:", {
         timeZone: clientContext.timeZone || "Unknown",
         language: clientContext.language || "Unknown",
-        userAgent: clientContext.userAgent?.substring(0, 100) || "Unknown",
+        device: extractDevice(clientContext.userAgent),
       });
     }
 
@@ -57,6 +68,10 @@ export async function authRoutes(app: FastifyInstance) {
           passwordHash,
           rol: "ADMIN",
           activo: true,
+          // Persisitir contexto del cliente
+          zonaHoraria: clientContext?.timeZone || null,
+          idioma: clientContext?.language || null,
+          dispositivo: extractDevice(clientContext?.userAgent || ""),
         },
       });
       // Sucursal principal por defecto para poder empezar a operar de inmediato.
@@ -162,13 +177,24 @@ export async function authRoutes(app: FastifyInstance) {
     const { email, password } = parsed.data;
     const { clientContext } = request.body as any;
 
+    // Extraer dispositivo del user agent
+    const extractDevice = (ua: string): string => {
+      if (!ua) return "Unknown";
+      if (ua.includes("Windows")) return "Windows";
+      if (ua.includes("Mac")) return "macOS";
+      if (ua.includes("Linux")) return "Linux";
+      if (ua.includes("Android")) return "Android";
+      if (ua.includes("iPhone") || ua.includes("iPad")) return "iOS";
+      return "Other";
+    };
+
     // Log contexto del cliente (zona horaria, idioma, dispositivo)
     if (clientContext) {
       console.log("🌐 Contexto del cliente en login:", {
         email,
         timeZone: clientContext.timeZone || "Unknown",
         language: clientContext.language || "Unknown",
-        userAgent: clientContext.userAgent?.substring(0, 100) || "Unknown",
+        device: extractDevice(clientContext.userAgent),
       });
     }
 
@@ -179,6 +205,18 @@ export async function authRoutes(app: FastifyInstance) {
     const ok = await verifyPassword(password, usuario.passwordHash);
     if (!ok) {
       return reply.code(401).send({ error: "Credenciales invalidas" });
+    }
+
+    // Actualizar contexto del cliente en cada login
+    if (clientContext) {
+      await prisma.usuario.update({
+        where: { id: usuario.id },
+        data: {
+          zonaHoraria: clientContext.timeZone || usuario.zonaHoraria,
+          idioma: clientContext.language || usuario.idioma,
+          dispositivo: extractDevice(clientContext.userAgent) || usuario.dispositivo,
+        },
+      });
     }
 
     const token = app.jwt.sign({ usuarioId: usuario.id, empresaId: usuario.empresaId, rol: usuario.rol });
@@ -761,6 +799,85 @@ export async function authRoutes(app: FastifyInstance) {
     } catch (e: any) {
       console.error("Error creando usuario:", e);
       return reply.code(500).send({ error: e.message });
+    }
+  });
+
+  // Analytics Dashboard para Super Admin
+  app.get("/admin/analytics", { preHandler: [app.authenticate] }, async (request, reply) => {
+    // Validar que sea Super Admin
+    if (!request.user.es_super_admin) {
+      return reply.code(403).send({ error: "Solo Super Admin puede acceder a analytics" });
+    }
+
+    try {
+      // 1. Total de usuarios activos
+      const totalUsuarios = await prisma.usuario.count({
+        where: { activo: true, es_super_admin: false },
+      });
+
+      // 2. Distribución de zonas horarias
+      const zonasHorarias = await prisma.usuario.groupBy({
+        by: ["zonaHoraria"],
+        where: { activo: true, es_super_admin: false },
+        _count: { id: true },
+      });
+
+      // 3. Distribución de idiomas
+      const idiomas = await prisma.usuario.groupBy({
+        by: ["idioma"],
+        where: { activo: true, es_super_admin: false },
+        _count: { id: true },
+      });
+
+      // 4. Distribución de dispositivos
+      const dispositivos = await prisma.usuario.groupBy({
+        by: ["dispositivo"],
+        where: { activo: true, es_super_admin: false },
+        _count: { id: true },
+      });
+
+      // 5. Empresas activas
+      const totalEmpresas = await prisma.empresa.count({
+        where: { activo: true },
+      });
+
+      // 6. Últimos 10 usuarios registrados (para tabla)
+      const ultimosUsuarios = await prisma.usuario.findMany({
+        where: { activo: true, es_super_admin: false },
+        select: {
+          id: true,
+          nombre: true,
+          email: true,
+          creadoEn: true,
+          zonaHoraria: true,
+          idioma: true,
+          dispositivo: true,
+          empresa: { select: { nombre: true } },
+        },
+        orderBy: { creadoEn: "desc" },
+        take: 10,
+      });
+
+      return {
+        totalUsuarios,
+        totalEmpresas,
+        zonasHorarias: zonasHorarias.map((z) => ({
+          name: z.zonaHoraria || "Unknown",
+          value: z._count.id,
+        })),
+        idiomas: idiomas.map((i) => ({
+          name: i.idioma || "Unknown",
+          value: i._count.id,
+        })),
+        dispositivos: dispositivos.map((d) => ({
+          name: d.dispositivo || "Unknown",
+          value: d._count.id,
+        })),
+        ultimosUsuarios,
+      };
+    } catch (err: any) {
+      console.error("Error en analytics:", err);
+      return reply.code(500).send({ error: "Error al obtener analytics" });
     }
   });
 }
