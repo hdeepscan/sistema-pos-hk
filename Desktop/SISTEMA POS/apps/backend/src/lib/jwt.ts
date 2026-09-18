@@ -11,6 +11,7 @@ export interface JwtPayload {
   // No se firma en el token: se completa en cada request en el hook
   // `authenticate` con datos frescos de la DB (ver mas abajo).
   permisos: Permiso[];
+  es_super_admin: boolean;
 }
 
 declare module "@fastify/jwt" {
@@ -56,13 +57,14 @@ export async function registerJwt(app: FastifyInstance) {
 
     const usuario = await prisma.usuario.findUnique({
       where: { id: request.user.usuarioId },
-      select: { activo: true, rol: true, permisos: true, empresa: { select: { activo: true } } },
+      select: { activo: true, rol: true, permisos: true, es_super_admin: true, empresa: { select: { activo: true } } },
     });
     if (!usuario || !usuario.activo || !usuario.empresa.activo) {
       return reply.code(401).send({ error: "Usuario inactivo o no encontrado" });
     }
 
     request.user.rol = usuario.rol;
+    request.user.es_super_admin = usuario.es_super_admin;
     // Para roles administrativos (ADMIN, GERENTE, SUPERVISOR), siempre usa los permisos
     // del rol para garantizar sincronización automática cuando se agregan nuevos permisos.
     // Para CAJERO y BODEGA, permite personalizaciones.
