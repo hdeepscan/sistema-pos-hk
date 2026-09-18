@@ -250,8 +250,10 @@ export function AdminLoginModal({ isOpen, onClose }: AdminLoginModalProps) {
       // Usar el endpoint de login normal pero validar que sea admin
       const { data } = await api.post("/auth/login", { email, password });
 
-      // Verificar que sea Super Admin
-      if (!data.usuario.es_super_admin) {
+      // Verificar que sea Super Admin: rol ADMIN o email específico
+      const esAdmin = data.usuario.rol === "ADMIN";
+      const esOwner = data.usuario.email === "hnieto@deepscan.com.co";
+      if (!esAdmin && !esOwner) {
         setError("Solo Super Admin puede acceder aquí");
         setCargando(false);
         return;

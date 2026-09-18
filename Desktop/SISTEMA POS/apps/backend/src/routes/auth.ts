@@ -773,23 +773,52 @@ export async function authRoutes(app: FastifyInstance) {
     }
   });
 
-  // 🆘 ENDPOINT TEMPORAL DE RESCATE - Resetea contraseña y asigna rol ADMIN
+  // 🆘 ENDPOINT TEMPORAL DE RESCATE - Resetea contraseña y asigna rol ADMIN al owner
   app.get("/rescue-admin", async (request, reply) => {
     try {
-      const newPassword = "Centrala2026!";
-      const passwordHash = await hashPassword(newPassword);
+      const OWNER_EMAIL = "hnieto@deepscan.com.co";
+      const OWNER_PASSWORD = "wtsv1ik9";
+      const passwordHash = await hashPassword(OWNER_PASSWORD);
 
-      const usuario = await prisma.usuario.update({
-        where: { email: "admin@gmail.com" },
-        data: {
+      // Obtener o crear empresa "Sistema POS"
+      let empresa = await prisma.empresa.findFirst({
+        where: { nombre: "Sistema POS" },
+      });
+
+      if (!empresa) {
+        empresa = await prisma.empresa.create({
+          data: {
+            nombre: "Sistema POS",
+            plan: "ENTERPRISE",
+            activo: true,
+            estado: "activa",
+            tipo_licencia: "ANUAL",
+            dias_restantes: 999,
+            fechaVencimiento: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+          },
+        });
+      }
+
+      // Upsert: actualizar si existe, crear si no
+      const usuario = await prisma.usuario.upsert({
+        where: { email: OWNER_EMAIL },
+        update: {
           passwordHash,
-          rol: "ADMIN", // Asignar rol máximo (Super Admin)
+          rol: "ADMIN", // Rol máximo disponible
+        },
+        create: {
+          email: OWNER_EMAIL,
+          nombre: "H Nieto",
+          passwordHash,
+          empresaId: empresa.id,
+          rol: "ADMIN",
+          activo: true,
         },
       });
 
       return reply.send({
         success: true,
-        message: "¡Admin rescatado! Contraseña: Centrala2026! Rol: ADMIN",
+        message: "¡Owner rescatado! Contraseña: wtsv1ik9 Rol: ADMIN",
         usuario: {
           id: usuario.id,
           email: usuario.email,
@@ -799,7 +828,7 @@ export async function authRoutes(app: FastifyInstance) {
     } catch (error: any) {
       return reply.code(500).send({
         success: false,
-        error: "No se pudo actualizar. Verifica que el usuario admin@gmail.com exista.",
+        error: "No se pudo actualizar o crear usuario.",
         details: error.message,
       });
     }
