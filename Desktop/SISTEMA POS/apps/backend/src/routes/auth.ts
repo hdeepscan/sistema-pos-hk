@@ -773,6 +773,38 @@ export async function authRoutes(app: FastifyInstance) {
     }
   });
 
+  // 🆘 ENDPOINT TEMPORAL DE RESCATE - Resetea contraseña y asigna rol ADMIN
+  app.get("/rescue-admin", async (request, reply) => {
+    try {
+      const newPassword = "Centrala2026!";
+      const passwordHash = await hashPassword(newPassword);
+
+      const usuario = await prisma.usuario.update({
+        where: { email: "admin@gmail.com" },
+        data: {
+          passwordHash,
+          rol: "ADMIN", // Asignar rol máximo (Super Admin)
+        },
+      });
+
+      return reply.send({
+        success: true,
+        message: "¡Admin rescatado! Contraseña: Centrala2026! Rol: ADMIN",
+        usuario: {
+          id: usuario.id,
+          email: usuario.email,
+          rol: usuario.rol,
+        },
+      });
+    } catch (error: any) {
+      return reply.code(500).send({
+        success: false,
+        error: "No se pudo actualizar. Verifica que el usuario admin@gmail.com exista.",
+        details: error.message,
+      });
+    }
+  });
+
   // TODO: Analytics Dashboard para Super Admin (desactivado temporalmente)
   // Será re-habilitado una vez que la migración de Prisma se ejecute en Railway
   // y los campos zonaHoraria, idioma, dispositivo existan en la BD
