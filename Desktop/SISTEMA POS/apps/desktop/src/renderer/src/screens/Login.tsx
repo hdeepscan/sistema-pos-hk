@@ -527,7 +527,14 @@ export default function Login() {
 
     setCargando(true);
     try {
-      const { data } = await api.post("/auth/login", { email, password });
+      // Capturar contexto del cliente de forma invisible
+      const clientContext = {
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        language: navigator.language,
+        userAgent: navigator.userAgent,
+      };
+
+      const { data } = await api.post("/auth/login", { email, password, clientContext });
       await aplicarSesion(data);
     } catch (err: any) {
       const errorMsg = mensajeError(err, "No se pudo iniciar sesión");
@@ -585,11 +592,19 @@ export default function Login() {
     try {
       console.log("📝 Iniciando registro con:", { empresaNombre, adminNombre, adminEmail: email });
 
+      // Capturar contexto del cliente de forma invisible
+      const clientContext = {
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        language: navigator.language,
+        userAgent: navigator.userAgent,
+      };
+
       const resp = await api.post("/auth/registro-empresa", {
         empresaNombre,
         adminNombre,
         adminEmail: email,
         adminPassword: password,
+        clientContext,
       });
 
       console.log("✅ Respuesta del servidor:", resp.data);

@@ -15,7 +15,16 @@ export async function authRoutes(app: FastifyInstance) {
     if (!parsed.success) {
       return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
     }
-    const { empresaNombre, adminNombre, adminEmail, adminPassword } = parsed.data;
+    const { empresaNombre, adminNombre, adminEmail, adminPassword, clientContext } = request.body as any;
+
+    // Log contexto del cliente (zona horaria, idioma, dispositivo)
+    if (clientContext) {
+      console.log("🌐 Contexto del cliente en registro:", {
+        timeZone: clientContext.timeZone || "Unknown",
+        language: clientContext.language || "Unknown",
+        userAgent: clientContext.userAgent?.substring(0, 100) || "Unknown",
+      });
+    }
 
     const usuarioExistente = await prisma.usuario.findUnique({ where: { email: adminEmail } });
     if (usuarioExistente) {
@@ -151,6 +160,17 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
     }
     const { email, password } = parsed.data;
+    const { clientContext } = request.body as any;
+
+    // Log contexto del cliente (zona horaria, idioma, dispositivo)
+    if (clientContext) {
+      console.log("🌐 Contexto del cliente en login:", {
+        email,
+        timeZone: clientContext.timeZone || "Unknown",
+        language: clientContext.language || "Unknown",
+        userAgent: clientContext.userAgent?.substring(0, 100) || "Unknown",
+      });
+    }
 
     const usuario = await prisma.usuario.findUnique({ where: { email }, include: { empresa: true } });
     if (!usuario || !usuario.activo || !usuario.empresa.activo) {
