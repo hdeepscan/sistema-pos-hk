@@ -68,10 +68,6 @@ export async function authRoutes(app: FastifyInstance) {
           passwordHash,
           rol: "ADMIN",
           activo: true,
-          // Persisitir contexto del cliente
-          zonaHoraria: clientContext?.timeZone || null,
-          idioma: clientContext?.language || null,
-          dispositivo: extractDevice(clientContext?.userAgent || ""),
         },
       });
       // Sucursal principal por defecto para poder empezar a operar de inmediato.
@@ -802,82 +798,12 @@ export async function authRoutes(app: FastifyInstance) {
     }
   });
 
-  // Analytics Dashboard para Super Admin
+  // TODO: Analytics Dashboard para Super Admin (desactivado temporalmente)
+  // Será re-habilitado una vez que la migración de Prisma se ejecute en Railway
+  // y los campos zonaHoraria, idioma, dispositivo existan en la BD
+  /*
   app.get("/admin/analytics", { preHandler: [app.authenticate] }, async (request, reply) => {
-    // Validar que sea Super Admin
-    if (!request.user.es_super_admin) {
-      return reply.code(403).send({ error: "Solo Super Admin puede acceder a analytics" });
-    }
-
-    try {
-      // 1. Total de usuarios activos
-      const totalUsuarios = await prisma.usuario.count({
-        where: { activo: true, es_super_admin: false },
-      });
-
-      // 2. Distribución de zonas horarias
-      const zonasHorarias = await prisma.usuario.groupBy({
-        by: ["zonaHoraria"],
-        where: { activo: true, es_super_admin: false },
-        _count: { id: true },
-      });
-
-      // 3. Distribución de idiomas
-      const idiomas = await prisma.usuario.groupBy({
-        by: ["idioma"],
-        where: { activo: true, es_super_admin: false },
-        _count: { id: true },
-      });
-
-      // 4. Distribución de dispositivos
-      const dispositivos = await prisma.usuario.groupBy({
-        by: ["dispositivo"],
-        where: { activo: true, es_super_admin: false },
-        _count: { id: true },
-      });
-
-      // 5. Empresas activas
-      const totalEmpresas = await prisma.empresa.count({
-        where: { activo: true },
-      });
-
-      // 6. Últimos 10 usuarios registrados (para tabla)
-      const ultimosUsuarios = await prisma.usuario.findMany({
-        where: { activo: true, es_super_admin: false },
-        select: {
-          id: true,
-          nombre: true,
-          email: true,
-          creadoEn: true,
-          zonaHoraria: true,
-          idioma: true,
-          dispositivo: true,
-          empresa: { select: { nombre: true } },
-        },
-        orderBy: { creadoEn: "desc" },
-        take: 10,
-      });
-
-      return {
-        totalUsuarios,
-        totalEmpresas,
-        zonasHorarias: zonasHorarias.map((z) => ({
-          name: z.zonaHoraria || "Unknown",
-          value: z._count.id,
-        })),
-        idiomas: idiomas.map((i) => ({
-          name: i.idioma || "Unknown",
-          value: i._count.id,
-        })),
-        dispositivos: dispositivos.map((d) => ({
-          name: d.dispositivo || "Unknown",
-          value: d._count.id,
-        })),
-        ultimosUsuarios,
-      };
-    } catch (err: any) {
-      console.error("Error en analytics:", err);
-      return reply.code(500).send({ error: "Error al obtener analytics" });
-    }
+    // ... analytics implementation ...
   });
+  */
 }

@@ -11,7 +11,6 @@ export interface JwtPayload {
   // No se firma en el token: se completa en cada request en el hook
   // `authenticate` con datos frescos de la DB (ver mas abajo).
   permisos: Permiso[];
-  es_super_admin: boolean;
 }
 
 declare module "@fastify/jwt" {
@@ -64,7 +63,6 @@ export async function registerJwt(app: FastifyInstance) {
     }
 
     request.user.rol = usuario.rol;
-    request.user.es_super_admin = false; // Default false hasta que migración se ejecute en Railway
     // Para roles administrativos (ADMIN, GERENTE, SUPERVISOR), siempre usa los permisos
     // del rol para garantizar sincronización automática cuando se agregan nuevos permisos.
     // Para CAJERO y BODEGA, permite personalizaciones.
