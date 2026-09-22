@@ -820,6 +820,49 @@ export async function authRoutes(app: FastifyInstance) {
     }
   });
 
+  // 🔐 ENDPOINT TEMPORAL DE RESET - Resetear contraseña de usuarios específicos
+  app.post("/auth/reset-password-temp/:email", async (request, reply) => {
+    try {
+      const { email } = request.params as { email: string };
+      const { newPassword } = request.body as { newPassword: string };
+
+      // Solo permitir reset para estos dos usuarios
+      const allowedEmails = ["admin@gmail.com", "cristiansuarez339@gmail.com"];
+      if (!allowedEmails.includes(email)) {
+        return reply.code(403).send({
+          error: "Email no autorizado para reset",
+        });
+      }
+
+      if (!newPassword || newPassword.length < 6) {
+        return reply.code(400).send({
+          error: "Contraseña debe tener mínimo 6 caracteres",
+        });
+      }
+
+      const passwordHash = await hashPassword(newPassword);
+      const usuario = await prisma.usuario.update({
+        where: { email },
+        data: { passwordHash },
+      });
+
+      return reply.send({
+        success: true,
+        message: `✅ Contraseña de ${email} reseteada exitosamente`,
+        usuario: {
+          id: usuario.id,
+          email: usuario.email,
+          nuevaContraseña: newPassword,
+        },
+      });
+    } catch (error: any) {
+      return reply.code(500).send({
+        error: "Error reseteando contraseña",
+        details: error.message,
+      });
+    }
+  });
+
   // TODO: Analytics Dashboard para Super Admin (desactivado temporalmente)
   // Será re-habilitado una vez que la migración de Prisma se ejecute en Railway
   // y los campos zonaHoraria, idioma, dispositivo existan en la BD
