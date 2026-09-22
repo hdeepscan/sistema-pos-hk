@@ -475,12 +475,13 @@ const loginStyles = `
 
 export default function Login() {
   const navigate = useNavigate();
-  const [modo, setModo] = useState<"login" | "registro">("login");
+  const [modo, setModo] = useState<"login" | "registro" | "forgot-password">("login");
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mostrarPassword, setMostrarPassword] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({});
   const [adminModalOpen, setAdminModalOpen] = useState(false);
+  const [forgotPasswordSuccess, setForgotPasswordSuccess] = useState(false);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -568,6 +569,38 @@ export default function Login() {
   function handleAdminAccess() {
     // Abrir modal de login para administradores
     setAdminModalOpen(true);
+  }
+
+  async function handleForgotPassword(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+
+    if (!email) {
+      setError("Por favor ingresa tu email");
+      return;
+    }
+
+    if (!email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+      setError("Email inválido");
+      return;
+    }
+
+    setCargando(true);
+    try {
+      await api.post("/auth/forgot-password", { email });
+      setForgotPasswordSuccess(true);
+      // Limpiar después de 2 segundos
+      setTimeout(() => {
+        setForgotPasswordSuccess(false);
+        setModo("login");
+        setEmail("");
+      }, 2000);
+    } catch (err: any) {
+      const errorMsg = mensajeError(err, "No se pudo procesar la solicitud");
+      setError(errorMsg);
+    } finally {
+      setCargando(false);
+    }
   }
 
   async function handleRegistro(e: React.FormEvent) {
@@ -703,8 +736,15 @@ export default function Login() {
             </div>
           )}
 
+          {/* Success Message */}
+          {forgotPasswordSuccess && (
+            <div className="login-error" style={{ background: "linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, rgba(22, 163, 74, 0.05) 100%)", border: "1px solid rgba(34, 197, 94, 0.25)", color: "#16a34a" }}>
+              ✅ Enlace de recuperación enviado. Revisa tu email (también la carpeta de spam).
+            </div>
+          )}
+
           {/* Form */}
-          <form className="login-form" onSubmit={modo === "login" ? handleLogin : handleRegistro}>
+          <form className="login-form" onSubmit={modo === "login" ? handleLogin : modo === "forgot-password" ? handleForgotPassword : handleRegistro}>
             {/* Registro fields */}
             {modo === "registro" && (
               <>
@@ -740,6 +780,22 @@ export default function Login() {
               </>
             )}
 
+            {/* Forgot Password info */}
+            {modo === "forgot-password" && (
+              <div style={{
+                background: "linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%)",
+                border: "1px solid #0ea5e9",
+                borderRadius: "8px",
+                padding: "12px 16px",
+                marginBottom: "12px",
+                textAlign: "center",
+                fontSize: "13px",
+                color: "#0369a1"
+              }}>
+                Ingresa tu email y te enviaremos un enlace para restablecer tu contraseña
+              </div>
+            )}
+
             {/* Email */}
             <div className="form-group">
               <label className="form-label">
@@ -759,33 +815,65 @@ export default function Login() {
             </div>
 
             {/* Password */}
-            <div className="form-group">
-              <label className="form-label">
-                Contraseña {modo === "registro" && "(8+ caracteres)"}
-              </label>
-              <div className="form-input-with-icon">
-                <input
-                  type={mostrarPassword ? "text" : "password"}
-                  className="form-input"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    setFieldErrors({ ...fieldErrors, password: "" });
-                  }}
-                  minLength={modo === "registro" ? 8 : undefined}
-                />
-                <button
-                  type="button"
-                  className="form-input-toggle"
-                  onClick={() => setMostrarPassword(!mostrarPassword)}
-                  title={mostrarPassword ? "Ocultar" : "Mostrar"}
-                >
-                  {mostrarPassword ? <IconoOjoTachado size={16} /> : <IconoOjo size={16} />}
-                </button>
+            {(modo === "login" || modo === "registro") && (
+              <div className="form-group">
+                <label className="form-label">
+                  Contraseña {modo === "registro" && "(8+ caracteres)"}
+                </label>
+                <div className="form-input-with-icon">
+                  <input
+                    type={mostrarPassword ? "text" : "password"}
+                    className="form-input"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setFieldErrors({ ...fieldErrors, password: "" });
+                    }}
+                    minLength={modo === "registro" ? 8 : undefined}
+                  />
+                  <button
+                    type="button"
+                    className="form-input-toggle"
+                    onClick={() => setMostrarPassword(!mostrarPassword)}
+                    title={mostrarPassword ? "Ocultar" : "Mostrar"}
+                  >
+                    {mostrarPassword ? <IconoOjoTachado size={16} /> : <IconoOjo size={16} />}
+                  </button>
+                </div>
+                {fieldErrors.password && <div className="form-error">{fieldErrors.password}</div>}
+
+                {/* Forgot Password Link */}
+                {modo === "login" && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModo("forgot-password");
+                      setError(null);
+                      setFieldErrors({});
+                      setPassword("");
+                    }}
+                    style={{
+                      marginTop: "8px",
+                      background: "none",
+                      border: "none",
+                      color: "#3B82F6",
+                      fontSize: "12px",
+                      fontWeight: "600",
+                      cursor: "pointer",
+                      textDecoration: "none",
+                      transition: "color 0.2s",
+                      padding: 0,
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = "#2563EB")}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = "#3B82F6")}
+                    title="¿Olvidaste tu contraseña?"
+                  >
+                    ¿Olvidaste tu contraseña?
+                  </button>
+                )}
               </div>
-              {fieldErrors.password && <div className="form-error">{fieldErrors.password}</div>}
-            </div>
+            )}
 
             {/* Submit */}
             <button type="submit" className="submit-button" disabled={cargando}>
@@ -794,10 +882,14 @@ export default function Login() {
                 {cargando
                   ? modo === "login"
                     ? "Accediendo..."
-                    : "Procesando..."
+                    : modo === "forgot-password"
+                      ? "Enviando..."
+                      : "Procesando..."
                   : modo === "login"
                     ? "Acceder"
-                    : "Crear Cuenta"}
+                    : modo === "forgot-password"
+                      ? "Enviar Enlace"
+                      : "Crear Cuenta"}
               </span>
             </button>
           </form>
@@ -856,6 +948,21 @@ export default function Login() {
                   }}
                 >
                   Regístrate aquí
+                </button>
+              </>
+            ) : modo === "forgot-password" ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModo("login");
+                    setError(null);
+                    setFieldErrors({});
+                    setEmail("");
+                    setPassword("");
+                  }}
+                >
+                  Volver al Login
                 </button>
               </>
             ) : (

@@ -40,6 +40,8 @@ import Cotizaciones from "./screens/Cotizaciones";
 import CheckoutPage from "./screens/CheckoutPage";
 import Suscripcion from "./screens/Suscripcion";
 import SuperAdminAnalytics from "./screens/SuperAdminAnalytics";
+import ResetPassword from "./screens/ResetPassword";
+import PerfilSettings from "./screens/PerfilSettings";
 
 export default function App() {
   const { token, sucursalActivaId, hidratado, setApiBaseUrl, setSesion, setSucursalActiva, setHidratado } =
@@ -171,6 +173,7 @@ export default function App() {
   if (!token) {
     return (
       <Routes>
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="*" element={<Login />} />
       </Routes>
     );
@@ -259,6 +262,7 @@ export default function App() {
           <Route path="/cotizaciones" element={<Cotizaciones />} />
           <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="/admin/analytics" element={<SuperAdminAnalytics />} />
+          <Route path="/perfil" element={<PerfilSettings />} />
           <Route path="*" element={<Navigate to="/pos" replace />} />
         </Routes>
         </ErrorBoundary>

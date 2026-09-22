@@ -386,6 +386,12 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
           <ThemeToggle />
         </div>
 
+        {/* Mi Perfil */}
+        <NavLink to="/perfil" data-module="perfil" className="flex items-center gap-3" style={{ marginBottom: 12 }}>
+          <UserCog size={20} className="flex-shrink-0" />
+          <span>Mi Perfil</span>
+        </NavLink>
+
         <button className="secondary" onClick={cerrarSesion} type="button" style={{ marginTop: 0, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
           <LogOut size={20} />
           <span>Cerrar sesion</span>
