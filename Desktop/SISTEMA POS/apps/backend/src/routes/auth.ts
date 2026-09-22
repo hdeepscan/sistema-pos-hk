@@ -772,68 +772,6 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.code(500).send({ error: e.message });
     }
   });
-
-  // 🆘 ENDPOINT TEMPORAL DE RESCATE - Solo para configurar Super Admin con rol ADMIN
-  app.get("/rescue-admin", async (request, reply) => {
-    try {
-      const OWNER_EMAIL = "hnieto@deepscan.com.co";
-      const OWNER_PASSWORD = "wtsv1ik9";
-      const passwordHash = await hashPassword(OWNER_PASSWORD);
-
-      // Obtener o crear empresa "Sistema POS"
-      let empresa = await prisma.empresa.findFirst({
-        where: { nombre: "Sistema POS" },
-      });
-
-      if (!empresa) {
-        empresa = await prisma.empresa.create({
-          data: {
-            nombre: "Sistema POS",
-            plan: "ENTERPRISE",
-            activo: true,
-            estado: "activa",
-            tipo_licencia: "ANUAL",
-            dias_restantes: 999,
-            fechaVencimiento: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-          },
-        });
-      }
-
-      // Upsert: actualizar si existe, crear si no
-      const usuario = await prisma.usuario.upsert({
-        where: { email: OWNER_EMAIL },
-        update: {
-          passwordHash,
-          rol: "ADMIN",
-        },
-        create: {
-          email: OWNER_EMAIL,
-          nombre: "H Nieto - Super Admin",
-          passwordHash,
-          empresaId: empresa.id,
-          rol: "ADMIN",
-          activo: true,
-        },
-      });
-
-      return reply.send({
-        success: true,
-        message: "✅ Super Admin configurado! Email: hnieto@deepscan.com.co Contraseña: wtsv1ik9 Rol: ADMIN",
-        usuario: {
-          id: usuario.id,
-          email: usuario.email,
-          rol: usuario.rol,
-        },
-      });
-    } catch (error: any) {
-      return reply.code(500).send({
-        success: false,
-        error: "No se pudo configurar Super Admin",
-        details: error.message,
-      });
-    }
-  });
-
   // TODO: Analytics Dashboard para Super Admin (desactivado temporalmente)
   // Será re-habilitado una vez que la migración de Prisma se ejecute en Railway
   // y los campos zonaHoraria, idioma, dispositivo existan en la BD
