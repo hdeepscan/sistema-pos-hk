@@ -772,96 +772,212 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.code(500).send({ error: e.message });
     }
   });
-  // 🔍 ENDPOINT TEMPORAL DE DIAGNÓSTICO - Verificar estado de usuarios
-  app.get("/auth/debug/:email", async (request, reply) => {
+  // 🔐 POST /auth/forgot-password - Solicitar reset de contraseña
+  app.post("/auth/forgot-password", async (request, reply) => {
     try {
-      const { email } = request.params as { email: string };
-      const usuario = await prisma.usuario.findUnique({
-        where: { email },
-        include: { empresa: true },
-      });
+      const { email } = request.body as { email: string };
 
+      const usuario = await prisma.usuario.findUnique({ where: { email } });
+
+      // Por seguridad, no revelamos si el usuario existe o no
       if (!usuario) {
         return reply.send({
-          existe: false,
-          email,
-          mensaje: "Usuario no encontrado en la BD",
+          success: true,
+          message: "Si el email existe, recibirás un enlace para resetear tu contraseña",
         });
       }
 
+      // Generar token aleatorio
+      const resetToken = require("crypto").randomBytes(32).toString("hex");
+      const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+
+      // Guardar token en la BD
+      await prisma.usuario.update({
+        where: { email },
+        data: { resetPasswordToken: resetToken, resetPasswordExpires: resetExpires },
+      });
+
+      // Enviar email con enlace de reset
+      try {
+        const { Resend } = await import("resend");
+        const resend = new Resend(process.env.RESEND_API_KEY);
+
+        const resetLink = `https://centrala.up.railway.app/reset-password?token=${resetToken}`;
+
+        await resend.emails.send({
+          from: process.env.EMAIL_FROM || "noreply@centrala-pos.com",
+          to: email,
+          subject: "Recupera tu contraseña en Centrala POS",
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <h2 style="color: #0f172a;">Recupera tu contraseña</h2>
+              <p style="color: #64748b; font-size: 14px; line-height: 1.6;">
+                Recibimos una solicitud para resetear tu contraseña. Haz clic en el botón de abajo para continuar.
+              </p>
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${resetLink}" style="background: #3B82F6; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
+                  Resetear Contraseña
+                </a>
+              </div>
+              <p style="color: #94a3b8; font-size: 12px;">
+                Este enlace expira en 1 hora. Si no solicitaste este reset, ignora este email.
+              </p>
+            </div>
+          `,
+        });
+
+        console.log(`✅ Email de reset enviado a ${email}`);
+      } catch (emailError: any) {
+        console.error("⚠️ Error enviando email de reset:", emailError.message);
+      }
+
       return reply.send({
-        existe: true,
-        usuario: {
-          id: usuario.id,
-          email: usuario.email,
-          nombre: usuario.nombre,
-          rol: usuario.rol,
-          activo: usuario.activo,
-          passwordHashLength: usuario.passwordHash.length,
-          passwordHashFirst20: usuario.passwordHash.substring(0, 20),
-        },
-        empresa: {
-          id: usuario.empresa.id,
-          nombre: usuario.empresa.nombre,
-          activo: usuario.empresa.activo,
-          estado: usuario.empresa.estado,
-        },
-        diagnostico: {
-          usuarioActivo: usuario.activo ? "✅ SÍ" : "❌ NO",
-          empresaActiva: usuario.empresa.activo ? "✅ SÍ" : "❌ NO",
-          puedeEntrar: usuario.activo && usuario.empresa.activo ? "✅ SÍ" : "❌ NO - Revisar arriba",
-        },
+        success: true,
+        message: "Si el email existe, recibirás un enlace para resetear tu contraseña",
       });
     } catch (error: any) {
+      console.error("Error en forgot-password:", error);
       return reply.code(500).send({
-        error: "Error en diagnóstico",
-        details: error.message,
+        error: "Error procesando solicitud",
       });
     }
   });
 
-  // 🔐 ENDPOINT TEMPORAL DE RESET - Resetear contraseña de usuarios específicos
-  app.post("/auth/reset-password-temp/:email", async (request, reply) => {
+  // 🔐 POST /auth/reset-password - Resetear contraseña con token
+  app.post("/auth/reset-password", async (request, reply) => {
     try {
-      const { email } = request.params as { email: string };
-      const { newPassword } = request.body as { newPassword: string };
+      const { token, newPassword } = request.body as { token: string; newPassword: string };
 
-      // Solo permitir reset para estos dos usuarios
-      const allowedEmails = ["admin@gmail.com", "cristiansuarez339@gmail.com"];
-      if (!allowedEmails.includes(email)) {
-        return reply.code(403).send({
-          error: "Email no autorizado para reset",
-        });
-      }
-
-      if (!newPassword || newPassword.length < 6) {
+      if (!token || !newPassword || newPassword.length < 6) {
         return reply.code(400).send({
-          error: "Contraseña debe tener mínimo 6 caracteres",
+          error: "Token y contraseña válidos requeridos",
         });
       }
 
+      // Buscar usuario con token válido
+      const usuario = await prisma.usuario.findFirst({
+        where: {
+          resetPasswordToken: token,
+          resetPasswordExpires: { gt: new Date() },
+        },
+      });
+
+      if (!usuario) {
+        return reply.code(401).send({
+          error: "Token inválido o expirado",
+        });
+      }
+
+      // Hashear nueva contraseña
       const passwordHash = await hashPassword(newPassword);
-      const usuario = await prisma.usuario.update({
-        where: { email },
-        data: { passwordHash },
+
+      // Actualizar contraseña y limpiar token
+      await prisma.usuario.update({
+        where: { id: usuario.id },
+        data: {
+          passwordHash,
+          resetPasswordToken: null,
+          resetPasswordExpires: null,
+        },
       });
 
       return reply.send({
         success: true,
-        message: `✅ Contraseña de ${email} reseteada exitosamente`,
-        usuario: {
-          id: usuario.id,
-          email: usuario.email,
-          nuevaContraseña: newPassword,
-        },
+        message: "Contraseña reseteada exitosamente",
       });
     } catch (error: any) {
+      console.error("Error en reset-password:", error);
       return reply.code(500).send({
         error: "Error reseteando contraseña",
-        details: error.message,
       });
     }
   });
+
+  // 👤 PUT /usuarios/perfil - Actualizar perfil del usuario autenticado
+  app.put(
+    "/usuarios/perfil",
+    { preHandler: [app.authenticate] },
+    async (request, reply) => {
+      try {
+        const { nuevoEmail, nuevaPassword, currentPassword } = request.body as {
+          nuevoEmail?: string;
+          nuevaPassword?: string;
+          currentPassword?: string;
+        };
+
+        const usuario = await prisma.usuario.findUnique({
+          where: { id: request.user.usuarioId },
+        });
+
+        if (!usuario) {
+          return reply.code(401).send({ error: "Usuario no encontrado" });
+        }
+
+        // Si va a cambiar contraseña, validar la actual
+        if (nuevaPassword) {
+          if (!currentPassword) {
+            return reply.code(400).send({
+              error: "Contraseña actual requerida para cambiar contraseña",
+            });
+          }
+
+          const passwordOk = await verifyPassword(
+            currentPassword,
+            usuario.passwordHash
+          );
+          if (!passwordOk) {
+            return reply.code(401).send({
+              error: "Contraseña actual incorrecta",
+            });
+          }
+
+          if (nuevaPassword.length < 6) {
+            return reply.code(400).send({
+              error: "Nueva contraseña debe tener mínimo 6 caracteres",
+            });
+          }
+        }
+
+        // Verificar si el nuevo email ya existe (si es diferente)
+        if (nuevoEmail && nuevoEmail !== usuario.email) {
+          const existeEmail = await prisma.usuario.findUnique({
+            where: { email: nuevoEmail },
+          });
+          if (existeEmail) {
+            return reply.code(409).send({
+              error: "El email ya está registrado",
+            });
+          }
+        }
+
+        // Actualizar perfil
+        const usuarioActualizado = await prisma.usuario.update({
+          where: { id: request.user.usuarioId },
+          data: {
+            email: nuevoEmail || usuario.email,
+            passwordHash: nuevaPassword
+              ? await hashPassword(nuevaPassword)
+              : usuario.passwordHash,
+          },
+        });
+
+        return reply.send({
+          success: true,
+          message: "Perfil actualizado exitosamente",
+          usuario: {
+            id: usuarioActualizado.id,
+            email: usuarioActualizado.email,
+            nombre: usuarioActualizado.nombre,
+          },
+        });
+      } catch (error: any) {
+        console.error("Error actualizando perfil:", error);
+        return reply.code(500).send({
+          error: "Error actualizando perfil",
+        });
+      }
+    }
+  );
 
   // TODO: Analytics Dashboard para Super Admin (desactivado temporalmente)
   // Será re-habilitado una vez que la migración de Prisma se ejecute en Railway

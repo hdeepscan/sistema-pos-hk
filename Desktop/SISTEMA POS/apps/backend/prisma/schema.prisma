@@ -163,6 +163,10 @@ model Usuario {
   activo       Boolean    @default(true)
   creadoEn     DateTime   @default(now())
 
+  // Recuperación de contraseña
+  resetPasswordToken String?
+  resetPasswordExpires DateTime?
+
   ventas          Venta[]
   movimientos     MovimientoInventario[]
   gastos          Gasto[]
