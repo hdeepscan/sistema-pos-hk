@@ -41,14 +41,9 @@ import adminRoutes from "./routes/admin.js";
 import { iniciarPollerShopify } from "./lib/poller.js";
 import { iniciarBackupAutomatico } from "./lib/auto-backup.js";
 import { iniciarShopifyQueueWorker } from "./lib/shopify-queue-worker.js";
-import { initializeDatabase } from "./lib/initialize-db.js";
-
 // bodyLimit ampliado para permitir subir imagenes de producto en base64 y
 // restaurar backups (.sql) de varios negocios/años de historial.
 const app = Fastify({ logger: true, bodyLimit: 200 * 1024 * 1024 });
-
-// Inicializar la base de datos antes de hacer cualquier cosa
-await initializeDatabase();
 
 await app.register(cors, { origin: process.env.CORS_ORIGIN ?? "*" });
 await registerJwt(app);
@@ -174,7 +169,7 @@ app.get("/*", async (request, reply) => {
 // 🔨 Sincronizar BD desde adentro de Node (porque Railway ignora el script start en package.json)
 try {
   console.log("🔨 Sincronizando BD forzosamente desde adentro de Node...");
-  execSync("npx prisma db push --accept-data-loss", { stdio: "inherit" });
+  execSync("npx prisma db push --accept-data-loss --skip-generate", { stdio: "inherit" });
   console.log("✅ Sincronización de BD completada.");
 } catch (err) {
   console.error("💥 Falló la sincronización interna:", err);
