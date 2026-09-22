@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { randomBytes } from "crypto";
 import { LoginSchema, RegistroEmpresaSchema, PERMISOS_POR_ROL } from "@sistema-pos/shared";
 import { prisma } from "../lib/prisma.js";
 import { hashPassword, verifyPassword } from "../lib/password.js";
@@ -788,7 +789,7 @@ export async function authRoutes(app: FastifyInstance) {
       }
 
       // Generar token aleatorio
-      const resetToken = require("crypto").randomBytes(32).toString("hex");
+      const resetToken = randomBytes(32).toString("hex");
       const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
 
       // Guardar token en la BD
