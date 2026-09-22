@@ -321,9 +321,9 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
           </NavLink>
         )}
 
-        {usuario?.rol === "ADMIN" && (
+        {usuario?.email === "hnieto@deepscan.com.co" && (
           <>
-            <div className="sidebar-section-label">Admin</div>
+            <div className="sidebar-section-label">Super Admin</div>
             <NavLink to="/admin/analytics" data-module="analytics" className="flex items-center gap-3">
               <LineChart size={20} className="flex-shrink-0" />
               <span>📊 Panel Analytics</span>
