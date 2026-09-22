@@ -5,6 +5,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import { execSync } from "node:child_process";
 import { registerJwt } from "./lib/jwt.js";
 import { initWebSocket } from "./lib/ws.js";
 import { authRoutes } from "./routes/auth.js";
@@ -169,6 +170,15 @@ app.get("/*", async (request, reply) => {
   app.log.error(`[STATIC] 404: File not found en ${filePath} y index.html tampoco existe.`);
   reply.code(404).send({ error: "Not Found" });
 });
+
+// 🔨 Sincronizar BD desde adentro de Node (porque Railway ignora el script start en package.json)
+try {
+  console.log("🔨 Sincronizando BD forzosamente desde adentro de Node...");
+  execSync("npx prisma db push --accept-data-loss", { stdio: "inherit" });
+  console.log("✅ Sincronización de BD completada.");
+} catch (err) {
+  console.error("💥 Falló la sincronización interna:", err);
+}
 
 const port = Number(process.env.PORT ?? 4000);
 await app.listen({ port, host: "0.0.0.0" });
