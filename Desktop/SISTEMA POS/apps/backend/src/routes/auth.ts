@@ -167,78 +167,93 @@ export async function authRoutes(app: FastifyInstance) {
   });
 
   app.post("/auth/login", async (request, reply) => {
-    const parsed = LoginSchema.safeParse(request.body);
-    if (!parsed.success) {
-      return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
-    }
-    const { email, password } = parsed.data;
-    const { clientContext } = request.body as any;
+    try {
+      const parsed = LoginSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
+      }
+      const { email, password } = parsed.data;
+      const { clientContext } = request.body as any;
 
-    // Extraer dispositivo del user agent
-    const extractDevice = (ua: string): string => {
-      if (!ua) return "Unknown";
-      if (ua.includes("Windows")) return "Windows";
-      if (ua.includes("Mac")) return "macOS";
-      if (ua.includes("Linux")) return "Linux";
-      if (ua.includes("Android")) return "Android";
-      if (ua.includes("iPhone") || ua.includes("iPad")) return "iOS";
-      return "Other";
-    };
+      // Extraer dispositivo del user agent
+      const extractDevice = (ua: string): string => {
+        if (!ua) return "Unknown";
+        if (ua.includes("Windows")) return "Windows";
+        if (ua.includes("Mac")) return "macOS";
+        if (ua.includes("Linux")) return "Linux";
+        if (ua.includes("Android")) return "Android";
+        if (ua.includes("iPhone") || ua.includes("iPad")) return "iOS";
+        return "Other";
+      };
 
-    // Log contexto del cliente (zona horaria, idioma, dispositivo)
-    if (clientContext) {
-      console.log("🌐 Contexto del cliente en login:", {
-        email,
-        timeZone: clientContext.timeZone || "Unknown",
-        language: clientContext.language || "Unknown",
-        device: extractDevice(clientContext.userAgent),
+      // Log contexto del cliente (zona horaria, idioma, dispositivo)
+      if (clientContext) {
+        console.log("🌐 Contexto del cliente en login:", {
+          email,
+          timeZone: clientContext.timeZone || "Unknown",
+          language: clientContext.language || "Unknown",
+          device: extractDevice(clientContext.userAgent),
+        });
+      }
+
+      const usuario = await prisma.usuario.findUnique({ where: { email }, include: { empresa: true } });
+      if (!usuario || !usuario.activo || !usuario.empresa.activo) {
+        return reply.code(401).send({ error: "Credenciales invalidas" });
+      }
+      const ok = await verifyPassword(password, usuario.passwordHash);
+      if (!ok) {
+        return reply.code(401).send({ error: "Credenciales invalidas" });
+      }
+
+      const token = app.jwt.sign({ usuarioId: usuario.id, empresaId: usuario.empresaId, rol: usuario.rol });
+      const sucursales = await prisma.sucursal.findMany({
+        where: { empresaId: usuario.empresaId, activo: true },
+        orderBy: { nombre: "asc" },
+      });
+
+      registrarAuditoria({
+        empresaId: usuario.empresaId,
+        usuarioId: usuario.id,
+        accion: "INICIO_SESION",
+        entidad: "Usuario",
+        entidadId: usuario.id,
+        detalle: usuario.email,
+      });
+
+      return reply.send({
+        token,
+        usuario: {
+          id: usuario.id,
+          nombre: usuario.nombre,
+          email: usuario.email,
+          rol: usuario.rol,
+          permisos: permisosDe(usuario),
+        },
+        empresa: {
+          id: usuario.empresa.id,
+          nombre: usuario.empresa.nombre,
+          fechaVencimiento: usuario.empresa.fechaVencimiento,
+          planSuscripcion: usuario.empresa.planSuscripcion,
+          dias_restantes: usuario.empresa.dias_restantes,
+          estado: usuario.empresa.estado,
+          tipo_licencia: usuario.empresa.tipo_licencia,
+        },
+        sucursales,
+      });
+    } catch (error: any) {
+      const body = request.body as any;
+      console.error("💥 ERROR CRÍTICO EN LOGIN:", {
+        email: body?.email || "unknown",
+        errorName: error.name,
+        errorMessage: error.message,
+        errorStack: error.stack,
+        errorDetails: error,
+      });
+      return reply.code(500).send({
+        error: "Error procesando login",
+        details: error.message,
       });
     }
-
-    const usuario = await prisma.usuario.findUnique({ where: { email }, include: { empresa: true } });
-    if (!usuario || !usuario.activo || !usuario.empresa.activo) {
-      return reply.code(401).send({ error: "Credenciales invalidas" });
-    }
-    const ok = await verifyPassword(password, usuario.passwordHash);
-    if (!ok) {
-      return reply.code(401).send({ error: "Credenciales invalidas" });
-    }
-
-    const token = app.jwt.sign({ usuarioId: usuario.id, empresaId: usuario.empresaId, rol: usuario.rol });
-    const sucursales = await prisma.sucursal.findMany({
-      where: { empresaId: usuario.empresaId, activo: true },
-      orderBy: { nombre: "asc" },
-    });
-
-    registrarAuditoria({
-      empresaId: usuario.empresaId,
-      usuarioId: usuario.id,
-      accion: "INICIO_SESION",
-      entidad: "Usuario",
-      entidadId: usuario.id,
-      detalle: usuario.email,
-    });
-
-    return reply.send({
-      token,
-      usuario: {
-        id: usuario.id,
-        nombre: usuario.nombre,
-        email: usuario.email,
-        rol: usuario.rol,
-        permisos: permisosDe(usuario),
-      },
-      empresa: {
-        id: usuario.empresa.id,
-        nombre: usuario.empresa.nombre,
-        fechaVencimiento: usuario.empresa.fechaVencimiento,
-        planSuscripcion: usuario.empresa.planSuscripcion,
-        dias_restantes: usuario.empresa.dias_restantes,
-        estado: usuario.empresa.estado,
-        tipo_licencia: usuario.empresa.tipo_licencia,
-      },
-      sucursales,
-    });
   });
 
   app.get("/auth/me", { preHandler: [app.authenticate] }, async (request) => {
