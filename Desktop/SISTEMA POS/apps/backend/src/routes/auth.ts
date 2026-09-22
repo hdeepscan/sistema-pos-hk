@@ -772,6 +772,54 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.code(500).send({ error: e.message });
     }
   });
+  // 🔍 ENDPOINT TEMPORAL DE DIAGNÓSTICO - Verificar estado de usuarios
+  app.get("/auth/debug/:email", async (request, reply) => {
+    try {
+      const { email } = request.params as { email: string };
+      const usuario = await prisma.usuario.findUnique({
+        where: { email },
+        include: { empresa: true },
+      });
+
+      if (!usuario) {
+        return reply.send({
+          existe: false,
+          email,
+          mensaje: "Usuario no encontrado en la BD",
+        });
+      }
+
+      return reply.send({
+        existe: true,
+        usuario: {
+          id: usuario.id,
+          email: usuario.email,
+          nombre: usuario.nombre,
+          rol: usuario.rol,
+          activo: usuario.activo,
+          passwordHashLength: usuario.passwordHash.length,
+          passwordHashFirst20: usuario.passwordHash.substring(0, 20),
+        },
+        empresa: {
+          id: usuario.empresa.id,
+          nombre: usuario.empresa.nombre,
+          activo: usuario.empresa.activo,
+          estado: usuario.empresa.estado,
+        },
+        diagnostico: {
+          usuarioActivo: usuario.activo ? "✅ SÍ" : "❌ NO",
+          empresaActiva: usuario.empresa.activo ? "✅ SÍ" : "❌ NO",
+          puedeEntrar: usuario.activo && usuario.empresa.activo ? "✅ SÍ" : "❌ NO - Revisar arriba",
+        },
+      });
+    } catch (error: any) {
+      return reply.code(500).send({
+        error: "Error en diagnóstico",
+        details: error.message,
+      });
+    }
+  });
+
   // TODO: Analytics Dashboard para Super Admin (desactivado temporalmente)
   // Será re-habilitado una vez que la migración de Prisma se ejecute en Railway
   // y los campos zonaHoraria, idioma, dispositivo existan en la BD
