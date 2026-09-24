@@ -179,11 +179,14 @@ export default function App() {
     return (
       <>
         <Routes>
+          {/* Rutas públicas específicas - ANTES de la ruta comodín */}
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/legal/privacidad" element={<PoliticaPrivacidad />} />
           <Route path="/legal/terminos" element={<TerminosCondiciones />} />
           <Route path="/legal/cookies" element={<PoliticaCookies />} />
           <Route path="/legal/reembolsos" element={<PoliticaReembolsos />} />
+
+          {/* Ruta comodín de Login - DESPUÉS de todas las rutas específicas */}
           <Route path="*" element={<Login />} />
         </Routes>
         <CookieBanner />
