@@ -384,6 +384,27 @@ const loginStyles = `
     letter-spacing: 0.2px;
   }
 
+  .login-legal-footer {
+    margin-top: 48px;
+    padding-top: 24px;
+    border-top: 1px solid rgba(226, 232, 240, 0.3);
+    text-align: center;
+    font-size: 11px;
+    color: #94a3b8;
+  }
+
+  .login-legal-footer a {
+    color: #64748b;
+    text-decoration: none;
+    margin: 0 8px;
+    transition: color 0.2s;
+  }
+
+  .login-legal-footer a:hover {
+    color: #3b82f6;
+    text-decoration: underline;
+  }
+
   .google-button {
     width: 100%;
     background: #F9FAFB;
@@ -452,6 +473,45 @@ const loginStyles = `
     height: 16px;
   }
 
+  .checkbox-group {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+
+  .checkbox-group input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    margin-top: 2px;
+    cursor: pointer;
+    accent-color: #3b82f6;
+  }
+
+  .checkbox-label {
+    font-size: 13px;
+    color: #475569;
+    line-height: 1.5;
+    cursor: pointer;
+    flex: 1;
+  }
+
+  .checkbox-label a {
+    color: #3b82f6;
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  .checkbox-label a:hover {
+    text-decoration: underline;
+  }
+
+  .checkbox-error {
+    color: #ef4444;
+    font-size: 12px;
+    margin-top: 4px;
+  }
+
   @media (max-width: 480px) {
     .login-card {
       padding: 32px 24px;
@@ -482,6 +542,7 @@ export default function Login() {
   const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({});
   const [adminModalOpen, setAdminModalOpen] = useState(false);
   const [forgotPasswordSuccess, setForgotPasswordSuccess] = useState(false);
+  const [aceptaTerminos, setAceptaTerminos] = useState(false);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -614,6 +675,7 @@ export default function Login() {
     if (!email) newErrors.email = "Email requerido";
     if (!password) newErrors.password = "Contraseña requerida";
     if (password && password.length < 8) newErrors.password = "Mínimo 8 caracteres";
+    if (!aceptaTerminos) newErrors.terminos = "Debes aceptar los términos y condiciones";
 
     if (Object.keys(newErrors).length > 0) {
       setFieldErrors(newErrors);
@@ -875,6 +937,35 @@ export default function Login() {
               </div>
             )}
 
+            {/* Checkbox de Términos (Solo en Registro) */}
+            {modo === "registro" && (
+              <div className="checkbox-group">
+                <input
+                  type="checkbox"
+                  id="acepta-terminos"
+                  checked={aceptaTerminos}
+                  onChange={(e) => {
+                    setAceptaTerminos(e.target.checked);
+                    setFieldErrors({ ...fieldErrors, terminos: "" });
+                  }}
+                  disabled={cargando}
+                />
+                <label htmlFor="acepta-terminos" className="checkbox-label">
+                  He leído y acepto los{" "}
+                  <a href="/legal/terminos" target="_blank" rel="noopener noreferrer">
+                    Términos y Condiciones
+                  </a>
+                  {" "}y la{" "}
+                  <a href="/legal/privacidad" target="_blank" rel="noopener noreferrer">
+                    Política de Privacidad
+                  </a>
+                </label>
+              </div>
+            )}
+            {fieldErrors.terminos && (
+              <div className="checkbox-error">{fieldErrors.terminos}</div>
+            )}
+
             {/* Submit */}
             <button type="submit" className="submit-button" disabled={cargando}>
               {cargando && <div className="spinner"></div>}
@@ -987,6 +1078,25 @@ export default function Login() {
           {/* Footer */}
           <div className="login-footer">
             © 2024 CENTRALA • Tu negocio, centralizado
+          </div>
+
+          {/* Legal Footer */}
+          <div className="login-legal-footer">
+            <a href="/legal/privacidad" target="_blank" rel="noopener noreferrer">
+              Privacidad
+            </a>
+            |
+            <a href="/legal/terminos" target="_blank" rel="noopener noreferrer">
+              Términos
+            </a>
+            |
+            <a href="/legal/cookies" target="_blank" rel="noopener noreferrer">
+              Cookies
+            </a>
+            |
+            <a href="/legal/reembolsos" target="_blank" rel="noopener noreferrer">
+              Reembolsos
+            </a>
           </div>
         </div>
       </div>

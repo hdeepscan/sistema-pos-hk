@@ -42,6 +42,11 @@ import Suscripcion from "./screens/Suscripcion";
 import SuperAdminAnalytics from "./screens/SuperAdminAnalytics";
 import ResetPassword from "./screens/ResetPassword";
 import PerfilSettings from "./screens/PerfilSettings";
+import PoliticaPrivacidad from "./screens/legal/PoliticaPrivacidad";
+import TerminosCondiciones from "./screens/legal/TerminosCondiciones";
+import PoliticaCookies from "./screens/legal/PoliticaCookies";
+import PoliticaReembolsos from "./screens/legal/PoliticaReembolsos";
+import { CookieBanner } from "./components/CookieBanner";
 
 export default function App() {
   const { token, sucursalActivaId, hidratado, setApiBaseUrl, setSesion, setSucursalActiva, setHidratado } =
@@ -172,10 +177,17 @@ export default function App() {
 
   if (!token) {
     return (
-      <Routes>
-        <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="*" element={<Login />} />
-      </Routes>
+      <>
+        <CookieBanner />
+        <Routes>
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/legal/privacidad" element={<PoliticaPrivacidad />} />
+          <Route path="/legal/terminos" element={<TerminosCondiciones />} />
+          <Route path="/legal/cookies" element={<PoliticaCookies />} />
+          <Route path="/legal/reembolsos" element={<PoliticaReembolsos />} />
+          <Route path="*" element={<Login />} />
+        </Routes>
+      </>
     );
   }
 
