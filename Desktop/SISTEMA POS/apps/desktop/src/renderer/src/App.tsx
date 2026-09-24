@@ -178,7 +178,6 @@ export default function App() {
   if (!token) {
     return (
       <>
-        <CookieBanner />
         <Routes>
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/legal/privacidad" element={<PoliticaPrivacidad />} />
@@ -187,6 +186,7 @@ export default function App() {
           <Route path="/legal/reembolsos" element={<PoliticaReembolsos />} />
           <Route path="*" element={<Login />} />
         </Routes>
+        <CookieBanner />
       </>
     );
   }

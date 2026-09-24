@@ -952,11 +952,11 @@ export default function Login() {
                 />
                 <label htmlFor="acepta-terminos" className="checkbox-label">
                   He leído y acepto los{" "}
-                  <a href="/legal/terminos" target="_blank" rel="noopener noreferrer">
+                  <a href="/legal/terminos">
                     Términos y Condiciones
                   </a>
                   {" "}y la{" "}
-                  <a href="/legal/privacidad" target="_blank" rel="noopener noreferrer">
+                  <a href="/legal/privacidad">
                     Política de Privacidad
                   </a>
                 </label>
@@ -1082,19 +1082,19 @@ export default function Login() {
 
           {/* Legal Footer */}
           <div className="login-legal-footer">
-            <a href="/legal/privacidad" target="_blank" rel="noopener noreferrer">
+            <a href="/legal/privacidad">
               Privacidad
             </a>
             |
-            <a href="/legal/terminos" target="_blank" rel="noopener noreferrer">
+            <a href="/legal/terminos">
               Términos
             </a>
             |
-            <a href="/legal/cookies" target="_blank" rel="noopener noreferrer">
+            <a href="/legal/cookies">
               Cookies
             </a>
             |
-            <a href="/legal/reembolsos" target="_blank" rel="noopener noreferrer">
+            <a href="/legal/reembolsos">
               Reembolsos
             </a>
           </div>

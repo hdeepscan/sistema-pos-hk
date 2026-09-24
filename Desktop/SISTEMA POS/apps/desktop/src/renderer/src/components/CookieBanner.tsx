@@ -182,13 +182,13 @@ export function CookieBanner() {
               Utilizamos cookies para mejorar tu experiencia, personalizar contenido, analizar tráfico y recordar tus preferencias. Puedes aceptar todas las cookies o gestionar tus preferencias.
             </div>
             <div className="cookie-links">
-              <a href="/legal/privacidad" target="_blank" rel="noopener noreferrer">
+              <a href="/legal/privacidad">
                 Privacidad
               </a>
-              <a href="/legal/cookies" target="_blank" rel="noopener noreferrer">
+              <a href="/legal/cookies">
                 Política de Cookies
               </a>
-              <a href="/legal/terminos" target="_blank" rel="noopener noreferrer">
+              <a href="/legal/terminos">
                 Términos
               </a>
             </div>
