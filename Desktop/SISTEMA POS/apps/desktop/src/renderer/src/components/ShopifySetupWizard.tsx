@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { api } from '../lib/api';
 import { ArrowRight, Check, Zap, Link2, Settings } from 'lucide-react';
+import { useSesionStore } from '../lib/store';
 
 type Paso = 1 | 2 | 3;
 
 interface ConfigShopify {
   conectado: boolean;
   shopDomain?: string;
+  clientId?: string;
   sucursalEcommerceId?: string;
   ultimaSincronizacion?: string;
 }
@@ -20,6 +22,10 @@ export default function ShopifySetupWizard() {
 
   // Paso 1: Conexión
   const [subdominio, setSubdominio] = useState('');
+  const [clientId, setClientId] = useState('');
+  const [clientSecret, setClientSecret] = useState('');
+  const sucursales = useSesionStore((s) => s.sucursales);
+  const [sucursalEcommerceId, setSucursalEcommerceId] = useState('');
   const [conectandoOAuth, setConectandoOAuth] = useState(false);
 
   // Paso 2: Mapeo e Importación
@@ -43,6 +49,8 @@ export default function ShopifySetupWizard() {
       setConfig(data);
       if (data.conectado) {
         setSubdominio(data.shopDomain || '');
+        setClientId(data.clientId || '');
+        if (data.sucursalEcommerceId) setSucursalEcommerceId(data.sucursalEcommerceId);
         // Avanzar al siguiente paso si ya está conectado
         setPaso(2);
       }
@@ -58,6 +66,15 @@ export default function ShopifySetupWizard() {
       setError('Ingresa el subdominio de tu tienda');
       return;
     }
+    if (!clientId.trim() || !clientSecret.trim()) {
+      setError('Ingresa el Client ID y el Client secret de tu app de Shopify');
+      return;
+    }
+    const sucursalElegida = sucursalEcommerceId || sucursales.find((s) => s.tipo === 'ECOMMERCE')?.id || sucursales[0]?.id;
+    if (!sucursalElegida) {
+      setError('No hay sucursales disponibles para asociar a Shopify');
+      return;
+    }
 
     try {
       setConectandoOAuth(true);
@@ -69,9 +86,9 @@ export default function ShopifySetupWizard() {
 
       await api.post('/shopify/config', {
         shopDomain: dominio,
-        sucursalEcommerceId: '',
-        clientId: '',
-        clientSecret: '',
+        sucursalEcommerceId: sucursalElegida,
+        clientId: clientId.trim(),
+        clientSecret: clientSecret.trim(),
       });
 
       // Iniciar OAuth
@@ -291,6 +308,45 @@ export default function ShopifySetupWizard() {
             </div>
             <p style={{ fontSize: '12px', color: '#999', marginTop: '8px' }}>
               Por ejemplo: si tu tienda es "mi-tienda.myshopify.com", escribe "mi-tienda"
+            </p>
+
+            <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginTop: '20px', marginBottom: '8px' }}>
+              Sucursal que maneja Shopify
+            </label>
+            <select
+              value={sucursalEcommerceId}
+              onChange={(e) => setSucursalEcommerceId(e.target.value)}
+              style={{ ...inputStyle, width: '100%' }}
+            >
+              <option value="">Automática (sucursal ecommerce o principal)</option>
+              {sucursales.map((s) => (
+                <option key={s.id} value={s.id}>{s.nombre}</option>
+              ))}
+            </select>
+
+            <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginTop: '20px', marginBottom: '8px' }}>
+              Client ID de tu app de Shopify
+            </label>
+            <input
+              type="text"
+              placeholder="Client ID"
+              value={clientId}
+              onChange={(e) => setClientId(e.target.value)}
+              style={{ ...inputStyle, width: '100%' }}
+            />
+
+            <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginTop: '16px', marginBottom: '8px' }}>
+              Client secret de tu app de Shopify
+            </label>
+            <input
+              type="password"
+              placeholder="Client secret"
+              value={clientSecret}
+              onChange={(e) => setClientSecret(e.target.value)}
+              style={{ ...inputStyle, width: '100%' }}
+            />
+            <p style={{ fontSize: '12px', color: '#999', marginTop: '8px' }}>
+              Lo encuentras en Shopify: Configuración → Aplicaciones → Desarrollar aplicaciones → tu app → Credenciales de API.
             </p>
 
             <button
