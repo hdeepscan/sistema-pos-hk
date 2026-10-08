@@ -683,72 +683,14 @@ export default function Login() {
       return;
     }
 
-    setCargando(true);
-    try {
-      console.log("📝 Iniciando registro con:", { empresaNombre, adminNombre, adminEmail: email });
-
-      // Capturar contexto del cliente de forma invisible
-      const clientContext = {
-        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        language: navigator.language,
-        userAgent: navigator.userAgent,
-      };
-
-      const resp = await api.post("/auth/registro-empresa", {
-        empresaNombre,
-        adminNombre,
-        adminEmail: email,
-        adminPassword: password,
-        clientContext,
-      });
-
-      console.log("✅ Respuesta del servidor:", resp.data);
-
-      // Auto-login: guardar token y datos de sesión
-      if (resp.data?.token && resp.data?.usuario && resp.data?.empresa) {
-        console.log("🔐 Token recibido, guardando sesión...");
-
-        const sucursales = resp.data?.sucursales || [];
-        console.log("📍 Sucursales recibidas:", sucursales.length);
-
-        const { setSesion } = useSesionStore.getState();
-        setSesion({
-          token: resp.data.token,
-          usuario: resp.data.usuario,
-          empresa: resp.data.empresa,
-          sucursales,
-        });
-
-        // Guardar token en localStorage para persistencia
-        localStorage.setItem("token", resp.data.token);
-        localStorage.setItem("usuario", JSON.stringify(resp.data.usuario));
-        localStorage.setItem("empresa", JSON.stringify(resp.data.empresa));
-        localStorage.setItem("sucursales", JSON.stringify(sucursales));
-
-        console.log("✅ Sesión guardada, redirigiendo al dashboard...");
-
-        // Redirigir al dashboard (aplicación principal) - SIN pasar por checkout
-        setTimeout(() => {
-          navigate("/");
-        }, 500);
-      } else {
-        console.error("❌ Respuesta incompleta del servidor:", resp.data);
-        setError("Respuesta del servidor incompleta. Por favor intenta de nuevo.");
-      }
-    } catch (err: any) {
-      console.error("❌ Error en registro:", {
-        status: err.response?.status,
-        data: err.response?.data,
-        message: err.message,
-      });
-      setError(
-        err.response?.data?.error ||
-        err.message ||
-        "Error procesando el registro. Por favor intenta de nuevo."
-      );
-    } finally {
-      setCargando(false);
-    }
+    // La cuenta se crea solo cuando Wompi confirma el pago (ver webhookController)
+    setRegistroDatos({
+      empresaNombre,
+      adminNombre,
+      adminEmail: email,
+      adminPassword: password,
+    });
+    navigate("/checkout");
   }
 
   return (

@@ -27,7 +27,7 @@ interface CheckoutPageProps {
 
 export default function CheckoutPage({ onBack, isRegistration = false }: CheckoutPageProps) {
   const navigate = useNavigate();
-  const { registroDatos, setSesion, limpiarRegistroDatos, empresa } = useSesionStore();
+  const { registroDatos, limpiarRegistroDatos, empresa } = useSesionStore();
   const [planesCompletos, setPlanesCompletos] = useState<Plan[]>([]);
   const [cargando, setCargando] = useState(true);
   const [planSeleccionado, setPlanSeleccionado] = useState<string>(isRegistration ? "TRIAL_5D" : "MENSUAL");
@@ -64,7 +64,7 @@ export default function CheckoutPage({ onBack, isRegistration = false }: Checkou
     const verificarPago = async () => {
       try {
         const pending = JSON.parse(checkoutPending);
-        const { referenciaPago, registroDatos: datosReg, tipoPlan, usuariosAdicionales: usuarios } = pending;
+        const { referenciaPago } = pending;
 
         const { data: estadoData } = await api.get(`/pagos/estado/${referenciaPago}`);
 
@@ -76,30 +76,13 @@ export default function CheckoutPage({ onBack, isRegistration = false }: Checkou
             console.log("✅ Pago realizado exitosamente");
           }
 
-          const { data: registroData } = await api.post("/auth/registro-empresa", {
-            empresaNombre: datosReg.empresaNombre,
-            adminNombre: datosReg.adminNombre,
-            adminEmail: datosReg.adminEmail,
-            adminPassword: datosReg.adminPassword,
-            referenciaPago,
-            tipoPlan,
-            usuariosAdicionales: usuarios,
-          });
-
-          setSesion({
-            token: registroData.token,
-            usuario: registroData.usuario,
-            empresa: registroData.empresa,
-            sucursales: registroData.sucursales || [],
-          });
-
           localStorage.removeItem("checkout_pending");
           limpiarRegistroDatos();
 
           try {
-            notif?.success?.("¡Empresa creada exitosamente!");
+            notif?.success?.("Cuenta creada. Inicia sesión con tu correo y contraseña.");
           } catch (e) {
-            console.log("✅ Empresa creada exitosamente");
+            console.log("✅ Cuenta creada");
           }
 
           setTimeout(() => {
@@ -131,7 +114,7 @@ export default function CheckoutPage({ onBack, isRegistration = false }: Checkou
 
     const timer = setTimeout(verificarPago, 2000);
     return () => clearTimeout(timer);
-  }, [setSesion, limpiarRegistroDatos, navigate]);
+  }, [limpiarRegistroDatos, navigate]);
 
   const planActual = planesFiltrados.find((p) => p.tipoPlan === planSeleccionado);
   const montoBase = planActual?.precioFinal || 0;
@@ -186,12 +169,11 @@ export default function CheckoutPage({ onBack, isRegistration = false }: Checkou
         }
         setReferenciaPago(data.checkout.referenciaPago);
 
-        if (isRegistration && registroDatos) {
+        if (isRegistration) {
           localStorage.setItem(
             "checkout_pending",
             JSON.stringify({
               referenciaPago: data.checkout.referenciaPago,
-              registroDatos,
               tipoPlan: planSeleccionado,
               usuariosAdicionales,
             })

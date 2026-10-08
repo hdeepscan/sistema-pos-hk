@@ -10,10 +10,9 @@ import {
   obtenerPlanes,
   crearCheckout,
   crearCheckoutUsuarios,
-  confirmarPago,
-  webhookPago,
   obtenerEstadoPago,
 } from "../controllers/checkoutController.js";
+import { webhookWompi } from "../controllers/webhookController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 
 const prisma = new PrismaClient();
@@ -24,9 +23,9 @@ export async function rutasPagos(fastify: FastifyInstance) {
     return obtenerPlanes(request, reply);
   });
 
-  // Webhook de Wompi (público)
+  // Webhook de Wompi (público, firma validada dentro del controlador)
   fastify.post("/pagos/webhook", async (request, reply) => {
-    return webhookPago(request, reply);
+    return webhookWompi(request, reply);
   });
 
   // TEST: Seed de planes de pago (temporal - solo para testing)
@@ -153,8 +152,13 @@ export async function rutasPagos(fastify: FastifyInstance) {
     }
   });
 
-  // Crear checkout (público - funciona para registro y usuarios autenticados)
+  // Registro nuevo es público; renovaciones requieren sesión
   fastify.post("/checkout/crear", async (request, reply) => {
+    const esRegistro = (request.body as any)?.isRegistration === true;
+    if (!esRegistro) {
+      await authMiddleware(request, reply);
+      if (reply.sent) return;
+    }
     return crearCheckout(request, reply);
   });
 
@@ -162,15 +166,6 @@ export async function rutasPagos(fastify: FastifyInstance) {
   fastify.get("/pagos/estado/:referenciaPago", async (request, reply) => {
     return obtenerEstadoPago(request, reply);
   });
-
-  // Rutas protegidas (requieren autenticación)
-  fastify.post(
-    "/checkout/confirmar",
-    { preHandler: authMiddleware },
-    async (request, reply) => {
-      return confirmarPago(request, reply);
-    }
-  );
 
   // Checkout de usuarios adicionales ($10,000 COP c/u) - requiere autenticación
   fastify.post(

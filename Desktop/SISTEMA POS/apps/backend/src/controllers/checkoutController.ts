@@ -6,8 +6,21 @@ import type { FastifyRequest, FastifyReply } from "fastify";
 import { PrismaClient } from "@prisma/client";
 import { wompiService } from "../services/wompiService.js";
 import { crearLicenciaPagada, registrarPago } from "../services/licenseService.js";
+import { hashPassword } from "../lib/password.js";
+import { permisosEfectivos } from "../middleware/authMiddleware.js";
+import { PERMISOS, PERMISOS_POR_ROL } from "@sistema-pos/shared";
 
 const prisma = new PrismaClient();
+
+async function construirDatosUsuarioSeguro(datos: any) {
+  const { nombre, email, password, rol, permisos } = datos ?? {};
+  if (!nombre || !email || typeof password !== "string" || password.length < 8) return null;
+  const rolFinal = typeof rol === "string" && rol !== "ADMIN" && rol in PERMISOS_POR_ROL ? rol : "CAJERO";
+  const permisosFinales = Array.isArray(permisos)
+    ? permisos.filter((p: unknown): p is string => typeof p === "string" && (PERMISOS as readonly string[]).includes(p))
+    : [];
+  return { nombre, email, rol: rolFinal, permisos: permisosFinales, passwordHash: await hashPassword(password) };
+}
 
 /**
  * GET /api/checkout/planes
@@ -53,13 +66,11 @@ export async function crearCheckoutUsuarios(
   try {
     console.log(`\n🛒 POST /checkout/usuarios-adicionales`);
     const usuario = (request as any).usuario;
-    let empresaId = (request as any).empresaId;
-    const { cantidadUsuarios, datosUsuario, empresaId: empresaIdBody } = request.body as any;
+    const empresaId = (request as any).empresaId as string | undefined;
+    const { cantidadUsuarios, datosUsuario } = request.body as any;
 
-    // Usar empresaId del body como fallback si no viene del middleware
-    if (!empresaId && empresaIdBody) {
-      empresaId = empresaIdBody;
-      console.log(`  empresaId extraído del body (fallback)`);
+    if (!usuario || !permisosEfectivos(usuario).includes("usuarios.administrar")) {
+      return reply.status(403).send({ error: "No tienes permiso para administrar usuarios" });
     }
 
     console.log(`  Usuario autenticado: ${usuario ? usuario.email : "NO"}`);
@@ -98,6 +109,11 @@ export async function crearCheckoutUsuarios(
     const precioPorUsuario = 10000;
     const montoTotal = precioPorUsuario * cantidadUsuarios;
 
+    const datosUsuarioSeguro = datosUsuario ? await construirDatosUsuarioSeguro(datosUsuario) : null;
+    if (datosUsuario && !datosUsuarioSeguro) {
+      return reply.status(400).send({ error: "Datos de usuario inválidos (contraseña mínimo 8 caracteres)" });
+    }
+
     // Crear orden de pago
     const referenciaPago = `USU-${empresaId}-${Date.now()}`;
 
@@ -116,7 +132,7 @@ export async function crearCheckoutUsuarios(
     const datosRegistroObj = {
       tipoCompra: "USUARIOS_ADICIONALES",
       cantidadUsuarios,
-      datosUsuario: datosUsuario || null, // Si viene el formulario de creación de usuario
+      datosUsuario: datosUsuarioSeguro,
     };
 
     const pago = await prisma.pago.create({
@@ -169,7 +185,7 @@ export async function crearCheckout(
   try {
     const usuario = (request as any).usuario;
     const empresaIdAuth = (request as any).empresaId;
-    const { tipoPlan, usuariosAdicionales = 0, email, nombre, isRegistration, empresaId: empresaIdBody } = request.body as any;
+    const { tipoPlan, usuariosAdicionales = 0, email, nombre, isRegistration, empresaNombre, password } = request.body as any;
 
     // Validar plan
     if (!["TRIAL_5D", "MENSUAL", "TRIMESTRAL", "ANUAL"].includes(tipoPlan)) {
@@ -177,17 +193,24 @@ export async function crearCheckout(
     }
 
     // Determinar si es renovación (usuario autenticado + empresaId)
-    const isRenovacion = !isRegistration && (empresaIdAuth || empresaIdBody);
+    const isRenovacion = !isRegistration && !!empresaIdAuth;
 
-    // Modo registro: validar email y nombre
     let userEmail = usuario?.email;
     let userName = usuario?.nombre;
-    let actualEmpresaId = empresaIdAuth || empresaIdBody;
+    let actualEmpresaId = empresaIdAuth;
 
     if (isRegistration) {
-      // Flujo de registro: no hay usuario autenticado
-      if (!email || !nombre) {
-        return reply.status(400).send({ error: "Email y nombre requeridos para registro" });
+      if (!email || !nombre || !empresaNombre) {
+        return reply.status(400).send({ error: "Email, nombre y empresa requeridos para registro" });
+      }
+      if (typeof password !== "string" || password.length < 8) {
+        return reply.status(400).send({ error: "La contraseña debe tener al menos 8 caracteres" });
+      }
+      if (await prisma.usuario.findUnique({ where: { email } })) {
+        return reply.status(409).send({ error: "Ya existe un usuario con ese email" });
+      }
+      if (await prisma.empresa.findFirst({ where: { nombre: empresaNombre } })) {
+        return reply.status(409).send({ error: "El nombre de la empresa ya está registrado" });
       }
       userEmail = email;
       userName = nombre;
@@ -247,16 +270,14 @@ export async function crearCheckout(
     // En modo registro, preparar datos temporales para guardar en Pago
     let datosRegistroJson: string | undefined;
     if (isRegistration) {
-      const datosRegistro = {
-        empresaNombre: (request.body as any).empresaNombre,
+      datosRegistroJson = JSON.stringify({
+        empresaNombre,
         adminNombre: userName,
         adminEmail: userEmail,
-        adminPassword: (request.body as any).password, // Sin hashear, será hasheado en webhook
+        adminPasswordHash: await hashPassword(password),
         tipoPlan,
-      };
-      datosRegistroJson = JSON.stringify(datosRegistro);
+      });
       console.log(`📝 Datos de registro preparados para referencia: ${referenciaPago}`);
-      console.log(datosRegistro);
     }
 
     // Guardar referencia de pago en base de datos

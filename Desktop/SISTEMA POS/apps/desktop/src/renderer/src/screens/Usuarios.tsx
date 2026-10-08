@@ -331,9 +331,6 @@ function FormularioPagoYUsuario({
         permisos,
       };
 
-      // Guardar en localStorage como respaldo
-      localStorage.setItem("usuarioPreregistrado", JSON.stringify(datosUsuarioNuevo));
-
       // Realizar POST con headers explícitos y empresaId en body
       const response = await api.post(
         "/checkout/usuarios-adicionales",
