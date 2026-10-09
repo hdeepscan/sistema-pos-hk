@@ -576,13 +576,27 @@ export async function ajustarInventarioEnShopifySiCorresponde(
   producto: { shopifyInventoryItemId: string | null },
   delta: number
 ): Promise<void> {
-  if (!producto.shopifyInventoryItemId || delta === 0) return;
+  if (delta === 0) return;
+  if (!producto.shopifyInventoryItemId) {
+    console.log(`[shopify] Ajuste omitido: producto sin shopifyInventoryItemId (empresa ${empresaId})`);
+    return;
+  }
   try {
     const config = await prisma.shopifyConfig.findUnique({ where: { empresaId } });
-    if (!config || config.sucursalEcommerceId !== sucursalId) return;
+    if (!config) {
+      console.log(`[shopify] Ajuste omitido: empresa ${empresaId} sin configuración de Shopify`);
+      return;
+    }
+    if (config.sucursalEcommerceId !== sucursalId) {
+      console.log(`[shopify] Ajuste omitido: sucursal ${sucursalId} no es la ecommerce (${config.sucursalEcommerceId})`);
+      return;
+    }
 
     const locationId = await asegurarUbicacionEcommerce(empresaId, sucursalId);
-    if (!locationId) return;
+    if (!locationId) {
+      console.log(`[shopify] Ajuste omitido: no se encontró ubicación de Shopify para sucursal ${sucursalId}`);
+      return;
+    }
 
     await ajustarInventarioEnShopify(empresaId, producto.shopifyInventoryItemId, locationId, delta);
   } catch (err) {
