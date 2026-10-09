@@ -560,6 +560,12 @@ export async function empujarProductoAShopify(producto: ProductoLocal): Promise<
   try {
     if (!producto.shopifyProductId) {
       const ids = await crearProductoEnShopify(producto);
+      await publicarInventarioInicialEnShopify(
+        producto.empresaId,
+        producto.id,
+        ids.shopifyInventoryItemId,
+        config.sucursalEcommerceId
+      ).catch((err) => console.error("[shopify] No se pudo publicar el inventario inicial:", err));
       return { ...producto, ...ids };
     }
     await actualizarProductoEnShopify(producto);
@@ -568,6 +574,20 @@ export async function empujarProductoAShopify(producto: ProductoLocal): Promise<
     console.error("[shopify] No se pudo sincronizar el producto:", err);
     return producto;
   }
+}
+
+async function publicarInventarioInicialEnShopify(
+  empresaId: string,
+  productoId: string,
+  inventoryItemId: string,
+  sucursalEcommerceId: string
+): Promise<void> {
+  const inventario = await prisma.inventarioSucursal.findUnique({
+    where: { productoId_sucursalId: { productoId, sucursalId: sucursalEcommerceId } },
+  });
+  const locationId = await asegurarUbicacionEcommerce(empresaId, sucursalEcommerceId);
+  if (!locationId) return;
+  await fijarInventarioEnShopify(empresaId, inventoryItemId, locationId, inventario?.cantidad ?? 0);
 }
 
 export async function ajustarInventarioEnShopifySiCorresponde(
