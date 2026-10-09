@@ -3,6 +3,7 @@ import type { FastifyInstance } from "fastify";
 import type { Prisma } from "@prisma/client";
 import {
   CrearProductoSchema,
+  DuplicarProductoSchema,
   CrearProductoCompletoSchema,
   CrearVarianteSchema,
   EdicionMasivaProductosSchema,
@@ -286,6 +287,123 @@ export async function productosRoutes(app: FastifyInstance) {
         },
       });
     }
+
+    return reply.code(201).send(productoFinal);
+  });
+
+  // Duplica un producto (sin variantes ni stock del origen). El stock inicial se
+  // registra por sucursal como ENTRADA auditada.
+  app.post("/productos/:id/duplicar", async (request, reply) => {
+    const { empresaId, usuarioId } = request.user;
+    if (!request.user.permisos.includes("productos.administrar")) {
+      return reply.code(403).send({ error: "No tienes permiso para administrar productos" });
+    }
+    const { id } = request.params as { id: string };
+    const parsed = DuplicarProductoSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
+    const { inventarioInicial, codigoBarras, sku, nombre, precio, costo } = parsed.data;
+
+    const origen = await prisma.producto.findFirst({
+      where: { id, empresaId },
+      include: { colecciones: true, sucursalesDisponibles: true },
+    });
+    if (!origen) return reply.code(404).send({ error: "Producto no encontrado" });
+
+    if (await prisma.producto.findUnique({ where: { empresaId_sku: { empresaId, sku } } })) {
+      return reply.code(409).send({ error: "Ya existe un producto con ese SKU" });
+    }
+    if (codigoBarras && (await prisma.producto.findFirst({ where: { empresaId, codigoBarras } }))) {
+      return reply.code(409).send({ error: "Ya existe un producto con ese código de barras" });
+    }
+
+    const sucursales = await prisma.sucursal.findMany({
+      where: { empresaId, activo: true },
+      select: { id: true },
+    });
+    const idsSucursales = new Set(sucursales.map((s) => s.id));
+    if (inventarioInicial.some((i) => !idsSucursales.has(i.sucursalId))) {
+      return reply.code(400).send({ error: "Hay sucursales que no pertenecen a tu empresa" });
+    }
+    const cantidadPorSucursal = new Map(inventarioInicial.map((i) => [i.sucursalId, i.cantidad]));
+
+    const producto = await prisma.$transaction(async (tx) => {
+      const nuevo = await tx.producto.create({
+        data: {
+          empresaId,
+          sku,
+          nombre,
+          categoria: origen.categoria,
+          marca: origen.marca,
+          descripcion: origen.descripcion,
+          impuestoPorcentaje: origen.impuestoPorcentaje,
+          precio: precio ?? origen.precio,
+          costo: costo ?? origen.costo,
+          codigoBarras: codigoBarras ?? null,
+          activo: origen.activo,
+          imagenUrl: origen.imagenUrl,
+          proveedorId: origen.proveedorId,
+          stockMinimo: origen.stockMinimo,
+        },
+      });
+
+      if (origen.colecciones.length > 0) {
+        await tx.productoColeccion.createMany({
+          data: origen.colecciones.map((c) => ({ productoId: nuevo.id, coleccionId: c.coleccionId })),
+        });
+      }
+      if (origen.sucursalesDisponibles.length > 0) {
+        await tx.productoSucursal.createMany({
+          data: origen.sucursalesDisponibles.map((s) => ({ productoId: nuevo.id, sucursalId: s.sucursalId })),
+        });
+      }
+
+      await tx.inventarioSucursal.createMany({
+        data: sucursales.map((s) => ({
+          productoId: nuevo.id,
+          sucursalId: s.id,
+          cantidad: cantidadPorSucursal.get(s.id) ?? 0,
+        })),
+      });
+
+      for (const { sucursalId, cantidad } of inventarioInicial) {
+        if (cantidad > 0) {
+          await tx.movimientoInventario.create({
+            data: {
+              productoId: nuevo.id,
+              sucursalId,
+              tipo: "ENTRADA",
+              cantidad,
+              motivo: `Stock inicial por duplicación de ${origen.sku}`,
+              usuarioId,
+            },
+          });
+        }
+      }
+
+      return nuevo;
+    });
+
+    registrarAuditoria({
+      empresaId,
+      usuarioId,
+      accion: "DUPLICAR_PRODUCTO",
+      entidad: "Producto",
+      entidadId: producto.id,
+      detalle: `${producto.nombre} (copia de ${origen.sku})`,
+    });
+
+    const conShopify = await empujarProductoAShopify(producto);
+    const productoFinal =
+      conShopify.shopifyProductId !== producto.shopifyProductId
+        ? await prisma.producto.update({
+            where: { id: producto.id },
+            data: {
+              shopifyProductId: conShopify.shopifyProductId,
+              shopifyVariantId: conShopify.shopifyVariantId,
+              shopifyInventoryItemId: conShopify.shopifyInventoryItemId,
+            },
+          })
+        : producto;
 
     return reply.code(201).send(productoFinal);
   });

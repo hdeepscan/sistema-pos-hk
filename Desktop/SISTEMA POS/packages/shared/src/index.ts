@@ -181,6 +181,18 @@ export const CrearProductoSchema = z.object({
 });
 export type CrearProductoInput = z.infer<typeof CrearProductoSchema>;
 
+export const DuplicarProductoSchema = z.object({
+  nombre: z.string().min(1),
+  sku: z.string().min(1),
+  codigoBarras: z.string().min(1).nullable().optional(),
+  precio: z.number().nonnegative().optional(),
+  costo: z.number().nonnegative().optional(),
+  inventarioInicial: z
+    .array(z.object({ sucursalId: z.string().min(1), cantidad: z.number().int().min(0) }))
+    .default([]),
+});
+export type DuplicarProductoInput = z.infer<typeof DuplicarProductoSchema>;
+
 // Creacion "inteligente": un producto base + combinaciones de variantes
 // generadas desde grupos (ej. Color x Talla). Si no hay variantes, se crea un
 // solo producto. La imagen va como dataUrl (base64) y Shopify/local la hostea.

@@ -242,6 +242,10 @@ export default function Productos() {
               setDetalle(null);
               cargarLista();
             }}
+            onDuplicado={(nuevoId) => {
+              cargarLista();
+              setSeleccionadoId(nuevoId);
+            }}
           />
         ) : (
           <div className="card">
@@ -604,16 +608,150 @@ function GaleriaSection({ producto, onActualizado }: { producto: ProductoDetalle
   );
 }
 
+function ModalDuplicarProducto({
+  producto,
+  onCerrar,
+  onCreado,
+}: {
+  producto: ProductoDetalle;
+  onCerrar: () => void;
+  onCreado: (nuevoId: string) => void;
+}) {
+  const [nombre, setNombre] = useState(`Copia de ${producto.nombre}`);
+  const [sku, setSku] = useState("");
+  const [codigoBarras, setCodigoBarras] = useState("");
+  const [precio, setPrecio] = useState(String(producto.precio));
+  const [costo, setCosto] = useState(String(producto.costo));
+  const [sucursales, setSucursales] = useState<{ id: string; nombre: string; activo?: boolean }[]>([]);
+  const [stock, setStock] = useState<Record<string, string>>({});
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api
+      .get<{ id: string; nombre: string; activo?: boolean }[]>("/sucursales")
+      .then(({ data }) => {
+        const activas = data.filter((s) => s.activo !== false);
+        setSucursales(activas);
+        setStock(Object.fromEntries(activas.map((s) => [s.id, "0"])));
+      })
+      .catch(() => setError("No se pudieron cargar las sucursales"));
+  }, []);
+
+  function generarSku() {
+    setSku(`DUP-${Date.now().toString(36).slice(-4).toUpperCase()}${Math.random().toString(36).slice(2, 6).toUpperCase()}`);
+  }
+
+  async function crear(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (!nombre.trim() || !sku.trim()) {
+      setError("Nombre y SKU son obligatorios");
+      return;
+    }
+    const inventarioInicial = sucursales.map((s) => ({
+      sucursalId: s.id,
+      cantidad: Math.max(0, Math.floor(Number(stock[s.id]) || 0)),
+    }));
+    setGuardando(true);
+    try {
+      const { data } = await api.post(`/productos/${producto.id}/duplicar`, {
+        nombre: nombre.trim(),
+        sku: sku.trim(),
+        codigoBarras: codigoBarras.trim() || null,
+        precio: Number(precio),
+        costo: Number(costo),
+        inventarioInicial,
+      });
+      onCreado(data.id);
+    } catch (err: any) {
+      setError(mensajeError(err, "No se pudo duplicar el producto"));
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop">
+      <div className="card" style={{ width: 560, maxHeight: "90vh", overflowY: "auto" }}>
+        <h4 style={{ marginBottom: 12 }}>Duplicar producto</h4>
+        <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 0 }}>
+          El stock del producto original no se copia. Define el inventario inicial de cada sucursal.
+        </p>
+        {error && <p className="error-text">{error}</p>}
+        <form className="grid-form" onSubmit={crear}>
+          <label>
+            Nombre
+            <input value={nombre} onChange={(e) => setNombre(e.target.value)} required />
+          </label>
+          <label>
+            SKU (obligatorio, único)
+            <div style={{ display: "flex", gap: 8 }}>
+              <input value={sku} onChange={(e) => setSku(e.target.value)} required style={{ flex: 1 }} />
+              <button type="button" className="secondary" onClick={generarSku}>
+                Generar
+              </button>
+            </div>
+          </label>
+          <label>
+            Código de barras (opcional, único)
+            <input value={codigoBarras} onChange={(e) => setCodigoBarras(e.target.value)} />
+          </label>
+          <label>
+            Precio
+            <input type="number" min={0} value={precio} onChange={(e) => setPrecio(e.target.value)} />
+          </label>
+          <label>
+            Costo
+            <input type="number" min={0} value={costo} onChange={(e) => setCosto(e.target.value)} />
+          </label>
+        </form>
+
+        <h5 style={{ marginTop: 16, marginBottom: 8 }}>Inventario inicial por sucursal</h5>
+        <table style={{ width: "100%", fontSize: 13 }}>
+          <tbody>
+            {sucursales.map((s) => (
+              <tr key={s.id}>
+                <td>{s.nombre}</td>
+                <td style={{ width: 120 }}>
+                  <input
+                    type="number"
+                    min={0}
+                    value={stock[s.id] ?? "0"}
+                    onChange={(e) => setStock((prev) => ({ ...prev, [s.id]: e.target.value }))}
+                    style={{ width: "100%" }}
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
+          <button type="button" className="secondary" onClick={onCerrar} disabled={guardando}>
+            Cancelar
+          </button>
+          <button type="button" onClick={crear} disabled={guardando}>
+            {guardando ? "Creando..." : "Crear producto duplicado"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DetalleProducto({
   producto,
   todasColecciones,
   onActualizado,
   onEliminado,
+  onDuplicado,
 }: {
   producto: ProductoDetalle;
   todasColecciones: Coleccion[];
   onActualizado: () => void;
   onEliminado: () => void;
+  onDuplicado: (nuevoId: string) => void;
 }) {
   const [nombre, setNombre] = useState(producto.nombre);
   const [categoria, setCategoria] = useState(producto.categoria ?? "");
@@ -635,6 +773,7 @@ function DetalleProducto({
   const [error, setError] = useState<string | null>(null);
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [accionando, setAccionando] = useState(false);
+  const [mostrarDuplicar, setMostrarDuplicar] = useState(false);
 
   async function reintentarShopify() {
     setAccionando(true);
@@ -766,6 +905,9 @@ function DetalleProducto({
           <button type="button" className="secondary" onClick={reintentarShopify} disabled={accionando}>
             {accionando ? "..." : "Reintentar Shopify"}
           </button>
+          <button type="button" className="secondary" onClick={() => setMostrarDuplicar(true)} disabled={accionando}>
+            Duplicar
+          </button>
           <button
             type="button"
             onClick={eliminarProducto}
@@ -778,6 +920,16 @@ function DetalleProducto({
       </div>
       {error && <p className="error-text">{error}</p>}
       {mensaje && <span className="badge success" style={{ width: "fit-content" }}>{mensaje}</span>}
+      {mostrarDuplicar && (
+        <ModalDuplicarProducto
+          producto={producto}
+          onCerrar={() => setMostrarDuplicar(false)}
+          onCreado={(nuevoId) => {
+            setMostrarDuplicar(false);
+            onDuplicado(nuevoId);
+          }}
+        />
+      )}
 
       {/* Informacion general */}
       <Seccion icono={<IconoInfo />} titulo="Informacion general" subtitulo="Nombre, categoria, marca, proveedor y descripcion">
