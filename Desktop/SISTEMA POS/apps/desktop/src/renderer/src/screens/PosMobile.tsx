@@ -9,11 +9,13 @@ import { CarritoMobile } from "../components/CarritoMobile";
 import { ScannerCamera } from "../components/ScannerCamera";
 import CreateProductMobile from "./CreateProductMobile";
 import { notif } from "../lib/notificationService";
+import { nombreConVariante } from "../lib/variantes";
 
 interface Producto {
   id: string;
   sku: string;
   nombre: string;
+  varianteTitulo?: string | null;
   precio: string | number;
   codigoBarras: string | null;
   imagenUrl: string | null;
@@ -133,7 +135,7 @@ export default function PosMobile({ onToggleMobile }: { onToggleMobile?: () => v
         ...carrito,
         {
           productoId: producto.id,
-          nombre: producto.nombre,
+          nombre: nombreConVariante(producto),
           imagenUrl: producto.imagenUrl,
           cantidad: 1,
           precioUnitario: Number(producto.precio),
@@ -324,7 +326,7 @@ export default function PosMobile({ onToggleMobile }: { onToggleMobile?: () => v
                       />
                     )}
                     <div className="pos-mobile-resultado-info">
-                      <div className="pos-mobile-resultado-nombre">{prod.nombre}</div>
+                      <div className="pos-mobile-resultado-nombre">{nombreConVariante(prod)}</div>
                       <div className="pos-mobile-resultado-sku">{prod.sku}</div>
                     </div>
                     <div className="pos-mobile-resultado-precio">

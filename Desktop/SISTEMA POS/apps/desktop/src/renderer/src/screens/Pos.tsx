@@ -12,11 +12,13 @@ import { mensajeError } from "../lib/errores";
 import { ModalCredito } from "../components/ModalCredito";
 import { DetalleCreditoModal } from "../components/DetalleCreditoModal";
 import { electronAPI } from "../lib/electron-api";
+import { nombreConVariante, textoVariante } from "../lib/variantes";
 
 interface Producto {
   id: string;
   sku: string;
   nombre: string;
+  varianteTitulo?: string | null;
   precio: string | number;
   codigoBarras: string | null;
   imagenUrl: string | null;
@@ -198,7 +200,7 @@ export default function Pos() {
         ...prev,
         {
           productoId: p.id,
-          nombre: p.nombre,
+          nombre: nombreConVariante(p),
           imagenUrl: p.imagenUrl,
           cantidad: 1,
           precioUnitario: Number(p.precio),
@@ -587,7 +589,14 @@ export default function Pos() {
                           <div style={{ width: 32, height: 32, borderRadius: 6, background: "#f3f4f6" }} />
                         )}
                         <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 500 }}>{p.nombre}</div>
+                          <div style={{ fontSize: 13, fontWeight: 500 }}>
+                            {p.nombre}
+                            {textoVariante(p.varianteTitulo) && (
+                              <span style={{ marginLeft: 6, fontWeight: 700, color: "var(--brand, #4f46e5)" }}>
+                                {textoVariante(p.varianteTitulo)}
+                              </span>
+                            )}
+                          </div>
                           <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
                             {p.sku} · {sinStock ? <span style={{ color: "var(--danger)" }}>Sin stock</span> : `${p.stockSucursal} disp.`}
                           </div>

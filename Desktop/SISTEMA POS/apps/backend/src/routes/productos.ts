@@ -91,23 +91,26 @@ export async function productosRoutes(app: FastifyInstance) {
   app.get("/productos", async (request) => {
     const { empresaId } = request.user;
     const { q, sucursalId } = request.query as { q?: string; sucursalId?: string };
+    // Cada palabra debe aparecer en algún campo: "blusa negro m" encuentra esa variante exacta.
+    const terminos = (q ?? "").trim().split(/\s+/).filter(Boolean);
     const productos = await prisma.producto.findMany({
       where: {
         empresaId,
         activo: true,
-        ...(q
-          ? {
-              OR: [
-                { nombre: { contains: q, mode: "insensitive" } },
-                { sku: { contains: q, mode: "insensitive" } },
-                { codigoBarras: { contains: q, mode: "insensitive" } },
-                { categoria: { contains: q, mode: "insensitive" } },
-              ],
-            }
-          : {}),
-        ...(sucursalId
-          ? { AND: [{ OR: [{ sucursalesDisponibles: { none: {} } }, { sucursalesDisponibles: { some: { sucursalId } } }] }] }
-          : {}),
+        AND: [
+          ...terminos.map((t) => ({
+            OR: [
+              { nombre: { contains: t, mode: "insensitive" as const } },
+              { sku: { contains: t, mode: "insensitive" as const } },
+              { codigoBarras: { contains: t, mode: "insensitive" as const } },
+              { categoria: { contains: t, mode: "insensitive" as const } },
+              { varianteTitulo: { contains: t, mode: "insensitive" as const } },
+            ],
+          })),
+          ...(sucursalId
+            ? [{ OR: [{ sucursalesDisponibles: { none: {} } }, { sucursalesDisponibles: { some: { sucursalId } } }] }]
+            : []),
+        ],
       },
       include: sucursalId ? { inventario: { where: { sucursalId } } } : undefined,
       orderBy: { nombre: "asc" },
