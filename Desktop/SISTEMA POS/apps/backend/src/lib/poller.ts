@@ -100,7 +100,10 @@ async function crearVentaDesdeShopify(empresaId: string, sucursalEcommerceId: st
 async function revisarTodasLasEmpresas() {
   let configs: { empresaId: string; sucursalEcommerceId: string }[];
   try {
-    configs = await prisma.shopifyConfig.findMany({ select: { empresaId: true, sucursalEcommerceId: true } });
+    configs = await prisma.shopifyConfig.findMany({
+      where: { accessToken: { not: null } },
+      select: { empresaId: true, sucursalEcommerceId: true },
+    });
   } catch (err) {
     console.error("[poller] Error consultando configuraciones de Shopify:", err);
     return;

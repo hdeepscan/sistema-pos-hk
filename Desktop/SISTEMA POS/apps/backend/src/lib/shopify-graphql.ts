@@ -44,9 +44,6 @@ export class ShopifyGraphQLClient {
     }
 
     try {
-      console.log(`[Shopify GraphQL] Iniciando query a: ${this.endpoint}`);
-      console.log(`[Shopify GraphQL] Token: ${this.accessToken.substring(0, 20)}...`);
-
       const response = await fetch(this.endpoint, {
         method: "POST",
         headers: {
@@ -56,12 +53,7 @@ export class ShopifyGraphQLClient {
         body: JSON.stringify(params),
       });
 
-      console.log(`[Shopify GraphQL] Response Status: ${response.status} ${response.statusText}`);
-
       const result: GraphQLResponse = await response.json();
-
-      // LOG COMPLETO DE LA RESPUESTA
-      console.log(`[Shopify GraphQL] Raw Response (completo):`, JSON.stringify(result, null, 2).substring(0, 2000));
 
       // Manejar errores GraphQL
       if (Array.isArray(result.errors) && result.errors.length > 0) {
@@ -93,8 +85,6 @@ export class ShopifyGraphQLClient {
         console.log(`[Shopify] Query Cost: ${result.extensions.cost.actualQueryCost}/${result.extensions.cost.requestedQueryCost}, Available: ${currentlyAvailable}`);
       }
 
-      const dataStr = result.data ? JSON.stringify(result.data).slice(0, 5000) : 'null';
-      console.log(`[Shopify GraphQL] Query returned data:`, dataStr);
       return result.data as T;
     } catch (error) {
       console.error("[Shopify GraphQL Error]", error);
@@ -252,6 +242,34 @@ export class ShopifyGraphQLClient {
    * Ajustar inventario en Shopify (cambio de stock)
    */
   async adjustInventory(inventoryItemId: string, locationId: string, deltaQuantity: number): Promise<any> {
+    const gid = (tipo: "InventoryItem" | "Location", id: string) =>
+      id.startsWith("gid://") ? id : `gid://shopify/${tipo}/${id}`;
+    const itemGid = gid("InventoryItem", inventoryItemId);
+    const locationGid = gid("Location", locationId);
+
+    // La API exige changeFromQuantity (la cantidad actual) para rechazar ajustes concurrentes.
+    const nivel = await this.query({
+      query: `
+        query NivelInventario($itemId: ID!, $locationId: ID!) {
+          inventoryItem(id: $itemId) {
+            inventoryLevel(locationId: $locationId) {
+              quantities(names: ["available"]) {
+                name
+                quantity
+              }
+            }
+          }
+        }
+      `,
+      variables: { itemId: itemGid, locationId: locationGid },
+    });
+    const actual = nivel?.inventoryItem?.inventoryLevel?.quantities?.find(
+      (q: { name: string; quantity: number }) => q.name === "available"
+    )?.quantity;
+    if (typeof actual !== "number") {
+      throw new Error(`El item ${inventoryItemId} no tiene inventario en la ubicación ${locationId} de Shopify`);
+    }
+
     const mutation = `
       mutation AdjustInventory($input: InventoryAdjustQuantitiesInput!) {
         inventoryAdjustQuantities(input: $input) {
@@ -267,9 +285,6 @@ export class ShopifyGraphQLClient {
       }
     `;
 
-    const gid = (tipo: "InventoryItem" | "Location", id: string) =>
-      id.startsWith("gid://") ? id : `gid://shopify/${tipo}/${id}`;
-
     return this.query({
       query: mutation,
       variables: {
@@ -278,9 +293,10 @@ export class ShopifyGraphQLClient {
           name: "available",
           changes: [
             {
-              inventoryItemId: gid("InventoryItem", inventoryItemId),
-              locationId: gid("Location", locationId),
+              inventoryItemId: itemGid,
+              locationId: locationGid,
               delta: deltaQuantity,
+              changeFromQuantity: actual,
             },
           ],
         },
