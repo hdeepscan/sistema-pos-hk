@@ -812,7 +812,8 @@ export async function ventasRoutes(app: FastifyInstance) {
           cantidad: inv.cantidad,
         });
       }
-      if (producto) {
+      // Una venta que vino de Shopify no se devuelve allá: el pedido sigue existiendo en Shopify.
+      if (producto && venta.canal !== "SHOPIFY") {
         void ajustarInventarioEnShopifySiCorresponde(empresaId, venta.sucursalId, producto, item.cantidad);
       }
     }

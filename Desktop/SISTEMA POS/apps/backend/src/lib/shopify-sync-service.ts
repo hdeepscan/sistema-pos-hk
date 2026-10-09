@@ -5,6 +5,7 @@
 
 import { prisma } from "./prisma.js";
 import { ShopifyGraphQLClient } from "./shopify-graphql.js";
+import { crearVentaDesdeShopify } from "./poller.js";
 
 export interface SyncQueueItem {
   id: string;
@@ -91,8 +92,9 @@ export class ShopifySyncService {
 
       for (const cambio of cambiosPendientes) {
         try {
-          await this.procesarCambio(cambio);
-          resultado.procesados++;
+          const ok = await this.procesarCambio(cambio);
+          if (ok) resultado.procesados++;
+          else resultado.errores++;
         } catch (error) {
           resultado.errores++;
           console.error(`[Sync Queue Error] Error procesando cambio ${cambio.id}:`, error);
@@ -109,7 +111,7 @@ export class ShopifySyncService {
   /**
    * Procesar un cambio individual
    */
-  private async procesarCambio(cambio: SyncQueueItem): Promise<void> {
+  private async procesarCambio(cambio: SyncQueueItem): Promise<boolean> {
     console.log(`[Sync Queue] Procesando cambio ${cambio.id}: ${cambio.tipo}`);
 
     try {
@@ -125,7 +127,7 @@ export class ShopifySyncService {
       switch (cambio.tipo) {
         case "ACTUALIZAR_INVENTARIO":
         case "INVENTORY_UPDATE":
-          await this.sincronizarInventario(datos);
+          await this.sincronizarInventario(datos, cambio.id);
           break;
 
         case "ACTUALIZAR_PRODUCTO":
@@ -148,6 +150,7 @@ export class ShopifySyncService {
       });
 
       console.log(`[Sync Queue] Cambio ${cambio.id} completado exitosamente`);
+      return true;
     } catch (error) {
       const intentosRestantes = cambio.maxIntentos - cambio.intentos - 1;
       const errorAnalisis = this.esErrorReintentable(error);
@@ -194,6 +197,7 @@ export class ShopifySyncService {
 
         console.error(`[Sync Queue] 🛑 Cambio marcado como ERROR: ${mensajeFinal}`);
       }
+      return false;
     }
   }
 
@@ -264,7 +268,7 @@ export class ShopifySyncService {
   /**
    * Sincronizar cambio de inventario con Shopify
    */
-  private async sincronizarInventario(datos: Record<string, any>): Promise<void> {
+  private async sincronizarInventario(datos: Record<string, any>, cambioId: string): Promise<void> {
     if (!this.client) throw new Error("Cliente GraphQL no disponible");
 
     const { shopifyInventoryItemId, locationId, cantidad } = datos;
@@ -278,7 +282,23 @@ export class ShopifySyncService {
     );
 
     try {
-      const resultado = await this.client.adjustInventory(shopifyInventoryItemId, locationId, cantidad);
+      const actual = await this.client.obtenerDisponible(shopifyInventoryItemId, locationId);
+      if (actual === null) {
+        throw new Error(`El item ${shopifyInventoryItemId} no tiene inventario en la ubicación ${locationId} de Shopify`);
+      }
+
+      // En un reintento, si Shopify ya está en "cantidad de partida + delta", el primer intento
+      // se aplicó aunque su respuesta se perdiera: no se vuelve a descontar.
+      if (typeof datos.changeFromQuantity === "number" && actual === datos.changeFromQuantity + cantidad) {
+        console.log(`[Sync] Ajuste ya aplicado en un intento anterior (Item=${shopifyInventoryItemId})`);
+        return;
+      }
+      await (prisma as any).shopifySyncQueue.update({
+        where: { id: cambioId },
+        data: { datos: JSON.stringify({ ...datos, changeFromQuantity: actual }) },
+      });
+
+      const resultado = await this.client.adjustInventory(shopifyInventoryItemId, locationId, cantidad, actual);
 
       if (!resultado.inventoryAdjustQuantities) {
         throw new Error(`Shopify no aplicó el ajuste de inventario: ${JSON.stringify(resultado.errors ?? resultado)}`);
@@ -393,9 +413,19 @@ export class ShopifySyncService {
           await this.procesarInventoryLevelUpdate(payload.data);
           break;
 
-        case "orders/create":
+        case "orders/create": {
+          const config = await prisma.shopifyConfig.findUnique({
+            where: { empresaId: this.empresaId },
+            select: { sucursalEcommerceId: true },
+          });
+          if (config?.sucursalEcommerceId) {
+            await crearVentaDesdeShopify(this.empresaId, config.sucursalEcommerceId, payload.data as any);
+          }
+          break;
+        }
+
         case "orders/updated":
-          await this.procesarOrdenShopify(payload.data);
+          // Una edición del pedido no debe volver a descontar inventario.
           break;
 
         default:

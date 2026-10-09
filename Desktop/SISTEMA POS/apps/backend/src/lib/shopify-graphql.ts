@@ -25,6 +25,10 @@ interface GraphQLResponse {
   };
 }
 
+function gid(tipo: "InventoryItem" | "Location", id: string): string {
+  return id.startsWith("gid://") ? id : `gid://shopify/${tipo}/${id}`;
+}
+
 export class ShopifyGraphQLClient {
   private shopDomain: string;
   private accessToken: string;
@@ -239,15 +243,9 @@ export class ShopifyGraphQLClient {
   // FASE 4: Mutations para sincronización bidireccional
 
   /**
-   * Ajustar inventario en Shopify (cambio de stock)
+   * Cantidad "available" de un item en una ubicación, o null si el item no está en esa ubicación
    */
-  async adjustInventory(inventoryItemId: string, locationId: string, deltaQuantity: number): Promise<any> {
-    const gid = (tipo: "InventoryItem" | "Location", id: string) =>
-      id.startsWith("gid://") ? id : `gid://shopify/${tipo}/${id}`;
-    const itemGid = gid("InventoryItem", inventoryItemId);
-    const locationGid = gid("Location", locationId);
-
-    // La API exige changeFromQuantity (la cantidad actual) para rechazar ajustes concurrentes.
+  async obtenerDisponible(inventoryItemId: string, locationId: string): Promise<number | null> {
     const nivel = await this.query({
       query: `
         query NivelInventario($itemId: ID!, $locationId: ID!) {
@@ -261,15 +259,24 @@ export class ShopifyGraphQLClient {
           }
         }
       `,
-      variables: { itemId: itemGid, locationId: locationGid },
+      variables: { itemId: gid("InventoryItem", inventoryItemId), locationId: gid("Location", locationId) },
     });
     const actual = nivel?.inventoryItem?.inventoryLevel?.quantities?.find(
       (q: { name: string; quantity: number }) => q.name === "available"
     )?.quantity;
-    if (typeof actual !== "number") {
-      throw new Error(`El item ${inventoryItemId} no tiene inventario en la ubicación ${locationId} de Shopify`);
-    }
+    return typeof actual === "number" ? actual : null;
+  }
 
+  /**
+   * Ajustar inventario en Shopify. changeFromQuantity es la cantidad esperada antes del
+   * cambio: si no coincide, Shopify rechaza el ajuste en vez de aplicarlo dos veces.
+   */
+  async adjustInventory(
+    inventoryItemId: string,
+    locationId: string,
+    deltaQuantity: number,
+    changeFromQuantity: number
+  ): Promise<any> {
     const mutation = `
       mutation AdjustInventory($input: InventoryAdjustQuantitiesInput!) {
         inventoryAdjustQuantities(input: $input) {
@@ -293,10 +300,10 @@ export class ShopifyGraphQLClient {
           name: "available",
           changes: [
             {
-              inventoryItemId: itemGid,
-              locationId: locationGid,
+              inventoryItemId: gid("InventoryItem", inventoryItemId),
+              locationId: gid("Location", locationId),
               delta: deltaQuantity,
-              changeFromQuantity: actual,
+              changeFromQuantity,
             },
           ],
         },

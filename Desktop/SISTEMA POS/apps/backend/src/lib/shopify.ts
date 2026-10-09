@@ -857,7 +857,7 @@ export interface OrdenShopify {
   total_price: string;
   created_at: string;
   customer?: { first_name?: string | null; last_name?: string | null } | null;
-  line_items: { name: string; quantity: number; sku?: string | null; price?: string }[];
+  line_items: { name: string; quantity: number; sku?: string | null; price?: string; variant_id?: number | null }[];
 }
 
 export async function revisarPedidosNuevos(empresaId: string): Promise<OrdenShopify[]> {

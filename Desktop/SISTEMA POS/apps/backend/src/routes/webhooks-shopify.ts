@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import crypto from 'crypto';
 import { prisma } from '../lib/prisma.js';
-import { decrementStockFromShopifyOrder } from '../lib/shopify-stock-sync.js';
+import { crearVentaDesdeShopify } from '../lib/poller.js';
 
 /**
  * Verifica la firma HMAC del webhook de Shopify
@@ -79,27 +79,16 @@ export async function webhooksShopifyRoutes(app: FastifyInstance) {
 
       console.log(`[webhooks-shopify] Empresa encontrada: ${shopifyConfig.empresaId}`);
 
-      // 3. Convertir line_items al formato esperado
-      const lineItems = (body.line_items || []).map((item: any) => ({
-        sku: item.sku,
-        variantId: String(item.variant_id),
-        quantity: item.quantity,
-      }));
-
-      console.log(`[webhooks-shopify] Procesando ${lineItems.length} items`);
-
-      // 4. Decrementar stock en POS
-      const resultado = await decrementStockFromShopifyOrder(shopifyConfig.empresaId, lineItems);
-
-      console.log(
-        `[webhooks-shopify] ✅ Resultado: ${resultado.descuentosAplicados} productos actualizados`
-      );
-
-      if (resultado.errores.length > 0) {
-        console.warn(`[webhooks-shopify] ⚠️ Errores: ${resultado.errores.join(', ')}`);
+      // 3. Misma vía que el poller: una venta por pedido (clienteUuid único), sin descuentos dobles
+      const config = await prisma.shopifyConfig.findUnique({
+        where: { empresaId: shopifyConfig.empresaId },
+        select: { sucursalEcommerceId: true },
+      });
+      if (config?.sucursalEcommerceId) {
+        await crearVentaDesdeShopify(shopifyConfig.empresaId, config.sucursalEcommerceId, body);
       }
 
-      // 5. Registrar evento de webhook para auditoría
+      // 4. Registrar evento de webhook para auditoría
       await prisma.shopifyWebhookEvent.create({
         data: {
           empresaId: shopifyConfig.empresaId,
@@ -107,19 +96,13 @@ export async function webhooksShopifyRoutes(app: FastifyInstance) {
           shopifyResourceId: String(body.id),
           shopifyResourceGid: body.admin_graphql_api_id || undefined,
           datos: JSON.stringify(body),
-          procesado: resultado.errores.length === 0,
-          procesoError: resultado.errores.length > 0 ? resultado.errores.join('; ') : undefined,
+          procesado: true,
         },
       }).catch((err) => {
         console.error('[webhooks-shopify] Error registrando evento:', err);
       });
 
-      // 6. Responder OK (Shopify no necesita datos, solo confirmación)
-      return reply.code(200).send({
-        ok: true,
-        descuentosAplicados: resultado.descuentosAplicados,
-        errores: resultado.errores,
-      });
+      return reply.code(200).send({ ok: true });
     } catch (error) {
       const mensaje = error instanceof Error ? error.message : 'Error desconocido';
       console.error('[webhooks-shopify/orders-create] ❌ Error:', mensaje);

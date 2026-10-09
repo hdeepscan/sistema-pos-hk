@@ -9,7 +9,7 @@ let timer: ReturnType<typeof setInterval> | undefined;
 // que aparezca en el modulo de Ventas junto a las del punto fisico. Descuenta
 // el inventario local de la sucursal ecommerce SIN empujar el ajuste de vuelta
 // a Shopify (alla ya se desconto al hacerse el pedido).
-async function crearVentaDesdeShopify(empresaId: string, sucursalEcommerceId: string, orden: OrdenShopify) {
+export async function crearVentaDesdeShopify(empresaId: string, sucursalEcommerceId: string, orden: OrdenShopify) {
   const clienteUuid = `shopify-${orden.id}`;
   const yaExiste = await prisma.venta.findUnique({ where: { clienteUuid } });
   if (yaExiste) return;
@@ -20,16 +20,31 @@ async function crearVentaDesdeShopify(empresaId: string, sucursalEcommerceId: st
   });
   if (!admin) return;
 
-  const skus = (orden.line_items ?? []).map((li) => li.sku).filter((s): s is string => !!s);
-  const productos = skus.length
-    ? await prisma.producto.findMany({ where: { empresaId, sku: { in: skus } } })
-    : [];
+  // Se vincula por variant_id (exacto); el SKU solo es respaldo si la variante no está vinculada.
+  const lineas = orden.line_items ?? [];
+  const variantIds = lineas.map((li) => li.variant_id).filter((v): v is number => v != null).map(String);
+  const skus = lineas.map((li) => li.sku).filter((s): s is string => !!s);
+  const productos = await prisma.producto.findMany({
+    where: {
+      empresaId,
+      OR: [
+        ...(variantIds.length ? [{ shopifyVariantId: { in: variantIds } }] : []),
+        ...(skus.length ? [{ sku: { in: skus } }] : []),
+      ],
+    },
+  });
+  const productoPorVariante = new Map(productos.filter((p) => p.shopifyVariantId).map((p) => [p.shopifyVariantId!, p]));
   const productoPorSku = new Map(productos.map((p) => [p.sku, p]));
 
-  const itemsMapeados = (orden.line_items ?? [])
+  const itemsMapeados = lineas
     .map((li) => {
-      const producto = li.sku ? productoPorSku.get(li.sku) : undefined;
-      if (!producto) return null;
+      const producto =
+        (li.variant_id != null ? productoPorVariante.get(String(li.variant_id)) : undefined) ??
+        (li.sku ? productoPorSku.get(li.sku) : undefined);
+      if (!producto) {
+        console.warn(`[poller] Pedido ${orden.name}: línea "${li.name}" sin producto vinculado en CENTRALA`);
+        return null;
+      }
       return { productoId: producto.id, cantidad: li.quantity, precioUnitario: Number(li.price ?? 0) };
     })
     .filter((i): i is NonNullable<typeof i> => i !== null);
@@ -75,7 +90,12 @@ async function crearVentaDesdeShopify(empresaId: string, sucursalEcommerceId: st
       });
     }
     return venta;
+  }).catch((err) => {
+    // La restricción única de clienteUuid garantiza un solo registro por pedido aunque dos procesos lo reciban a la vez.
+    if (err?.code === "P2002") return null;
+    throw err;
   });
+  if (!venta) return;
 
   emitVentaCreada(empresaId, {
     ventaId: venta.id,
