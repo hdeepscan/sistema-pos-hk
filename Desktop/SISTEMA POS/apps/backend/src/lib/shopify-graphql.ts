@@ -253,17 +253,8 @@ export class ShopifyGraphQLClient {
    */
   async adjustInventory(inventoryItemId: string, locationId: string, deltaQuantity: number): Promise<any> {
     const mutation = `
-      mutation AdjustInventory($input: InventoryAdjustQuantityInput!) {
-        inventoryAdjustQuantity(input: $input) {
-          inventoryLevel {
-            id
-            available
-            onHand
-            location {
-              id
-              name
-            }
-          }
+      mutation AdjustInventory($input: InventoryAdjustQuantitiesInput!) {
+        inventoryAdjustQuantities(input: $input) {
           inventoryAdjustmentGroup {
             reason
             createdAt
@@ -283,9 +274,15 @@ export class ShopifyGraphQLClient {
       query: mutation,
       variables: {
         input: {
-          inventoryItemId: gid("InventoryItem", inventoryItemId),
-          locationId: gid("Location", locationId),
-          availableDelta: deltaQuantity,
+          reason: "correction",
+          name: "available",
+          changes: [
+            {
+              inventoryItemId: gid("InventoryItem", inventoryItemId),
+              locationId: gid("Location", locationId),
+              delta: deltaQuantity,
+            },
+          ],
         },
       },
     });
