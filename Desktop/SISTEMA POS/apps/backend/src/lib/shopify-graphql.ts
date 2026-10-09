@@ -276,11 +276,15 @@ export class ShopifyGraphQLClient {
       }
     `;
 
+    const gid = (tipo: "InventoryItem" | "Location", id: string) =>
+      id.startsWith("gid://") ? id : `gid://shopify/${tipo}/${id}`;
+
     return this.query({
       query: mutation,
       variables: {
         input: {
-          inventoryItemId,
+          inventoryItemId: gid("InventoryItem", inventoryItemId),
+          locationId: gid("Location", locationId),
           availableDelta: deltaQuantity,
         },
       },

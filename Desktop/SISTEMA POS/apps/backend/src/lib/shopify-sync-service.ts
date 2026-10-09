@@ -280,6 +280,9 @@ export class ShopifySyncService {
     try {
       const resultado = await this.client.adjustInventory(shopifyInventoryItemId, locationId, cantidad);
 
+      if (!resultado.inventoryAdjustQuantity) {
+        throw new Error(`Shopify no aplicó el ajuste de inventario: ${JSON.stringify(resultado.errors ?? resultado)}`);
+      }
       if (resultado.inventoryAdjustQuantity?.userErrors?.length > 0) {
         const errores = resultado.inventoryAdjustQuantity.userErrors;
         throw new Error(`Error Shopify: ${errores.map((e: any) => e.message).join(", ")}`);
