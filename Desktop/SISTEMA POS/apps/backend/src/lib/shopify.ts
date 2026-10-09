@@ -412,7 +412,7 @@ export async function ajustarInventarioEnShopify(
 
   try {
     // Agregar a cola para procesarse de forma asincrónica
-    await syncService.agregarACola("ACTUALIZAR_INVENTARIO", {
+    await syncService.agregarACola("INVENTORY_UPDATE", {
       shopifyInventoryItemId: inventoryItemId,
       locationId,
       cantidad: delta, // Este será el delta que procesa el worker
