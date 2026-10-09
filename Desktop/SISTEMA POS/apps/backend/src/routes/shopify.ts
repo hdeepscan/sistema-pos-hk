@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { GuardarShopifyConfigSchema } from "@sistema-pos/shared";
 import { prisma } from "../lib/prisma.js";
 import { normalizarDominio, validarDominioShopify, sincronizarProductos } from "../lib/shopify.js";
+import { conciliarInventario } from "../lib/shopify-conciliacion.js";
 import { verificarWebhookShopify } from "../lib/shopify-webhook-verify.js";
 import { mensajeDeValidacion } from "../lib/errores.js";
 import {
@@ -666,6 +667,29 @@ export async function shopifyRoutes(app: FastifyInstance) {
         error: mensaje,
         detalles: process.env.NODE_ENV === "development" ? String(err) : undefined,
       });
+    }
+  });
+
+  // Conciliación de inventario. GET solo informa; POST corrige Shopify para igualar a CENTRALA.
+  app.get("/shopify/conciliacion", async (request, reply) => {
+    if (!request.user.permisos.includes("inventario.administrar")) {
+      return reply.code(403).send({ error: "No tienes permiso para administrar inventario" });
+    }
+    try {
+      return await conciliarInventario(request.user.empresaId, false);
+    } catch (err) {
+      return reply.code(502).send({ error: err instanceof Error ? err.message : "Error consultando Shopify" });
+    }
+  });
+
+  app.post("/shopify/conciliacion/corregir", async (request, reply) => {
+    if (!request.user.permisos.includes("inventario.administrar")) {
+      return reply.code(403).send({ error: "No tienes permiso para administrar inventario" });
+    }
+    try {
+      return await conciliarInventario(request.user.empresaId, true);
+    } catch (err) {
+      return reply.code(502).send({ error: err instanceof Error ? err.message : "Error corrigiendo en Shopify" });
     }
   });
 

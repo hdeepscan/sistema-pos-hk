@@ -268,6 +268,107 @@ export class ShopifyGraphQLClient {
   }
 
   /**
+   * Todo el inventario "available" de una ubicación (paginado). Solo lectura.
+   */
+  async obtenerInventarioUbicacion(
+    locationId: string
+  ): Promise<{ inventoryItemId: string; sku: string | null; disponible: number }[]> {
+    const niveles: { inventoryItemId: string; sku: string | null; disponible: number }[] = [];
+    let after: string | null = null;
+
+    do {
+      const data: any = await this.query({
+        query: `
+          query InventarioUbicacion($locationId: ID!, $after: String) {
+            location(id: $locationId) {
+              inventoryLevels(first: 100, after: $after) {
+                pageInfo {
+                  hasNextPage
+                  endCursor
+                }
+                edges {
+                  node {
+                    item {
+                      id
+                      sku
+                    }
+                    quantities(names: ["available"]) {
+                      name
+                      quantity
+                    }
+                  }
+                }
+              }
+            }
+          }
+        `,
+        variables: { locationId: gid("Location", locationId), after },
+      });
+
+      const conexion = data?.location?.inventoryLevels;
+      if (!conexion) break;
+
+      for (const { node } of conexion.edges) {
+        niveles.push({
+          inventoryItemId: String(node.item.id).replace("gid://shopify/InventoryItem/", ""),
+          sku: node.item.sku ?? null,
+          disponible:
+            node.quantities?.find((q: { name: string; quantity: number }) => q.name === "available")?.quantity ?? 0,
+        });
+      }
+
+      after = conexion.pageInfo.hasNextPage ? conexion.pageInfo.endCursor : null;
+    } while (after);
+
+    return niveles;
+  }
+
+  /**
+   * Varios ajustes de "available" en una sola mutación. Cada cambio lleva changeFromQuantity,
+   * así que si Shopify cambió desde la lectura, rechaza el lote en vez de pisarlo.
+   */
+  async ajustarInventarioLote(
+    cambios: { inventoryItemId: string; locationId: string; delta: number; changeFromQuantity: number }[],
+    referenceDocumentUri: string
+  ): Promise<void> {
+    const data: any = await this.query({
+      query: `
+        mutation ConciliarInventario($input: InventoryAdjustQuantitiesInput!) {
+          inventoryAdjustQuantities(input: $input) {
+            inventoryAdjustmentGroup {
+              id
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+      `,
+      variables: {
+        input: {
+          reason: "correction",
+          name: "available",
+          referenceDocumentUri,
+          changes: cambios.map((c) => ({
+            inventoryItemId: gid("InventoryItem", c.inventoryItemId),
+            locationId: gid("Location", c.locationId),
+            delta: c.delta,
+            changeFromQuantity: c.changeFromQuantity,
+          })),
+        },
+      },
+    });
+
+    const errores = data?.inventoryAdjustQuantities?.userErrors ?? [];
+    if (!data?.inventoryAdjustQuantities || errores.length > 0) {
+      throw new Error(
+        `Shopify rechazó la corrección: ${errores.map((e: { message: string }) => e.message).join(", ") || "sin respuesta"}`
+      );
+    }
+  }
+
+  /**
    * Ajustar inventario en Shopify. changeFromQuantity es la cantidad esperada antes del
    * cambio: si no coincide, Shopify rechaza el ajuste en vez de aplicarlo dos veces.
    */
