@@ -414,7 +414,7 @@ export async function ajustarInventarioEnShopify(
     // Agregar a cola para procesarse de forma asincrónica
     await syncService.agregarACola("ACTUALIZAR_INVENTARIO", {
       shopifyInventoryItemId: inventoryItemId,
-      shopifyLocationId: locationId,
+      locationId,
       cantidad: delta, // Este será el delta que procesa el worker
     });
 
@@ -581,10 +581,10 @@ export async function ajustarInventarioEnShopifySiCorresponde(
     const config = await prisma.shopifyConfig.findUnique({ where: { empresaId } });
     if (!config || config.sucursalEcommerceId !== sucursalId) return;
 
-    const sucursal = await prisma.sucursal.findUnique({ where: { id: sucursalId } });
-    if (!sucursal?.shopifyLocationId) return;
+    const locationId = await asegurarUbicacionEcommerce(empresaId, sucursalId);
+    if (!locationId) return;
 
-    await ajustarInventarioEnShopify(empresaId, producto.shopifyInventoryItemId, sucursal.shopifyLocationId, delta);
+    await ajustarInventarioEnShopify(empresaId, producto.shopifyInventoryItemId, locationId, delta);
   } catch (err) {
     console.error("[shopify] No se pudo ajustar el inventario:", err);
   }
