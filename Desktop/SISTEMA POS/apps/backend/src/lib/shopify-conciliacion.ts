@@ -124,13 +124,17 @@ async function aplicarCambios(
   for (let i = 0; i < cambios.length; i += MAX_CAMBIOS_POR_LOTE) {
     const lote = cambios.slice(i, i + MAX_CAMBIOS_POR_LOTE);
     try {
-      await client.ajustarInventarioLote(lote, referencia);
+      await client.ajustarInventarioLote(lote, referencia, `${referencia}-lote-${i}`);
       aplicados += lote.length;
     } catch {
       // Un solo artículo que cambió desde la lectura rechaza el lote completo: se aplican uno por uno.
       for (const cambio of lote) {
         try {
-          await client.ajustarInventarioLote([cambio], referencia);
+          await client.ajustarInventarioLote(
+            [cambio],
+            referencia,
+            `${referencia}-${cambio.inventoryItemId}-${cambio.changeFromQuantity}`
+          );
           aplicados++;
         } catch (err) {
           console.warn(

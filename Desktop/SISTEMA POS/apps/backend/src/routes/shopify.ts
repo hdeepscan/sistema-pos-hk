@@ -334,194 +334,21 @@ export async function shopifyRoutes(app: FastifyInstance) {
     }
   });
 
-  // Forzar sincronización de inventario: Centrala POS → Shopify
+  // Deja Shopify igual a CENTRALA ahora mismo (misma lógica y protecciones que la conciliación automática)
   app.post("/shopify/force-push-inventory", async (request, reply) => {
-    const { empresaId } = request.user;
-
+    if (!request.user.permisos.includes("inventario.administrar")) {
+      return reply.code(403).send({ error: "No tienes permiso para administrar inventario" });
+    }
     try {
-      request.log.info(`[shopify-force-push] Iniciando force-push de inventario para empresa ${empresaId}`);
-
-      // Obtener configuración de Shopify y limpiar dominio
-      let config = await prisma.shopifyConfig.findUnique({
-        where: { empresaId },
-        select: { shopDomain: true, accessToken: true, sucursalEcommerceId: true, id: true },
-      });
-
-      if (!config?.accessToken) {
-        return reply.code(400).send({ error: "Tienda Shopify no conectada. Realiza la conexión primero." });
-      }
-
-      // Limpiar dominio si tiene duplicaciones
-      const domainLimpio = config.shopDomain.replace(/(\.myshopify\.com)+$/i, '') + '.myshopify.com';
-      if (domainLimpio !== config.shopDomain) {
-        await prisma.shopifyConfig.update({
-          where: { id: config.id },
-          data: { shopDomain: domainLimpio },
-        });
-        config = { ...config, shopDomain: domainLimpio };
-      }
-
-      // Obtener locationId válido (primera ubicación activa)
-      const location = await prisma.shopifyLocation.findFirst({
-        where: { empresaId, activa: true },
-        select: { shopifyLocationId: true },
-      });
-
-      if (!location?.shopifyLocationId) {
-        return reply.code(400).send({
-          error: "No hay ubicación (location) configurada en Shopify. Sincroniza primero con /shopify/sync-inicial"
-        });
-      }
-
-      // Obtener todos los productos con inventoryItemId en Shopify
-      const productosConShopify = await prisma.producto.findMany({
-        where: {
-          empresaId,
-          shopifyInventoryItemId: { not: null },
-        },
-        select: {
-          id: true,
-          nombre: true,
-          shopifyInventoryItemId: true,
-        },
-      });
-
-      request.log.info(`[shopify-force-push] Encontrados ${productosConShopify.length} productos para sincronizar`);
-
-      if (productosConShopify.length === 0) {
-        return reply.code(200).send({
-          exito: true,
-          productosActualizados: 0,
-          mensaje: "No hay productos vinculados a Shopify",
-        });
-      }
-
-      // Obtener stock actual de cada producto en la sucursal ecommerce
-      const inventarios = await prisma.inventarioSucursal.findMany({
-        where: {
-          sucursalId: config.sucursalEcommerceId,
-          productoId: { in: productosConShopify.map(p => p.id) },
-        },
-        select: {
-          productoId: true,
-          cantidad: true,
-        },
-      });
-
-      const stockMap = new Map(inventarios.map(inv => [inv.productoId, inv.cantidad]));
-
-      // Procesar cada producto individualmente para evitar rollback de batch completo
-      let productosActualizados = 0;
-      let erroresDetalle: Array<{ producto: string; error: string }> = [];
-
-      const mutation = `
-        mutation inventorySetQuantities($input: InventorySetQuantitiesInput!) {
-          inventorySetQuantities(input: $input) {
-            inventoryAdjustmentGroup {
-              id
-            }
-            userErrors {
-              field
-              message
-            }
-          }
-        }
-      `;
-
-      for (const producto of productosConShopify) {
-        try {
-          const cantidad = stockMap.get(producto.id) ?? 0;
-
-          const response = await fetch(
-            `https://${config.shopDomain}/admin/api/2024-01/graphql.json`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'X-Shopify-Access-Token': config.accessToken,
-              },
-              body: JSON.stringify({
-                query: mutation,
-                variables: {
-                  input: {
-                    name: 'available',
-                    reason: 'correction',
-                    ignoreCompareQuantity: true,
-                    quantities: [
-                      {
-                        inventoryItemId: formatGid(producto.shopifyInventoryItemId!, 'InventoryItem'),
-                        locationId: formatGid(location.shopifyLocationId, 'Location'),
-                        quantity: cantidad,
-                      },
-                    ],
-                  },
-                },
-              }),
-            }
-          );
-
-          const data: any = await response.json();
-
-          if (data.errors || data.data?.inventorySetQuantities?.userErrors?.length) {
-            let mensajeError = "Error desconocido de Shopify";
-            const userErrors = data.data?.inventorySetQuantities?.userErrors;
-
-            if (userErrors && userErrors.length > 0) {
-              mensajeError = userErrors.map((e: any) => {
-                if (e.message.includes("could not be found")) {
-                  return "El producto ya no existe en Shopify (fue eliminado).";
-                }
-                return e.message;
-              }).join(" | ");
-            } else if (data.errors) {
-              mensajeError = data.errors[0]?.message || "Error interno de GraphQL";
-            }
-
-            request.log.warn(`[shopify-force-push] Advertencia para ${producto.nombre}: ${mensajeError}`);
-
-            erroresDetalle.push({
-              producto: producto.nombre,
-              error: mensajeError,
-            });
-          } else {
-            productosActualizados++;
-            request.log.info(`[shopify-force-push] ✅ ${producto.nombre}: ${cantidad} unidades sincronizadas`);
-          }
-        } catch (err) {
-          const mensaje = err instanceof Error ? err.message : 'Error desconocido';
-          request.log.warn(`[shopify-force-push] Advertencia para ${producto.nombre}: ${mensaje}`);
-          erroresDetalle.push({
-            producto: producto.nombre,
-            error: mensaje.slice(0, 150),
-          });
-        }
-      }
-
-      // Registrar en auditoría
-      await prisma.shopifyWebhookEvent.create({
-        data: {
-          empresaId,
-          tipo: 'force_push_inventory',
-          shopifyResourceId: 'bulk_update',
-          datos: JSON.stringify({
-            productosActualizados,
-            totalProductos: productosConShopify.length,
-            timestamp: new Date().toISOString(),
-          }),
-        },
-      }).catch(() => {});
-
+      const r = await conciliarInventario(request.user.empresaId, true);
       return reply.code(200).send({
-        exito: true,
-        productosActualizados,
-        totalProductos: productosConShopify.length,
-        erroresDetalle: erroresDetalle.length > 0 ? erroresDetalle : undefined,
-        mensaje: `✅ ${productosActualizados} productos sincronizados correctamente`,
+        exito: !r.omitido,
+        productosActualizados: r.corregidos,
+        totalProductos: r.totalVinculados,
+        mensaje: r.omitido ?? `${r.corregidos} producto(s) corregidos en Shopify`,
       });
-    } catch (error) {
-      const mensaje = error instanceof Error ? error.message : 'Error desconocido';
-      request.log.error(`[shopify-force-push] Error crítico: ${mensaje}`);
-      return reply.code(500).send({ error: mensaje });
+    } catch (err) {
+      return reply.code(502).send({ error: err instanceof Error ? err.message : "Error sincronizando con Shopify" });
     }
   });
 

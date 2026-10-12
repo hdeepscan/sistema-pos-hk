@@ -363,12 +363,13 @@ export class ShopifyGraphQLClient {
    */
   async ajustarInventarioLote(
     cambios: { inventoryItemId: string; locationId: string; delta: number; changeFromQuantity: number }[],
-    referenceDocumentUri: string
+    referenceDocumentUri: string,
+    idempotencyKey: string
   ): Promise<void> {
     const data: any = await this.query({
       query: `
-        mutation ConciliarInventario($input: InventoryAdjustQuantitiesInput!) {
-          inventoryAdjustQuantities(input: $input) {
+        mutation ConciliarInventario($input: InventoryAdjustQuantitiesInput!, $idempotencyKey: String!) {
+          inventoryAdjustQuantities(input: $input) @idempotent(key: $idempotencyKey) {
             inventoryAdjustmentGroup {
               id
             }
@@ -391,6 +392,7 @@ export class ShopifyGraphQLClient {
             changeFromQuantity: c.changeFromQuantity,
           })),
         },
+        idempotencyKey,
       },
     });
 
@@ -410,11 +412,13 @@ export class ShopifyGraphQLClient {
     inventoryItemId: string,
     locationId: string,
     deltaQuantity: number,
-    changeFromQuantity: number
+    changeFromQuantity: number,
+    idempotencyKey: string
   ): Promise<any> {
+    // Desde la API 2026-04 Shopify exige @idempotent en las mutaciones de inventario.
     const mutation = `
-      mutation AdjustInventory($input: InventoryAdjustQuantitiesInput!) {
-        inventoryAdjustQuantities(input: $input) {
+      mutation AdjustInventory($input: InventoryAdjustQuantitiesInput!, $idempotencyKey: String!) {
+        inventoryAdjustQuantities(input: $input) @idempotent(key: $idempotencyKey) {
           inventoryAdjustmentGroup {
             reason
             createdAt
@@ -442,6 +446,7 @@ export class ShopifyGraphQLClient {
             },
           ],
         },
+        idempotencyKey,
       },
     });
   }

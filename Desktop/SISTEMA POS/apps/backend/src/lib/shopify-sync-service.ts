@@ -323,7 +323,15 @@ export class ShopifySyncService {
         data: { datos: JSON.stringify({ ...datos, locationId: ubicacion, changeFromQuantity: actual }) },
       });
 
-      const resultado = await this.client.adjustInventory(shopifyInventoryItemId, ubicacion, cantidad, actual);
+      // La clave depende del cambio y de la cantidad de partida: un reintento del mismo ajuste
+      // reutiliza la clave y Shopify no lo aplica dos veces.
+      const resultado = await this.client.adjustInventory(
+        shopifyInventoryItemId,
+        ubicacion,
+        cantidad,
+        actual,
+        `centrala-${cambioId}-${actual}`
+      );
 
       if (!resultado.inventoryAdjustQuantities) {
         throw new Error(`Shopify no aplicó el ajuste de inventario: ${JSON.stringify(resultado.errors ?? resultado)}`);
