@@ -268,6 +268,19 @@ export class ShopifySyncService {
   /**
    * Sincronizar cambio de inventario con Shopify
    */
+  private async recordarUbicacionEcommerce(locationId: string): Promise<void> {
+    const config = await prisma.shopifyConfig.findUnique({
+      where: { empresaId: this.empresaId },
+      select: { sucursalEcommerceId: true },
+    });
+    if (!config?.sucursalEcommerceId) return;
+    await prisma.sucursal.update({
+      where: { id: config.sucursalEcommerceId },
+      data: { shopifyLocationId: locationId },
+    });
+    console.log(`[Sync] Ubicación de Shopify de la sucursal ecommerce actualizada a ${locationId}`);
+  }
+
   private async sincronizarInventario(datos: Record<string, any>, cambioId: string): Promise<void> {
     if (!this.client) throw new Error("Cliente GraphQL no disponible");
 
@@ -282,9 +295,21 @@ export class ShopifySyncService {
     );
 
     try {
-      const actual = await this.client.obtenerDisponible(shopifyInventoryItemId, locationId);
+      let ubicacion: string = locationId;
+      let actual = await this.client.obtenerDisponible(shopifyInventoryItemId, ubicacion);
       if (actual === null) {
-        throw new Error(`El item ${shopifyInventoryItemId} no tiene inventario en la ubicación ${locationId} de Shopify`);
+        // El item no está en la ubicación configurada: si está en una sola, se usa esa y se recuerda.
+        const niveles = await this.client.ubicacionesDelItem(shopifyInventoryItemId);
+        if (niveles.length !== 1) {
+          throw new Error(
+            niveles.length === 0
+              ? `El item ${shopifyInventoryItemId} no tiene inventario en ninguna ubicación de Shopify`
+              : `El item ${shopifyInventoryItemId} no está en la ubicación ${locationId} y existe en ${niveles.length} ubicaciones de Shopify`
+          );
+        }
+        ubicacion = niveles[0].locationId;
+        actual = niveles[0].disponible;
+        await this.recordarUbicacionEcommerce(ubicacion);
       }
 
       // En un reintento, si Shopify ya está en "cantidad de partida + delta", el primer intento
@@ -295,10 +320,10 @@ export class ShopifySyncService {
       }
       await (prisma as any).shopifySyncQueue.update({
         where: { id: cambioId },
-        data: { datos: JSON.stringify({ ...datos, changeFromQuantity: actual }) },
+        data: { datos: JSON.stringify({ ...datos, locationId: ubicacion, changeFromQuantity: actual }) },
       });
 
-      const resultado = await this.client.adjustInventory(shopifyInventoryItemId, locationId, cantidad, actual);
+      const resultado = await this.client.adjustInventory(shopifyInventoryItemId, ubicacion, cantidad, actual);
 
       if (!resultado.inventoryAdjustQuantities) {
         throw new Error(`Shopify no aplicó el ajuste de inventario: ${JSON.stringify(resultado.errors ?? resultado)}`);

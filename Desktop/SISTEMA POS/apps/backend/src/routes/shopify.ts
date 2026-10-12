@@ -596,6 +596,7 @@ export async function shopifyRoutes(app: FastifyInstance) {
           estado: true,
           intentos: true,
           errorMensaje: true,
+          datos: true,
           creadoEn: true,
           procesadoEn: true,
           proximoIntento: true,

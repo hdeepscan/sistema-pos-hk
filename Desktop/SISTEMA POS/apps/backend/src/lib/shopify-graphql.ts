@@ -268,6 +268,40 @@ export class ShopifyGraphQLClient {
   }
 
   /**
+   * Ubicaciones donde un item tiene inventario, con su cantidad "available".
+   */
+  async ubicacionesDelItem(inventoryItemId: string): Promise<{ locationId: string; disponible: number }[]> {
+    const data: any = await this.query({
+      query: `
+        query UbicacionesItem($itemId: ID!) {
+          inventoryItem(id: $itemId) {
+            inventoryLevels(first: 20) {
+              edges {
+                node {
+                  location {
+                    id
+                  }
+                  quantities(names: ["available"]) {
+                    name
+                    quantity
+                  }
+                }
+              }
+            }
+          }
+        }
+      `,
+      variables: { itemId: gid("InventoryItem", inventoryItemId) },
+    });
+
+    return (data?.inventoryItem?.inventoryLevels?.edges ?? []).map(({ node }: any) => ({
+      locationId: String(node.location.id).replace("gid://shopify/Location/", ""),
+      disponible:
+        node.quantities?.find((q: { name: string; quantity: number }) => q.name === "available")?.quantity ?? 0,
+    }));
+  }
+
+  /**
    * Todo el inventario "available" de una ubicación (paginado). Solo lectura.
    */
   async obtenerInventarioUbicacion(

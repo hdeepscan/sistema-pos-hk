@@ -122,6 +122,7 @@ export interface ResultadoSync {
 interface ShopifyLocation {
   id: number;
   name: string;
+  active?: boolean;
 }
 
 export async function obtenerUbicaciones(empresaId: string): Promise<ShopifyLocation[]> {
@@ -140,7 +141,7 @@ async function asegurarUbicacionEcommerceInterno(empresaId: string, sucursalEcom
   const sucursal = await prisma.sucursal.findUnique({ where: { id: sucursalEcommerceId } });
   if (sucursal?.shopifyLocationId) return;
 
-  const ubicaciones = await obtenerUbicaciones(empresaId);
+  const ubicaciones = (await obtenerUbicaciones(empresaId)).filter((u) => u.active !== false);
   if (ubicaciones.length === 0) return;
 
   await prisma.sucursal.update({
@@ -403,7 +404,8 @@ export async function ajustarInventarioEnShopify(
   empresaId: string,
   inventoryItemId: string,
   locationId: string,
-  delta: number
+  delta: number,
+  productoId?: string
 ): Promise<void> {
   // ✅ NUEVO: Usar el sistema de cola de sincronización
   // en lugar de llamar directamente a Shopify (evita rate limits)
@@ -416,7 +418,7 @@ export async function ajustarInventarioEnShopify(
       shopifyInventoryItemId: inventoryItemId,
       locationId,
       cantidad: delta, // Este será el delta que procesa el worker
-    });
+    }, productoId);
 
     console.log(
       `[shopify] Ajuste de inventario encolado: Item=${inventoryItemId}, Delta=${delta}`
@@ -593,7 +595,7 @@ async function publicarInventarioInicialEnShopify(
 export async function ajustarInventarioEnShopifySiCorresponde(
   empresaId: string,
   sucursalId: string,
-  producto: { shopifyInventoryItemId: string | null },
+  producto: { id?: string; shopifyInventoryItemId: string | null },
   delta: number
 ): Promise<void> {
   if (delta === 0) return;
@@ -618,7 +620,7 @@ export async function ajustarInventarioEnShopifySiCorresponde(
       return;
     }
 
-    await ajustarInventarioEnShopify(empresaId, producto.shopifyInventoryItemId, locationId, delta);
+    await ajustarInventarioEnShopify(empresaId, producto.shopifyInventoryItemId, locationId, delta, producto.id);
   } catch (err) {
     console.error("[shopify] No se pudo ajustar el inventario:", err);
   }
