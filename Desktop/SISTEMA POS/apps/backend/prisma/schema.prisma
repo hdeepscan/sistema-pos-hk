@@ -1226,7 +1226,13 @@ model TurnoCaja {
   usuarioCierre     Usuario?            @relation("TurnoCajaCierre", fields: [usuarioCierreId], references: [id])
 
   estado            EstadoTurnoCaja     @default(ABIERTA)
-  saldoInicial      Decimal             @db.Decimal(14, 2) @default(0)
+  saldoInicial      Decimal             @db.Decimal(14, 2) @default(0) // Efectivo físico al abrir
+
+  // Saldos iniciales de los demás canales (no son efectivo)
+  saldoInicialTarjeta       Decimal     @db.Decimal(14, 2) @default(0)
+  saldoInicialTransferencia Decimal     @db.Decimal(14, 2) @default(0)
+  saldoInicialCredito       Decimal     @db.Decimal(14, 2) @default(0)
+  saldoInicialOtro          Decimal     @db.Decimal(14, 2) @default(0)
 
   // Ventas por método de pago (sumadas en tiempo real)
   ventasEfectivo    Decimal             @db.Decimal(14, 2) @default(0)

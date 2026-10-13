@@ -88,7 +88,7 @@ export default function Caja() {
   const [turno, setTurno] = useState<any>(null);
   const [canales, setCanales] = useState<any>(null);
   const [totales, setTotales] = useState<any>(null);
-  const [saldoInicial, setSaldoInicial] = useState("");
+  const [apertura, setApertura] = useState({ efectivo: "", tarjeta: "", transferencia: "", credito: "", otro: "" });
   const [loading, setLoading] = useState(false);
   const [mostrarModal, setMostrarModal] = useState(false);
   const [mostrarMovimiento, setMostrarMovimiento] = useState(false);
@@ -128,11 +128,21 @@ export default function Caja() {
   }
 
   async function abrirCaja() {
-    if (!saldoInicial) return alert("Ingresa saldo inicial");
+    const monto = (v: string) => (v.trim() === "" ? 0 : Number(v));
+    const montos = {
+      saldoInicial: monto(apertura.efectivo),
+      saldoInicialTarjeta: monto(apertura.tarjeta),
+      saldoInicialTransferencia: monto(apertura.transferencia),
+      saldoInicialCredito: monto(apertura.credito),
+      saldoInicialOtro: monto(apertura.otro),
+    };
+    if (Object.values(montos).some((v) => !Number.isFinite(v) || v < 0)) {
+      return alert("Los saldos iniciales deben ser números mayores o iguales a 0");
+    }
     try {
       setLoading(true);
-      await api.post("/caja/abrir", { saldoInicial: parseFloat(saldoInicial) });
-      setSaldoInicial("");
+      await api.post("/caja/abrir", montos);
+      setApertura({ efectivo: "", tarjeta: "", transferencia: "", credito: "", otro: "" });
       await cargarEstado();
     } catch (error) {
       alert("Error al abrir caja");
@@ -395,13 +405,26 @@ export default function Caja() {
     }, 250);
   }
 
-  const renderCanalCard = (titulo: string, icono: any, valor: number) => (
+  const formatoPesos = (valor: number) => `$${valor.toLocaleString("es-CO", { maximumFractionDigits: 0 })}`;
+
+  const renderCanalCard = (titulo: string, icono: any, valor: number, inicial?: number) => (
     <div className="caja-card">
       {icono}
       <div className="caja-card-label">{titulo}</div>
-      <div className="caja-card-value">${valor.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</div>
+      <div className="caja-card-value">{formatoPesos(valor)}</div>
+      {inicial !== undefined && inicial > 0 && (
+        <div style={{ fontSize: "12px", color: "#64748b", marginTop: "4px" }}>Inicial: {formatoPesos(inicial)}</div>
+      )}
     </div>
   );
+
+  const camposApertura: { clave: keyof typeof apertura; etiqueta: string }[] = [
+    { clave: "efectivo", etiqueta: "Efectivo (billetes y monedas en la caja)" },
+    { clave: "tarjeta", etiqueta: "Tarjeta" },
+    { clave: "transferencia", etiqueta: "Transferencia" },
+    { clave: "credito", etiqueta: "Crédito" },
+    { clave: "otro", etiqueta: "Otro" },
+  ];
 
   return (
     <div className="caja-container">
@@ -414,15 +437,25 @@ export default function Caja() {
             <h2>Caja Cerrada</h2>
             <p>Abre la caja para comenzar el turno</p>
           </div>
-          <div style={{ width: "100%", maxWidth: "300px" }}>
-            <input
-              type="number"
-              className="form-input"
-              placeholder="Saldo inicial"
-              value={saldoInicial}
-              onChange={(e) => setSaldoInicial(e.target.value)}
-              step="0.01"
-            />
+          <div style={{ width: "100%", maxWidth: "340px", textAlign: "left" }}>
+            <p style={{ fontSize: "13px", color: "#64748b", margin: "0 0 12px" }}>
+              Saldo inicial de cada canal. Deja en blanco los que estén en $0.
+            </p>
+            {camposApertura.map(({ clave, etiqueta }) => (
+              <label key={clave} style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "10px" }}>
+                {etiqueta}
+                <input
+                  type="number"
+                  className="form-input"
+                  placeholder="0"
+                  min={0}
+                  value={apertura[clave]}
+                  onChange={(e) => setApertura({ ...apertura, [clave]: e.target.value })}
+                  step="0.01"
+                  style={{ marginTop: "4px" }}
+                />
+              </label>
+            ))}
             <button onClick={abrirCaja} disabled={loading} className="caja-btn caja-btn-primary" style={{ width: "100%", marginTop: "12px" }}>
               <Unlock size={16} /> Abrir Caja
             </button>
@@ -437,12 +470,12 @@ export default function Caja() {
 
           {/* Grid de Resumen de Canales */}
           <div className="caja-grid">
-            {renderCanalCard("EFECTIVO", <div className="caja-card-icon">💵</div>, canales?.efectivo?.esperado || 0)}
-            {renderCanalCard("TARJETA", <CreditCard size={20} className="caja-card-icon" />, canales?.tarjeta?.esperado || 0)}
-            {renderCanalCard("TRANSFERENCIA", <Send size={20} className="caja-card-icon" />, canales?.transferencia?.esperado || 0)}
-            {renderCanalCard("CRÉDITO", <TrendingUp size={20} className="caja-card-icon" />, canales?.credito?.esperado || 0)}
-            {renderCanalCard("OTRO", <Smartphone size={20} className="caja-card-icon" />, canales?.otro?.esperado || 0)}
-            {renderCanalCard("TOTAL", <CheckCircle size={20} className="caja-card-icon" />, totales?.ventasTotales || 0)}
+            {renderCanalCard("EFECTIVO", <div className="caja-card-icon">💵</div>, canales?.efectivo?.esperado || 0, canales?.efectivo?.inicial)}
+            {renderCanalCard("TARJETA", <CreditCard size={20} className="caja-card-icon" />, canales?.tarjeta?.esperado || 0, canales?.tarjeta?.inicial)}
+            {renderCanalCard("TRANSFERENCIA", <Send size={20} className="caja-card-icon" />, canales?.transferencia?.esperado || 0, canales?.transferencia?.inicial)}
+            {renderCanalCard("CRÉDITO", <TrendingUp size={20} className="caja-card-icon" />, canales?.credito?.esperado || 0, canales?.credito?.inicial)}
+            {renderCanalCard("OTRO", <Smartphone size={20} className="caja-card-icon" />, canales?.otro?.esperado || 0, canales?.otro?.inicial)}
+            {renderCanalCard("TOTAL", <CheckCircle size={20} className="caja-card-icon" />, totales?.totalEsperado ?? totales?.ventasTotales ?? 0)}
           </div>
 
           {/* Historial de Movimientos */}

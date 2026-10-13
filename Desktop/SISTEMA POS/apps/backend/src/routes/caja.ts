@@ -1,28 +1,118 @@
 import type { FastifyInstance } from "fastify";
+import type { TurnoCaja } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
+
+type Canal = "efectivo" | "tarjeta" | "transferencia" | "credito" | "otro";
+type PorCanal = Record<Canal, number>;
+
+const CANAL_POR_METODO: Record<string, Canal> = {
+  EFECTIVO: "efectivo",
+  TARJETA: "tarjeta",
+  TRANSFERENCIA: "transferencia",
+  CREDITO: "credito",
+};
+
+function montoNoNegativo(valor: unknown): number | null {
+  if (valor === undefined || valor === null || valor === "") return 0;
+  const n = Number(valor);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+// Cada canal espera su saldo inicial más sus ventas del turno. Solo el efectivo suma
+// ingresos y resta egresos manuales, porque esos movimientos son dinero físico.
+async function calcularCanales(empresaId: string, turno: TurnoCaja) {
+  const ventas = await prisma.venta.findMany({
+    where: {
+      empresaId,
+      sucursalId: turno.sucursalId,
+      fecha: { gte: turno.fechaApertura, lte: new Date() },
+    },
+    select: { total: true, metodoPago: true },
+  });
+
+  const vendido: PorCanal = { efectivo: 0, tarjeta: 0, transferencia: 0, credito: 0, otro: 0 };
+  for (const v of ventas) {
+    vendido[CANAL_POR_METODO[v.metodoPago] ?? "otro"] += Number(v.total);
+  }
+
+  const inicial: PorCanal = {
+    efectivo: Number(turno.saldoInicial),
+    tarjeta: Number(turno.saldoInicialTarjeta),
+    transferencia: Number(turno.saldoInicialTransferencia),
+    credito: Number(turno.saldoInicialCredito),
+    otro: Number(turno.saldoInicialOtro),
+  };
+
+  const esperado: PorCanal = {
+    efectivo: inicial.efectivo + vendido.efectivo + Number(turno.ingresos) - Number(turno.egresos),
+    tarjeta: inicial.tarjeta + vendido.tarjeta,
+    transferencia: inicial.transferencia + vendido.transferencia,
+    credito: inicial.credito + vendido.credito,
+    otro: inicial.otro + vendido.otro,
+  };
+
+  return { vendido, inicial, esperado };
+}
+
+function datosEsperados(vendido: PorCanal, esperado: PorCanal) {
+  return {
+    ventasEfectivo: vendido.efectivo,
+    ventasTarjeta: vendido.tarjeta,
+    ventasTransferencia: vendido.transferencia,
+    ventasCredito: vendido.credito,
+    ventasOtro: vendido.otro,
+    esperadoEfectivo: esperado.efectivo,
+    esperadoTarjeta: esperado.tarjeta,
+    esperadoTransferencia: esperado.transferencia,
+    esperadoCredito: esperado.credito,
+    esperadoOtro: esperado.otro,
+  };
+}
+
+const suma = (valores: PorCanal) => Object.values(valores).reduce((a, b) => a + b, 0);
 
 export async function cajaRoutes(app: FastifyInstance) {
   app.addHook("preHandler", app.authenticate);
 
-  // POST /caja/abrir - Abre turno de caja con saldo inicial
-  app.post<{ Body: { saldoInicial: number } }>("/caja/abrir", async (req, reply) => {
+  // POST /caja/abrir - Abre turno de caja con el saldo inicial de cada canal
+  app.post<{
+    Body: {
+      saldoInicial?: number;
+      saldoInicialTarjeta?: number;
+      saldoInicialTransferencia?: number;
+      saldoInicialCredito?: number;
+      saldoInicialOtro?: number;
+    };
+  }>("/caja/abrir", async (req, reply) => {
     try {
       const { empresaId, usuarioId } = req.user;
       const sucursal = await prisma.sucursal.findFirst({ where: { empresaId, activo: true } });
       if (!sucursal) return reply.code(404).send({ error: "Sucursal no encontrada" });
 
-      // Verificar que no haya caja abierta
       const cajaAbierta = await prisma.turnoCaja.findFirst({
         where: { empresaId, fechaCierre: null },
       });
       if (cajaAbierta) return reply.code(400).send({ error: "Caja ya está abierta" });
+
+      const efectivo = montoNoNegativo(req.body.saldoInicial);
+      const tarjeta = montoNoNegativo(req.body.saldoInicialTarjeta);
+      const transferencia = montoNoNegativo(req.body.saldoInicialTransferencia);
+      const credito = montoNoNegativo(req.body.saldoInicialCredito);
+      const otro = montoNoNegativo(req.body.saldoInicialOtro);
+      if ([efectivo, tarjeta, transferencia, credito, otro].some((v) => v === null)) {
+        return reply.code(400).send({ error: "Los saldos iniciales deben ser números mayores o iguales a 0" });
+      }
 
       const turno = await prisma.turnoCaja.create({
         data: {
           empresaId,
           sucursalId: sucursal.id,
           usuarioAperturaId: usuarioId,
-          saldoInicial: parseFloat(req.body.saldoInicial.toString()),
+          saldoInicial: efectivo!,
+          saldoInicialTarjeta: tarjeta!,
+          saldoInicialTransferencia: transferencia!,
+          saldoInicialCredito: credito!,
+          saldoInicialOtro: otro!,
         },
       });
 
@@ -43,80 +133,33 @@ export async function cajaRoutes(app: FastifyInstance) {
 
       if (!turno) return reply.send({ estado: "CERRADA", turno: null });
 
-      // Obtener todas las ventas del turno
-      const ventas = await prisma.venta.findMany({
-        where: {
-          empresaId,
-          sucursalId: turno.sucursalId,
-          fecha: { gte: turno.fechaApertura, lte: new Date() },
-        },
-      });
+      const { vendido, inicial, esperado } = await calcularCanales(empresaId, turno);
 
-      // Agrupar ventas por método de pago
-      let ventasEfectivo = 0,
-        ventasTarjeta = 0,
-        ventasTransferencia = 0,
-        ventasCredito = 0,
-        ventasOtro = 0;
-
-      for (const v of ventas) {
-        const total = Number(v.total);
-        switch (v.metodoPago) {
-          case "EFECTIVO":
-            ventasEfectivo += total;
-            break;
-          case "TARJETA":
-            ventasTarjeta += total;
-            break;
-          case "TRANSFERENCIA":
-            ventasTransferencia += total;
-            break;
-          case "CREDITO":
-            ventasCredito += total;
-            break;
-          default:
-            ventasOtro += total;
-        }
-      }
-
-      // Calcular esperados: Efectivo = saldo inicial + ventas - egresos + ingresos
-      // Otros métodos = solo sus ventas
-      const esperadoEfectivo =
-        Number(turno.saldoInicial) + ventasEfectivo + Number(turno.ingresos) - Number(turno.egresos);
-
-      // Actualizar esperados en BD (útil para auditoría)
+      // Guardar esperados en BD (útil para auditoría)
       await prisma.turnoCaja.update({
         where: { id: turno.id },
-        data: {
-          ventasEfectivo,
-          ventasTarjeta,
-          ventasTransferencia,
-          ventasCredito,
-          ventasOtro,
-          esperadoEfectivo,
-          esperadoTarjeta: ventasTarjeta,
-          esperadoTransferencia: ventasTransferencia,
-          esperadoCredito: ventasCredito,
-          esperadoOtro: ventasOtro,
-        },
+        data: datosEsperados(vendido, esperado),
       });
+
+      const canal = (c: Canal) => ({ esperado: esperado[c], vendido: vendido[c], inicial: inicial[c] });
 
       reply.send({
         estado: "ABIERTA",
         turno: {
           id: turno.id,
           usuario: turno.usuarioApertura.nombre,
-          saldoInicial: Number(turno.saldoInicial),
+          saldoInicial: inicial.efectivo,
         },
         canales: {
-          efectivo: { esperado: esperadoEfectivo, vendido: ventasEfectivo },
-          tarjeta: { esperado: ventasTarjeta, vendido: ventasTarjeta },
-          transferencia: { esperado: ventasTransferencia, vendido: ventasTransferencia },
-          credito: { esperado: ventasCredito, vendido: ventasCredito },
-          otro: { esperado: ventasOtro, vendido: ventasOtro },
+          efectivo: canal("efectivo"),
+          tarjeta: canal("tarjeta"),
+          transferencia: canal("transferencia"),
+          credito: canal("credito"),
+          otro: canal("otro"),
         },
         totales: {
-          ventasTotales: ventasEfectivo + ventasTarjeta + ventasTransferencia + ventasCredito + ventasOtro,
+          ventasTotales: suma(vendido),
+          totalEsperado: suma(esperado),
           ingresos: Number(turno.ingresos),
           egresos: Number(turno.egresos),
         },
@@ -131,7 +174,7 @@ export async function cajaRoutes(app: FastifyInstance) {
     "/caja/movimiento",
     async (req, reply) => {
       try {
-        const { empresaId, usuarioId } = req.user;
+        const { empresaId } = req.user;
         const turno = await prisma.turnoCaja.findFirst({
           where: { empresaId, fechaCierre: null },
         });
@@ -141,7 +184,6 @@ export async function cajaRoutes(app: FastifyInstance) {
         const monto = parseFloat(req.body.monto.toString());
         const tipo = req.body.tipo;
 
-        // Registrar movimiento
         await prisma.movimientoCaja.create({
           data: {
             turnoId: turno.id,
@@ -151,7 +193,6 @@ export async function cajaRoutes(app: FastifyInstance) {
           },
         });
 
-        // Actualizar sumas en turno
         if (tipo === "INGRESO") {
           await prisma.turnoCaja.update({
             where: { id: turno.id },
@@ -186,137 +227,68 @@ export async function cajaRoutes(app: FastifyInstance) {
       const { empresaId, usuarioId } = req.user;
       const turno = await prisma.turnoCaja.findFirst({
         where: { empresaId, fechaCierre: null },
-        include: { usuarioApertura: true },
       });
 
       if (!turno) return reply.code(400).send({ error: "No hay caja abierta" });
 
-      // Obtener ventas del turno
-      const ventas = await prisma.venta.findMany({
-        where: {
-          empresaId,
-          sucursalId: turno.sucursalId,
-          fecha: { gte: turno.fechaApertura, lte: new Date() },
-        },
-      });
+      const { vendido, esperado } = await calcularCanales(empresaId, turno);
 
-      // Agrupar ventas por método
-      let ventasEfectivo = 0,
-        ventasTarjeta = 0,
-        ventasTransferencia = 0,
-        ventasCredito = 0,
-        ventasOtro = 0;
+      const reportado: PorCanal = {
+        efectivo: Number(req.body.reportadoEfectivo) || 0,
+        tarjeta: Number(req.body.reportadoTarjeta) || 0,
+        transferencia: Number(req.body.reportadoTransferencia) || 0,
+        credito: Number(req.body.reportadoCredito) || 0,
+        otro: Number(req.body.reportadoOtro) || 0,
+      };
 
-      for (const v of ventas) {
-        const total = Number(v.total);
-        switch (v.metodoPago) {
-          case "EFECTIVO":
-            ventasEfectivo += total;
-            break;
-          case "TARJETA":
-            ventasTarjeta += total;
-            break;
-          case "TRANSFERENCIA":
-            ventasTransferencia += total;
-            break;
-          case "CREDITO":
-            ventasCredito += total;
-            break;
-          default:
-            ventasOtro += total;
-        }
-      }
+      const diferencia: PorCanal = {
+        efectivo: reportado.efectivo - esperado.efectivo,
+        tarjeta: reportado.tarjeta - esperado.tarjeta,
+        transferencia: reportado.transferencia - esperado.transferencia,
+        credito: reportado.credito - esperado.credito,
+        otro: reportado.otro - esperado.otro,
+      };
 
-      // Calcular esperados
-      const esperadoEfectivo =
-        Number(turno.saldoInicial) + ventasEfectivo + Number(turno.ingresos) - Number(turno.egresos);
-
-      // Obtener montos reportados
-      const reportadoEfectivo = parseFloat(req.body.reportadoEfectivo.toString());
-      const reportadoTarjeta = req.body.reportadoTarjeta ? parseFloat(req.body.reportadoTarjeta.toString()) : 0;
-      const reportadoTransferencia = req.body.reportadoTransferencia
-        ? parseFloat(req.body.reportadoTransferencia.toString())
-        : 0;
-      const reportadoCredito = req.body.reportadoCredito ? parseFloat(req.body.reportadoCredito.toString()) : 0;
-      const reportadoOtro = req.body.reportadoOtro ? parseFloat(req.body.reportadoOtro.toString()) : 0;
-
-      // Calcular diferencias
-      const diferenciaEfectivo = reportadoEfectivo - esperadoEfectivo;
-      const diferenciaTarjeta = reportadoTarjeta - ventasTarjeta;
-      const diferenciaTransferencia = reportadoTransferencia - ventasTransferencia;
-      const diferenciaCredito = reportadoCredito - ventasCredito;
-      const diferenciaOtro = reportadoOtro - ventasOtro;
-
-      // Actualizar turno con cierre multicanal
       await prisma.turnoCaja.update({
         where: { id: turno.id },
         data: {
-          ventasEfectivo,
-          ventasTarjeta,
-          ventasTransferencia,
-          ventasCredito,
-          ventasOtro,
-          esperadoEfectivo,
-          esperadoTarjeta: ventasTarjeta,
-          esperadoTransferencia: ventasTransferencia,
-          esperadoCredito: ventasCredito,
-          esperadoOtro: ventasOtro,
-          reportadoEfectivo,
-          reportadoTarjeta,
-          reportadoTransferencia,
-          reportadoCredito,
-          reportadoOtro,
-          diferenciaEfectivo,
-          diferenciaTarjeta,
-          diferenciaTransferencia,
-          diferenciaCredito,
-          diferenciaOtro,
+          ...datosEsperados(vendido, esperado),
+          reportadoEfectivo: reportado.efectivo,
+          reportadoTarjeta: reportado.tarjeta,
+          reportadoTransferencia: reportado.transferencia,
+          reportadoCredito: reportado.credito,
+          reportadoOtro: reportado.otro,
+          diferenciaEfectivo: diferencia.efectivo,
+          diferenciaTarjeta: diferencia.tarjeta,
+          diferenciaTransferencia: diferencia.transferencia,
+          diferenciaCredito: diferencia.credito,
+          diferenciaOtro: diferencia.otro,
           usuarioCierreId: usuarioId,
           fechaCierre: new Date(),
           observaciones: req.body.observaciones,
         },
       });
 
-      // Determinar estado por cada canal
-      const calcularEstado = (diferencia: number) => {
-        const abs = Math.abs(diferencia);
-        if (abs < 0.01) return "CUADRADO";
-        return diferencia > 0 ? "SOBRANTE" : "FALTANTE";
+      const calcularEstado = (dif: number) => {
+        if (Math.abs(dif) < 0.01) return "CUADRADO";
+        return dif > 0 ? "SOBRANTE" : "FALTANTE";
       };
+
+      const resumen = (c: Canal) => ({
+        esperado: esperado[c],
+        reportado: reportado[c],
+        diferencia: diferencia[c],
+        estado: calcularEstado(diferencia[c]),
+      });
 
       reply.send({
         success: true,
         cierre: {
-          efectivo: {
-            esperado: esperadoEfectivo,
-            reportado: reportadoEfectivo,
-            diferencia: diferenciaEfectivo,
-            estado: calcularEstado(diferenciaEfectivo),
-          },
-          tarjeta: {
-            esperado: ventasTarjeta,
-            reportado: reportadoTarjeta,
-            diferencia: diferenciaTarjeta,
-            estado: calcularEstado(diferenciaTarjeta),
-          },
-          transferencia: {
-            esperado: ventasTransferencia,
-            reportado: reportadoTransferencia,
-            diferencia: diferenciaTransferencia,
-            estado: calcularEstado(diferenciaTransferencia),
-          },
-          credito: {
-            esperado: ventasCredito,
-            reportado: reportadoCredito,
-            diferencia: diferenciaCredito,
-            estado: calcularEstado(diferenciaCredito),
-          },
-          otro: {
-            esperado: ventasOtro,
-            reportado: reportadoOtro,
-            diferencia: diferenciaOtro,
-            estado: calcularEstado(diferenciaOtro),
-          },
+          efectivo: resumen("efectivo"),
+          tarjeta: resumen("tarjeta"),
+          transferencia: resumen("transferencia"),
+          credito: resumen("credito"),
+          otro: resumen("otro"),
         },
         mensaje: "Caja cerrada - Arqueo multicanal completado",
       });
