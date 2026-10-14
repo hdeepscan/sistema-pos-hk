@@ -111,6 +111,7 @@ export function DetalleCreditoModal({
             {estado === "PROXIMO_A_VENCER" && "Próximo a vencer"}
             {estado === "VENCIDO" && "Vencido"}
             {estado === "PAGADO" && "Pagado"}
+            {estado === "ABANDONADO" && "Abandonado"}
           </span>
         </div>
 

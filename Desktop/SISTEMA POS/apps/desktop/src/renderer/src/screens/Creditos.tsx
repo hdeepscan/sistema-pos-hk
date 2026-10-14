@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
-import { useSesionStore } from "../lib/store";
+import { useSesionStore, usePermiso } from "../lib/store";
 import { BotonesExportar } from "../lib/BotonesExportar";
 import type { ColumnaExport } from "../lib/export";
 import { mensajeError } from "../lib/errores";
@@ -14,11 +14,14 @@ interface Credito {
   clienteNombre: string;
   sucursalId: string;
   total: number;
+  abonado: number;
   pendiente: number;
   fecha: string;
   fechaVencimiento: string;
   diasRetraso: number;
-  estado: "VIGENTE" | "PROXIMO_A_VENCER" | "VENCIDO" | "PAGADO";
+  estado: "VIGENTE" | "PROXIMO_A_VENCER" | "VENCIDO" | "PAGADO" | "ABANDONADO";
+  abandonadoEn: string | null;
+  notaAbandono: string | null;
 }
 
 const TABS: { estado?: Credito["estado"]; label: string }[] = [
@@ -26,6 +29,7 @@ const TABS: { estado?: Credito["estado"]; label: string }[] = [
   { estado: "VIGENTE", label: "Vigentes" },
   { estado: "PROXIMO_A_VENCER", label: "Proximos a vencer" },
   { estado: "VENCIDO", label: "Vencidos" },
+  { estado: "ABANDONADO", label: "Abandonados" },
 ];
 
 const badgeEstado: Record<Credito["estado"], string> = {
@@ -33,6 +37,7 @@ const badgeEstado: Record<Credito["estado"], string> = {
   PROXIMO_A_VENCER: "warning",
   VENCIDO: "danger",
   PAGADO: "neutral",
+  ABANDONADO: "neutral",
 };
 
 const etiquetaEstado: Record<Credito["estado"], string> = {
@@ -40,6 +45,7 @@ const etiquetaEstado: Record<Credito["estado"], string> = {
   PROXIMO_A_VENCER: "Proximo a vencer",
   VENCIDO: "Vencido",
   PAGADO: "Pagado",
+  ABANDONADO: "Abandonado",
 };
 
 const COLUMNAS_CREDITOS: ColumnaExport<Credito>[] = [
@@ -80,6 +86,10 @@ function CreditosVentas() {
   const [guardandoConfig, setGuardandoConfig] = useState(false);
   const [mensajeConfig, setMensajeConfig] = useState<string | null>(null);
   const [creditoDetalle, setCreditoDetalle] = useState<Credito | null>(null);
+  const [busqueda, setBusqueda] = useState("");
+  const [procesando, setProcesando] = useState<string | null>(null);
+  const [errorAccion, setErrorAccion] = useState<string | null>(null);
+  const puedeAdministrar = usePermiso("creditos.administrar");
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -112,7 +122,49 @@ function CreditosVentas() {
     }
   }
 
-  const totalPendiente = creditos.reduce((acc, c) => acc + c.pendiente, 0);
+  // Busca por cliente o número de factura (sin tildes ni mayúsculas).
+  const creditosFiltrados = useMemo(() => {
+    const normalizar = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const q = normalizar(busqueda.trim()).replace(/^#/, "");
+    if (!q) return creditos;
+    return creditos.filter((c) => normalizar(c.clienteNombre).includes(q) || String(c.consecutivo).includes(q));
+  }, [creditos, busqueda]);
+
+  async function noVolvioAAbonar(c: Credito) {
+    const nota = window.prompt(
+      `Marcar el crédito #${c.consecutivo} de ${c.clienteNombre} como abandonado (no volvió a abonar).\n` +
+        `Saldo pendiente: $${c.pendiente.toLocaleString("es-CO")}. La deuda se conserva y puedes reactivarlo después.\n\n` +
+        `Nota opcional (por ejemplo, el motivo):`,
+      ""
+    );
+    if (nota === null) return;
+    setProcesando(c.ventaId);
+    setErrorAccion(null);
+    try {
+      await api.post(`/creditos/${c.ventaId}/abandonar`, { nota });
+      await cargar();
+    } catch (err) {
+      setErrorAccion(mensajeError(err, "No se pudo marcar el crédito"));
+    } finally {
+      setProcesando(null);
+    }
+  }
+
+  async function reactivar(c: Credito) {
+    if (!window.confirm(`¿Reactivar el crédito #${c.consecutivo} de ${c.clienteNombre}? Volverá a la lista de activos.`)) return;
+    setProcesando(c.ventaId);
+    setErrorAccion(null);
+    try {
+      await api.post(`/creditos/${c.ventaId}/reactivar`);
+      await cargar();
+    } catch (err) {
+      setErrorAccion(mensajeError(err, "No se pudo reactivar el crédito"));
+    } finally {
+      setProcesando(null);
+    }
+  }
+
+  const totalPendiente = creditosFiltrados.reduce((acc, c) => acc + c.pendiente, 0);
 
   return (
     <div>
@@ -144,13 +196,20 @@ function CreditosVentas() {
       </div>
 
       <div className="toolbar" style={{ marginBottom: 16 }}>
-        <BotonesExportar nombreArchivo="creditos" titulo="Creditos" columnas={COLUMNAS_CREDITOS} filas={creditos} />
+        <input
+          type="search"
+          placeholder="Buscar por cliente o # de factura..."
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          style={{ flex: 1, minWidth: 220, maxWidth: 360 }}
+        />
+        <BotonesExportar nombreArchivo="creditos" titulo="Creditos" columnas={COLUMNAS_CREDITOS} filas={creditosFiltrados} />
       </div>
 
       <div className="stat-grid">
         <div className="stat-card">
           <div className="label">Creditos en el listado</div>
-          <div className="value">{creditos.length}</div>
+          <div className="value">{creditosFiltrados.length}</div>
         </div>
         <div className="stat-card">
           <div className="label">Valor pendiente</div>
@@ -175,11 +234,13 @@ function CreditosVentas() {
         </div>
       </div>
 
+      {errorAccion && <p className="error-text">{errorAccion}</p>}
+
       <div className="card">
         {cargando ? (
           <p className="empty-state">Cargando...</p>
-        ) : creditos.length === 0 ? (
-          <p className="empty-state">No hay creditos en este filtro</p>
+        ) : creditosFiltrados.length === 0 ? (
+          <p className="empty-state">{busqueda.trim() ? "Ningún crédito coincide con la búsqueda" : "No hay creditos en este filtro"}</p>
         ) : (
           <table>
             <thead>
@@ -196,7 +257,7 @@ function CreditosVentas() {
               </tr>
             </thead>
             <tbody>
-              {creditos.map((c) => (
+              {creditosFiltrados.map((c) => (
                 <tr key={c.ventaId}>
                   <td>{c.clienteNombre}</td>
                   <td>#{c.consecutivo}</td>
@@ -207,11 +268,42 @@ function CreditosVentas() {
                   <td>${c.pendiente.toLocaleString("es-CO")}</td>
                   <td>
                     <span className={`badge ${badgeEstado[c.estado]}`}>{etiquetaEstado[c.estado]}</span>
+                    {c.estado === "ABANDONADO" && c.abandonadoEn && (
+                      <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 4 }}>
+                        Desde {new Date(c.abandonadoEn).toLocaleDateString("es-CO")}
+                        {c.notaAbandono ? ` · ${c.notaAbandono}` : ""}
+                      </div>
+                    )}
                   </td>
                   <td>
-                    <button type="button" className="secondary" style={{ fontSize: 12, padding: "4px 10px" }} onClick={() => setCreditoDetalle(c)}>
-                      Ver info
-                    </button>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      <button type="button" className="secondary" style={{ fontSize: 12, padding: "4px 10px" }} onClick={() => setCreditoDetalle(c)}>
+                        Ver info
+                      </button>
+                      {puedeAdministrar && c.estado === "ABANDONADO" && (
+                        <button
+                          type="button"
+                          className="secondary"
+                          style={{ fontSize: 12, padding: "4px 10px" }}
+                          disabled={procesando === c.ventaId}
+                          onClick={() => void reactivar(c)}
+                        >
+                          Reactivar
+                        </button>
+                      )}
+                      {puedeAdministrar && c.estado !== "ABANDONADO" && c.estado !== "PAGADO" && c.abonado > 0 && (
+                        <button
+                          type="button"
+                          className="secondary"
+                          style={{ fontSize: 12, padding: "4px 10px" }}
+                          disabled={procesando === c.ventaId}
+                          onClick={() => void noVolvioAAbonar(c)}
+                          title="El cliente abonó pero no volvió a pagar: sale de los activos y conserva la deuda"
+                        >
+                          No volvió a abonar
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

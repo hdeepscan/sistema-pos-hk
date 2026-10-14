@@ -72,8 +72,14 @@ function mapearCuota(c: { id: string; numero: number; fechaVencimiento: Date; va
 }
 
 // Estado global del credito para el semaforo (al dia / proximo a vencer / vencido).
-function estadoCredito(cuotas: CuotaConEstado[], diasAviso: number): "AL_DIA" | "PROXIMO" | "VENCIDO" | "PAGADO" {
+// "ABANDONADO": el cliente no volvio a abonar (marcado a mano); conserva la deuda.
+function estadoCredito(
+  cuotas: CuotaConEstado[],
+  diasAviso: number,
+  abandonadoEn: Date | null = null
+): "AL_DIA" | "PROXIMO" | "VENCIDO" | "PAGADO" | "ABANDONADO" {
   if (cuotas.every((c) => c.estado === "PAGADA")) return "PAGADO";
+  if (abandonadoEn) return "ABANDONADO";
   if (cuotas.some((c) => c.estado === "VENCIDA")) return "VENCIDO";
   const ahora = Date.now();
   const proximo = cuotas.some(
@@ -225,7 +231,9 @@ export async function creditosManualesRoutes(app: FastifyInstance) {
         frecuencia: c.frecuencia,
         fechaInicio: c.fechaInicio,
         observaciones: c.observaciones,
-        estado: estadoCredito(cuotas, dias),
+        estado: estadoCredito(cuotas, dias, c.abandonadoEn),
+        abandonadoEn: c.abandonadoEn,
+        notaAbandono: c.notaAbandono,
         proximaCuota: cuotas.find((q2) => q2.pendiente > 0) ?? null,
         cuotasVencidas: cuotas.filter((q2) => q2.estado === "VENCIDA").length,
       };
@@ -266,7 +274,9 @@ export async function creditosManualesRoutes(app: FastifyInstance) {
       frecuencia: credito.frecuencia,
       fechaInicio: credito.fechaInicio,
       observaciones: credito.observaciones,
-      estado: estadoCredito(cuotas, await diasAviso(empresaId)),
+      estado: estadoCredito(cuotas, await diasAviso(empresaId), credito.abandonadoEn),
+      abandonadoEn: credito.abandonadoEn,
+      notaAbandono: credito.notaAbandono,
       cuotas,
     };
   });
@@ -299,6 +309,10 @@ export async function creditosManualesRoutes(app: FastifyInstance) {
     }
 
     await prisma.$transaction(async (tx) => {
+      // Si el cliente vuelve a abonar, el credito deja de estar abandonado.
+      if (credito.abandonadoEn) {
+        await tx.creditoManual.update({ where: { id: credito.id }, data: { abandonadoEn: null, notaAbandono: null } });
+      }
       for (const cuota of credito.cuotas) {
         if (restante <= 0) break;
         const pendienteCuota = redondear(Number(cuota.valor) - Number(cuota.pagado));
@@ -336,7 +350,7 @@ export async function creditosManualesRoutes(app: FastifyInstance) {
     const limiteAviso = ahora + dias * MS_DIA;
 
     const creditos = await prisma.creditoManual.findMany({
-      where: { empresaId, activo: true },
+      where: { empresaId, activo: true, abandonadoEn: null },
       include: { cuotas: true, cliente: { select: { nombre: true } } },
     });
 
@@ -386,7 +400,7 @@ export async function creditosManualesRoutes(app: FastifyInstance) {
     const ahora = Date.now();
     const limiteAviso = ahora + dias * MS_DIA;
     const creditos = await prisma.creditoManual.findMany({
-      where: { empresaId, activo: true },
+      where: { empresaId, activo: true, abandonadoEn: null },
       include: { cuotas: true },
     });
     let alertas = 0;
@@ -401,6 +415,67 @@ export async function creditosManualesRoutes(app: FastifyInstance) {
       }
     }
     return { alertas, vencidas };
+  });
+
+  // "No volvio a abonar": marca el credito como abandonado (requiere saldo y al menos un abono).
+  app.post("/creditos-manuales/:id/abandonar", async (request, reply) => {
+    if (!request.user.permisos.includes("creditos.administrar")) {
+      return reply.code(403).send({ error: "No tienes permiso para administrar creditos" });
+    }
+    const { empresaId } = request.user;
+    const { id } = request.params as { id: string };
+    const { nota } = (request.body ?? {}) as { nota?: string };
+    const credito = await prisma.creditoManual.findFirst({
+      where: { id, empresaId },
+      include: { cuotas: true, cliente: { select: { nombre: true } } },
+    });
+    if (!credito) return reply.code(404).send({ error: "Credito no encontrado" });
+    if (credito.abandonadoEn) return reply.code(400).send({ error: "Este credito ya esta marcado como abandonado" });
+
+    const pagado = redondear(credito.cuotas.reduce((acc, c) => acc + Number(c.pagado), 0));
+    const pendiente = redondear(Number(credito.valorTotal) - pagado);
+    if (pendiente <= 0) return reply.code(400).send({ error: "Este credito ya esta pagado" });
+    if (pagado <= 0) {
+      return reply.code(400).send({ error: "Solo se puede marcar como abandonado un credito que tenga al menos un abono" });
+    }
+
+    const notaLimpia = typeof nota === "string" && nota.trim() ? nota.trim().slice(0, 500) : null;
+    await prisma.creditoManual.update({
+      where: { id },
+      data: { abandonadoEn: new Date(), notaAbandono: notaLimpia },
+    });
+    registrarAuditoria({
+      empresaId,
+      usuarioId: request.user.usuarioId,
+      accion: "ABANDONAR_CREDITO_MANUAL",
+      entidad: "CreditoManual",
+      entidadId: id,
+      detalle: `Credito #${credito.numero} de ${credito.cliente.nombre}: no volvio a abonar (pendiente ${pendiente})${
+        notaLimpia ? ` — ${notaLimpia}` : ""
+      }`,
+    });
+    return { ok: true };
+  });
+
+  app.post("/creditos-manuales/:id/reactivar", async (request, reply) => {
+    if (!request.user.permisos.includes("creditos.administrar")) {
+      return reply.code(403).send({ error: "No tienes permiso para administrar creditos" });
+    }
+    const { empresaId } = request.user;
+    const { id } = request.params as { id: string };
+    const credito = await prisma.creditoManual.findFirst({ where: { id, empresaId } });
+    if (!credito) return reply.code(404).send({ error: "Credito no encontrado" });
+    if (!credito.abandonadoEn) return reply.code(400).send({ error: "Este credito no esta abandonado" });
+    await prisma.creditoManual.update({ where: { id }, data: { abandonadoEn: null, notaAbandono: null } });
+    registrarAuditoria({
+      empresaId,
+      usuarioId: request.user.usuarioId,
+      accion: "REACTIVAR_CREDITO_MANUAL",
+      entidad: "CreditoManual",
+      entidadId: id,
+      detalle: `Credito #${credito.numero} reactivado`,
+    });
+    return { ok: true };
   });
 
   app.delete("/creditos-manuales/:id", async (request, reply) => {

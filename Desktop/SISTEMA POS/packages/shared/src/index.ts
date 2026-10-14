@@ -344,7 +344,7 @@ export type RegistrarAbonoInput = z.infer<typeof RegistrarAbonoSchema>;
 
 // ---------- Creditos ----------
 
-export const EstadoCredito = z.enum(["VIGENTE", "PROXIMO_A_VENCER", "VENCIDO", "PAGADO"]);
+export const EstadoCredito = z.enum(["VIGENTE", "PROXIMO_A_VENCER", "VENCIDO", "PAGADO", "ABANDONADO"]);
 export type EstadoCredito = z.infer<typeof EstadoCredito>;
 
 export const ActualizarConfigCreditoSchema = z.object({

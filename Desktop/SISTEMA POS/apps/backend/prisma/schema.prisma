@@ -327,6 +327,10 @@ model Venta {
   // vencimientos ya generados.
   fechaVencimientoCredito DateTime?
   numeroCuotasCredito     Int?
+  // Credito marcado como abandonado ("no volvio a abonar"): sale de los activos y del
+  // total por cobrar, pero conserva la deuda. Se limpia si se reactiva o vuelve a abonar.
+  creditoAbandonadoEn     DateTime?
+  creditoNotaAbandono     String?
 
   // Canal por el que entro la venta (POS fisico, Shopify, etc).
   canal CanalVenta @default(POS)
@@ -790,6 +794,9 @@ model CreditoManual {
   observaciones String?
   activo        Boolean  @default(true)
   creadoEn      DateTime @default(now())
+  // Marcado como abandonado ("no volvio a abonar"); ver Venta.creditoAbandonadoEn.
+  abandonadoEn  DateTime?
+  notaAbandono  String?
 
   cuotas        CuotaCredito[]
 

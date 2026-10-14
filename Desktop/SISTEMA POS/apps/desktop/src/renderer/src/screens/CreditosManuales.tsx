@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { mensajeError } from "../lib/errores";
+import { usePermiso } from "../lib/store";
 import { BotonesExportar } from "../lib/BotonesExportar";
 import type { ColumnaExport } from "../lib/export";
 
 type Frecuencia = "DIARIA" | "SEMANAL" | "QUINCENAL" | "MENSUAL";
-type EstadoCredito = "AL_DIA" | "PROXIMO" | "VENCIDO" | "PAGADO";
+type EstadoCredito = "AL_DIA" | "PROXIMO" | "VENCIDO" | "PAGADO" | "ABANDONADO";
 type EstadoCuota = "PENDIENTE" | "PAGADA" | "VENCIDA" | "PARCIAL";
 
 interface Cliente {
@@ -35,6 +36,8 @@ interface CreditoLista {
   fechaInicio: string;
   observaciones: string | null;
   estado: EstadoCredito;
+  abandonadoEn: string | null;
+  notaAbandono: string | null;
   proximaCuota: CuotaResumen | null;
   cuotasVencidas: number;
 }
@@ -77,12 +80,14 @@ const badgeCredito: Record<EstadoCredito, string> = {
   PROXIMO: "warning",
   VENCIDO: "danger",
   PAGADO: "neutral",
+  ABANDONADO: "neutral",
 };
 const etiquetaCredito: Record<EstadoCredito, string> = {
   AL_DIA: "Al dia",
   PROXIMO: "Proximo a vencer",
   VENCIDO: "Vencido",
   PAGADO: "Pagado",
+  ABANDONADO: "Abandonado",
 };
 const badgeCuota: Record<EstadoCuota, string> = {
   PENDIENTE: "neutral",
@@ -123,6 +128,8 @@ export default function CreditosManuales() {
   const [detalleId, setDetalleId] = useState<string | null>(null);
   const [diasAviso, setDiasAviso] = useState("3");
   const [mensajeConfig, setMensajeConfig] = useState<string | null>(null);
+  const [procesando, setProcesando] = useState<string | null>(null);
+  const puedeAdministrar = usePermiso("creditos.administrar");
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -166,7 +173,44 @@ export default function CreditosManuales() {
     }
   }
 
-  const totalPendiente = creditos.reduce((acc, c) => acc + c.pendiente, 0);
+  async function noVolvioAAbonar(c: CreditoLista) {
+    const nota = window.prompt(
+      `Marcar el crédito #${c.numero} de ${c.clienteNombre} como abandonado (no volvió a abonar).\n` +
+        `Saldo pendiente: ${pesos(c.pendiente)}. La deuda se conserva y puedes reactivarlo después.\n\n` +
+        `Nota opcional (por ejemplo, el motivo):`,
+      ""
+    );
+    if (nota === null) return;
+    setProcesando(c.id);
+    setError(null);
+    try {
+      await api.post(`/creditos-manuales/${c.id}/abandonar`, { nota });
+      await cargar();
+    } catch (err) {
+      setError(mensajeError(err, "No se pudo marcar el crédito"));
+    } finally {
+      setProcesando(null);
+    }
+  }
+
+  async function reactivar(c: CreditoLista) {
+    if (!window.confirm(`¿Reactivar el crédito #${c.numero} de ${c.clienteNombre}?`)) return;
+    setProcesando(c.id);
+    setError(null);
+    try {
+      await api.post(`/creditos-manuales/${c.id}/reactivar`);
+      await cargar();
+    } catch (err) {
+      setError(mensajeError(err, "No se pudo reactivar el crédito"));
+    } finally {
+      setProcesando(null);
+    }
+  }
+
+  // Los abandonados no cuentan en el valor por cobrar (salvo que se esté viendo ese filtro).
+  const totalPendiente = creditos
+    .filter((c) => estado === "ABANDONADO" || c.estado !== "ABANDONADO")
+    .reduce((acc, c) => acc + c.pendiente, 0);
   const vencidos = creditos.filter((c) => c.estado === "VENCIDO").length;
 
   return (
@@ -224,6 +268,7 @@ export default function CreditosManuales() {
             <option value="PROXIMO">Proximos a vencer</option>
             <option value="VENCIDO">Vencidos</option>
             <option value="PAGADO">Pagados</option>
+            <option value="ABANDONADO">Abandonados</option>
           </select>
           <div style={{ marginLeft: "auto" }}>
             <BotonesExportar
@@ -277,11 +322,35 @@ export default function CreditosManuales() {
                   </td>
                   <td>
                     <span className={`badge ${badgeCredito[c.estado]}`}>{etiquetaCredito[c.estado]}</span>
+                    {c.estado === "ABANDONADO" && c.abandonadoEn && (
+                      <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 4 }}>
+                        Desde {new Date(c.abandonadoEn).toLocaleDateString("es-CO")}
+                        {c.notaAbandono ? ` · ${c.notaAbandono}` : ""}
+                      </div>
+                    )}
                   </td>
                   <td>
-                    <button type="button" className="secondary" onClick={() => setDetalleId(c.id)}>
-                      Ver / abonar
-                    </button>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      <button type="button" className="secondary" onClick={() => setDetalleId(c.id)}>
+                        Ver / abonar
+                      </button>
+                      {puedeAdministrar && c.estado === "ABANDONADO" && (
+                        <button type="button" className="secondary" disabled={procesando === c.id} onClick={() => void reactivar(c)}>
+                          Reactivar
+                        </button>
+                      )}
+                      {puedeAdministrar && c.estado !== "ABANDONADO" && c.estado !== "PAGADO" && c.pagado > 0 && (
+                        <button
+                          type="button"
+                          className="secondary"
+                          disabled={procesando === c.id}
+                          onClick={() => void noVolvioAAbonar(c)}
+                          title="El cliente abonó pero no volvió a pagar: deja de contar como cartera activa y conserva la deuda"
+                        >
+                          No volvió a abonar
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

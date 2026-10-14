@@ -16,11 +16,14 @@ interface CreditoCalculado {
   clienteNombre: string;
   sucursalId: string;
   total: number;
+  abonado: number;
   pendiente: number;
   fecha: Date;
   fechaVencimiento: Date;
   diasRetraso: number;
   estado: EstadoCredito;
+  abandonadoEn: Date | null;
+  notaAbandono: string | null;
 }
 
 // Calcula, para cada venta a credito de la empresa, cuanto queda pendiente.
@@ -58,6 +61,8 @@ async function calcularCreditos(empresaId: string): Promise<CreditoCalculado[]> 
     let estado: EstadoCredito;
     if (pendiente <= 0) {
       estado = "PAGADO";
+    } else if (venta.creditoAbandonadoEn) {
+      estado = "ABANDONADO";
     } else if (ahora > fechaVencimiento.getTime()) {
       estado = "VENCIDO";
     } else if (fechaVencimiento.getTime() - ahora <= DIAS_PROXIMO_A_VENCER * MS_DIA) {
@@ -73,11 +78,14 @@ async function calcularCreditos(empresaId: string): Promise<CreditoCalculado[]> 
       clienteNombre: venta.cliente?.nombre ?? "Cliente sin nombre",
       sucursalId: venta.sucursalId,
       total,
+      abonado: Math.round(aplicado * 100) / 100,
       pendiente,
       fecha: venta.fecha,
       fechaVencimiento,
       diasRetraso,
       estado,
+      abandonadoEn: venta.creditoAbandonadoEn,
+      notaAbandono: venta.creditoNotaAbandono,
     });
   }
 
@@ -129,7 +137,7 @@ export async function creditosRoutes(app: FastifyInstance) {
     if (estado) {
       creditos = creditos.filter((c) => c.estado === estado);
     } else {
-      creditos = creditos.filter((c) => c.estado !== "PAGADO");
+      creditos = creditos.filter((c) => c.estado !== "PAGADO" && c.estado !== "ABANDONADO");
     }
     creditos.sort((a, b) => b.diasRetraso - a.diasRetraso || a.fechaVencimiento.getTime() - b.fechaVencimiento.getTime());
     return creditos;
@@ -138,9 +146,12 @@ export async function creditosRoutes(app: FastifyInstance) {
   app.get("/creditos/resumen", async (request) => {
     const { empresaId } = request.user;
     const creditos = await calcularCreditos(empresaId);
-    const activos = creditos.filter((c) => c.estado !== "PAGADO");
+    const activos = creditos.filter((c) => c.estado !== "PAGADO" && c.estado !== "ABANDONADO");
+    const abandonados = creditos.filter((c) => c.estado === "ABANDONADO");
 
     return {
+      abandonados: abandonados.length,
+      valorAbandonado: abandonados.reduce((acc, c) => acc + c.pendiente, 0),
       vigentes: activos.filter((c) => c.estado === "VIGENTE").length,
       proximosAVencer: activos.filter((c) => c.estado === "PROXIMO_A_VENCER").length,
       vencidos: activos.filter((c) => c.estado === "VENCIDO").length,
@@ -206,6 +217,14 @@ export async function creditosRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: "Crédito no encontrado" });
     }
 
+    // Si el cliente vuelve a abonar, el credito deja de estar abandonado.
+    if (venta.creditoAbandonadoEn) {
+      await prisma.venta.update({
+        where: { id: venta.id },
+        data: { creditoAbandonadoEn: null, creditoNotaAbandono: null },
+      });
+    }
+
     const abono = await prisma.abono.create({
       data: {
         clienteId: venta.clienteId!,
@@ -263,6 +282,67 @@ export async function creditosRoutes(app: FastifyInstance) {
     return abono;
   });
 
+  // "No volvio a abonar": marca el credito como abandonado. Solo si tiene saldo pendiente y
+  // al menos un abono aplicado. Conserva la deuda; se puede reactivar.
+  app.post("/creditos/:ventaId/abandonar", async (request, reply) => {
+    if (!request.user.permisos.includes("creditos.administrar")) {
+      return reply.code(403).send({ error: "No tienes permiso para administrar creditos" });
+    }
+    const { empresaId, usuarioId } = request.user;
+    const { ventaId } = request.params as { ventaId: string };
+    const { nota } = (request.body ?? {}) as { nota?: string };
+
+    const credito = (await calcularCreditos(empresaId)).find((c) => c.ventaId === ventaId);
+    if (!credito) return reply.code(404).send({ error: "Crédito no encontrado" });
+    if (credito.estado === "PAGADO") return reply.code(400).send({ error: "Este crédito ya está pagado" });
+    if (credito.estado === "ABANDONADO") return reply.code(400).send({ error: "Este crédito ya está marcado como abandonado" });
+    if (credito.abonado <= 0) {
+      return reply.code(400).send({ error: "Solo se puede marcar como abandonado un crédito que tenga al menos un abono" });
+    }
+
+    const notaLimpia = typeof nota === "string" && nota.trim() ? nota.trim().slice(0, 500) : null;
+    await prisma.venta.update({
+      where: { id: ventaId },
+      data: { creditoAbandonadoEn: new Date(), creditoNotaAbandono: notaLimpia },
+    });
+    registrarAuditoria({
+      empresaId,
+      usuarioId,
+      accion: "ABANDONAR_CREDITO",
+      entidad: "Venta",
+      entidadId: ventaId,
+      detalle: `Crédito #${credito.consecutivo} de ${credito.clienteNombre}: no volvió a abonar (pendiente ${credito.pendiente})${
+        notaLimpia ? ` — ${notaLimpia}` : ""
+      }`,
+    });
+    return { ok: true };
+  });
+
+  app.post("/creditos/:ventaId/reactivar", async (request, reply) => {
+    if (!request.user.permisos.includes("creditos.administrar")) {
+      return reply.code(403).send({ error: "No tienes permiso para administrar creditos" });
+    }
+    const { empresaId, usuarioId } = request.user;
+    const { ventaId } = request.params as { ventaId: string };
+    const venta = await prisma.venta.findFirst({ where: { id: ventaId, empresaId, metodoPago: "CREDITO" } });
+    if (!venta) return reply.code(404).send({ error: "Crédito no encontrado" });
+    if (!venta.creditoAbandonadoEn) return reply.code(400).send({ error: "Este crédito no está abandonado" });
+
+    await prisma.venta.update({
+      where: { id: ventaId },
+      data: { creditoAbandonadoEn: null, creditoNotaAbandono: null },
+    });
+    registrarAuditoria({
+      empresaId,
+      usuarioId,
+      accion: "REACTIVAR_CREDITO",
+      entidad: "Venta",
+      entidadId: ventaId,
+      detalle: `Crédito #${venta.consecutivo} reactivado`,
+    });
+    return { ok: true };
+  });
+
   app.get("/creditos/:ventaId/proximos-pagos", async (request, reply) => {
     const { empresaId } = request.user;
     const { ventaId } = request.params as { ventaId: string };
@@ -317,7 +397,7 @@ export async function creditosRoutes(app: FastifyInstance) {
       const aplicado = Math.min(disponible, total);
       poolAbonos.set(venta.clienteId, disponible - aplicado);
       const pendiente = Math.round((total - aplicado) * 100) / 100;
-      if (pendiente <= 0) continue;
+      if (pendiente <= 0 || venta.creditoAbandonadoEn) continue;
 
       const cuotas = calcularCuotas(venta);
       for (const cuota of cuotas) {

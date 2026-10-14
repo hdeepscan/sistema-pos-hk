@@ -69,6 +69,7 @@ const ESTADOS_CREDITO: Record<string, string> = {
   PROXIMO_A_VENCER: "Proximo a vencer",
   VENCIDO: "Vencido",
   PAGADO: "Pagada",
+  ABANDONADO: "Abandonado",
 };
 
 const ETIQUETAS_CANAL: Record<string, string> = {
@@ -320,9 +321,10 @@ export default function Ventas() {
     Promise.all([
       api.get("/creditos", { params: { estado: undefined } }).catch(() => ({ data: [] })),
       api.get("/creditos", { params: { estado: "PAGADO" } }).catch(() => ({ data: [] })),
-    ]).then(([activos, pagados]) => {
+      api.get("/creditos", { params: { estado: "ABANDONADO" } }).catch(() => ({ data: [] })),
+    ]).then(([activos, pagados, abandonados]) => {
       const mapa = new Map<string, string>();
-      for (const c of [...activos.data, ...pagados.data]) mapa.set(c.ventaId, c.estado);
+      for (const c of [...activos.data, ...pagados.data, ...abandonados.data]) mapa.set(c.ventaId, c.estado);
       setEstadoPorVenta(mapa);
     });
   }, [ventas]);
