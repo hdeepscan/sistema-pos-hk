@@ -168,12 +168,16 @@ app.get("/*", async (request, reply) => {
 });
 
 // 🔨 Sincronizar BD desde adentro de Node (porque Railway ignora el script start en package.json)
+// Sin --accept-data-loss: Prisma aplica solo cambios que no pierden datos. Si un cambio
+// borraría columnas/datos, se rechaza completo y el servidor arranca con el esquema anterior.
 try {
-  console.log("🔨 Sincronizando BD forzosamente desde adentro de Node...");
-  execSync("npx prisma db push --accept-data-loss --skip-generate", { stdio: "inherit" });
+  console.log("🔨 Sincronizando BD desde adentro de Node (sin pérdida de datos)...");
+  execSync("npx prisma db push --skip-generate", { stdio: "inherit" });
   console.log("✅ Sincronización de BD completada.");
 } catch (err) {
-  console.error("💥 Falló la sincronización interna:", err);
+  console.error("💥💥💥 SINCRONIZACIÓN DE BD RECHAZADA: el esquema NO se aplicó a la base de datos.");
+  console.error("💥 Posible cambio con pérdida de datos (columna/tabla eliminada, tipo cambiado o unique con duplicados).");
+  console.error("💥 Revisa schema.prisma; el servidor sigue con el esquema anterior.", err);
 }
 
 const port = Number(process.env.PORT ?? 4000);
