@@ -520,65 +520,9 @@ export class ShopifySyncService {
    */
   private async procesarProductoCreate(data: Record<string, any>): Promise<void> {
     console.log(`[Webhook] Nuevo producto creado en Shopify:`, data.id, data.title);
-
-    try {
-      const shopifyProductId = String(data.id);
-      const shopifyGid = data.admin_graphql_api_id;
-
-      // Verificar si ya existe
-      const productoExistente = await prisma.producto.findFirst({
-        where: {
-          empresaId: this.empresaId,
-          shopifyProductId,
-        },
-      });
-
-      if (productoExistente) {
-        console.log(`[Webhook] Producto ya existe en POS: ${shopifyProductId}`);
-        return;
-      }
-
-      // Crear producto base
-      const producto = await prisma.producto.create({
-        data: {
-          empresaId: this.empresaId,
-          sku: `SKU-${shopifyProductId}`,
-          nombre: data.title,
-          descripcion: data.body_html || null,
-          activo: data.status === "active",
-          shopifyProductId,
-          precio: 0, // Se actualiza con variantes
-          costo: 0,
-        },
-      });
-
-      console.log(`[Webhook] Producto creado en POS: ${producto.id}`);
-
-      // Crear variantes
-      if (data.variants && data.variants.length > 0) {
-        for (const variant of data.variants) {
-          await prisma.producto.create({
-            data: {
-              empresaId: this.empresaId,
-              nombre: data.title,
-              sku: variant.sku || `SKU-${variant.id}`,
-              precio: parseFloat(variant.price || "0"),
-              costo: 0,
-              activo: data.status === "active",
-              shopifyProductId: shopifyProductId,
-              shopifyVariantId: String(variant.id),
-              shopifyInventoryItemId: variant.inventory_item_id ? String(variant.inventory_item_id) : null,
-              varianteTitulo: variant.title,
-            },
-          });
-
-          console.log(`[Webhook] Variante creada: ${variant.sku || variant.title}`);
-        }
-      }
-    } catch (error) {
-      console.error(`[Webhook Error] Error creando producto desde Shopify:`, error);
-      throw error;
-    }
+    // Misma vía que el poller: variantes + stock de la sucursal ecommerce.
+    const { importarProductoShopify } = await import("./shopify-productos-nuevos.js");
+    await importarProductoShopify(this.empresaId, String(data.id));
   }
 
   /**

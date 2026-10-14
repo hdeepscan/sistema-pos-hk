@@ -2,6 +2,7 @@ import { prisma } from "./prisma.js";
 import { revisarPedidosNuevos, type OrdenShopify } from "./shopify.js";
 import { emitPedidoShopify, emitVentaCreada, emitInventarioActualizado } from "./ws.js";
 import { conciliarInventario } from "./shopify-conciliacion.js";
+import { importarProductosNuevosDeShopify } from "./shopify-productos-nuevos.js";
 
 const INTERVALO_MS = 60_000;
 // Cada cuántos ciclos (minutos) se corrige Shopify para igualar a CENTRALA.
@@ -187,6 +188,16 @@ async function revisarTodasLasEmpresas() {
       console.error(`[poller] Error revisando pedidos de la empresa ${empresaId}:`, err);
       // Sin los pedidos al día, corregir Shopify podría devolverle unidades ya vendidas allá.
       continue;
+    }
+
+    // Productos creados directamente en Shopify: se traen a CENTRALA con su stock.
+    try {
+      const importados = await importarProductosNuevosDeShopify(empresaId);
+      if (importados > 0) {
+        console.log(`[poller] Empresa ${empresaId.slice(0, 8)}: ${importados} producto(s) nuevo(s) importado(s) desde Shopify`);
+      }
+    } catch (err) {
+      console.error(`[poller] Error importando productos nuevos de la empresa ${empresaId}:`, err instanceof Error ? err.message : err);
     }
 
     if (!tocaConciliar || algunPedidoFallo) continue;
