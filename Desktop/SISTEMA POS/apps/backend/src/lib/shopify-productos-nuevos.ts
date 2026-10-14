@@ -187,29 +187,47 @@ export async function importarProductoShopify(empresaId: string, shopifyProductI
     };
   });
 
-  // Shopify permite SKUs repetidos; en CENTRALA el SKU es único por empresa.
-  const vistos = new Set<string>();
-  for (const f of filas) {
-    if (vistos.has(f.sku)) f.sku = `${f.sku}-${f.shopifyVariantId}`;
-    vistos.add(f.sku);
-  }
-
-  // Un SKU ya usado en CENTRALA indica que el producto ya existe aquí (o que CENTRALA lo está
-  // creando en Shopify en este momento): no se duplica.
-  const skuRepetido = await prisma.producto.findFirst({
-    where: { empresaId, sku: { in: filas.map((f) => f.sku) } },
-    select: { sku: true, nombre: true, varianteTitulo: true },
-  });
-  if (skuRepetido) {
-    const motivo = `El SKU ${skuRepetido.sku} ya lo usa "${skuRepetido.nombre}${
-      skuRepetido.varianteTitulo ? ` (${skuRepetido.varianteTitulo})` : ""
-    }" en CENTRALA`;
+  // En CENTRALA el SKU es único por empresa, pero Shopify permite repetirlos (por ejemplo, al
+  // "Duplicar" un producto se copian los SKUs). Una variante cuyo SKU repite el de otra variante
+  // de este producto, o el de un producto de CENTRALA ya vinculado a OTRA variante de Shopify,
+  // es un artículo distinto: recibe un SKU propio (SHOP-<id de variante>).
+  const omitir = (motivo: string): ResultadoProducto => {
     if (!omitidos.has(`${empresaId}:${shopifyProductId}`)) {
       console.warn(`[shopify-productos-nuevos] "${producto.title}" (${shopifyProductId}) no se importó: ${motivo}`);
     }
     omitidos.add(`${empresaId}:${shopifyProductId}`);
     return { shopifyProductId, titulo: producto.title, estado: "omitido", motivo };
+  };
+  const describir = (p: { sku: string; nombre: string; varianteTitulo: string | null }) =>
+    `"${p.nombre}${p.varianteTitulo ? ` (${p.varianteTitulo})` : ""}"`;
+
+  const vistos = new Set<string>();
+  for (const f of filas) {
+    if (vistos.has(f.sku)) f.sku = `SHOP-${f.shopifyVariantId}`;
+    vistos.add(f.sku);
   }
+
+  const existentes = await prisma.producto.findMany({
+    where: { empresaId, sku: { in: filas.map((f) => f.sku) } },
+    select: { sku: true, nombre: true, varianteTitulo: true, shopifyVariantId: true },
+  });
+  const existentePorSku = new Map(existentes.map((p) => [p.sku, p]));
+  for (const f of filas) {
+    const existente = existentePorSku.get(f.sku);
+    if (!existente) continue;
+    // Sin vínculo a Shopify puede ser el mismo artículo (o CENTRALA creándolo ahora mismo en
+    // Shopify): no se duplica.
+    if (!existente.shopifyVariantId) {
+      return omitir(`El SKU ${f.sku} ya lo usa ${describir(existente)} en CENTRALA (sin vincular a Shopify)`);
+    }
+    f.sku = `SHOP-${f.shopifyVariantId}`;
+  }
+
+  const choque = await prisma.producto.findFirst({
+    where: { empresaId, sku: { in: filas.map((f) => f.sku) } },
+    select: { sku: true, nombre: true, varianteTitulo: true },
+  });
+  if (choque) return omitir(`El SKU ${choque.sku} ya lo usa ${describir(choque)} en CENTRALA`);
 
   const imagenProducto: string | null = producto.media?.nodes?.[0]?.preview?.image?.url ?? null;
   const tieneVariantes = filas.some((f) => f.varianteTitulo);
