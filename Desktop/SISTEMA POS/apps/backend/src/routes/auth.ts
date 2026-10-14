@@ -5,6 +5,7 @@ import { prisma } from "../lib/prisma.js";
 import { hashPassword, verifyPassword } from "../lib/password.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
 import { mensajeDeValidacion } from "../lib/errores.js";
+import { asegurarSucursalInicial } from "../lib/sucursal-inicial.js";
 
 function permisosDe(usuario: { rol: keyof typeof PERMISOS_POR_ROL; permisos: string[] }) {
   return usuario.permisos.length > 0 ? usuario.permisos : PERMISOS_POR_ROL[usuario.rol];
@@ -51,6 +52,7 @@ export async function authRoutes(app: FastifyInstance) {
       }
 
       const token = app.jwt.sign({ usuarioId: usuario.id, empresaId: usuario.empresaId, rol: usuario.rol });
+      await asegurarSucursalInicial(usuario.empresaId);
       const sucursales = await prisma.sucursal.findMany({
         where: { empresaId: usuario.empresaId, activo: true },
         orderBy: { nombre: "asc" },

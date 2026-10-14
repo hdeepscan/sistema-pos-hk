@@ -129,27 +129,47 @@ export default async function adminRoutes(app: FastifyInstance) {
 
       const fechaVencimiento = new Date(hoy.getTime() + diasExpiracion * 24 * 60 * 60 * 1000);
 
-      // Crear empresa
-      const empresa = await prisma.empresa.create({
-        data: {
-          nombre: nombreEmpresa,
-          estado: "activa",
-          tipo_licencia: tipoLicencia,
-          dias_restantes: diasExpiracion,
-          fechaVencimiento: fechaVencimiento,
-          bloqueada_por_admin: false,
-        },
-      });
+      if (await prisma.usuario.findUnique({ where: { email: emailAdmin } })) {
+        return reply.code(409).send({ error: "Ya existe un usuario con ese email" });
+      }
 
-      // Crear usuario admin para la empresa
-      const usuario = await prisma.usuario.create({
-        data: {
-          email: emailAdmin,
-          nombre: nombreAdmin,
-          passwordHash: passwordHash,
-          empresaId: empresa.id,
-          rol: "ADMIN",
-        },
+      const planSuscripcion =
+        tipoLicencia === "prueba" ? "TRIAL_5D"
+        : tipoLicencia === "trimestral" ? "TRIMESTRAL"
+        : tipoLicencia === "anual" ? "ANUAL"
+        : "MENSUAL";
+
+      // Empresa + usuario admin + sucursal principal (sin sucursal no puede entrar al POS)
+      const { empresa, usuario } = await prisma.$transaction(async (tx) => {
+        const empresa = await tx.empresa.create({
+          data: {
+            nombre: nombreEmpresa,
+            estado: "activa",
+            tipo_licencia: tipoLicencia,
+            plan: planSuscripcion,
+            planSuscripcion,
+            dias_restantes: diasExpiracion,
+            fechaVencimiento: fechaVencimiento,
+            bloqueada_por_admin: false,
+          },
+        });
+
+        const usuario = await tx.usuario.create({
+          data: {
+            email: emailAdmin,
+            nombre: nombreAdmin,
+            passwordHash: passwordHash,
+            empresaId: empresa.id,
+            rol: "ADMIN",
+          },
+          select: { id: true, email: true, nombre: true, rol: true, empresaId: true },
+        });
+
+        await tx.sucursal.create({
+          data: { empresaId: empresa.id, nombre: "Sucursal Principal", tipo: "FISICA", activo: true },
+        });
+
+        return { empresa, usuario };
       });
 
       // Registrar en auditoría

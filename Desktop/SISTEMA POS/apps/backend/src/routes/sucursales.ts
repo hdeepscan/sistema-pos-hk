@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { CrearSucursalSchema } from "@sistema-pos/shared";
 import { prisma } from "../lib/prisma.js";
 import { mensajeDeValidacion } from "../lib/errores.js";
+import { asegurarSucursalInicial } from "../lib/sucursal-inicial.js";
 import type { Prisma } from "@prisma/client";
 
 export async function sucursalesRoutes(app: FastifyInstance) {
@@ -9,6 +10,7 @@ export async function sucursalesRoutes(app: FastifyInstance) {
 
   app.get("/sucursales", async (request) => {
     const { empresaId } = request.user;
+    await asegurarSucursalInicial(empresaId);
     return prisma.sucursal.findMany({
       where: { empresaId, activo: true },
       orderBy: { nombre: "asc" },
