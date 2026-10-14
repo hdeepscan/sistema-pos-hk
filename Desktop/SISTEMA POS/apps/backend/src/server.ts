@@ -1,3 +1,4 @@
+// Servidor principal de la app web (desplegada en Railway desde main).
 import "dotenv/config";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
