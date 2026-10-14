@@ -3,6 +3,7 @@ import { revisarPedidosNuevos, type OrdenShopify } from "./shopify.js";
 import { emitPedidoShopify, emitVentaCreada, emitInventarioActualizado } from "./ws.js";
 import { conciliarInventario } from "./shopify-conciliacion.js";
 import { importarProductosNuevosDeShopify } from "./shopify-productos-nuevos.js";
+import { archivarProductosEliminadosEnShopify } from "./shopify-productos-eliminados.js";
 
 const INTERVALO_MS = 60_000;
 // Cada cuántos ciclos (minutos) se corrige Shopify para igualar a CENTRALA.
@@ -198,6 +199,18 @@ async function revisarTodasLasEmpresas() {
       }
     } catch (err) {
       console.error(`[poller] Error importando productos nuevos de la empresa ${empresaId}:`, err instanceof Error ? err.message : err);
+    }
+
+    // Productos eliminados en Shopify: se archivan en CENTRALA (cada 15 minutos).
+    if (tocaConciliar) {
+      try {
+        const archivados = await archivarProductosEliminadosEnShopify(empresaId);
+        if (archivados > 0) {
+          console.log(`[poller] Empresa ${empresaId.slice(0, 8)}: ${archivados} variante(s) archivada(s) por eliminarse en Shopify`);
+        }
+      } catch (err) {
+        console.error(`[poller] Error revisando productos eliminados de la empresa ${empresaId}:`, err instanceof Error ? err.message : err);
+      }
     }
 
     if (!tocaConciliar || algunPedidoFallo) continue;
