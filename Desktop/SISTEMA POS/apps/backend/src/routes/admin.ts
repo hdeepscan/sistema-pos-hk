@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { PrismaClient } from "@prisma/client";
 import * as bcrypt from "bcrypt";
+import { construirCorreoAcceso, generarPasswordTemporal } from "../lib/email-bienvenida.js";
 
 const prisma = new PrismaClient();
 
@@ -494,7 +495,7 @@ export default async function adminRoutes(app: FastifyInstance) {
       // Obtener usuario destino
       const usuario = await prisma.usuario.findUnique({
         where: { id: usuarioId },
-        select: { id: true, email: true, nombre: true, empresa: { select: { nombre: true } } },
+        select: { id: true, email: true, nombre: true, passwordHash: true, empresa: { select: { nombre: true } } },
       });
 
       if (!usuario) {
@@ -506,41 +507,29 @@ export default async function adminRoutes(app: FastifyInstance) {
       let finalAsunto = asunto;
       let passwordGenerado = null;
 
-      if (tipoPlantilla === "CREDENCIALES") {
-        // Generar nueva contraseña temporal
-        passwordGenerado = Math.random().toString(36).slice(-8);
-        const passwordHash = await bcrypt.hash(passwordGenerado, 10);
+      let textoPlano: string | undefined;
+      // Si el envío falla, se restaura esta contraseña para no dejar al usuario sin acceso.
+      let passwordHashAnterior: string | null = null;
 
-        // Actualizar usuario con nueva contraseña
+      if (tipoPlantilla === "BIENVENIDA" || tipoPlantilla === "CREDENCIALES") {
+        // La contraseña actual no se puede leer (está cifrada): se genera una temporal nueva.
+        passwordGenerado = generarPasswordTemporal();
+        passwordHashAnterior = usuario.passwordHash;
         await prisma.usuario.update({
           where: { id: usuarioId },
-          data: { passwordHash },
+          data: { passwordHash: await bcrypt.hash(passwordGenerado, 10) },
         });
 
-        finalAsunto = "Tus nuevas credenciales de acceso";
-        htmlContent = `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
-            <h2 style="color: #333; text-align: center;">¡Bienvenido a Centrala POS!</h2>
-            <p style="color: #666; font-size: 14px;">
-              Hola <strong>${usuario.nombre}</strong>,
-            </p>
-            <p style="color: #666; font-size: 14px;">
-              Tu administrador ha generado nuevas credenciales de acceso a la plataforma.
-            </p>
-            <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
-              <p style="margin: 0 0 10px 0; color: #999; font-size: 12px;">USUARIO</p>
-              <p style="margin: 0 0 15px 0; font-family: monospace; font-size: 16px; color: #333;"><strong>${usuario.email}</strong></p>
-              <p style="margin: 0 0 10px 0; color: #999; font-size: 12px;">CONTRASEÑA TEMPORAL</p>
-              <p style="margin: 0; font-family: monospace; font-size: 16px; background: #fff; padding: 10px; border-radius: 3px; color: #e74c3c;"><strong>${passwordGenerado}</strong></p>
-            </div>
-            <p style="color: #666; font-size: 13px;">
-              <strong>⚠️ Importante:</strong> Esta es una contraseña temporal. Te recomendamos cambiarla la primera vez que inicies sesión.
-            </p>
-            <div style="text-align: center; margin-top: 20px;">
-              <a href="https://sistema-pos-hk.up.railway.app/login" style="display: inline-block; background: #3B82F6; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Iniciar Sesión</a>
-            </div>
-          </div>
-        `;
+        const correo = construirCorreoAcceso({
+          nombre: usuario.nombre,
+          empresa: usuario.empresa?.nombre ?? "",
+          email: usuario.email,
+          password: passwordGenerado,
+          tipo: tipoPlantilla,
+        });
+        finalAsunto = correo.asunto;
+        htmlContent = correo.html;
+        textoPlano = correo.texto;
       } else if (tipoPlantilla === "PERSONALIZADO" || tipoPlantilla === "HTML_PLANTILLA") {
         // Plantillas personalizadas o HTML - respeta el HTML puro si se proporciona
         const isHtml = mensaje && (mensaje.includes("<") && mensaje.includes(">"));
@@ -576,12 +565,14 @@ export default async function adminRoutes(app: FastifyInstance) {
         const { Resend } = await import("resend");
         const resend = new Resend(process.env.RESEND_API_KEY);
 
-        await resend.emails.send({
-          from: process.env.EMAIL_FROM || "noreply@centrala-pos.com",
+        const { error: errorResend } = await resend.emails.send({
+          from: process.env.EMAIL_FROM || "centrala_correos@centrala.com.co",
           to: usuario.email,
           subject: finalAsunto,
           html: htmlContent,
+          ...(textoPlano ? { text: textoPlano } : {}),
         });
+        if (errorResend) throw new Error(errorResend.message);
 
         console.log("✅ EMAIL SENT SUCCESSFULLY:", {
           usuarioId,
@@ -603,9 +594,14 @@ export default async function adminRoutes(app: FastifyInstance) {
         reply.send({
           success: true,
           mensaje: `Correo enviado exitosamente a ${usuario.email}`,
-          passwordGenerado: tipoPlantilla === "CREDENCIALES" ? "✓ Contraseña generada y enviada" : null,
+          passwordGenerado: passwordGenerado ? "✓ Contraseña generada y enviada" : null,
         });
       } catch (emailError: any) {
+        if (passwordHashAnterior) {
+          await prisma.usuario
+            .update({ where: { id: usuarioId }, data: { passwordHash: passwordHashAnterior } })
+            .catch((err) => console.error("❌ No se pudo restaurar la contraseña anterior:", err));
+        }
         console.error("❌ EMAIL SEND FAILED:", {
           error: emailError.message,
           usuarioEmail: usuario.email,

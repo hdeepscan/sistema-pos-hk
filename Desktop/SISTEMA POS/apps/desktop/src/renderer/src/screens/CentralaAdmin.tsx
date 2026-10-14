@@ -695,7 +695,7 @@ export default function CentralaAdmin() {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [selectedClientForEmail, setSelectedClientForEmail] = useState<any>(null);
-  const [emailFormData, setEmailFormData] = useState({ tipoPlantilla: "CREDENCIALES", asunto: "", mensaje: "" });
+  const [emailFormData, setEmailFormData] = useState({ tipoPlantilla: "BIENVENIDA", asunto: "", mensaje: "" });
   const [enviadoCorreo, setEnviadoCorreo] = useState(false);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
 
@@ -969,7 +969,7 @@ export default function CentralaAdmin() {
       setTimeout(() => {
         setShowEmailModal(false);
         setEnviadoCorreo(false);
-        setEmailFormData({ tipoPlantilla: "CREDENCIALES", asunto: "", mensaje: "" });
+        setEmailFormData({ tipoPlantilla: "BIENVENIDA", asunto: "", mensaje: "" });
         setSelectedClientForEmail(null);
         alert("Correo enviado exitosamente a " + selectedClientForEmail.adminEmail);
       }, 1500);
@@ -1673,12 +1673,28 @@ export default function CentralaAdmin() {
                           fontFamily: "inherit"
                         }}
                       >
+                        <option value="BIENVENIDA">Correo de Bienvenida (con datos de acceso)</option>
                         <option value="CREDENCIALES">Reenviar Credenciales (Generar nueva contraseña)</option>
                         <option value="AVISO">Aviso del Sistema</option>
                         <option value="PERSONALIZADO">Mensaje Personalizado (HTML)</option>
                         <option value="HTML_PLANTILLA">Plantilla HTML Prediseñada</option>
                       </select>
                     </div>
+
+                    {emailFormData.tipoPlantilla === "BIENVENIDA" && (
+                      <div style={{
+                        background: "#eff6ff",
+                        border: "1px solid #bfdbfe",
+                        borderRadius: "6px",
+                        padding: "12px",
+                        marginBottom: "20px",
+                        color: "#1e40af",
+                        fontSize: "13px"
+                      }}>
+                        ✉️ Envía el correo de bienvenida con el logo de CENTRALA, el enlace a la plataforma y los datos de acceso.
+                        Se generará una contraseña temporal nueva (la anterior dejará de funcionar).
+                      </div>
+                    )}
 
                     {emailFormData.tipoPlantilla === "CREDENCIALES" && (
                       <div style={{
@@ -1892,14 +1908,14 @@ export default function CentralaAdmin() {
                       </button>
                       <button
                         onClick={handleSendEmail}
-                        disabled={cargando || (emailFormData.tipoPlantilla !== "CREDENCIALES" && (!emailFormData.asunto || !emailFormData.mensaje))}
+                        disabled={cargando || (!["CREDENCIALES", "BIENVENIDA"].includes(emailFormData.tipoPlantilla) && (!emailFormData.asunto || !emailFormData.mensaje))}
                         style={{
                           padding: "10px 20px",
                           borderRadius: "6px",
                           border: "none",
-                          background: (cargando || (emailFormData.tipoPlantilla !== "CREDENCIALES" && (!emailFormData.asunto || !emailFormData.mensaje))) ? "#ccc" : "#3b82f6",
+                          background: (cargando || (!["CREDENCIALES", "BIENVENIDA"].includes(emailFormData.tipoPlantilla) && (!emailFormData.asunto || !emailFormData.mensaje))) ? "#ccc" : "#3b82f6",
                           color: "white",
-                          cursor: (cargando || (emailFormData.tipoPlantilla !== "CREDENCIALES" && (!emailFormData.asunto || !emailFormData.mensaje))) ? "not-allowed" : "pointer",
+                          cursor: (cargando || (!["CREDENCIALES", "BIENVENIDA"].includes(emailFormData.tipoPlantilla) && (!emailFormData.asunto || !emailFormData.mensaje))) ? "not-allowed" : "pointer",
                           fontSize: "14px",
                           fontWeight: "500"
                         }}
