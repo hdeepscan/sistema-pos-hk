@@ -521,6 +521,19 @@ export async function shopifyRoutes(app: FastifyInstance) {
     }
   });
 
+  // Trae de Shopify los productos que faltan en CENTRALA y explica por qué se omitió cada uno.
+  app.post("/shopify/productos-nuevos/importar", async (request, reply) => {
+    if (!request.user.permisos.includes("productos.administrar")) {
+      return reply.code(403).send({ error: "No tienes permiso para administrar productos" });
+    }
+    try {
+      const { importarProductosFaltantesDeShopify } = await import("../lib/shopify-productos-nuevos.js");
+      return await importarProductosFaltantesDeShopify(request.user.empresaId, { todos: true });
+    } catch (err) {
+      return reply.code(502).send({ error: err instanceof Error ? err.message : "Error consultando Shopify" });
+    }
+  });
+
   // Reintentar cambio específico
   app.post("/shopify/reintentar/:cambioId", async (request, reply) => {
     const { empresaId } = request.user;

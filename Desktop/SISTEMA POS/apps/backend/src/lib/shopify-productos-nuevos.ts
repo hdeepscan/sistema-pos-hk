@@ -10,6 +10,8 @@ import { ShopifyGraphQLClient } from "./shopify-graphql.js";
 // que la conciliación no lo deje en 0 en Shopify.
 
 const MAX_PAGINAS = 10;
+// Revisión completa desde el botón: hasta 10.000 productos.
+const MAX_PAGINAS_TODOS = 100;
 
 // Productos que no se importan (SKU ya usado en CENTRALA): se recuerdan para no
 // consultarlos ni registrarlos en el log cada minuto.
@@ -19,33 +21,57 @@ function idNumerico(id: string): string {
   return id.slice(id.lastIndexOf("/") + 1);
 }
 
+export interface ResultadoProducto {
+  shopifyProductId: string;
+  titulo: string;
+  estado: "importado" | "ya_existe" | "omitido" | "error";
+  motivo?: string;
+  variantes?: number;
+}
+
+export interface ResultadoImportacion {
+  revisados: number;
+  importados: number;
+  productos: ResultadoProducto[];
+}
+
 /**
- * Busca productos creados en Shopify después de conectar la tienda que todavía no están
- * en CENTRALA y los importa. Devuelve cuántos productos se importaron.
+ * Busca productos de Shopify que todavía no están en CENTRALA y los importa.
+ * - Automático (poller): solo los creados después de conectar la tienda, y se detiene en la
+ *   primera página que ya está completa.
+ * - todos = true (botón en la pantalla de Shopify): revisa todo el catálogo y reporta por qué
+ *   se omitió cada producto.
  */
-export async function importarProductosNuevosDeShopify(empresaId: string): Promise<number> {
+export async function importarProductosFaltantesDeShopify(
+  empresaId: string,
+  opciones: { todos?: boolean } = {}
+): Promise<ResultadoImportacion> {
   const config = await prisma.shopifyConfig.findUnique({ where: { empresaId } });
-  if (!config?.accessToken) return 0;
+  if (!config?.accessToken) throw new Error("Conecta Shopify antes de importar productos");
 
   const client = new ShopifyGraphQLClient(config.shopDomain, config.accessToken);
-  const filtro = `created_at:>'${config.creadoEn.toISOString()}'`;
-  const nuevos: string[] = [];
+  const filtro = opciones.todos ? "" : `created_at:>'${config.creadoEn.toISOString()}'`;
+  const maxPaginas = opciones.todos ? MAX_PAGINAS_TODOS : MAX_PAGINAS;
+  const faltantes: { id: string; titulo: string }[] = [];
+  let revisados = 0;
   let after: string | null = null;
 
-  for (let pagina = 0; pagina < MAX_PAGINAS; pagina++) {
+  for (let pagina = 0; pagina < maxPaginas; pagina++) {
     const data: any = await client.query({
       query: `
-        query ProductosRecientes($after: String, $filtro: String!) {
+        query ProductosRecientes($after: String, $filtro: String) {
           products(first: 100, after: $after, sortKey: CREATED_AT, reverse: true, query: $filtro) {
             pageInfo { hasNextPage endCursor }
-            nodes { id }
+            nodes { id title }
           }
         }
       `,
-      variables: { after, filtro },
+      variables: { after, filtro: filtro || null },
     });
-    const ids: string[] = (data?.products?.nodes ?? []).map((n: { id: string }) => idNumerico(n.id));
-    if (ids.length === 0) break;
+    const nodos: { id: string; title: string }[] = data?.products?.nodes ?? [];
+    if (nodos.length === 0) break;
+    revisados += nodos.length;
+    const ids = nodos.map((n) => idNumerico(n.id));
 
     const existentes = await prisma.producto.findMany({
       where: { empresaId, shopifyProductId: { in: ids } },
@@ -53,38 +79,50 @@ export async function importarProductosNuevosDeShopify(empresaId: string): Promi
       distinct: ["shopifyProductId"],
     });
     const conocidos = new Set(existentes.map((p) => p.shopifyProductId));
-    const faltantes = ids.filter((id) => !conocidos.has(id) && !omitidos.has(`${empresaId}:${id}`));
-    nuevos.push(...faltantes);
+    const nuevosPagina = nodos
+      .map((n) => ({ id: idNumerico(n.id), titulo: n.title }))
+      .filter((n) => !conocidos.has(n.id) && (opciones.todos || !omitidos.has(`${empresaId}:${n.id}`)));
+    faltantes.push(...nuevosPagina);
 
+    if (!data.products.pageInfo.hasNextPage) break;
     // Los más recientes vienen primero: una página sin faltantes significa que lo anterior ya está.
-    if (faltantes.length === 0 || !data.products.pageInfo.hasNextPage) break;
+    if (!opciones.todos && nuevosPagina.length === 0) break;
     after = data.products.pageInfo.endCursor;
   }
 
-  let importados = 0;
-  for (const shopifyProductId of nuevos) {
+  const productos: ResultadoProducto[] = [];
+  for (const { id, titulo } of faltantes) {
     try {
-      if (await importarProductoShopify(empresaId, shopifyProductId)) importados++;
+      productos.push(await importarProductoShopify(empresaId, id));
     } catch (err) {
-      console.error(
-        `[shopify-productos-nuevos] No se pudo importar el producto ${shopifyProductId}:`,
-        err instanceof Error ? err.message : err
-      );
+      const motivo = err instanceof Error ? err.message : String(err);
+      console.error(`[shopify-productos-nuevos] No se pudo importar "${titulo}" (${id}):`, motivo);
+      productos.push({ shopifyProductId: id, titulo, estado: "error", motivo });
     }
   }
-  return importados;
+
+  return { revisados, importados: productos.filter((p) => p.estado === "importado").length, productos };
+}
+
+// Usado por el poller cada minuto.
+export async function importarProductosNuevosDeShopify(empresaId: string): Promise<number> {
+  const config = await prisma.shopifyConfig.findUnique({ where: { empresaId }, select: { accessToken: true } });
+  if (!config?.accessToken) return 0;
+  return (await importarProductosFaltantesDeShopify(empresaId)).importados;
 }
 
 /**
- * Importa un producto de Shopify (con todas sus variantes y su stock). Devuelve false si
- * ya existía o si se omitió.
+ * Importa un producto de Shopify (con todas sus variantes y su stock).
  */
-export async function importarProductoShopify(empresaId: string, shopifyProductId: string): Promise<boolean> {
+export async function importarProductoShopify(empresaId: string, shopifyProductId: string): Promise<ResultadoProducto> {
   const config = await prisma.shopifyConfig.findUnique({ where: { empresaId } });
-  if (!config?.accessToken) return false;
+  if (!config?.accessToken) throw new Error("Shopify no está conectado");
 
-  const yaExiste = await prisma.producto.findFirst({ where: { empresaId, shopifyProductId }, select: { id: true } });
-  if (yaExiste) return false;
+  const yaExiste = await prisma.producto.findFirst({
+    where: { empresaId, shopifyProductId },
+    select: { nombre: true },
+  });
+  if (yaExiste) return { shopifyProductId, titulo: yaExiste.nombre, estado: "ya_existe" };
 
   const locationId = await asegurarUbicacionEcommerce(empresaId, config.sucursalEcommerceId);
   const client = new ShopifyGraphQLClient(config.shopDomain, config.accessToken);
@@ -126,9 +164,11 @@ export async function importarProductoShopify(empresaId: string, shopifyProductI
   });
 
   const producto = data?.product;
-  if (!producto) return false;
+  if (!producto) return { shopifyProductId, titulo: shopifyProductId, estado: "omitido", motivo: "No se encontró en Shopify" };
   const variantes: any[] = producto.variants?.nodes ?? [];
-  if (variantes.length === 0) return false;
+  if (variantes.length === 0) {
+    return { shopifyProductId, titulo: producto.title, estado: "omitido", motivo: "El producto no tiene variantes" };
+  }
 
   const filas = variantes.map((v) => {
     const variantId = idNumerico(v.id);
@@ -147,18 +187,28 @@ export async function importarProductoShopify(empresaId: string, shopifyProductI
     };
   });
 
+  // Shopify permite SKUs repetidos; en CENTRALA el SKU es único por empresa.
+  const vistos = new Set<string>();
+  for (const f of filas) {
+    if (vistos.has(f.sku)) f.sku = `${f.sku}-${f.shopifyVariantId}`;
+    vistos.add(f.sku);
+  }
+
   // Un SKU ya usado en CENTRALA indica que el producto ya existe aquí (o que CENTRALA lo está
   // creando en Shopify en este momento): no se duplica.
   const skuRepetido = await prisma.producto.findFirst({
     where: { empresaId, sku: { in: filas.map((f) => f.sku) } },
-    select: { sku: true },
+    select: { sku: true, nombre: true, varianteTitulo: true },
   });
   if (skuRepetido) {
+    const motivo = `El SKU ${skuRepetido.sku} ya lo usa "${skuRepetido.nombre}${
+      skuRepetido.varianteTitulo ? ` (${skuRepetido.varianteTitulo})` : ""
+    }" en CENTRALA`;
+    if (!omitidos.has(`${empresaId}:${shopifyProductId}`)) {
+      console.warn(`[shopify-productos-nuevos] "${producto.title}" (${shopifyProductId}) no se importó: ${motivo}`);
+    }
     omitidos.add(`${empresaId}:${shopifyProductId}`);
-    console.warn(
-      `[shopify-productos-nuevos] "${producto.title}" (${shopifyProductId}) no se importó: el SKU ${skuRepetido.sku} ya existe en CENTRALA`
-    );
-    return false;
+    return { shopifyProductId, titulo: producto.title, estado: "omitido", motivo };
   }
 
   const imagenProducto: string | null = producto.media?.nodes?.[0]?.preview?.image?.url ?? null;
@@ -221,5 +271,6 @@ export async function importarProductoShopify(empresaId: string, shopifyProductI
   console.log(
     `[shopify-productos-nuevos] Importado "${producto.title}" (${shopifyProductId}) con ${filas.length} variante(s)`
   );
-  return true;
+  omitidos.delete(`${empresaId}:${shopifyProductId}`);
+  return { shopifyProductId, titulo: producto.title, estado: "importado", variantes: filas.length };
 }
