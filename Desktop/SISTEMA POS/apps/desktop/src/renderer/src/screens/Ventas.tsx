@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../lib/api";
 import { useSesionStore, usePermiso } from "../lib/store";
 import { useVentaCreada } from "../lib/socket";
@@ -18,7 +18,14 @@ interface VentaItem {
   cantidad: number;
   cantidadDevuelta: number;
   precioUnitario: string | number;
-  producto: { nombre: string; sku: string; imagenUrl: string | null; costo: string | number } | null;
+  producto: {
+    nombre: string;
+    sku: string;
+    imagenUrl: string | null;
+    costo: string | number;
+    precio?: string | number;
+    codigoBarras?: string | null;
+  } | null;
 }
 
 // Nombre a mostrar de un item: el producto, o la descripcion si es venta libre.
@@ -73,14 +80,14 @@ const ESTADOS_CREDITO: Record<string, string> = {
 };
 
 const ETIQUETAS_CANAL: Record<string, string> = {
-  PUNTO_DE_VENTA: "Punto de venta",
+  POS: "Punto de venta",
   SHOPIFY: "Shopify",
   WHATSAPP: "WhatsApp",
   OTRO: "Otro",
 };
 
 const badgeCanal: Record<string, string> = {
-  PUNTO_DE_VENTA: "neutral",
+  POS: "neutral",
   SHOPIFY: "success",
   WHATSAPP: "warning",
   OTRO: "neutral",
@@ -124,7 +131,7 @@ function columnasExportVentas(
       encabezado: "Ganancia",
       clave: "total",
       formato: (v, fila) => {
-        const costoTotal = fila.items.reduce((acc, i) => acc + i.cantidad * Number(i.producto.costo), 0);
+        const costoTotal = fila.items.reduce((acc, i) => acc + i.cantidad * Number(i.producto?.costo ?? 0), 0);
         return String(Number(v) - costoTotal);
       },
     },
@@ -148,6 +155,7 @@ export default function Ventas() {
   const [filtroCanal, setFiltroCanal] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("");
   const [cargando, setCargando] = useState(true);
+  const [errorCarga, setErrorCarga] = useState<string | null>(null);
   const [seleccionada, setSeleccionada] = useState<Venta | null>(null);
   const [totalReal, setTotalReal] = useState(0);
   const [totalCartera, setTotalCartera] = useState(0);
@@ -161,7 +169,9 @@ export default function Ventas() {
     }
 
     const ahora = new Date();
-    const desdeStr = (fecha: Date) => fecha.toISOString().split("T")[0];
+    // Fecha local (no UTC): con toISOString, después de las 7 p. m. en Colombia "hoy" salía como mañana.
+    const desdeStr = (fecha: Date) =>
+      `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}-${String(fecha.getDate()).padStart(2, "0")}`;
 
     switch (rango) {
       case "hoy":
@@ -176,13 +186,13 @@ export default function Ventas() {
         break;
       case "ultimos_7":
         const hace7 = new Date(ahora);
-        hace7.setDate(hace7.getDate() - 7);
+        hace7.setDate(hace7.getDate() - 6); // hoy + 6 días anteriores = 7 días
         setDesde(desdeStr(hace7));
         setHasta(desdeStr(ahora));
         break;
       case "ultimos_15":
         const hace15 = new Date(ahora);
-        hace15.setDate(hace15.getDate() - 15);
+        hace15.setDate(hace15.getDate() - 14);
         setDesde(desdeStr(hace15));
         setHasta(desdeStr(ahora));
         break;
@@ -194,14 +204,17 @@ export default function Ventas() {
     }
   };
 
-  const cargar = useCallback(async () => {
-    setCargando(true);
-    try {
-      // Si no hay filtro de sucursal pero hay sucursal activa, usa esa
-      const sucursalParaFiltro = filtroSucursal || sucursalActivaId || undefined;
+  // Solo la respuesta de la última consulta se muestra: si cambian los filtros mientras otra
+  // consulta (o el refresco automático) está en curso, la respuesta vieja se descarta.
+  const consultaActual = useRef(0);
 
+  const cargar = useCallback(async (silencioso = false) => {
+    const consulta = ++consultaActual.current;
+    if (!silencioso) setCargando(true);
+    try {
+      // "" = Todas las sucursales (antes se reemplazaba por la sucursal activa y "Todas" no funcionaba).
       const params = {
-        sucursalId: sucursalParaFiltro,
+        sucursalId: filtroSucursal || undefined,
         desde: desde || undefined,
         hasta: hasta || undefined,
         montoMin: montoMin || undefined,
@@ -221,15 +234,19 @@ export default function Ventas() {
         })),
       ]);
 
+      if (consulta !== consultaActual.current) return;
       setVentas(ventasRes.data);
       setTotalReal(totalesRes.data.totalReal);
       setTotalCartera(totalesRes.data.totalCartera);
+      setErrorCarga(null);
     } catch (err) {
+      if (consulta !== consultaActual.current) return;
       console.error("Error al cargar ventas:", err);
+      setErrorCarga(mensajeError(err, "No se pudieron cargar las ventas con estos filtros"));
     } finally {
-      setCargando(false);
+      if (consulta === consultaActual.current) setCargando(false);
     }
-  }, [filtroSucursal, sucursalActivaId, desde, hasta, montoMin, montoMax, filtroClienteId, filtroUsuarioId, filtroMetodoPago, filtroCanal]);
+  }, [filtroSucursal, desde, hasta, montoMin, montoMax, filtroClienteId, filtroUsuarioId, filtroMetodoPago, filtroCanal]);
 
   const reimprimir = useCallback(async (venta: Venta, sucursalNombre: string) => {
     try {
@@ -308,7 +325,7 @@ export default function Ventas() {
   // Auto-refresh cada 10 segundos como fallback si el WebSocket no funciona
   useEffect(() => {
     const intervalo = setInterval(() => {
-      cargar();
+      void cargar(true);
     }, 10000);
     return () => clearInterval(intervalo);
   }, [cargar]);
@@ -332,14 +349,29 @@ export default function Ventas() {
   // Escucha cuando se crea una venta y recarga inmediatamente
   useVentaCreada(useCallback(() => {
     console.log("Venta creada detectada, recargando...");
-    cargar();
+    void cargar(true);
   }, [cargar]));
 
-  const cajeros = useMemo(() => {
-    const mapa = new Map<string, string>();
-    for (const v of ventas) if (v.usuario) mapa.set(v.usuario.id, v.usuario.nombre);
-    return [...mapa.entries()].map(([id, nombre]) => ({ id, nombre }));
+  // Se acumulan los cajeros vistos: si la lista dependiera solo de las ventas cargadas, al
+  // filtrar por un cajero desaparecerían los demás de las opciones.
+  const [cajerosVistos, setCajerosVistos] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    setCajerosVistos((prev) => {
+      let cambio = false;
+      const mapa = new Map(prev);
+      for (const v of ventas) {
+        if (v.usuario && mapa.get(v.usuario.id) !== v.usuario.nombre) {
+          mapa.set(v.usuario.id, v.usuario.nombre);
+          cambio = true;
+        }
+      }
+      return cambio ? mapa : prev;
+    });
   }, [ventas]);
+  const cajeros = useMemo(
+    () => [...cajerosVistos.entries()].map(([id, nombre]) => ({ id, nombre })).sort((a, b) => a.nombre.localeCompare(b.nombre)),
+    [cajerosVistos]
+  );
 
   function estadoDe(venta: Venta): string {
     if (venta.metodoPago !== "CREDITO") return "Pagada";
@@ -483,7 +515,7 @@ export default function Ventas() {
             </label>
             <select value={filtroCanal} onChange={(e) => setFiltroCanal(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }}>
               <option value="">Todos</option>
-              <option value="PUNTO_DE_VENTA">Punto de venta</option>
+              <option value="POS">Punto de venta</option>
               <option value="SHOPIFY">Shopify</option>
               <option value="WHATSAPP">WhatsApp</option>
               <option value="OTRO">Otro</option>
@@ -499,6 +531,7 @@ export default function Ventas() {
               <option value="Vigente">Vigente</option>
               <option value="Proximo a vencer">Proximo a vencer</option>
               <option value="Vencido">Vencido</option>
+              <option value="Abandonado">Abandonado</option>
             </select>
           </div>
           <div style={{ display: "flex", alignItems: "flex-end" }}>
@@ -518,10 +551,16 @@ export default function Ventas() {
         />
       </div>
 
+      {errorCarga && <p className="error-text">{errorCarga}</p>}
+
       <div className="stat-grid">
         <div className="stat-card">
           <div className="label">Ventas en el listado</div>
           <div className="value">{ventasFiltradas.length}</div>
+        </div>
+        <div className="stat-card">
+          <div className="label">Total del listado</div>
+          <div className="value">${totalListado.toLocaleString("es-CO")}</div>
         </div>
         <div className="stat-card">
           <div className="label">Total Real</div>

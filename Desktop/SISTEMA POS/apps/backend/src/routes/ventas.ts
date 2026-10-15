@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { CrearVentaSchema, DevolucionParcialSchema } from "@sistema-pos/shared";
 import type { MetodoPago, CanalVenta } from "@sistema-pos/shared";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { emitInventarioActualizado, emitVentaCreada } from "../lib/ws.js";
 import { ajustarInventarioEnShopifySiCorresponde } from "../lib/shopify.js";
@@ -46,6 +47,63 @@ async function encontrarOCrearCliente(
   return nuevo.id;
 }
 
+// Filtros del historial de ventas (listado y totales usan exactamente los mismos).
+interface FiltrosVentasQuery {
+  sucursalId?: string;
+  desde?: string;
+  hasta?: string;
+  montoMin?: string;
+  montoMax?: string;
+  clienteId?: string;
+  usuarioId?: string;
+  metodoPago?: string;
+  canal?: string;
+}
+
+const METODOS_PAGO = ["EFECTIVO", "TARJETA", "TRANSFERENCIA", "CREDITO", "OTRO"] as const;
+const CANALES = ["POS", "SHOPIFY", "WHATSAPP", "OTRO"] as const;
+const FECHA_ISO = /^\d{4}-\d{2}-\d{2}$/;
+
+function construirFiltroVentas(
+  empresaId: string,
+  q: FiltrosVentasQuery
+): { where: Prisma.VentaWhereInput; startDate?: Date; endDate?: Date } | { error: string } {
+  // "PUNTO_DE_VENTA" lo enviaban versiones anteriores de la pantalla; en la base es "POS".
+  const canal = q.canal === "PUNTO_DE_VENTA" ? "POS" : q.canal;
+  if (canal && !(CANALES as readonly string[]).includes(canal)) return { error: "Canal de venta inválido" };
+  if (q.metodoPago && !(METODOS_PAGO as readonly string[]).includes(q.metodoPago)) {
+    return { error: "Método de pago inválido" };
+  }
+  if ((q.desde && !FECHA_ISO.test(q.desde)) || (q.hasta && !FECHA_ISO.test(q.hasta))) {
+    return { error: "Fecha inválida (usa AAAA-MM-DD)" };
+  }
+  const montoMin = q.montoMin !== undefined && q.montoMin !== "" ? Number(q.montoMin) : undefined;
+  const montoMax = q.montoMax !== undefined && q.montoMax !== "" ? Number(q.montoMax) : undefined;
+  if ((montoMin !== undefined && !Number.isFinite(montoMin)) || (montoMax !== undefined && !Number.isFinite(montoMax))) {
+    return { error: "Monto inválido" };
+  }
+
+  // Días completos en hora de Colombia (UTC-5).
+  const startDate = q.desde ? new Date(`${q.desde}T00:00:00-05:00`) : undefined;
+  const endDate = q.hasta ? new Date(`${q.hasta}T23:59:59.999-05:00`) : undefined;
+
+  const where: Prisma.VentaWhereInput = {
+    empresaId,
+    ...(q.sucursalId ? { sucursalId: q.sucursalId } : {}),
+    ...(q.clienteId ? { clienteId: q.clienteId } : {}),
+    ...(q.usuarioId ? { usuarioId: q.usuarioId } : {}),
+    ...(q.metodoPago ? { metodoPago: q.metodoPago as MetodoPago } : {}),
+    ...(canal ? { canal: canal as CanalVenta } : {}),
+    ...(startDate || endDate
+      ? { fecha: { ...(startDate ? { gte: startDate } : {}), ...(endDate ? { lte: endDate } : {}) } }
+      : {}),
+    ...(montoMin !== undefined || montoMax !== undefined
+      ? { total: { ...(montoMin !== undefined ? { gte: montoMin } : {}), ...(montoMax !== undefined ? { lte: montoMax } : {}) } }
+      : {}),
+  };
+  return { where, startDate, endDate };
+}
+
 export async function ventasRoutes(app: FastifyInstance) {
   app.addHook("preHandler", app.authenticate);
 
@@ -54,55 +112,19 @@ export async function ventasRoutes(app: FastifyInstance) {
     if (!request.user.permisos.includes("ventas.ver")) {
       return reply.code(403).send({ error: "No tienes permiso para ver las ventas" });
     }
-    const { sucursalId, desde, hasta, montoMin, montoMax, clienteId, usuarioId, metodoPago, canal, limit } =
-      request.query as {
-        sucursalId?: string;
-        desde?: string;
-        hasta?: string;
-        montoMin?: string;
-        montoMax?: string;
-        clienteId?: string;
-        usuarioId?: string;
-        metodoPago?: string;
-        canal?: string;
-        limit?: string;
-      };
-    // Parsear fechas con offset UTC-5 (Colombia) para evitar desfase de zonas horarias
-    let startDate, endDate;
-    if (desde) {
-      startDate = new Date(`${desde}T00:00:00-05:00`);
-    }
-    if (hasta) {
-      endDate = new Date(`${hasta}T23:59:59-05:00`);
-    }
+    const { limit } = request.query as { limit?: string };
+    const filtro = construirFiltroVentas(empresaId, request.query as FiltrosVentasQuery);
+    if ("error" in filtro) return reply.code(400).send({ error: filtro.error });
 
     return prisma.venta.findMany({
-      where: {
-        empresaId,
-        ...(sucursalId ? { sucursalId } : {}),
-        ...(clienteId ? { clienteId } : {}),
-        ...(usuarioId ? { usuarioId } : {}),
-        ...(metodoPago ? { metodoPago: metodoPago as MetodoPago } : {}),
-        ...(canal ? { canal: canal as CanalVenta } : {}),
-        ...(startDate || endDate
-          ? {
-              fecha: {
-                ...(startDate ? { gte: startDate } : {}),
-                ...(endDate ? { lte: endDate } : {}),
-              },
-            }
-          : {}),
-        ...(montoMin || montoMax
-          ? {
-              total: {
-                ...(montoMin ? { gte: Number(montoMin) } : {}),
-                ...(montoMax ? { lte: Number(montoMax) } : {}),
-              },
-            }
-          : {}),
-      },
+      where: filtro.where,
       include: {
-        items: { include: { producto: { select: { nombre: true, sku: true, imagenUrl: true, costo: true } } } },
+        // precio y codigoBarras: para reimprimir etiquetas con el código de barras real del producto.
+        items: {
+          include: {
+            producto: { select: { nombre: true, sku: true, imagenUrl: true, costo: true, precio: true, codigoBarras: true } },
+          },
+        },
         cliente: { select: { nombre: true } },
         usuario: { select: { id: true, nombre: true } },
         devoluciones: { orderBy: { fecha: "desc" } },
@@ -119,53 +141,12 @@ export async function ventasRoutes(app: FastifyInstance) {
       return reply.code(403).send({ error: "No tienes permiso para ver las ventas" });
     }
 
-    const { sucursalId, desde, hasta, montoMin, montoMax, clienteId, usuarioId, metodoPago, canal } =
-      request.query as {
-        sucursalId?: string;
-        desde?: string;
-        hasta?: string;
-        montoMin?: string;
-        montoMax?: string;
-        clienteId?: string;
-        usuarioId?: string;
-        metodoPago?: string;
-        canal?: string;
-      };
-
-    // Parsear fechas con offset UTC-5 (Colombia) para evitar desfase de zonas horarias
-    let startDate, endDate;
-    if (desde) {
-      startDate = new Date(`${desde}T00:00:00-05:00`);
-    }
-    if (hasta) {
-      endDate = new Date(`${hasta}T23:59:59-05:00`);
-    }
-
-    // Construir el filtro base (mismo que en GET /ventas)
-    const filtroBase = {
-      empresaId,
-      ...(sucursalId ? { sucursalId } : {}),
-      ...(clienteId ? { clienteId } : {}),
-      ...(usuarioId ? { usuarioId } : {}),
-      ...(metodoPago ? { metodoPago: metodoPago as MetodoPago } : {}),
-      ...(canal ? { canal: canal as CanalVenta } : {}),
-      ...(startDate || endDate
-        ? {
-            fecha: {
-              ...(startDate ? { gte: startDate } : {}),
-              ...(endDate ? { lte: endDate } : {}),
-            },
-          }
-        : {}),
-      ...(montoMin || montoMax
-        ? {
-            total: {
-              ...(montoMin ? { gte: Number(montoMin) } : {}),
-              ...(montoMax ? { lte: Number(montoMax) } : {}),
-            },
-          }
-        : {}),
-    };
+    const query = request.query as FiltrosVentasQuery;
+    const filtro = construirFiltroVentas(empresaId, query);
+    if ("error" in filtro) return reply.code(400).send({ error: filtro.error });
+    const filtroBase = filtro.where;
+    const { clienteId } = query;
+    const { startDate, endDate } = filtro;
 
     // 1. Obtener ventas no-crédito (EFECTIVO, TARJETA, TRANSFERENCIA, OTRO) en el rango
     const ventasNoCredito = await prisma.venta.findMany({
