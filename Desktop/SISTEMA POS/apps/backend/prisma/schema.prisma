@@ -1040,7 +1040,9 @@ model Cotizacion {
   empresaId           String
   empresa             Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
-  numero              String    @unique // Ej: COT-001
+  // Consecutivo por empresa (COT-000001). No es único global: cada empresa tiene su
+  // propia numeración (antes era @unique y la segunda empresa no podía crear cotizaciones).
+  numero              String
   secuencial          Int       // Para generar próximo número
 
   // Cliente
@@ -1049,6 +1051,8 @@ model Cotizacion {
   clienteTelefono     String?
   clienteEmpresa      String?
   clienteDireccion    String?
+  clienteTipoDocumento   String?  // NIT, CC, CE, PASAPORTE
+  clienteNumeroDocumento String?
 
   // Datos comerciales
   estado              EstadoCotizacion @default(BORRADOR)
@@ -1066,6 +1070,7 @@ model Cotizacion {
   // Notas
   comentarios         String?
   condicionesPago     String?   // Contado, crédito, plazos
+  firmaBase64         String?   @db.Text // Imagen PNG (data URL) de la firma para el PDF
 
   // Auditoría
   creadoPor           String?

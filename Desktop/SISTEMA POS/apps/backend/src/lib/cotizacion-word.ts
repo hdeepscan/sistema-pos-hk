@@ -1,4 +1,5 @@
 import { Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun, AlignmentType } from "docx";
+import { nombreLinea } from "./cotizacion-pdf.js";
 
 type CotizacionConLineas = any;
 
@@ -13,7 +14,7 @@ export async function generarWordCotizacion(
           children: [new Paragraph(String(Number(linea.cantidad).toFixed(2)))],
         }),
         new TableCell({
-          children: [new Paragraph(linea.producto.nombre)],
+          children: [new Paragraph(nombreLinea(linea))],
         }),
         new TableCell({
           children: [
@@ -58,7 +59,7 @@ export async function generarWordCotizacion(
             spacing: { line: 240, after: 100 },
           } as any),
           new Paragraph({
-            text: `NIT: ${datosEmpresa.nit || "N/A"} | ${datosEmpresa.telefono || ""} | ${datosEmpresa.email || ""}`,
+            text: [datosEmpresa.telefono, datosEmpresa.email].filter(Boolean).join(" | "),
             alignment: AlignmentType.CENTER,
             spacing: { line: 240, after: 50 },
           } as any),
@@ -81,7 +82,15 @@ export async function generarWordCotizacion(
                     children: [new Paragraph("Número: " + cotizacion.numero)],
                   }),
                   new TableCell({
-                    children: [new Paragraph("Fecha: " + cotizacion.fechaCreacion.toLocaleDateString("es-CO"))],
+                    children: [
+                      new Paragraph(
+                        "Fecha: " +
+                          new Date(cotizacion.fechaCreacion).toLocaleDateString("es-CO", { timeZone: "America/Bogota" }) +
+                          (cotizacion.fechaVigencia
+                            ? ` — Válida hasta: ${new Date(cotizacion.fechaVigencia).toLocaleDateString("es-CO", { timeZone: "America/Bogota" })}`
+                            : "")
+                      ),
+                    ],
                   }),
                 ],
               }),
@@ -94,6 +103,9 @@ export async function generarWordCotizacion(
           } as any),
           new Paragraph(`Nombre: ${cotizacion.clienteNombre}`),
           new Paragraph(`Empresa: ${cotizacion.clienteEmpresa || "N/A"}`),
+          ...(cotizacion.clienteNumeroDocumento
+            ? [new Paragraph(`${cotizacion.clienteTipoDocumento || "Documento"}: ${cotizacion.clienteNumeroDocumento}`)]
+            : []),
           new Paragraph(`Teléfono: ${cotizacion.clienteTelefono || "N/A"}`),
           new Paragraph(`Email: ${cotizacion.clienteEmail || "N/A"}`),
           ...(cotizacion.clienteDireccion ? [new Paragraph(`Dirección: ${cotizacion.clienteDireccion}`)] : []),
@@ -135,7 +147,7 @@ export async function generarWordCotizacion(
                 ? [
                     new TableRow({
                       children: [
-                        new TableCell({ children: [new Paragraph("Descuento:")] }),
+                        new TableCell({ children: [new Paragraph(`Descuento (${Number(cotizacion.descuentoPorcentaje)}%):`)] }),
                         new TableCell({
                           children: [
                             new Paragraph(
@@ -149,7 +161,7 @@ export async function generarWordCotizacion(
                     }),
                   ]
                 : []),
-              ...(Number(cotizacion.impuestoValor) > 0
+              ...(Number(cotizacion.impuestoPorcentaje) > 0
                 ? [
                     new TableRow({
                       children: [
@@ -193,7 +205,7 @@ export async function generarWordCotizacion(
                   spacing: { after: 100 },
                 } as any),
                 ...(cotizacion.comentarios ? [new Paragraph(cotizacion.comentarios)] : []),
-                ...(cotizacion.condicionesPago ? [new Paragraph(cotizacion.condicionesPago)] : []),
+                ...(cotizacion.condicionesPago ? [new Paragraph(`Condiciones de pago: ${cotizacion.condicionesPago}`)] : []),
               ]
             : []),
           new Paragraph({ text: "", spacing: { after: 200 } }),
