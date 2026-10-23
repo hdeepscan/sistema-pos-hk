@@ -1455,27 +1455,24 @@ function EtiquetaCard({ producto, onActualizado }: { producto: ProductoDetalle; 
       </div>
 
       <div style={{ marginTop: 14 }}>
-        <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 6 }}>Tamaño de impresion</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+        <div className="etq-titulo">Tamaño de impresión</div>
+        <div className="etq-formatos" role="radiogroup" aria-label="Tamaño de impresión">
           {FORMATOS_ETIQUETA.map((f) => {
             const activo = formato === f.valor;
             return (
               <button
                 key={f.valor}
                 type="button"
+                role="radio"
+                aria-checked={activo}
+                className={`etq-formato ${activo ? "activo" : ""}`}
                 onClick={() => setFormato(f.valor)}
-                style={{
-                  textAlign: "left",
-                  padding: 10,
-                  borderRadius: 8,
-                  border: `1.5px solid ${activo ? "var(--brand, #4f46e5)" : "var(--border)"}`,
-                  background: activo ? "var(--brand-light, #eef2ff)" : "transparent",
-                  color: "inherit",
-                  cursor: "pointer",
-                }}
               >
-                <div style={{ fontSize: 13, fontWeight: 700 }}>{f.titulo}</div>
-                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2, lineHeight: 1.35 }}>{f.detalle}</div>
+                <span className="etq-formato-radio" aria-hidden="true" />
+                <span className="etq-formato-texto">
+                  <span className="etq-formato-nombre">{f.titulo}</span>
+                  <span className="etq-formato-detalle">{f.detalle}</span>
+                </span>
               </button>
             );
           })}

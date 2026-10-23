@@ -2578,3 +2578,94 @@ tbody tr:hover {
     flex: 1;
   }
 }
+
+/* ---------- Etiquetas: selector de tamaño de impresión ----------
+   Son botones: se neutraliza el estilo global (mayúsculas, fila, gradiente). */
+.etq-titulo {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.etq-formatos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 10px;
+}
+
+.etq-formatos .etq-formato {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  min-height: 0;
+  height: auto;
+  padding: 12px 14px;
+  margin: 0;
+  text-align: left;
+  text-transform: none;
+  letter-spacing: normal;
+  white-space: normal;
+  border-radius: 10px;
+  border: 1.5px solid var(--border-light, #e2e8f0);
+  background: var(--surface, #fff);
+  background-image: none;
+  color: var(--text);
+  box-shadow: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.etq-formatos .etq-formato::before {
+  display: none;
+}
+
+.etq-formatos .etq-formato:hover:not(:disabled) {
+  border-color: var(--brand, #3b82f6);
+  transform: none;
+  box-shadow: none;
+}
+
+.etq-formatos .etq-formato.activo {
+  border-color: var(--brand, #3b82f6);
+  background: rgba(59, 130, 246, 0.07);
+}
+
+.etq-formato-radio {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border-radius: 50%;
+  border: 2px solid #cbd5e1;
+  background: #fff;
+}
+
+.etq-formato.activo .etq-formato-radio {
+  border-color: var(--brand, #3b82f6);
+  box-shadow: inset 0 0 0 3px #fff;
+  background: var(--brand, #3b82f6);
+}
+
+.etq-formato-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.etq-formato-nombre {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.etq-formato-detalle {
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
