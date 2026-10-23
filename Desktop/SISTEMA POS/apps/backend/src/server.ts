@@ -1,4 +1,4 @@
-// Servidor principal de la app web CENTRALA (desplegada en Railway desde main).
+// Servidor principal de la app web CENTRALA (desplegada en Railway desde la rama main).
 import "dotenv/config";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
