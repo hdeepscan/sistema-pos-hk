@@ -9,6 +9,11 @@ interface Proveedor {
   nombre: string;
 }
 
+interface Coleccion {
+  id: string;
+  titulo: string;
+}
+
 interface GrupoVariante {
   id: string;
   nombre: string;
@@ -338,185 +343,213 @@ export function NuevoProductoInteligente({
     }
   }
 
-  return (
-    <div className="modal-backdrop">
-      <div className="card" style={{ width: 760, maxWidth: "94vw" }}>
-        <h4 style={{ marginTop: 0, marginBottom: 4 }}>Nuevo producto</h4>
-        <p style={{ marginTop: 0, fontSize: 12.5, color: "var(--text-muted)" }}>
-          Configura todo en una sola pantalla. Si agregas variantes (ej. Color x Talla) se crean todas las combinaciones
-          automaticamente.
-        </p>
-        <form className="grid-form" onSubmit={guardar}>
-          {/* ---- Datos base ---- */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <label>
-              Nombre
-              <input value={nombre} onChange={(e) => setNombre(e.target.value)} required />
-            </label>
-            <label>
-              Categoria
-              <input
-                list="categorias-existentes"
-                value={categoria}
-                onChange={(e) => setCategoria(e.target.value)}
-                placeholder="Escribe o elige una existente"
-              />
-              <datalist id="categorias-existentes">
-                {categorias.map((c) => (
-                  <option key={c} value={c} />
-                ))}
-              </datalist>
-            </label>
-            <label>
-              Marca
-              <input value={marca} onChange={(e) => setMarca(e.target.value)} />
-            </label>
-            <label>
-              Proveedor
-              <select value={proveedorId} onChange={(e) => setProveedorId(e.target.value)}>
-                <option value="">Sin proveedor</option>
-                {proveedores.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Precio de compra (costo)
-              <input type="number" step="0.01" value={costo} onChange={(e) => setCosto(e.target.value)} />
-            </label>
-            <label>
-              Precio de venta
-              <input type="number" step="0.01" value={precio} onChange={(e) => setPrecio(e.target.value)} required />
-            </label>
-            <label>
-              SKU (sugerido, editable)
-              <input
-                value={sku}
-                onChange={(e) => {
-                  setSkuManual(true);
-                  setSku(e.target.value);
-                }}
-                required
-              />
-            </label>
-            <label>
-              Codigo de barras (automatico, editable)
-              <input
-                value={codigoBarras}
-                onChange={(e) => {
-                  setCodigoManual(true);
-                  setCodigoBarras(e.target.value);
-                }}
-              />
-            </label>
-            <label>
-              Impuesto (%)
-              <input type="number" step="0.01" value={impuesto} onChange={(e) => setImpuesto(e.target.value)} />
-            </label>
-            <label style={{ flexDirection: "row", alignItems: "center", gap: 8, alignSelf: "end" }}>
-              <input type="checkbox" checked={activo} onChange={(e) => setActivo(e.target.checked)} style={{ width: "auto" }} />
-              Producto activo
-            </label>
-          </div>
-          <label>
-            Descripcion
-            <textarea rows={2} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
-          </label>
+  const margen =
+    Number(precio) > 0 && costo !== "" ? Math.round(((Number(precio) - Number(costo || 0)) / Number(precio)) * 100) : null;
 
-          {/* ---- Colecciones ---- */}
-          {colecciones.length > 0 && (
-            <div>
-              <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-muted)" }}>Colecciones</span>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 6 }}>
-                {colecciones.map((c) => (
-                  <label key={c.id} style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                    <input
-                      type="checkbox"
-                      checked={coleccionesSeleccionadas.includes(c.id)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setColeccionesSeleccionadas([...coleccionesSeleccionadas, c.id]);
-                        } else {
-                          setColeccionesSeleccionadas(coleccionesSeleccionadas.filter((id) => id !== c.id));
-                        }
-                      }}
-                      style={{ width: "auto" }}
-                    />
-                    {c.titulo}
-                  </label>
-                ))}
+  return (
+    // Clic fuera NO cierra: es un formulario largo y se perdería lo escrito.
+    <div className="modal-backdrop np-backdrop">
+      <form className="np-modal" onSubmit={guardar}>
+        {/* ---- Encabezado fijo ---- */}
+        <header className="np-header">
+          <div>
+            <h3>Nuevo producto</h3>
+            <p>Completa los datos por secciones. Los campos con * son obligatorios.</p>
+          </div>
+          <button type="button" className="np-cerrar" aria-label="Cerrar" onClick={onClose} disabled={guardando}>
+            ✕
+          </button>
+        </header>
+
+        <div className="np-body">
+          {/* ---- Información básica ---- */}
+          <section className="np-section">
+            <div className="np-section-title">
+              <span className="np-step">1</span>
+              <div>
+                <h4>Información básica</h4>
+                <p>Cómo se llama y cómo lo encuentras en el catálogo.</p>
               </div>
             </div>
-          )}
+            <div className="np-grid">
+              <div className="np-field np-full">
+                <span className="np-label">Nombre *</span>
+                <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Conjunto dama deportivo" required autoFocus />
+              </div>
+              <div className="np-field">
+                <span className="np-label">Categoría</span>
+                <input
+                  list="categorias-existentes"
+                  value={categoria}
+                  onChange={(e) => setCategoria(e.target.value)}
+                  placeholder="Escribe o elige una existente"
+                />
+                <datalist id="categorias-existentes">
+                  {categorias.map((c) => (
+                    <option key={c} value={c} />
+                  ))}
+                </datalist>
+              </div>
+              <div className="np-field">
+                <span className="np-label">Marca</span>
+                <input value={marca} onChange={(e) => setMarca(e.target.value)} placeholder="Opcional" />
+              </div>
+              <div className="np-field">
+                <span className="np-label">Proveedor</span>
+                <select value={proveedorId} onChange={(e) => setProveedorId(e.target.value)}>
+                  <option value="">Sin proveedor</option>
+                  {proveedores.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="np-field np-full">
+                <span className="np-label">Descripción</span>
+                <textarea
+                  rows={3}
+                  value={descripcion}
+                  onChange={(e) => setDescripcion(e.target.value)}
+                  placeholder="Detalles del producto: material, cuidados, medidas..."
+                />
+              </div>
+            </div>
+          </section>
 
-          {/* ---- Imagenes ---- */}
-          <div>
-            <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-muted)" }}>Imagenes del producto</span>
-            <div
+          {/* ---- Precios ---- */}
+          <section className="np-section">
+            <div className="np-section-title">
+              <span className="np-step">2</span>
+              <div>
+                <h4>Precios</h4>
+                <p>El precio de venta se usa en el POS y en Shopify.</p>
+              </div>
+            </div>
+            <div className="np-grid np-grid-3">
+              <div className="np-field">
+                <span className="np-label">Precio de compra (costo)</span>
+                <div className="np-input-prefijo">
+                  <span>$</span>
+                  <input type="number" min="0" step="0.01" value={costo} onChange={(e) => setCosto(e.target.value)} />
+                </div>
+              </div>
+              <div className="np-field">
+                <span className="np-label">Precio de venta *</span>
+                <div className="np-input-prefijo">
+                  <span>$</span>
+                  <input type="number" min="0" step="0.01" value={precio} onChange={(e) => setPrecio(e.target.value)} placeholder="0" required />
+                </div>
+                {margen !== null && (
+                  <span className={`np-hint ${margen < 0 ? "np-hint-danger" : ""}`}>
+                    Margen: {margen}% {margen < 0 ? "(estás vendiendo por debajo del costo)" : ""}
+                  </span>
+                )}
+              </div>
+              <div className="np-field">
+                <span className="np-label">Impuesto (%)</span>
+                <input type="number" min="0" max="100" step="0.01" value={impuesto} onChange={(e) => setImpuesto(e.target.value)} />
+              </div>
+            </div>
+          </section>
+
+          {/* ---- Códigos ---- */}
+          <section className="np-section">
+            <div className="np-section-title">
+              <span className="np-step">3</span>
+              <div>
+                <h4>Códigos</h4>
+                <p>Se generan solos a partir del nombre; puedes cambiarlos.</p>
+              </div>
+            </div>
+            <div className="np-grid">
+              <div className="np-field">
+                <span className="np-label">SKU *</span>
+                <input
+                  value={sku}
+                  onChange={(e) => {
+                    setSkuManual(true);
+                    setSku(e.target.value);
+                  }}
+                  required
+                />
+                <span className="np-hint">Código interno para identificar el producto.</span>
+              </div>
+              <div className="np-field">
+                <span className="np-label">Código de barras</span>
+                <div className="np-input-accion">
+                  <input
+                    value={codigoBarras}
+                    onChange={(e) => {
+                      setCodigoManual(true);
+                      setCodigoBarras(e.target.value);
+                    }}
+                    placeholder="Escanéalo o genera uno"
+                  />
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => {
+                      setCodigoManual(true);
+                      setCodigoBarras(generarCodigoBarras());
+                    }}
+                  >
+                    Generar
+                  </button>
+                </div>
+                <span className="np-hint">Si el producto ya trae código, escanéalo aquí.</span>
+              </div>
+            </div>
+          </section>
+
+          {/* ---- Imágenes ---- */}
+          <section className="np-section">
+            <div className="np-section-title">
+              <span className="np-step">4</span>
+              <div>
+                <h4>Imágenes</h4>
+                <p>La primera es la principal. Usa ◀ ▶ para ordenarlas.</p>
+              </div>
+            </div>
+            <label
+              className="np-dropzone"
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
                 e.preventDefault();
                 if (e.dataTransfer.files.length) agregarArchivos(e.dataTransfer.files);
               }}
-              style={{
-                marginTop: 6,
-                border: "1.5px dashed var(--border)",
-                borderRadius: 8,
-                padding: 12,
-                textAlign: "center",
-                fontSize: 12.5,
-                color: "var(--text-muted)",
-              }}
             >
-              Arrastra imagenes aqui o{" "}
-              <label style={{ display: "inline", color: "var(--brand)", cursor: "pointer", textDecoration: "underline" }}>
-                seleccionalas
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  style={{ display: "none" }}
-                  onChange={(e) => e.target.files && agregarArchivos(e.target.files)}
-                />
-              </label>
-            </div>
+              <span className="np-dropzone-icono">🖼️</span>
+              <span>
+                Arrastra imágenes aquí o <strong>selecciónalas</strong>
+              </span>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                style={{ display: "none" }}
+                onChange={(e) => e.target.files && agregarArchivos(e.target.files)}
+              />
+            </label>
             {imagenes.length > 0 && (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 10 }}>
+              <div className="np-imagenes">
                 {imagenes.map((img, i) => (
-                  <div key={img.id} style={{ width: 88, fontSize: 11, textAlign: "center" }}>
-                    <div style={{ position: "relative" }}>
-                      <img
-                        src={img.dataUrl}
-                        alt=""
-                        style={{
-                          width: 88,
-                          height: 88,
-                          objectFit: "cover",
-                          borderRadius: 8,
-                          border: i === 0 ? "2px solid var(--brand)" : "1px solid var(--border)",
-                        }}
-                      />
-                      {i === 0 && (
-                        <span className="badge success" style={{ position: "absolute", top: 2, left: 2, fontSize: 9 }}>
-                          Principal
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "center", gap: 2, marginTop: 2 }}>
-                      <button type="button" className="secondary" style={{ padding: "2px 6px" }} onClick={() => moverImagen(i, -1)}>
+                  <div key={img.id} className={`np-imagen ${i === 0 ? "np-imagen-principal" : ""}`}>
+                    <img src={img.dataUrl} alt="" />
+                    {i === 0 && <span className="np-imagen-tag">Principal</span>}
+                    <div className="np-imagen-acciones">
+                      <button type="button" title="Mover a la izquierda" onClick={() => moverImagen(i, -1)}>
                         ◀
                       </button>
                       {i !== 0 && (
-                        <button type="button" className="secondary" style={{ padding: "2px 6px" }} onClick={() => hacerPrincipal(i)}>
+                        <button type="button" title="Hacer principal" onClick={() => hacerPrincipal(i)}>
                           ★
                         </button>
                       )}
-                      <button type="button" className="secondary" style={{ padding: "2px 6px" }} onClick={() => moverImagen(i, 1)}>
+                      <button type="button" title="Mover a la derecha" onClick={() => moverImagen(i, 1)}>
                         ▶
                       </button>
-                      <button type="button" className="secondary" style={{ padding: "2px 6px" }} onClick={() => quitarImagen(img.id)}>
+                      <button type="button" title="Quitar" onClick={() => quitarImagen(img.id)}>
                         ✕
                       </button>
                     </div>
@@ -524,14 +557,20 @@ export function NuevoProductoInteligente({
                 ))}
               </div>
             )}
-          </div>
+          </section>
 
           {/* ---- Variantes ---- */}
-          <div>
-            <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-muted)" }}>Variantes (opcional)</span>
-            <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+          <section className="np-section">
+            <div className="np-section-title">
+              <span className="np-step">5</span>
+              <div>
+                <h4>Variantes (opcional)</h4>
+                <p>Si el producto viene en tallas, colores, etc., se crea una variante por cada combinación.</p>
+              </div>
+            </div>
+            <div className="np-chips-acciones">
               {GRUPOS_SUGERIDOS.map((g) => (
-                <button key={g} type="button" className="secondary" onClick={() => agregarGrupo(g)}>
+                <button key={g} type="button" className="secondary" onClick={() => agregarGrupo(g)} disabled={grupos.some((x) => x.nombre.toLowerCase() === g.toLowerCase())}>
                   + {g}
                 </button>
               ))}
@@ -541,15 +580,16 @@ export function NuevoProductoInteligente({
             </div>
 
             {grupos.map((grupo) => (
-              <div key={grupo.id} style={{ border: "1px solid var(--border)", borderRadius: 8, padding: 10, marginTop: 8 }}>
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <div key={grupo.id} className="np-grupo">
+                <div className="np-grupo-fila">
                   <input
+                    className="np-grupo-nombre"
                     value={grupo.nombre}
                     onChange={(e) => renombrarGrupo(grupo.id, e.target.value)}
-                    style={{ maxWidth: 160, fontWeight: 600 }}
+                    aria-label="Nombre del grupo"
                   />
                   <input
-                    placeholder="Escribe valores separados por coma y Enter (ej. Negro, Blanco)"
+                    placeholder="Escribe valores separados por coma y presiona Enter (ej. S, M, L)"
                     style={{ flex: 1 }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
@@ -567,194 +607,226 @@ export function NuevoProductoInteligente({
                     Quitar
                   </button>
                 </div>
-                {grupo.valores.length > 0 && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                {grupo.valores.length > 0 ? (
+                  <div className="np-chips">
                     {grupo.valores.map((v) => (
-                      <span
-                        key={v}
-                        className="badge"
-                        style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
-                      >
+                      <span key={v} className="np-chip">
                         {v}
-                        <button
-                          type="button"
-                          onClick={() => quitarValor(grupo.id, v)}
-                          style={{ border: "none", background: "none", cursor: "pointer", padding: 0, color: "inherit" }}
-                        >
+                        <button type="button" aria-label={`Quitar ${v}`} onClick={() => quitarValor(grupo.id, v)}>
                           ✕
                         </button>
                       </span>
                     ))}
                   </div>
+                ) : (
+                  <span className="np-hint">Aún no hay valores para {grupo.nombre || "este grupo"}.</span>
                 )}
               </div>
             ))}
 
             {combinaciones.length > 0 && (
-              <div style={{ marginTop: 10, overflowX: "auto" }}>
-                <p style={{ fontSize: 12.5, color: "var(--text-muted)", margin: "4px 0" }}>
-                  Se crearan <strong>{combinaciones.length}</strong> variantes. Ajusta cada una si lo necesitas.
+              <div className="np-variantes">
+                <p className="np-hint">
+                  Se crearán <strong>{combinaciones.length}</strong> variantes. Deja el precio vacío para usar el precio de venta general.
                 </p>
-                <table style={{ fontSize: 12 }}>
-                  <thead>
-                    <tr>
-                      <th>Variante</th>
-                      <th>SKU</th>
-                      <th>Codigo</th>
-                      <th>Precio</th>
-                      <th>Stock</th>
-                      <th>Imagen</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {combinaciones.map((valores) => {
-                      const titulo = valores.join(" / ");
-                      const ov = overrides[titulo] ?? {};
-                      return (
-                        <tr key={titulo}>
-                          <td style={{ whiteSpace: "nowrap" }}>{titulo}</td>
-                          <td>
-                            <input
-                              style={{ width: 130 }}
-                              value={ov.sku ?? skuVariante(valores)}
-                              onChange={(e) => setOverride(titulo, "sku", e.target.value)}
-                            />
-                          </td>
-                          <td>
-                            <input
-                              style={{ width: 130 }}
-                              value={ov.codigoBarras ?? autoBarras[titulo] ?? ""}
-                              onChange={(e) => setOverride(titulo, "codigoBarras", e.target.value)}
-                            />
-                          </td>
-                          <td>
-                            <input
-                              type="number"
-                              step="0.01"
-                              placeholder={precio || "0"}
-                              style={{ width: 90 }}
-                              value={ov.precio ?? ""}
-                              onChange={(e) => setOverride(titulo, "precio", e.target.value)}
-                            />
-                          </td>
-                          <td>
-                            <input
-                              type="number"
-                              style={{ width: 70 }}
-                              value={ov.stock ?? ""}
-                              onChange={(e) => setOverride(titulo, "stock", e.target.value)}
-                            />
-                          </td>
-                          <td>
-                            <select
-                              style={{ width: 110 }}
-                              value={ov.imagenId ?? ""}
-                              onChange={(e) => setOverride(titulo, "imagenId", e.target.value || undefined)}
-                            >
-                              <option value="">Principal</option>
-                              {imagenes.map((img, idx) => (
-                                <option key={img.id} value={img.id}>
-                                  Imagen {idx + 1}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                <div className="np-tabla-scroll">
+                  <table className="np-tabla">
+                    <thead>
+                      <tr>
+                        <th>Variante</th>
+                        <th>SKU</th>
+                        <th>Código de barras</th>
+                        <th>Precio</th>
+                        <th>Stock inicial</th>
+                        <th>Imagen</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {combinaciones.map((valores) => {
+                        const titulo = valores.join(" / ");
+                        const ov = overrides[titulo] ?? {};
+                        return (
+                          <tr key={titulo}>
+                            <td className="np-variante-titulo">{titulo}</td>
+                            <td>
+                              <input value={ov.sku ?? skuVariante(valores)} onChange={(e) => setOverride(titulo, "sku", e.target.value)} />
+                            </td>
+                            <td>
+                              <input
+                                value={ov.codigoBarras ?? autoBarras[titulo] ?? ""}
+                                onChange={(e) => setOverride(titulo, "codigoBarras", e.target.value)}
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                placeholder={precio || "0"}
+                                value={ov.precio ?? ""}
+                                onChange={(e) => setOverride(titulo, "precio", e.target.value)}
+                              />
+                            </td>
+                            <td>
+                              <input type="number" min="0" placeholder="0" value={ov.stock ?? ""} onChange={(e) => setOverride(titulo, "stock", e.target.value)} />
+                            </td>
+                            <td>
+                              <select value={ov.imagenId ?? ""} onChange={(e) => setOverride(titulo, "imagenId", e.target.value || undefined)}>
+                                <option value="">Principal</option>
+                                {imagenes.map((img, idx) => (
+                                  <option key={img.id} value={img.id}>
+                                    Imagen {idx + 1}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
-          </div>
+          </section>
 
-          {/* ---- Stock y disponibilidad ---- */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <label>
-              Sucursal donde entra el stock inicial
-              <select value={sucursalStockId} onChange={(e) => setSucursalStockId(e.target.value)}>
-                {sucursales.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.nombre}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {combinaciones.length === 0 && (
-              <label>
-                Stock inicial
-                <input type="number" value={stockInicial} onChange={(e) => setStockInicial(e.target.value)} />
-              </label>
-            )}
-          </div>
-
-          <div>
-            <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-muted)" }}>Sucursales donde se vende</span>
-            <div style={{ display: "flex", gap: 12, marginTop: 4, fontSize: 13 }}>
-              <label style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                <input type="radio" checked={modoSucursales === "todas"} onChange={() => setModoSucursales("todas")} style={{ width: "auto" }} />
-                Todas
-              </label>
-              <label style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                <input type="radio" checked={modoSucursales === "algunas"} onChange={() => setModoSucursales("algunas")} style={{ width: "auto" }} />
-                Solo algunas
-              </label>
+          {/* ---- Inventario y disponibilidad ---- */}
+          <section className="np-section">
+            <div className="np-section-title">
+              <span className="np-step">6</span>
+              <div>
+                <h4>Inventario y disponibilidad</h4>
+                <p>Dónde entra el stock inicial y en qué sucursales se puede vender.</p>
+              </div>
             </div>
-            {modoSucursales === "algunas" && (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 8 }}>
-                {sucursales.map((s) => (
-                  <label key={s.id} style={{ flexDirection: "row", alignItems: "center", gap: 4, fontSize: 13 }}>
-                    <input
-                      type="checkbox"
-                      checked={sucursalIds.includes(s.id)}
-                      onChange={() => alternarSucursal(s.id)}
-                      style={{ width: "auto" }}
-                    />
-                    {s.nombre}
-                  </label>
-                ))}
+            <div className="np-grid">
+              <div className="np-field">
+                <span className="np-label">Sucursal del stock inicial</span>
+                <select value={sucursalStockId} onChange={(e) => setSucursalStockId(e.target.value)}>
+                  {sucursales.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {combinaciones.length === 0 ? (
+                <div className="np-field">
+                  <span className="np-label">Stock inicial</span>
+                  <input type="number" min="0" value={stockInicial} onChange={(e) => setStockInicial(e.target.value)} />
+                </div>
+              ) : (
+                <div className="np-field">
+                  <span className="np-label">Stock inicial</span>
+                  <span className="np-hint">Se indica por variante en la tabla de arriba.</span>
+                </div>
+              )}
+              <div className="np-field np-full">
+                <span className="np-label">Sucursales donde se vende</span>
+                <div className="np-segmentado">
+                  <button type="button" className={modoSucursales === "todas" ? "activo" : ""} onClick={() => setModoSucursales("todas")}>
+                    Todas
+                  </button>
+                  <button type="button" className={modoSucursales === "algunas" ? "activo" : ""} onClick={() => setModoSucursales("algunas")}>
+                    Solo algunas
+                  </button>
+                </div>
+                {modoSucursales === "algunas" && (
+                  <div className="np-chips">
+                    {sucursales.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        className={`np-chip-toggle ${sucursalIds.includes(s.id) ? "activo" : ""}`}
+                        onClick={() => alternarSucursal(s.id)}
+                      >
+                        {sucursalIds.includes(s.id) ? "✓ " : ""}
+                        {s.nombre}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+
+          {/* ---- Organización y publicación ---- */}
+          <section className="np-section">
+            <div className="np-section-title">
+              <span className="np-step">7</span>
+              <div>
+                <h4>Estado y publicación</h4>
+                <p>Colecciones, si está activo y si se publica en Shopify.</p>
+              </div>
+            </div>
+            {colecciones.length > 0 && (
+              <div className="np-field">
+                <span className="np-label">Colecciones</span>
+                <div className="np-chips">
+                  {colecciones.map((c) => {
+                    const sel = coleccionesSeleccionadas.includes(c.id);
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        className={`np-chip-toggle ${sel ? "activo" : ""}`}
+                        onClick={() =>
+                          setColeccionesSeleccionadas(sel ? coleccionesSeleccionadas.filter((id) => id !== c.id) : [...coleccionesSeleccionadas, c.id])
+                        }
+                      >
+                        {sel ? "✓ " : ""}
+                        {c.titulo}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
-          </div>
-
-          {/* ---- Shopify ---- */}
-          {shopifyConectado && (
-            <label style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <input
-                type="checkbox"
-                checked={publicarShopify}
-                onChange={(e) => setPublicarShopify(e.target.checked)}
-                style={{ width: "auto" }}
-              />
-              Publicar en Shopify (si lo desmarcas, se crea como <strong style={{ margin: "0 4px" }}>borrador</strong> y no
-              aparece en la tienda online)
+            <label className="np-switch">
+              <input type="checkbox" checked={activo} onChange={(e) => setActivo(e.target.checked)} />
+              <span className="np-switch-pista" />
+              <span>
+                <strong>Producto activo</strong>
+                <small>Si lo desactivas, no aparece en el punto de venta.</small>
+              </span>
             </label>
-          )}
+            {shopifyConectado && (
+              <label className="np-switch">
+                <input type="checkbox" checked={publicarShopify} onChange={(e) => setPublicarShopify(e.target.checked)} />
+                <span className="np-switch-pista" />
+                <span>
+                  <strong>Publicar en Shopify</strong>
+                  <small>Si lo desmarcas, se crea como borrador y no aparece en la tienda online.</small>
+                </span>
+              </label>
+            )}
+          </section>
+        </div>
 
-          {error && <span className="error-text">{error}</span>}
-          {avisoSync && (
-            <span className="badge warning" style={{ whiteSpace: "normal", lineHeight: 1.4 }}>
-              {avisoSync}
-            </span>
-          )}
-          <div style={{ display: "flex", gap: 8 }}>
+        {/* ---- Pie fijo con acciones ---- */}
+        <footer className="np-footer">
+          <div className="np-footer-mensajes">
+            {error && <span className="error-text">{error}</span>}
+            {avisoSync && <span className="badge warning np-aviso">{avisoSync}</span>}
+          </div>
+          <div className="np-footer-botones">
             {creado ? (
               <button type="button" onClick={onClose}>
                 Cerrar
               </button>
             ) : (
               <>
+                <button className="secondary" type="button" onClick={onClose} disabled={guardando}>
+                  Cancelar
+                </button>
                 <button type="submit" disabled={guardando}>
                   {guardando ? "Guardando..." : combinaciones.length > 0 ? `Crear ${combinaciones.length} variantes` : "Crear producto"}
-                </button>
-                <button className="secondary" type="button" onClick={onClose}>
-                  Cancelar
                 </button>
               </>
             )}
           </div>
-        </form>
-      </div>
+        </footer>
+      </form>
     </div>
   );
 }

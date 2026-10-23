@@ -1739,3 +1739,573 @@ tbody tr:hover {
   -webkit-appearance: none;
   margin: 0;
 }
+
+/* ---------- Nuevo producto (formulario por secciones) ----------
+   components.css pone label { display: block }, lo que dejaba cada etiqueta al lado de su
+   campo. Este formulario usa sus propias clases (np-*) con la etiqueta encima del campo. */
+.np-backdrop {
+  padding: 16px;
+}
+
+.np-modal {
+  width: 920px;
+  max-width: 100%;
+  max-height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface, #fff);
+  border-radius: 16px;
+  box-shadow: var(--shadow-xl, 0 20px 50px rgba(15, 23, 42, 0.25));
+  overflow: hidden;
+  animation: scaleIn var(--transition-base);
+}
+
+.np-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border-light, #e2e8f0);
+}
+
+.np-header h3 {
+  margin: 0 0 4px;
+  font-size: 20px;
+}
+
+.np-header p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.np-modal .np-cerrar {
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border-light, #e2e8f0);
+  box-shadow: none;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.np-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: var(--surface-secondary, #f8fafc);
+}
+
+.np-section {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border-light, #e2e8f0);
+  border-radius: 12px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.np-section-title {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.np-section-title h4 {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.np-section-title p {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.np-step {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--brand, #3b82f6);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.np-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 16px;
+}
+
+.np-grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.np-full {
+  grid-column: 1 / -1;
+}
+
+.np-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.np-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.np-field input,
+.np-field select,
+.np-field textarea,
+.np-grupo input,
+.np-tabla input,
+.np-tabla select {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 12px;
+  margin: 0;
+}
+
+.np-field textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.np-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.np-hint-danger {
+  color: var(--danger);
+}
+
+.np-input-prefijo {
+  display: flex;
+  align-items: center;
+  border: 1.5px solid var(--border-light, #e2e8f0);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--surface, #fff);
+  overflow: hidden;
+}
+
+.np-input-prefijo span {
+  padding: 0 4px 0 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.np-input-prefijo input {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding-left: 4px;
+}
+
+.np-input-accion {
+  display: flex;
+  gap: 8px;
+}
+
+.np-input-accion input {
+  flex: 1;
+}
+
+.np-modal .np-input-accion button {
+  min-height: 42px;
+  padding: 0 14px;
+  white-space: nowrap;
+}
+
+.np-dropzone {
+  display: flex !important;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 22px 16px;
+  margin: 0;
+  border: 2px dashed var(--border-light, #cbd5e1);
+  border-radius: 12px;
+  background: var(--surface-secondary, #f8fafc);
+  color: var(--text-muted);
+  font-size: 13.5px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.np-dropzone:hover {
+  border-color: var(--brand, #3b82f6);
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.np-dropzone strong {
+  color: var(--brand, #3b82f6);
+}
+
+.np-dropzone-icono {
+  font-size: 24px;
+}
+
+.np-imagenes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.np-imagen {
+  position: relative;
+  width: 104px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border-light, #e2e8f0);
+  background: var(--surface, #fff);
+}
+
+.np-imagen-principal {
+  border: 2px solid var(--brand, #3b82f6);
+}
+
+.np-imagen img {
+  width: 100%;
+  height: 104px;
+  object-fit: cover;
+  display: block;
+}
+
+.np-imagen-tag {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  background: var(--brand, #3b82f6);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.np-imagen-acciones {
+  display: flex;
+  justify-content: space-around;
+  padding: 4px;
+  border-top: 1px solid var(--border-light, #e2e8f0);
+}
+
+.np-modal .np-imagen-acciones button {
+  min-height: 26px;
+  height: 26px;
+  padding: 0 6px;
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  box-shadow: none;
+  font-size: 12px;
+}
+
+.np-chips-acciones,
+.np-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.np-grupo {
+  border: 1px solid var(--border-light, #e2e8f0);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.np-grupo-fila {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.np-grupo .np-grupo-nombre {
+  width: 150px;
+  flex: 0 0 150px;
+  font-weight: 700;
+}
+
+.np-grupo-fila > input:not(.np-grupo-nombre) {
+  min-width: 200px;
+}
+
+.np-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px 5px 12px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--brand, #1d4ed8);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.np-modal .np-chip button {
+  width: 20px;
+  height: 20px;
+  min-height: 20px;
+  padding: 0;
+  border-radius: 50%;
+  border: none;
+  background: rgba(59, 130, 246, 0.15);
+  color: inherit;
+  box-shadow: none;
+  font-size: 10px;
+}
+
+.np-modal .np-chip-toggle {
+  background-image: none;
+  border-radius: 999px;
+  padding: 6px 14px;
+  min-height: 34px;
+  background: var(--surface, #fff);
+  color: var(--text);
+  border: 1.5px solid var(--border-light, #e2e8f0);
+  box-shadow: none;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: none;
+}
+
+.np-modal .np-chip-toggle.activo {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: var(--brand, #3b82f6);
+  color: var(--brand, #1d4ed8);
+}
+
+.np-segmentado {
+  display: inline-flex;
+  width: fit-content;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--surface-secondary, #f1f5f9);
+  border: 1px solid var(--border-light, #e2e8f0);
+}
+
+.np-modal .np-segmentado button {
+  background-image: none;
+  min-height: 34px;
+  padding: 0 16px;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  box-shadow: none;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: none;
+}
+
+.np-modal .np-segmentado button.activo {
+  background: var(--surface, #fff);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+
+.np-variantes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.np-tabla-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--border-light, #e2e8f0);
+  border-radius: 10px;
+}
+
+.np-tabla {
+  width: 100%;
+  font-size: 13px;
+  border-collapse: collapse;
+}
+
+.np-tabla th {
+  text-align: left;
+  white-space: nowrap;
+  padding: 10px;
+  background: var(--surface-secondary, #f8fafc);
+}
+
+.np-tabla td {
+  padding: 6px 8px;
+  min-width: 120px;
+}
+
+/* SKU e imagen necesitan más espacio para no cortarse */
+.np-tabla td:nth-child(2) {
+  min-width: 200px;
+}
+
+.np-tabla td:nth-child(3) {
+  min-width: 165px;
+}
+
+.np-tabla td:nth-child(6) {
+  min-width: 140px;
+}
+
+.np-tabla .np-variante-titulo {
+  font-weight: 600;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.np-switch {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.np-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.np-switch-pista {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border-radius: 999px;
+  background: #cbd5e1;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+
+.np-switch-pista::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s ease;
+}
+
+.np-switch input:checked + .np-switch-pista {
+  background: var(--brand, #3b82f6);
+}
+
+.np-switch input:checked + .np-switch-pista::after {
+  transform: translateX(20px);
+}
+
+.np-switch input:focus-visible + .np-switch-pista {
+  outline: 2px solid var(--brand, #3b82f6);
+  outline-offset: 2px;
+}
+
+.np-switch strong {
+  display: block;
+  font-weight: 600;
+}
+
+.np-switch small {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.np-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--border-light, #e2e8f0);
+  background: var(--surface, #fff);
+  flex-wrap: wrap;
+}
+
+.np-footer-mensajes {
+  flex: 1;
+  min-width: 200px;
+}
+
+.np-aviso {
+  white-space: normal;
+  line-height: 1.4;
+}
+
+.np-footer-botones {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+@media (max-width: 720px) {
+  .np-backdrop {
+    padding: 0;
+  }
+
+  .np-modal {
+    max-height: 100vh;
+    height: 100vh;
+    border-radius: 0;
+  }
+
+  .np-header,
+  .np-body,
+  .np-footer {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .np-grid,
+  .np-grid-3 {
+    grid-template-columns: 1fr;
+  }
+
+  .np-footer-botones {
+    width: 100%;
+  }
+
+  .np-footer-botones button {
+    flex: 1;
+  }
+}
