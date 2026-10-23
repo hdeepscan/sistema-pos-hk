@@ -5,6 +5,7 @@ import { normalizarDominio, validarDominioShopify, sincronizarProductos } from "
 import { conciliarInventario } from "../lib/shopify-conciliacion.js";
 import { verificarWebhookShopify } from "../lib/shopify-webhook-verify.js";
 import { mensajeDeValidacion } from "../lib/errores.js";
+import { registrarAuditoria } from "../lib/auditoria.js";
 import {
   generarUrlAutorizacion,
   validarCallbackShopify,
@@ -498,13 +499,14 @@ export async function shopifyRoutes(app: FastifyInstance) {
     }
   });
 
-  // Conciliación de inventario. GET solo informa; POST corrige Shopify para igualar a CENTRALA.
+  // Conciliación de inventario entre la sucursal ecommerce de CENTRALA y su ubicación en Shopify.
+  // GET solo informa; "corregir" deja Shopify igual a CENTRALA; "corregir-centrala" deja CENTRALA igual a Shopify.
   app.get("/shopify/conciliacion", async (request, reply) => {
     if (!request.user.permisos.includes("inventario.administrar")) {
       return reply.code(403).send({ error: "No tienes permiso para administrar inventario" });
     }
     try {
-      return await conciliarInventario(request.user.empresaId, false);
+      return await conciliarInventario(request.user.empresaId, "revisar");
     } catch (err) {
       return reply.code(502).send({ error: err instanceof Error ? err.message : "Error consultando Shopify" });
     }
@@ -515,9 +517,83 @@ export async function shopifyRoutes(app: FastifyInstance) {
       return reply.code(403).send({ error: "No tienes permiso para administrar inventario" });
     }
     try {
-      return await conciliarInventario(request.user.empresaId, true);
+      const r = await conciliarInventario(request.user.empresaId, "shopify", request.user.usuarioId);
+      registrarAuditoria({
+        empresaId: request.user.empresaId,
+        usuarioId: request.user.usuarioId,
+        accion: "CORREGIR_INVENTARIO_SHOPIFY",
+        entidad: "Shopify",
+        detalle: `${r.corregidos} artículo(s) corregidos en Shopify con el inventario de CENTRALA`,
+      });
+      return r;
     } catch (err) {
       return reply.code(502).send({ error: err instanceof Error ? err.message : "Error corrigiendo en Shopify" });
+    }
+  });
+
+  app.post("/shopify/conciliacion/corregir-centrala", async (request, reply) => {
+    if (!request.user.permisos.includes("inventario.administrar")) {
+      return reply.code(403).send({ error: "No tienes permiso para administrar inventario" });
+    }
+    try {
+      const r = await conciliarInventario(request.user.empresaId, "centrala", request.user.usuarioId);
+      registrarAuditoria({
+        empresaId: request.user.empresaId,
+        usuarioId: request.user.usuarioId,
+        accion: "CORREGIR_INVENTARIO_CENTRALA",
+        entidad: "Inventario",
+        detalle: `${r.corregidosCentrala} artículo(s) de CENTRALA igualados con el inventario de Shopify`,
+      });
+      return r;
+    } catch (err) {
+      return reply.code(502).send({ error: err instanceof Error ? err.message : "Error corrigiendo CENTRALA" });
+    }
+  });
+
+  // Ubicación de Shopify vinculada a la sucursal ecommerce (se puede cambiar si quedó la equivocada).
+  app.get("/shopify/ubicaciones", async (request, reply) => {
+    try {
+      const { obtenerUbicaciones } = await import("../lib/shopify.js");
+      const config = await prisma.shopifyConfig.findUnique({ where: { empresaId: request.user.empresaId } });
+      const sucursal = config
+        ? await prisma.sucursal.findUnique({ where: { id: config.sucursalEcommerceId }, select: { id: true, nombre: true, shopifyLocationId: true } })
+        : null;
+      const ubicaciones = (await obtenerUbicaciones(request.user.empresaId)).filter((u) => u.active !== false);
+      return {
+        sucursal: sucursal ? { id: sucursal.id, nombre: sucursal.nombre } : null,
+        ubicacionActual: sucursal?.shopifyLocationId ?? null,
+        ubicaciones: ubicaciones.map((u) => ({ id: String(u.id), nombre: u.name })),
+      };
+    } catch (err) {
+      return reply.code(502).send({ error: err instanceof Error ? err.message : "Error consultando Shopify" });
+    }
+  });
+
+  app.patch("/shopify/ubicacion-ecommerce", async (request, reply) => {
+    if (!request.user.permisos.includes("inventario.administrar")) {
+      return reply.code(403).send({ error: "No tienes permiso para administrar inventario" });
+    }
+    const { locationId } = (request.body ?? {}) as { locationId?: string };
+    const config = await prisma.shopifyConfig.findUnique({ where: { empresaId: request.user.empresaId } });
+    if (!config) return reply.code(400).send({ error: "Configura Shopify primero" });
+    try {
+      const { obtenerUbicaciones } = await import("../lib/shopify.js");
+      const ubicaciones = await obtenerUbicaciones(request.user.empresaId);
+      if (!locationId || !ubicaciones.some((u) => String(u.id) === String(locationId))) {
+        return reply.code(400).send({ error: "Ubicación de Shopify inválida" });
+      }
+      await prisma.sucursal.update({ where: { id: config.sucursalEcommerceId }, data: { shopifyLocationId: String(locationId) } });
+      registrarAuditoria({
+        empresaId: request.user.empresaId,
+        usuarioId: request.user.usuarioId,
+        accion: "CAMBIAR_UBICACION_SHOPIFY",
+        entidad: "Sucursal",
+        entidadId: config.sucursalEcommerceId,
+        detalle: `Ubicación de Shopify → ${locationId}`,
+      });
+      return { ok: true };
+    } catch (err) {
+      return reply.code(502).send({ error: err instanceof Error ? err.message : "Error consultando Shopify" });
     }
   });
 

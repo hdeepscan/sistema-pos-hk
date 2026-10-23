@@ -2669,3 +2669,81 @@ tbody tr:hover {
   line-height: 1.4;
   color: var(--text-muted);
 }
+
+/* ---------- Shopify: conciliación de inventario ---------- */
+.cs-vinculo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--surface-secondary, #f8fafc);
+  border: 1px solid var(--border-light, #e2e8f0);
+}
+
+.cs-vinculo > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cs-vinculo-etiqueta {
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+
+.cs-vinculo select {
+  min-height: 40px;
+  height: 40px;
+  padding: 6px 10px;
+  margin: 0;
+}
+
+.cs-vinculo-flecha {
+  font-size: 20px;
+  color: var(--brand, #3b82f6);
+}
+
+.cs-nota {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin: 8px 0 16px;
+}
+
+.cs-acciones {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.cs-accion {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-light, #e2e8f0);
+}
+
+.cs-accion > span {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.cs-accion > span strong {
+  color: var(--text);
+}
+
+.cs-accion button {
+  width: 100%;
+}
+
+.cs-accion .cs-btn-alterno {
+  background: #0f766e;
+  background-image: none;
+}
