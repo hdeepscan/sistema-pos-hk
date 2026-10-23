@@ -3,6 +3,7 @@ import { api } from "../lib/api";
 import { useSesionStore } from "../lib/store";
 import { leerArchivoComoDataUrl } from "../lib/files";
 import { mensajeError } from "../lib/errores";
+import { FILTRO_TODAS, coincideFiltroLote, opcionesFiltroLote } from "../lib/variantes-lote";
 
 interface Proveedor {
   id: string;
@@ -119,6 +120,12 @@ export function NuevoProductoInteligente({
   const [overrides, setOverrides] = useState<Record<string, OverrideVariante>>({});
   // Codigo de barras autogenerado por combinacion (unico para cada variante).
   const [autoBarras, setAutoBarras] = useState<Record<string, string>>({});
+
+  // Llenado en lote de la tabla de variantes
+  const [loteStock, setLoteStock] = useState("");
+  const [lotePrecio, setLotePrecio] = useState("");
+  const [loteFiltro, setLoteFiltro] = useState(FILTRO_TODAS);
+  const [loteMensaje, setLoteMensaje] = useState<string | null>(null);
 
   // Imagenes
   const [imagenes, setImagenes] = useState<ImagenSubida[]>([]);
@@ -250,6 +257,30 @@ export function NuevoProductoInteligente({
 
   function setOverride(titulo: string, campo: keyof OverrideVariante, valor: string | undefined) {
     setOverrides((prev) => ({ ...prev, [titulo]: { ...prev[titulo], [campo]: valor } }));
+  }
+
+  // Pone el mismo stock y/o precio a todas las variantes (o a las de una talla, color...).
+  function aplicarLote() {
+    const stock = loteStock.trim();
+    const precioLote = lotePrecio.trim();
+    if (!stock && !precioLote) {
+      setLoteMensaje("Escribe un stock o un precio para aplicar");
+      return;
+    }
+    const destino = combinaciones.filter((valores) => coincideFiltroLote(valores, loteFiltro));
+    setOverrides((prev) => {
+      const sig = { ...prev };
+      for (const valores of destino) {
+        const titulo = valores.join(" / ");
+        sig[titulo] = {
+          ...sig[titulo],
+          ...(stock ? { stock: String(Math.max(0, Math.floor(Number(stock) || 0))) } : {}),
+          ...(precioLote ? { precio: precioLote } : {}),
+        };
+      }
+      return sig;
+    });
+    setLoteMensaje(`Aplicado a ${destino.length} variante${destino.length === 1 ? "" : "s"}`);
   }
 
   function skuVariante(valores: string[]): string {
@@ -629,6 +660,34 @@ export function NuevoProductoInteligente({
                 <p className="np-hint">
                   Se crearán <strong>{combinaciones.length}</strong> variantes. Deja el precio vacío para usar el precio de venta general.
                 </p>
+                <div className="lote-barra">
+                  <span className="lote-titulo">Llenar en lote</span>
+                  <div className="lote-campo">
+                    <span>Stock</span>
+                    <input type="number" min="0" placeholder="Ej: 10" value={loteStock} onChange={(e) => setLoteStock(e.target.value)} />
+                  </div>
+                  <div className="lote-campo">
+                    <span>Precio</span>
+                    <input type="number" min="0" step="0.01" placeholder="Opcional" value={lotePrecio} onChange={(e) => setLotePrecio(e.target.value)} />
+                  </div>
+                  <div className="lote-campo lote-campo-ancho">
+                    <span>Aplicar a</span>
+                    <select value={loteFiltro} onChange={(e) => setLoteFiltro(e.target.value)}>
+                      {opcionesFiltroLote(
+                        combinaciones,
+                        grupos.filter((g) => g.valores.length > 0).map((g) => g.nombre)
+                      ).map((o) => (
+                        <option key={o.valor} value={o.valor}>
+                          {o.etiqueta}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <button type="button" onClick={aplicarLote}>
+                    Aplicar
+                  </button>
+                  {loteMensaje && <span className="lote-mensaje">{loteMensaje}</span>}
+                </div>
                 <div className="np-tabla-scroll">
                   <table className="np-tabla">
                     <thead>

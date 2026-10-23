@@ -2085,7 +2085,7 @@ tbody tr:hover {
   font-size: 10px;
 }
 
-.np-modal .np-chip-toggle {
+.np-modal .np-chip-toggle, .pd-inline .np-chip-toggle {
   background-image: none;
   border-radius: 999px;
   padding: 6px 14px;
@@ -2099,7 +2099,7 @@ tbody tr:hover {
   text-transform: none;
 }
 
-.np-modal .np-chip-toggle.activo {
+.np-modal .np-chip-toggle.activo, .pd-inline .np-chip-toggle.activo {
   background: rgba(59, 130, 246, 0.1);
   border-color: var(--brand, #3b82f6);
   color: var(--brand, #1d4ed8);
@@ -2114,7 +2114,7 @@ tbody tr:hover {
   border: 1px solid var(--border-light, #e2e8f0);
 }
 
-.np-modal .np-segmentado button {
+.np-modal .np-segmentado button, .pd-inline .np-segmentado button {
   background-image: none;
   min-height: 34px;
   padding: 0 16px;
@@ -2128,7 +2128,7 @@ tbody tr:hover {
   text-transform: none;
 }
 
-.np-modal .np-segmentado button.activo {
+.np-modal .np-segmentado button.activo, .pd-inline .np-segmentado button.activo {
   background: var(--surface, #fff);
   color: var(--text);
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
@@ -2306,6 +2306,275 @@ tbody tr:hover {
   }
 
   .np-footer-botones button {
+    flex: 1;
+  }
+}
+
+/* ---------- Edición en lote (nuevo producto e inventario) ---------- */
+.lote-barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(59, 130, 246, 0.06);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.lote-titulo {
+  width: 100%;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--brand, #1d4ed8);
+}
+
+.lote-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 130px;
+}
+
+.lote-campo-ancho {
+  width: 200px;
+}
+
+.lote-campo > span {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.lote-campo input,
+.lote-campo select {
+  width: 100%;
+  min-height: 40px;
+  height: 40px;
+  padding: 6px 10px;
+  margin: 0;
+}
+
+.lote-barra > button {
+  min-height: 40px;
+  height: 40px;
+  padding: 0 18px;
+}
+
+.lote-mensaje {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--success, #16a34a);
+  align-self: center;
+}
+
+/* ---------- Inventario por sucursal (detalle de producto) ---------- */
+.inv-contenedor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.inv-tabla-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--border-light, #e2e8f0);
+  border-radius: 10px;
+}
+
+.inv-tabla {
+  width: 100%;
+  font-size: 13px;
+  border-collapse: collapse;
+}
+
+.inv-tabla th {
+  padding: 10px 12px;
+  background: var(--surface-secondary, #f8fafc);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.inv-tabla td {
+  padding: 6px 12px;
+  border-top: 1px solid var(--border-light, #eef2f7);
+}
+
+.inv-tabla .inv-col-num {
+  text-align: center;
+}
+
+.inv-variante-nombre {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.inv-variante-sku {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.inv-tabla .inv-input {
+  width: 84px;
+  min-height: 38px;
+  height: 38px;
+  padding: 0 6px;
+  margin: 0;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.inv-tabla .inv-input-cambiado {
+  border-color: var(--warning, #f59e0b);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.inv-tabla .inv-borrar {
+  width: 36px;
+  min-height: 36px;
+  height: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--danger, #dc2626);
+}
+
+.inv-tabla tfoot td {
+  background: var(--surface-secondary, #f8fafc);
+}
+
+.inv-total {
+  font-weight: 700;
+}
+
+.inv-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ---------- Detalle de producto ---------- */
+.pd-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 16px;
+  padding: 16px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.pd-header-info {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.pd-header-info h3 {
+  margin: 0 0 6px;
+  font-size: 19px;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pd-header-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.pd-sku {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin-right: 4px;
+}
+
+.pd-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 18px;
+  border: 1px solid transparent;
+}
+
+.pd-pill-ok {
+  background: var(--success-bg, #dcfce7);
+  color: var(--success, #15803d);
+  border-color: rgba(34, 197, 94, 0.25);
+}
+
+.pd-pill-aviso {
+  background: var(--warning-bg, #fef3c7);
+  color: var(--warning, #b45309);
+  border-color: rgba(245, 158, 11, 0.25);
+}
+
+.pd-pill-neutral {
+  background: var(--surface-secondary, #f1f5f9);
+  color: var(--text-muted);
+  border-color: var(--border-light, #e2e8f0);
+}
+
+.pd-header-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.pd-header-acciones button {
+  min-height: 40px;
+  height: 40px;
+  padding: 0 16px;
+  white-space: nowrap;
+}
+
+.pd-header-acciones .pd-btn-eliminar {
+  color: var(--danger, #dc2626);
+  border-color: rgba(220, 38, 38, 0.35);
+}
+
+.pd-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.pd-grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 900px) {
+  .pd-grid-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .pd-grid,
+  .pd-grid-3 {
+    grid-template-columns: 1fr;
+  }
+
+  .pd-header-acciones {
+    width: 100%;
+  }
+
+  .pd-header-acciones button {
     flex: 1;
   }
 }

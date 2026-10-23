@@ -9,6 +9,7 @@ import type { ColumnaExport } from "../lib/export";
 import { mensajeError } from "../lib/errores";
 import { electronAPI } from "../lib/electron-api";
 import { NuevoProductoInteligente } from "./NuevoProductoInteligente";
+import { FILTRO_TODAS, coincideFiltroLote, opcionesFiltroLote, valoresDeTitulo } from "../lib/variantes-lote";
 import type { EtiquetaFormato } from "../../../shared/api-types";
 import { formatearVariante } from "@sistema-pos/shared";
 import {
@@ -20,6 +21,9 @@ import {
   IconoBasura,
   IconoEstrella,
   IconoMas,
+  IconoVariantes,
+  IconoSucursal,
+  IconoEtiqueta,
 } from "../lib/iconos";
 
 // Convierte la variante en lineas legibles usando formatearVariante de shared
@@ -347,6 +351,11 @@ function InventarioSection({ producto, onActualizado }: { producto: ProductoDeta
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Edición en lote
+  const [loteCantidad, setLoteCantidad] = useState("");
+  const [loteModo, setLoteModo] = useState<"fijar" | "sumar">("fijar");
+  const [loteSucursal, setLoteSucursal] = useState("todas");
+  const [loteFiltro, setLoteFiltro] = useState(FILTRO_TODAS);
 
   const cargar = useCallback(() => {
     api
@@ -359,29 +368,71 @@ function InventarioSection({ producto, onActualizado }: { producto: ProductoDeta
     cargar();
   }, [cargar]);
 
-  async function guardar() {
+  const cantidadActual = (u: UnidadInventario, sucursalId: string) =>
+    u.stock.find((x) => x.sucursalId === sucursalId)?.cantidad ?? 0;
+
+  // Solo se guardan las celdas cuyo valor cambió de verdad.
+  const cambios = useMemo(() => {
+    if (!data) return [];
+    return Object.entries(editado)
+      .map(([clave, valor]) => {
+        const [unidadId, sucursalId] = clave.split("::");
+        const u = data.unidades.find((x) => x.id === unidadId);
+        return { clave, unidadId, sucursalId, cantidad: Math.max(0, Math.floor(Number(valor) || 0)), actual: u ? cantidadActual(u, sucursalId) : 0 };
+      })
+      .filter((c) => c.cantidad !== c.actual);
+  }, [editado, data]);
+
+  function aplicarLote() {
     if (!data) return;
+    const n = Math.floor(Number(loteCantidad));
+    if (loteCantidad.trim() === "" || !Number.isFinite(n) || (loteModo === "fijar" && n < 0)) {
+      setError("Escribe una cantidad válida para aplicar en lote");
+      return;
+    }
+    setError(null);
+    const sucursalesDestino = loteSucursal === "todas" ? data.sucursales : data.sucursales.filter((s) => s.id === loteSucursal);
+    const unidadesDestino = data.unidades.filter((u) => coincideFiltroLote(valoresDeTitulo(u.varianteTitulo), loteFiltro));
+    setEditado((prev) => {
+      const sig = { ...prev };
+      for (const u of unidadesDestino) {
+        for (const s of sucursalesDestino) {
+          const clave = `${u.id}::${s.id}`;
+          const base = sig[clave] !== undefined ? Number(sig[clave]) || 0 : cantidadActual(u, s.id);
+          sig[clave] = String(Math.max(0, loteModo === "fijar" ? n : base + n));
+        }
+      }
+      return sig;
+    });
+    setMensaje(
+      `${loteModo === "fijar" ? "Fijado" : "Sumado"} en ${unidadesDestino.length * sucursalesDestino.length} casilla(s). Revisa y presiona "Guardar stock".`
+    );
+  }
+
+  async function guardar() {
+    if (!data || cambios.length === 0) return;
     setGuardando(true);
     setError(null);
     setMensaje(null);
-    try {
-      for (const [clave, valor] of Object.entries(editado)) {
-        const [unidadId, sucursalId] = clave.split("::");
-        await api.patch("/inventario/ajustar-directo", {
-          productoId: unidadId,
-          sucursalId,
-          cantidad: Number(valor) || 0,
-        });
+    const fallidos: string[] = [];
+    // Se envían de a 4 en paralelo para que muchas variantes no tarden demasiado.
+    const pendientes = [...cambios];
+    async function trabajador() {
+      for (let c = pendientes.shift(); c; c = pendientes.shift()) {
+        try {
+          await api.patch("/inventario/ajustar-directo", { productoId: c.unidadId, sucursalId: c.sucursalId, cantidad: c.cantidad });
+        } catch {
+          fallidos.push(c.clave);
+        }
       }
-      setEditado({});
-      setMensaje("Stock actualizado");
-      cargar();
-      onActualizado();
-    } catch (err: any) {
-      setError(mensajeError(err, "No se pudo actualizar el stock"));
-    } finally {
-      setGuardando(false);
     }
+    await Promise.all([trabajador(), trabajador(), trabajador(), trabajador()]);
+    setEditado((prev) => Object.fromEntries(Object.entries(prev).filter(([k]) => fallidos.includes(k))));
+    if (fallidos.length > 0) setError(`No se pudieron guardar ${fallidos.length} casilla(s). Intenta de nuevo.`);
+    else setMensaje(`Stock actualizado (${cambios.length} cambio${cambios.length === 1 ? "" : "s"})`);
+    cargar();
+    onActualizado();
+    setGuardando(false);
   }
 
   async function eliminarVariante(u: UnidadInventario) {
@@ -400,72 +451,146 @@ function InventarioSection({ producto, onActualizado }: { producto: ProductoDeta
 
   if (!data) return <p className="empty-state">Cargando inventario...</p>;
   const hayVariantes = data.unidades.length > 1;
+  const nombresOpciones = (data.unidades.find((u) => u.grupoOpciones)?.grupoOpciones ?? "").split("|").filter(Boolean);
+  const totalPorSucursal = (sucursalId: string) =>
+    data.unidades.reduce((acc, u) => {
+      const clave = `${u.id}::${sucursalId}`;
+      return acc + (editado[clave] !== undefined ? Number(editado[clave]) || 0 : cantidadActual(u, sucursalId));
+    }, 0);
 
   return (
-    <div style={{ overflowX: "auto" }}>
-      <table style={{ fontSize: 13 }}>
-        <thead>
-          <tr>
-            <th>Variante</th>
+    <div className="inv-contenedor">
+      <div className="lote-barra">
+        <span className="lote-titulo">Editar en lote</span>
+        <div className="lote-campo">
+          <span>Acción</span>
+          <select value={loteModo} onChange={(e) => setLoteModo(e.target.value as "fijar" | "sumar")}>
+            <option value="fijar">Dejar en</option>
+            <option value="sumar">Sumar (+) / restar (−)</option>
+          </select>
+        </div>
+        <div className="lote-campo">
+          <span>Cantidad</span>
+          <input
+            type="number"
+            placeholder={loteModo === "fijar" ? "Ej: 10" : "Ej: 5 o -2"}
+            value={loteCantidad}
+            onChange={(e) => setLoteCantidad(e.target.value)}
+          />
+        </div>
+        <div className="lote-campo">
+          <span>Sucursal</span>
+          <select value={loteSucursal} onChange={(e) => setLoteSucursal(e.target.value)}>
+            <option value="todas">Todas</option>
             {data.sucursales.map((s) => (
-              <th key={s.id} style={{ textAlign: "center" }}>
+              <option key={s.id} value={s.id}>
                 {s.nombre}
-              </th>
+              </option>
             ))}
-            {hayVariantes && <th></th>}
-          </tr>
-        </thead>
-        <tbody>
-          {data.unidades.map((u) => {
-            const lineas = lineasVariante(u);
-            return (
-              <tr key={u.id}>
-                <td style={{ whiteSpace: "nowrap" }}>
-                  <div style={{ fontWeight: 600 }}>{u.nombre}</div>
-                  {lineas.length > 0 ? (
-                    <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>{lineas.join(" · ")}</div>
-                  ) : null}
-                  <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{u.sku}</div>
-                </td>
-                {data.sucursales.map((s) => {
-                  const clave = `${u.id}::${s.id}`;
-                  const actual = u.stock.find((x) => x.sucursalId === s.id)?.cantidad ?? 0;
-                  return (
-                    <td key={s.id} style={{ textAlign: "center" }}>
-                      <input
-                        type="number"
-                        min={0}
-                        value={editado[clave] ?? String(actual)}
-                        onChange={(e) =>
-                          setEditado((p) => ({ ...p, [clave]: String(Math.max(0, Number(e.target.value) || 0)) }))
-                        }
-                        style={{ width: 68, textAlign: "center" }}
-                      />
-                    </td>
-                  );
-                })}
-                {hayVariantes && (
-                  <td style={{ textAlign: "center" }}>
-                    <button
-                      type="button"
-                      className="secondary"
-                      title="Eliminar variante"
-                      onClick={() => eliminarVariante(u)}
-                      style={{ padding: "4px 8px", display: "inline-flex", alignItems: "center", color: "var(--danger,#dc2626)" }}
-                    >
-                      <IconoBasura size={16} />
-                    </button>
-                  </td>
-                )}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
-        <button type="button" onClick={guardar} disabled={guardando || Object.keys(editado).length === 0}>
-          {guardando ? "Guardando..." : "Guardar stock"}
+          </select>
+        </div>
+        {hayVariantes && (
+          <div className="lote-campo lote-campo-ancho">
+            <span>Variantes</span>
+            <select value={loteFiltro} onChange={(e) => setLoteFiltro(e.target.value)}>
+              {opcionesFiltroLote(
+                data.unidades.map((u) => valoresDeTitulo(u.varianteTitulo)),
+                nombresOpciones
+              ).map((o) => (
+                <option key={o.valor} value={o.valor}>
+                  {o.etiqueta}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+        <button type="button" onClick={aplicarLote}>
+          Aplicar
         </button>
+      </div>
+
+      <div className="inv-tabla-scroll">
+        <table className="inv-tabla">
+          <thead>
+            <tr>
+              <th>Variante</th>
+              {data.sucursales.map((s) => (
+                <th key={s.id} className="inv-col-num">
+                  {s.nombre}
+                </th>
+              ))}
+              {hayVariantes && <th></th>}
+            </tr>
+          </thead>
+          <tbody>
+            {data.unidades.map((u) => {
+              const lineas = lineasVariante(u);
+              return (
+                <tr key={u.id}>
+                  <td className="inv-variante">
+                    <div className="inv-variante-nombre">{lineas.length > 0 ? lineas.join(" · ") : u.nombre}</div>
+                    <div className="inv-variante-sku">{u.sku}</div>
+                  </td>
+                  {data.sucursales.map((s) => {
+                    const clave = `${u.id}::${s.id}`;
+                    const actual = cantidadActual(u, s.id);
+                    const valor = editado[clave] ?? String(actual);
+                    const cambiado = editado[clave] !== undefined && Number(editado[clave]) !== actual;
+                    return (
+                      <td key={s.id} className="inv-col-num">
+                        <input
+                          type="number"
+                          min={0}
+                          className={`inv-input ${cambiado ? "inv-input-cambiado" : ""}`}
+                          value={valor}
+                          onFocus={(e) => e.currentTarget.select()}
+                          onChange={(e) => setEditado((p) => ({ ...p, [clave]: e.target.value }))}
+                          title={cambiado ? `Antes: ${actual}` : undefined}
+                        />
+                      </td>
+                    );
+                  })}
+                  {hayVariantes && (
+                    <td className="inv-col-num">
+                      <button
+                        type="button"
+                        className="secondary inv-borrar"
+                        title="Eliminar variante"
+                        onClick={() => eliminarVariante(u)}
+                      >
+                        <IconoBasura size={16} />
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
+          </tbody>
+          {hayVariantes && (
+            <tfoot>
+              <tr>
+                <td className="inv-total">Total</td>
+                {data.sucursales.map((s) => (
+                  <td key={s.id} className="inv-col-num inv-total">
+                    {totalPorSucursal(s.id)}
+                  </td>
+                ))}
+                <td></td>
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+
+      <div className="inv-acciones">
+        <button type="button" onClick={guardar} disabled={guardando || cambios.length === 0}>
+          {guardando ? "Guardando..." : cambios.length > 0 ? `Guardar stock (${cambios.length})` : "Guardar stock"}
+        </button>
+        {Object.keys(editado).length > 0 && !guardando && (
+          <button type="button" className="secondary" onClick={() => setEditado({})}>
+            Descartar cambios
+          </button>
+        )}
         {mensaje && <span className="badge success">{mensaje}</span>}
         {error && <span className="error-text">{error}</span>}
       </div>
@@ -868,53 +993,40 @@ function DetalleProducto({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {/* Encabezado con imagen, nombre, estado y acciones */}
-      <div
-        style={{
-          background: "var(--surface, #fff)",
-          border: "1px solid var(--border)",
-          borderRadius: 16,
-          padding: 16,
-          boxShadow: "0 1px 2px rgba(16,24,40,0.04)",
-          display: "flex",
-          alignItems: "center",
-          gap: 16,
-          position: "sticky",
-          top: 0,
-          zIndex: 5,
-        }}
-      >
+      {/* Encabezado: imagen + nombre + estado a la izquierda, acciones a la derecha (bajan si no caben) */}
+      <div className="pd-header">
         <Miniatura url={previewImagen} size={64} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <h3 style={{ margin: 0, fontSize: 18 }}>{producto.nombre}</h3>
-            {producto.varianteTitulo && <span className="badge neutral">{formatearVariante(producto.varianteTitulo)}</span>}
-            <span className={`badge ${activo ? "success" : "neutral"}`}>{activo ? "Activo" : "Inactivo"}</span>
-            {producto.shopifyProductId ? (
-              <span className="badge success">Shopify</span>
-            ) : (
-              <span className="badge warning">Sin Shopify</span>
+        <div className="pd-header-info">
+          <h3 title={producto.nombre}>{producto.nombre}</h3>
+          <div className="pd-header-meta">
+            <span className="pd-sku">SKU {producto.sku}</span>
+            {producto.variantes.length > 0 && (
+              <span className="pd-pill pd-pill-neutral">{producto.variantes.length + 1} variantes</span>
             )}
+            <span className={`pd-pill ${activo ? "pd-pill-ok" : "pd-pill-neutral"}`}>{activo ? "Activo" : "Inactivo"}</span>
+            <span className={`pd-pill ${producto.shopifyProductId ? "pd-pill-ok" : "pd-pill-aviso"}`}>
+              {producto.shopifyProductId ? "En Shopify" : "Sin Shopify"}
+            </span>
           </div>
-          <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 2 }}>{producto.sku}</div>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button type="button" onClick={guardar} disabled={guardando}>
-            {guardando ? "Guardando..." : "Guardar"}
-          </button>
-          <button type="button" className="secondary" onClick={reintentarShopify} disabled={accionando}>
-            {accionando ? "..." : "Reintentar Shopify"}
-          </button>
+        <div className="pd-header-acciones">
           <button type="button" className="secondary" onClick={() => setMostrarDuplicar(true)} disabled={accionando}>
             Duplicar
           </button>
           <button
             type="button"
-            onClick={eliminarProducto}
+            className="secondary"
+            onClick={reintentarShopify}
             disabled={accionando}
-            style={{ background: "var(--danger, #dc2626)", color: "#fff" }}
+            title={producto.shopifyProductId ? "Volver a enviar los datos a Shopify" : "Publicar este producto en Shopify"}
           >
+            {accionando ? "..." : producto.shopifyProductId ? "Sincronizar Shopify" : "Subir a Shopify"}
+          </button>
+          <button type="button" className="secondary pd-btn-eliminar" onClick={eliminarProducto} disabled={accionando}>
             Eliminar
+          </button>
+          <button type="button" className="pd-btn-guardar" onClick={guardar} disabled={guardando}>
+            {guardando ? "Guardando..." : "Guardar cambios"}
           </button>
         </div>
       </div>
@@ -932,8 +1044,8 @@ function DetalleProducto({
       )}
 
       {/* Informacion general */}
-      <Seccion icono={<IconoInfo />} titulo="Informacion general" subtitulo="Nombre, categoria, marca, proveedor y descripcion">
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <Seccion icono={<IconoInfo />} titulo="Información general" subtitulo="Nombre, categoría, marca, proveedor y descripción">
+        <div className="pd-grid">
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
               Nombre
@@ -982,16 +1094,20 @@ function DetalleProducto({
             </label>
             <textarea rows={3} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} style={{ width: "100%", padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14, fontFamily: "inherit" }} />
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, gridColumn: "1 / -1" }}>
-            <input type="checkbox" checked={activo} onChange={(e) => setActivo(e.target.checked)} style={{ width: "auto" }} />
-            <label style={{ fontSize: 14, fontWeight: 500, margin: 0 }}>Producto activo (visible en el POS)</label>
-          </div>
+          <label className="np-switch" style={{ gridColumn: "1 / -1" }}>
+            <input type="checkbox" checked={activo} onChange={(e) => setActivo(e.target.checked)} />
+            <span className="np-switch-pista" />
+            <span>
+              <strong>Producto activo</strong>
+              <small>Si lo desactivas, no aparece en el punto de venta.</small>
+            </span>
+          </label>
         </div>
       </Seccion>
 
       {/* Precios, impuestos e identificadores */}
-      <Seccion icono={<IconoPrecio />} titulo="Precios e identificadores" subtitulo="Costo, precio, impuesto, SKU y codigo de barras">
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+      <Seccion icono={<IconoPrecio />} titulo="Precios e identificadores" subtitulo="Costo, precio, impuesto, SKU y código de barras">
+        <div className="pd-grid pd-grid-3">
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
               Precio de compra (costo)
@@ -1032,12 +1148,16 @@ function DetalleProducto({
       </Seccion>
 
       {/* Galeria de imagenes */}
-      <Seccion icono={<IconoImagen />} titulo="Imagenes" subtitulo="Sube varias, elige la principal y sincroniza con Shopify">
+      <Seccion icono={<IconoImagen />} titulo="Imágenes" subtitulo="Sube varias, elige la principal y sincroniza con Shopify">
         <GaleriaSection producto={producto} onActualizado={onActualizado} />
       </Seccion>
 
       {/* Inventario por sucursal */}
-      <Seccion icono={<IconoInventario />} titulo="Inventario por sucursal" subtitulo="Ajusta el stock de cada variante en cada sucursal">
+      <Seccion
+        icono={<IconoInventario />}
+        titulo="Inventario por sucursal"
+        subtitulo="Edita una casilla o usa “Editar en lote” para cambiar muchas variantes a la vez"
+      >
         <InventarioSection producto={producto} onActualizado={onActualizado} />
       </Seccion>
 
@@ -1206,10 +1326,12 @@ function EtiquetaCard({ producto, onActualizado }: { producto: ProductoDetalle; 
   }
 
   return (
-    <div className="card">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-        <h4 style={{ margin: 0 }}>Etiquetas / codigos de barras</h4>
-        <div style={{ display: "flex", gap: 6 }}>
+    <Seccion
+      icono={<IconoEtiqueta />}
+      titulo="Etiquetas y códigos de barras"
+      subtitulo="Imprime etiquetas con el código de cada variante"
+      aside={
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
           {faltanCodigos > 0 && (
             <button type="button" className="secondary" style={{ padding: "4px 10px" }} onClick={generarFaltantes} disabled={ocupado}>
               Generar {faltanCodigos} codigo{faltanCodigos === 1 ? "" : "s"} faltante{faltanCodigos === 1 ? "" : "s"}
@@ -1226,7 +1348,8 @@ function EtiquetaCard({ producto, onActualizado }: { producto: ProductoDetalle; 
             </>
           )}
         </div>
-      </div>
+      }
+    >
       <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 0, marginBottom: 12 }}>
         {tieneVariantes
           ? "Elige cuantas etiquetas imprimir de cada variante. Cada una lleva su propio codigo de barras."
@@ -1310,18 +1433,19 @@ function EtiquetaCard({ producto, onActualizado }: { producto: ProductoDetalle; 
                   )}
                 </div>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-                <button type="button" className="secondary" style={{ padding: "2px 8px" }} onClick={() => setCopiasUnidad(u.id, n - 1)}>
+              <div className="pos-cantidad" style={{ flexShrink: 0 }}>
+                <button type="button" className="secondary pos-cantidad-boton" aria-label="Una etiqueta menos" onClick={() => setCopiasUnidad(u.id, n - 1)}>
                   −
                 </button>
                 <input
+                  className="pos-cantidad-input"
                   type="number"
                   min={0}
                   value={n}
+                  onFocus={(e) => e.currentTarget.select()}
                   onChange={(e) => setCopiasUnidad(u.id, Number(e.target.value) || 0)}
-                  style={{ width: 56, textAlign: "center" }}
                 />
-                <button type="button" className="secondary" style={{ padding: "2px 8px" }} onClick={() => setCopiasUnidad(u.id, n + 1)}>
+                <button type="button" className="secondary pos-cantidad-boton" aria-label="Una etiqueta más" onClick={() => setCopiasUnidad(u.id, n + 1)}>
                   +
                 </button>
               </div>
@@ -1379,7 +1503,7 @@ function EtiquetaCard({ producto, onActualizado }: { producto: ProductoDetalle; 
           </div>
         )}
       </div>
-    </div>
+    </Seccion>
   );
 }
 
@@ -1417,43 +1541,47 @@ function SucursalesDisponiblesCard({
   }
 
   return (
-    <div className="card">
-      <h4 style={{ marginTop: 0, marginBottom: 4 }}>Sucursales disponibles</h4>
-      <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 0, marginBottom: 10 }}>
-        {producto.shopifyProductId
-          ? "Aplica a todas las variantes de este producto (talla, color, etc.)."
-          : "En que sucursales se puede vender este producto."}
-      </p>
-      <div style={{ display: "flex", gap: 12, fontSize: 13 }}>
-        <label style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-          <input type="radio" checked={modo === "todas"} onChange={() => setModo("todas")} style={{ width: "auto" }} />
-          Todas las sucursales
-        </label>
-        <label style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-          <input type="radio" checked={modo === "algunas"} onChange={() => setModo("algunas")} style={{ width: "auto" }} />
-          Solo algunas
-        </label>
-      </div>
-      {modo === "algunas" && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 8 }}>
-          {sucursales.map((s) => (
-            <label key={s.id} style={{ flexDirection: "row", alignItems: "center", gap: 4, fontSize: 13 }}>
-              <input
-                type="checkbox"
-                checked={sucursalIds.includes(s.id)}
-                onChange={() => alternarSucursal(s.id)}
-                style={{ width: "auto" }}
-              />
-              {s.nombre}
-            </label>
-          ))}
+    <Seccion
+      icono={<IconoSucursal />}
+      titulo="Sucursales disponibles"
+      subtitulo={
+        producto.shopifyProductId
+          ? "Aplica a todas las variantes de este producto (talla, color, etc.)"
+          : "En qué sucursales se puede vender este producto"
+      }
+    >
+      <div className="pd-inline">
+        <div className="np-segmentado">
+          <button type="button" className={modo === "todas" ? "activo" : ""} onClick={() => setModo("todas")}>
+            Todas las sucursales
+          </button>
+          <button type="button" className={modo === "algunas" ? "activo" : ""} onClick={() => setModo("algunas")}>
+            Solo algunas
+          </button>
         </div>
-      )}
-      {mensaje && <p className="badge success" style={{ marginTop: 10, width: "fit-content" }}>{mensaje}</p>}
-      <button type="button" style={{ marginTop: 12 }} onClick={guardar} disabled={guardando}>
-        {guardando ? "Guardando..." : "Guardar disponibilidad"}
-      </button>
-    </div>
+        {modo === "algunas" && (
+          <div className="np-chips" style={{ marginTop: 10 }}>
+            {sucursales.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                className={`np-chip-toggle ${sucursalIds.includes(s.id) ? "activo" : ""}`}
+                onClick={() => alternarSucursal(s.id)}
+              >
+                {sucursalIds.includes(s.id) ? "✓ " : ""}
+                {s.nombre}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="inv-acciones">
+        <button type="button" onClick={guardar} disabled={guardando}>
+          {guardando ? "Guardando..." : "Guardar disponibilidad"}
+        </button>
+        {mensaje && <span className="badge success">{mensaje}</span>}
+      </div>
+    </Seccion>
   );
 }
 
@@ -1509,13 +1637,16 @@ function VariantesCard({ producto, onActualizado }: { producto: ProductoDetalle;
   }
 
   return (
-    <div className="card">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-        <h4 style={{ margin: 0 }}>Variantes</h4>
+    <Seccion
+      icono={<IconoVariantes />}
+      titulo="Variantes"
+      subtitulo="Tallas, colores u otras opciones de este producto"
+      aside={
         <button className="secondary" type="button" onClick={() => setMostrarForm((v) => !v)}>
-          {mostrarForm ? "Cancelar" : "Agregar variante"}
+          {mostrarForm ? "Cancelar" : "+ Agregar variante"}
         </button>
-      </div>
+      }
+    >
       {!producto.shopifyProductId && (
         <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10, padding: "8px 12px", background: "var(--bg-secondary)", borderRadius: 6 }}>
           ℹ️ Las variantes se guardarán localmente. Se sincronizarán con Shopify cuando conectes este producto.
@@ -1523,7 +1654,7 @@ function VariantesCard({ producto, onActualizado }: { producto: ProductoDetalle;
       )}
 
       {mostrarForm && (
-        <form style={{ marginBottom: 12, maxWidth: 360, display: "flex", flexDirection: "column", gap: 12 }}>
+        <form onSubmit={guardar} style={{ marginBottom: 12, maxWidth: 360, display: "flex", flexDirection: "column", gap: 12 }}>
           {opciones.length > 0 ? (
             opciones.map((o) => (
               <div key={o.name} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -1618,6 +1749,6 @@ function VariantesCard({ producto, onActualizado }: { producto: ProductoDetalle;
           </tbody>
         </table>
       )}
-    </div>
+    </Seccion>
   );
 }
