@@ -42,6 +42,8 @@ export interface ReciboData {
   consecutivo: number;
   fecha: string;
   cajero: string;
+  // Cliente de la venta (si se eligió uno o se escribieron sus datos).
+  cliente?: { nombre: string; documento?: string | null; telefono?: string | null } | null;
   items: { nombre: string; cantidad: number; precioUnitario: number }[];
   total: number;
   metodoPago: string;

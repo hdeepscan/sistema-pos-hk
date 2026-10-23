@@ -2,14 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
 import { useSesionStore } from "../lib/store";
 import { leerArchivoComoDataUrl } from "../lib/files";
-import { generarSvgCodigoBarras, generarSKUCorto } from "../lib/barcode";
+import { generarSvgCodigoBarras, generarSKUCorto, generarCodigoBarrasEan13 } from "../lib/barcode";
 import { BotonesExportar } from "../lib/BotonesExportar";
 import { ModalImportarProductos } from "../lib/ModalImportarProductos";
 import type { ColumnaExport } from "../lib/export";
 import { mensajeError } from "../lib/errores";
 import { electronAPI } from "../lib/electron-api";
 import { NuevoProductoInteligente } from "./NuevoProductoInteligente";
-import { FILTRO_TODAS, coincideFiltroLote, opcionesFiltroLote, valoresDeTitulo } from "../lib/variantes-lote";
+import { FILTRO_TODAS, coincideFiltroLote, opcionesFiltroLote, skuConNuevosValores, valoresDeTitulo } from "../lib/variantes-lote";
 import type { EtiquetaFormato } from "../../../shared/api-types";
 import { formatearVariante } from "@sistema-pos/shared";
 import {
@@ -1582,6 +1582,104 @@ function SucursalesDisponiblesCard({
   );
 }
 
+// Formulario para editar una variante ya creada. Si cambian los valores (talla/color) y el SKU
+// se había armado con ellos, propone el SKU nuevo; el servidor garantiza que no se repita.
+function EditorVariante({
+  variante,
+  nombresOpciones,
+  onCancelar,
+  onGuardado,
+}: {
+  variante: Producto;
+  nombresOpciones: string[];
+  onCancelar: () => void;
+  onGuardado: (avisos: string[]) => void;
+}) {
+  const valoresIniciales = valoresDeTitulo(variante.varianteTitulo);
+  const cantidadOpciones = Math.max(valoresIniciales.length, 1);
+  const [valores, setValores] = useState<string[]>(
+    valoresIniciales.length > 0 ? valoresIniciales : [""]
+  );
+  const [skuManual, setSkuManual] = useState<string | null>(null);
+  const [codigoBarras, setCodigoBarras] = useState(variante.codigoBarras ?? "");
+  const [precio, setPrecio] = useState(String(Number(variante.precio)));
+  const [error, setError] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
+
+  const valoresLimpios = valores.map((v) => v.trim());
+  const cambiaronValores = valoresLimpios.join(" / ") !== (variante.varianteTitulo ?? "");
+  const skuAuto = cambiaronValores ? skuConNuevosValores(variante.sku, valoresIniciales, valoresLimpios) : null;
+  const sku = skuManual ?? skuAuto ?? variante.sku;
+
+  async function guardar(e: React.FormEvent) {
+    e.preventDefault();
+    if (valoresLimpios.some((v) => !v)) return setError("Completa el valor de cada opción");
+    if (!sku.trim()) return setError("El SKU no puede quedar vacío");
+    if (precio === "" || Number(precio) < 0) return setError("Pon un precio válido");
+    setGuardando(true);
+    setError(null);
+    try {
+      const { data } = await api.patch<{ avisos?: string[] }>(`/productos/${variante.id}/variante`, {
+        ...(cambiaronValores ? { valores: valoresLimpios } : {}),
+        sku: sku.trim(),
+        codigoBarras: codigoBarras.trim() || null,
+        precio: Number(precio),
+      });
+      onGuardado(data.avisos ?? []);
+    } catch (err) {
+      setError(mensajeError(err, "No se pudo guardar la variante"));
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <form className="var-editor" onSubmit={guardar}>
+      <div className="var-editor-titulo">Editar variante {formatearVariante(variante.varianteTitulo)}</div>
+      <div className="var-editor-campos">
+        {Array.from({ length: cantidadOpciones }, (_, i) => (
+          <label key={i} className="var-campo">
+            <span>{nombresOpciones[i] || (cantidadOpciones === 1 ? "Variante" : `Opción ${i + 1}`)}</span>
+            <input
+              value={valores[i] ?? ""}
+              onChange={(e) => setValores((p) => p.map((v, j) => (j === i ? e.target.value : v)))}
+              required
+            />
+          </label>
+        ))}
+        <label className="var-campo">
+          <span>SKU</span>
+          <input value={sku} onChange={(e) => setSkuManual(e.target.value)} required />
+          {skuManual === null && skuAuto && <small className="var-ayuda">Se actualiza solo con la variante</small>}
+        </label>
+        <label className="var-campo var-campo-ancho">
+          <span>Código de barras</span>
+          <div className="var-campo-fila">
+            <input value={codigoBarras} onChange={(e) => setCodigoBarras(e.target.value)} placeholder="Opcional" />
+            <button type="button" className="var-btn-generar" onClick={() => setCodigoBarras(generarCodigoBarrasEan13())}>
+              Generar
+            </button>
+          </div>
+        </label>
+        <label className="var-campo">
+          <span>Precio</span>
+          <input type="number" min="0" step="0.01" value={precio} onChange={(e) => setPrecio(e.target.value)} required />
+        </label>
+      </div>
+      <p className="var-nota">El SKU y el código de barras nunca se repiten: si ya existen en otro producto, el sistema lo ajusta o te avisa.</p>
+      {error && <span className="error-text">{error}</span>}
+      <div className="var-editor-acciones">
+        <button type="button" className="secondary" onClick={onCancelar} disabled={guardando}>
+          Cancelar
+        </button>
+        <button type="submit" disabled={guardando}>
+          {guardando ? "Guardando..." : "Guardar cambios"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 function VariantesCard({ producto, onActualizado }: { producto: ProductoDetalle; onActualizado: () => void }) {
   const [mostrarForm, setMostrarForm] = useState(false);
   const [opciones, setOpciones] = useState<{ name: string; values: string[] }[]>([]);
@@ -1592,6 +1690,19 @@ function VariantesCard({ producto, onActualizado }: { producto: ProductoDetalle;
   const [precio, setPrecio] = useState(String(producto.precio));
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
+
+  // El producto abierto también es una variante: se lista junto con las demás.
+  const todas = useMemo(
+    () =>
+      [producto, ...producto.variantes].sort((a, b) =>
+        (a.varianteTitulo ?? "").localeCompare(b.varianteTitulo ?? "", "es", { numeric: true })
+      ),
+    [producto]
+  );
+  const nombresOpciones =
+    opciones.length > 0 ? opciones.map((o) => o.name) : (producto.grupoOpciones ?? "").split("|").filter(Boolean);
 
   // Carga las opciones reales del producto en Shopify (Color, Talla...) para
   // pedir un valor por cada una y evitar el error "add option values".
@@ -1724,25 +1835,62 @@ function VariantesCard({ producto, onActualizado }: { producto: ProductoDetalle;
         </form>
       )}
 
-      {producto.variantes.length === 0 ? (
+      {aviso && <div className="var-aviso">{aviso}</div>}
+
+      {todas.length <= 1 && !producto.varianteTitulo ? (
         <p className="empty-state">Este producto no tiene otras variantes</p>
       ) : (
-        <table>
+        <table className="var-tabla">
           <thead>
             <tr>
               <th>Variante</th>
               <th>SKU</th>
+              <th>Código de barras</th>
               <th>Precio</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
-            {producto.variantes.map((v) => (
-              <tr key={v.id}>
-                <td>{formatearVariante(v.varianteTitulo) || "-"}</td>
-                <td>{v.sku}</td>
-                <td>${Number(v.precio).toLocaleString("es-CO")}</td>
-              </tr>
-            ))}
+            {todas.map((v) =>
+              editandoId === v.id ? (
+                <tr key={v.id} className="var-fila-editando">
+                  <td colSpan={5}>
+                    <EditorVariante
+                      variante={v}
+                      nombresOpciones={nombresOpciones}
+                      onCancelar={() => setEditandoId(null)}
+                      onGuardado={(avisos) => {
+                        setEditandoId(null);
+                        setAviso(avisos.length > 0 ? avisos.join(" ") : "✓ Variante actualizada");
+                        onActualizado();
+                      }}
+                    />
+                  </td>
+                </tr>
+              ) : (
+                <tr key={v.id}>
+                  <td>
+                    {formatearVariante(v.varianteTitulo) || "-"}
+                    {v.id === producto.id && <span className="var-actual">este</span>}
+                  </td>
+                  <td>{v.sku}</td>
+                  <td>{v.codigoBarras || <span className="var-vacio">—</span>}</td>
+                  <td>${Number(v.precio).toLocaleString("es-CO")}</td>
+                  <td className="var-acciones">
+                    <button
+                      type="button"
+                      className="var-btn-editar"
+                      onClick={() => {
+                        setAviso(null);
+                        setEditandoId(v.id);
+                      }}
+                    >
+                      ✏️ Editar variante
+                    </button>
+                  </td>
+                </tr>
+              )
+            )}
           </tbody>
         </table>
       )}

@@ -97,6 +97,7 @@ const DATOS_EJEMPLO: Omit<ReciboData, "plantilla"> = {
   consecutivo: 1042,
   fecha: new Date().toLocaleString("es-CO"),
   cajero: "Ana Cajera",
+  cliente: { nombre: "María Gómez", documento: "1.020.304.050" },
   items: [
     { nombre: "Camiseta Basica", cantidad: 2, precioUnitario: 35000 },
     { nombre: "Pantalon Slim", cantidad: 1, precioUnitario: 89000 },

@@ -257,6 +257,7 @@ export default function Ventas() {
         consecutivo: venta.consecutivo,
         fecha: new Date(venta.fecha).toLocaleString("es-CO"),
         cajero: venta.usuario?.nombre ?? "Desconocido",
+        cliente: venta.cliente?.nombre ? { nombre: venta.cliente.nombre } : null,
         items: venta.items.map((item) => ({
           nombre: item.producto?.nombre || item.descripcionLibre || "Venta libre",
           cantidad: item.cantidad,

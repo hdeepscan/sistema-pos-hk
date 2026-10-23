@@ -35,3 +35,26 @@ export function coincideFiltroLote(valores: string[], filtro: string): boolean {
   const indice = Number(filtro.slice(0, separador));
   return valores[indice] === filtro.slice(separador + 2);
 }
+
+// Abreviatura de un valor, igual que al crear el producto ("ROJO" -> "ROJ", "42" -> "42").
+export function abreviarValor(texto: string): string {
+  const limpio = texto.trim();
+  if (/^\d+$/.test(limpio)) return limpio;
+  return limpio
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .slice(0, 3)
+    .toUpperCase();
+}
+
+/**
+ * Si el SKU se armó con los valores de la variante ("BLU-L-ROJ" para "L / Rojo"), devuelve el SKU
+ * con los valores nuevos. null si el SKU no depende de los valores (no hace falta cambiarlo).
+ * Misma regla que usa el servidor al guardar.
+ */
+export function skuConNuevosValores(sku: string, valoresViejos: string[], valoresNuevos: string[]): string | null {
+  const viejo = valoresViejos.map(abreviarValor).filter(Boolean).join("-");
+  const nuevo = valoresNuevos.map(abreviarValor).filter(Boolean).join("-");
+  if (!viejo || !nuevo || viejo === nuevo) return null;
+  const m = sku.match(new RegExp(`^(.*)-${viejo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(-\\d+)?$`, "i"));
+  return m ? `${m[1]}-${nuevo}` : null;
+}

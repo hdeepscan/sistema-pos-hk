@@ -301,6 +301,9 @@ export function construirReciboHtml(data: ReciboData): string {
         <div class="center">No. ${data.consecutivo}</div>
         <div class="center" style="font-size:10px">${escapeHtml(data.fecha)}</div>
         <div style="font-size:10px">Cajero: ${escapeHtml(data.cajero)}</div>
+        ${data.cliente?.nombre ? `<div style="font-size:10px">Cliente: <strong>${escapeHtml(data.cliente.nombre)}</strong></div>` : ""}
+        ${data.cliente?.documento ? `<div style="font-size:10px">CC/NIT: ${escapeHtml(data.cliente.documento)}</div>` : ""}
+        ${data.cliente?.telefono ? `<div style="font-size:10px">Tel. cliente: ${escapeHtml(data.cliente.telefono)}</div>` : ""}
         <hr />
         <table>${filas}</table>
         <hr />

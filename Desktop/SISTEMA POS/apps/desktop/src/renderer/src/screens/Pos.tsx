@@ -34,6 +34,8 @@ interface ItemCarrito {
   imagenUrl: string | null;
   cantidad: number;
   precioUnitario: number;
+  // Precio de lista antes de editarlo a mano en el carrito (para mostrarlo tachado).
+  precioOriginal?: number;
   stockSucursal?: number;
 }
 
@@ -41,6 +43,8 @@ interface Cliente {
   id: string;
   nombre: string;
   puntos: number;
+  cedula?: string | null;
+  telefono?: string | null;
 }
 
 interface VentaEnEspera {
@@ -113,6 +117,11 @@ export default function Pos() {
   const [descuentoValor, setDescuentoValor] = useState("");
   const [puntosARedimir, setPuntosARedimir] = useState("");
   const [mostrarModalClaveDescuento, setMostrarModalClaveDescuento] = useState(false);
+  // Edición del precio de un producto en el carrito (lápiz junto al precio).
+  const [editandoPrecioId, setEditandoPrecioId] = useState<string | null>(null);
+  const [precioEditado, setPrecioEditado] = useState("");
+  // Precio rebajado esperando la clave de autorización.
+  const [precioPendiente, setPrecioPendiente] = useState<{ productoId: string; valor: number } | null>(null);
   const [claveDescuentoIngresada, setClaveDescuentoIngresada] = useState("");
   const [esAdministrador, setEsAdministrador] = useState(false);
   const [fidelizacion, setFidelizacion] = useState<{ pesosPorPunto: number | null; valorPunto: number | null }>({
@@ -346,6 +355,39 @@ export default function Pos() {
     }
   }
 
+  function aplicarPrecio(productoId: string, valor: number) {
+    setCarrito((prev) =>
+      prev.map((i) => {
+        if (i.productoId !== productoId) return i;
+        const original = i.precioOriginal ?? i.precioUnitario;
+        return { ...i, precioUnitario: valor, precioOriginal: valor === original ? undefined : original };
+      })
+    );
+  }
+
+  async function confirmarPrecio(item: ItemCarrito) {
+    const valor = Number(precioEditado);
+    if (precioEditado.trim() === "" || !Number.isFinite(valor) || valor < 0) {
+      setError("Escribe un precio válido");
+      return;
+    }
+    setError(null);
+    setEditandoPrecioId(null);
+    if (valor === item.precioUnitario) return;
+    // Bajar el precio es un descuento: si el usuario no es administrador y hay clave, se pide.
+    const original = item.precioOriginal ?? item.precioUnitario;
+    if (valor < original && !esAdministrador) {
+      const config = await electronAPI.getConfig();
+      if (config.descuentosClave) {
+        setPrecioPendiente({ productoId: item.productoId, valor });
+        setClaveDescuentoIngresada("");
+        setMostrarModalClaveDescuento(true);
+        return;
+      }
+    }
+    aplicarPrecio(item.productoId, valor);
+  }
+
   function limpiarCarrito() {
     setCarrito([]);
     setDescuentoValor("");
@@ -451,6 +493,15 @@ export default function Pos() {
       consecutivo: consecutivo || 0,
       fecha: new Date().toLocaleString("es-CO"),
       cajero: usuario?.nombre ?? "",
+      cliente: (() => {
+        // Cliente elegido de la lista, o los datos escritos en "Agregar datos del cliente".
+        const c = clienteIdEfectivo ? clientes.find((x) => x.id === clienteIdEfectivo) : undefined;
+        if (c) return { nombre: c.nombre, documento: c.cedula ?? null, telefono: c.telefono ?? null };
+        if (contactoCliente?.nombre) {
+          return { nombre: contactoCliente.nombre, documento: contactoCliente.cedula ?? null, telefono: contactoCliente.telefono ?? null };
+        }
+        return null;
+      })(),
       items: carrito.map((i) => ({
         nombre: i.esLibre ? `Venta Libre: ${i.nombre}` : i.nombre,
         cantidad: i.cantidad,
@@ -728,7 +779,60 @@ export default function Pos() {
                         </button>
                       </div>
                     </td>
-                    <td>${i.precioUnitario.toLocaleString("es-CO")}</td>
+                    <td>
+                      {editandoPrecioId === i.productoId ? (
+                        <div className="pos-precio-edicion">
+                          <input
+                            className="pos-precio-input"
+                            type="number"
+                            inputMode="decimal"
+                            min={0}
+                            value={precioEditado}
+                            autoFocus
+                            aria-label={`Precio de ${i.nombre}`}
+                            onFocus={(e) => e.currentTarget.select()}
+                            onChange={(e) => setPrecioEditado(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                void confirmarPrecio(i);
+                              } else if (e.key === "Escape") {
+                                setEditandoPrecioId(null);
+                              }
+                            }}
+                          />
+                          <button type="button" className="pos-precio-boton pos-precio-ok" aria-label="Guardar precio" onClick={() => void confirmarPrecio(i)}>
+                            ✓
+                          </button>
+                          <button type="button" className="pos-precio-boton" aria-label="Cancelar" onClick={() => setEditandoPrecioId(null)}>
+                            ✕
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="pos-precio">
+                          <div>
+                            <div>${i.precioUnitario.toLocaleString("es-CO")}</div>
+                            {i.precioOriginal !== undefined && (
+                              <div className="pos-precio-original">${i.precioOriginal.toLocaleString("es-CO")}</div>
+                            )}
+                          </div>
+                          {puedeDescuentos && (
+                            <button
+                              type="button"
+                              className="pos-precio-lapiz"
+                              title="Editar precio"
+                              aria-label={`Editar precio de ${i.nombre}`}
+                              onClick={() => {
+                                setPrecioEditado(String(i.precioUnitario));
+                                setEditandoPrecioId(i.productoId);
+                              }}
+                            >
+                              ✏️
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </td>
                     <td>${(i.cantidad * i.precioUnitario).toLocaleString("es-CO")}</td>
                     <td>
                       <button className="secondary" onClick={() => actualizarCantidad(i.productoId, 0)} type="button">
@@ -991,10 +1095,16 @@ export default function Pos() {
 
       {/* Modal de clave de descuento */}
       {mostrarModalClaveDescuento && (
-        <div className="modal-backdrop" onClick={() => setMostrarModalClaveDescuento(false)}>
+        <div
+          className="modal-backdrop"
+          onClick={() => {
+            setMostrarModalClaveDescuento(false);
+            setPrecioPendiente(null);
+          }}
+        >
           <div className="card" style={{ width: 340 }} onClick={(e) => e.stopPropagation()}>
             <h3 style={{ marginTop: 0 }}>Autorización requerida</h3>
-            <p>Este usuario necesita ingresar la clave de autorización para aplicar descuentos.</p>
+            <p>Este usuario necesita ingresar la clave de autorización para {precioPendiente ? "bajar el precio de un producto" : "aplicar descuentos"}.</p>
             <input
               type="password"
               placeholder="Ingresa la clave"
@@ -1009,6 +1119,8 @@ export default function Pos() {
                 onClick={async () => {
                   const config = await electronAPI.getConfig();
                   if (claveDescuentoIngresada === config.descuentosClave) {
+                    if (precioPendiente) aplicarPrecio(precioPendiente.productoId, precioPendiente.valor);
+                    setPrecioPendiente(null);
                     setMostrarModalClaveDescuento(false);
                     setClaveDescuentoIngresada("");
                   } else {
@@ -1025,7 +1137,9 @@ export default function Pos() {
                 className="secondary"
                 onClick={() => {
                   setMostrarModalClaveDescuento(false);
-                  setDescuentoValor("");
+                  // Si la clave era para un precio rebajado, se descarta solo ese cambio.
+                  if (precioPendiente) setPrecioPendiente(null);
+                  else setDescuentoValor("");
                   setClaveDescuentoIngresada("");
                   setError(null);
                 }}

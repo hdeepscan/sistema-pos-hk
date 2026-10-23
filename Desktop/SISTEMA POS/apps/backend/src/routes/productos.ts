@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import type { Prisma } from "@prisma/client";
+import { z } from "zod";
 import {
   CrearProductoSchema,
   DuplicarProductoSchema,
@@ -25,6 +26,25 @@ import {
 } from "../lib/shopify.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
 import { mensajeDeValidacion } from "../lib/errores.js";
+import {
+  actualizarVarianteEnShopify,
+  codigoBarrasEnUso,
+  codigoBarrasNuevo,
+  ShopifyRechazoVariante,
+  skuConNuevosValores,
+  skuDisponible,
+} from "../lib/variante-edicion.js";
+
+const EditarVarianteSchema = z.object({
+  valores: z.array(z.string().trim().min(1, "Completa el valor de cada opción").max(80)).min(1).max(3).optional(),
+  sku: z.string().trim().min(1, "El SKU no puede quedar vacío").max(64).optional(),
+  codigoBarras: z.string().trim().max(64).nullable().optional(),
+  precio: z.number().nonnegative().optional(),
+});
+
+function valoresDeTitulo(titulo: string | null): string[] {
+  return titulo ? titulo.split("/").map((v) => v.trim()).filter(Boolean) : [];
+}
 
 // Genera un SKU corto aleatorio (8 caracteres: 4 letras + 4 números)
 // Mucho más compacto que EAN-13 - ideal para etiquetas térmicas
@@ -865,6 +885,123 @@ export async function productosRoutes(app: FastifyInstance) {
     });
 
     return { ok: true, shopifyError, mensaje: "Variante eliminada del POS y de Shopify." };
+  });
+
+  // Edita UNA variante: sus valores (talla/color), SKU, código de barras y precio. Si el SKU se
+  // armó con los valores viejos se actualiza solo; el SKU y el código nunca quedan repetidos.
+  app.patch("/productos/:id/variante", async (request, reply) => {
+    const { empresaId } = request.user;
+    if (!request.user.permisos.includes("productos.administrar")) {
+      return reply.code(403).send({ error: "No tienes permiso para administrar productos" });
+    }
+    const { id } = request.params as { id: string };
+    const parsed = EditarVarianteSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: mensajeDeValidacion(parsed.error) });
+    const cuerpo = parsed.data;
+
+    const variante = await prisma.producto.findFirst({ where: { id, empresaId } });
+    if (!variante) return reply.code(404).send({ error: "Variante no encontrada" });
+
+    const avisos: string[] = [];
+    const valoresViejos = valoresDeTitulo(variante.varianteTitulo);
+    const valoresNuevos = cuerpo.valores?.map((v) => v.trim());
+    const tituloNuevo = valoresNuevos ? valoresNuevos.join(" / ") : variante.varianteTitulo;
+    const cambiaTitulo = !!valoresNuevos && tituloNuevo !== variante.varianteTitulo;
+
+    if (cambiaTitulo && (variante.shopifyProductId || variante.grupoVariantes)) {
+      const hermanos = await prisma.producto.findMany({
+        where: {
+          empresaId,
+          id: { not: id },
+          ...(variante.shopifyProductId
+            ? { shopifyProductId: variante.shopifyProductId }
+            : { grupoVariantes: variante.grupoVariantes }),
+        },
+        select: { varianteTitulo: true },
+      });
+      if (hermanos.some((h) => (h.varianteTitulo ?? "").toLowerCase() === tituloNuevo!.toLowerCase())) {
+        return reply.code(409).send({ error: `Ya existe otra variante "${tituloNuevo}" en este producto.` });
+      }
+    }
+
+    // SKU: el que escribió el usuario; si no lo tocó, se ajusta solo cuando venía de los valores viejos.
+    let sku = variante.sku;
+    if (cuerpo.sku && cuerpo.sku !== variante.sku) {
+      sku = cuerpo.sku;
+    } else if (cambiaTitulo) {
+      sku = skuConNuevosValores(variante.sku, valoresViejos, valoresNuevos!) ?? variante.sku;
+    }
+    if (sku !== variante.sku) {
+      const libre = await skuDisponible(empresaId, sku, id);
+      if (libre !== sku) avisos.push(`El SKU ${sku} ya lo usa otro producto; se guardó como ${libre}.`);
+      sku = libre;
+    } else if (await prisma.producto.findFirst({ where: { empresaId, sku, id: { not: id } }, select: { id: true } })) {
+      sku = await skuDisponible(empresaId, sku, id);
+    }
+
+    // Código de barras: si el usuario escribe uno que ya existe se le avisa (va impreso en etiquetas);
+    // si el que ya tenía está repetido con otro producto, se genera uno nuevo.
+    let codigoBarras = variante.codigoBarras;
+    if (cuerpo.codigoBarras !== undefined && (cuerpo.codigoBarras || null) !== variante.codigoBarras) {
+      codigoBarras = cuerpo.codigoBarras || null;
+      if (codigoBarras) {
+        const otro = await codigoBarrasEnUso(empresaId, codigoBarras, id);
+        if (otro) {
+          return reply.code(409).send({
+            error: `El código de barras ${codigoBarras} ya lo usa ${otro.nombre}${otro.varianteTitulo ? ` (${otro.varianteTitulo})` : ""}. Usa otro o deja el anterior.`,
+            codigo: "CODIGO_BARRAS_DUPLICADO",
+          });
+        }
+      }
+    } else if (codigoBarras && (await codigoBarrasEnUso(empresaId, codigoBarras, id))) {
+      const anterior = codigoBarras;
+      codigoBarras = await codigoBarrasNuevo(empresaId, id);
+      avisos.push(`El código de barras ${anterior} estaba repetido con otro producto; se cambió por ${codigoBarras}.`);
+    }
+
+    const precio = cuerpo.precio ?? Number(variante.precio);
+
+    let shopifyError: string | null = null;
+    if (variante.shopifyProductId && variante.shopifyVariantId) {
+      try {
+        await actualizarVarianteEnShopify(empresaId, variante.shopifyProductId, variante.shopifyVariantId, {
+          valores: cambiaTitulo ? valoresNuevos : undefined,
+          sku,
+          codigoBarras,
+          precio,
+        });
+      } catch (err) {
+        request.log.error(err);
+        // Si Shopify rechaza el cambio no se guarda nada, para no dejar los dos lados distintos.
+        if (err instanceof ShopifyRechazoVariante) {
+          return reply.code(409).send({ error: `Shopify no aceptó el cambio: ${err.message}` });
+        }
+        shopifyError = err instanceof Error ? err.message : "No se pudo actualizar en Shopify";
+      }
+    }
+
+    let actualizada;
+    try {
+      actualizada = await prisma.producto.update({
+        where: { id },
+        data: { varianteTitulo: tituloNuevo, sku, codigoBarras, precio },
+      });
+    } catch (err: any) {
+      if (err?.code === "P2002") return reply.code(409).send({ error: "Ese SKU acaba de ser usado por otro producto. Intenta de nuevo." });
+      throw err;
+    }
+
+    registrarAuditoria({
+      empresaId,
+      usuarioId: request.user.usuarioId,
+      accion: "EDITAR_VARIANTE",
+      entidad: "Producto",
+      entidadId: id,
+      detalle: `${variante.nombre}: ${variante.varianteTitulo ?? "-"} → ${tituloNuevo ?? "-"} · SKU ${variante.sku} → ${sku}`,
+    });
+
+    if (shopifyError) avisos.push(`Se guardó en CENTRALA, pero no se pudo actualizar en Shopify: ${shopifyError}`);
+    return { ...actualizada, avisos };
   });
 
   // Opciones del producto en Shopify (Color, Talla...), con sus valores
