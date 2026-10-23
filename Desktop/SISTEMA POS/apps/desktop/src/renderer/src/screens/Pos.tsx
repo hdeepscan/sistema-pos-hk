@@ -693,18 +693,37 @@ export default function Pos() {
                       </div>
                     </td>
                     <td>
-                      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                        <button className="secondary" type="button" style={{ padding: "2px 8px" }} onClick={() => actualizarCantidad(i.productoId, i.cantidad - 1)}>
+                      <div className="pos-cantidad">
+                        <button
+                          className="secondary pos-cantidad-boton"
+                          type="button"
+                          aria-label="Restar una unidad"
+                          onClick={() => actualizarCantidad(i.productoId, i.cantidad - 1)}
+                        >
                           −
                         </button>
                         <input
+                          className="pos-cantidad-input"
                           type="number"
+                          inputMode="numeric"
                           min={1}
                           value={i.cantidad}
-                          onChange={(e) => actualizarCantidad(i.productoId, Number(e.target.value))}
-                          style={{ width: 44, textAlign: "center" }}
+                          aria-label={`Cantidad de ${i.nombre}`}
+                          // Al enfocar se selecciona el número para escribir encima.
+                          onFocus={(e) => e.currentTarget.select()}
+                          onChange={(e) => {
+                            // Campo vacío mientras se escribe: no se quita el producto (para quitarlo está "Quitar" o el botón −).
+                            if (e.target.value === "") return;
+                            const n = Math.floor(Number(e.target.value));
+                            if (Number.isFinite(n) && n >= 1) actualizarCantidad(i.productoId, n);
+                          }}
                         />
-                        <button className="secondary" type="button" style={{ padding: "2px 8px" }} onClick={() => actualizarCantidad(i.productoId, i.cantidad + 1)}>
+                        <button
+                          className="secondary pos-cantidad-boton"
+                          type="button"
+                          aria-label="Sumar una unidad"
+                          onClick={() => actualizarCantidad(i.productoId, i.cantidad + 1)}
+                        >
                           +
                         </button>
                       </div>
