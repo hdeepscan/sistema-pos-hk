@@ -27,6 +27,18 @@ export function skuConNuevosValores(sku: string, valoresViejos: string[], valore
   return `${m[1]}-${nuevo}`;
 }
 
+/**
+ * SKU para una variante nueva: el prefijo del SKU del producto (sin la parte de sus valores)
+ * más las abreviaturas de los valores nuevos. Ej. producto "BLU-L-ROJ" (L / Rojo) y variante
+ * "M / Azul" -> "BLU-M-AZU". Si el SKU del producto no lleva sus valores: "ABCD1234-M-AZU".
+ */
+export function skuParaVariante(skuProducto: string, valoresProducto: string[], valoresNuevos: string[]): string {
+  const viejo = valoresProducto.map(abreviarValor).filter(Boolean).join("-");
+  const nuevo = valoresNuevos.map(abreviarValor).filter(Boolean).join("-") || "VAR";
+  const m = viejo ? skuProducto.match(new RegExp(`^(.*)-${viejo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(-\\d+)?$`, "i")) : null;
+  return `${m ? m[1] : skuProducto}-${nuevo}`;
+}
+
 /** Devuelve `base`, o `base-2`, `base-3`... el primero que ningún otro producto de la empresa use. */
 export async function skuDisponible(empresaId: string, base: string, productoId: string): Promise<string> {
   for (let i = 1; i < 500; i++) {

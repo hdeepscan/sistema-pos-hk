@@ -476,7 +476,8 @@ export type AgregarProductoColeccionInput = z.infer<typeof AgregarProductoColecc
 
 export const CrearVarianteSchema = z.object({
   opcionValor: z.string().min(1),
-  sku: z.string().min(1),
+  // Opcional: si no viene, el sistema lo arma con el SKU del producto y los valores de la variante.
+  sku: z.string().trim().optional(),
   precio: z.number().nonnegative(),
   codigoBarras: z.string().optional(),
 });

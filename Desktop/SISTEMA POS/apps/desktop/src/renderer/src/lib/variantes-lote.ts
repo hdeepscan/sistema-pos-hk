@@ -58,3 +58,15 @@ export function skuConNuevosValores(sku: string, valoresViejos: string[], valore
   const m = sku.match(new RegExp(`^(.*)-${viejo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(-\\d+)?$`, "i"));
   return m ? `${m[1]}-${nuevo}` : null;
 }
+
+/**
+ * SKU para una variante nueva: el prefijo del SKU del producto (sin sus valores) más las
+ * abreviaturas de los valores nuevos. Ej. "BLU-L-ROJ" (L / Rojo) + "M / Azul" -> "BLU-M-AZU".
+ * Misma regla que usa el servidor cuando no se envía SKU.
+ */
+export function skuParaVariante(skuProducto: string, valoresProducto: string[], valoresNuevos: string[]): string {
+  const viejo = valoresProducto.map(abreviarValor).filter(Boolean).join("-");
+  const nuevo = valoresNuevos.map(abreviarValor).filter(Boolean).join("-") || "VAR";
+  const m = viejo ? skuProducto.match(new RegExp(`^(.*)-${viejo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(-\\d+)?$`, "i")) : null;
+  return `${m ? m[1] : skuProducto}-${nuevo}`;
+}

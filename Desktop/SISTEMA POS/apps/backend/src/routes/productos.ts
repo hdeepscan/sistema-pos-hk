@@ -33,6 +33,7 @@ import {
   ShopifyRechazoVariante,
   skuConNuevosValores,
   skuDisponible,
+  skuParaVariante,
 } from "../lib/variante-edicion.js";
 
 const EditarVarianteSchema = z.object({
@@ -1361,10 +1362,31 @@ export async function productosRoutes(app: FastifyInstance) {
     const producto = await prisma.producto.findFirst({ where: { id, empresaId } });
     if (!producto) return reply.code(404).send({ error: "Producto no encontrado" });
 
-    const existente = await prisma.producto.findUnique({
-      where: { empresaId_sku: { empresaId, sku: parsed.data.sku } },
-    });
-    if (existente) return reply.code(409).send({ error: "Ya existe un producto con ese SKU" });
+    // SKU: si no lo escriben se arma solo; si ya lo usa otro producto se le agrega -2, -3...
+    const avisos: string[] = [];
+    const skuPedido =
+      parsed.data.sku ||
+      skuParaVariante(producto.sku, valoresDeTitulo(producto.varianteTitulo), valoresDeTitulo(parsed.data.opcionValor));
+    const skuFinal = await skuDisponible(empresaId, skuPedido, "");
+    if (parsed.data.sku && skuFinal !== parsed.data.sku) {
+      avisos.push(`El SKU ${parsed.data.sku} ya lo usa otro producto; se guardó como ${skuFinal}.`);
+    }
+    const codigoBarras = parsed.data.codigoBarras?.trim() || undefined;
+    if (codigoBarras) {
+      const otro = await codigoBarrasEnUso(empresaId, codigoBarras, "");
+      if (otro) {
+        return reply.code(409).send({
+          error: `El código de barras ${codigoBarras} ya lo usa ${otro.nombre}${otro.varianteTitulo ? ` (${otro.varianteTitulo})` : ""}. Usa otro.`,
+          codigo: "CODIGO_BARRAS_DUPLICADO",
+        });
+      }
+    }
+    const datosVariante = {
+      opcionValor: parsed.data.opcionValor as string,
+      sku: skuFinal,
+      precio: parsed.data.precio as number,
+      codigoBarras,
+    };
 
     // Intentar crear en Shopify solo si el producto está vinculado
     let ids: { shopifyVariantId: string; shopifyInventoryItemId: string } | null = null;
@@ -1372,7 +1394,7 @@ export async function productosRoutes(app: FastifyInstance) {
 
     if (producto.shopifyProductId) {
       try {
-        ids = await crearVarianteEnShopify(empresaId, producto.shopifyProductId, parsed.data as any);
+        ids = await crearVarianteEnShopify(empresaId, producto.shopifyProductId, datosVariante);
       } catch (err) {
         request.log.error(err);
         const mensaje = err instanceof Error ? err.message : "";
@@ -1399,12 +1421,12 @@ export async function productosRoutes(app: FastifyInstance) {
       const nueva = await tx.producto.create({
         data: {
           empresaId,
-          sku: parsed.data.sku,
+          sku: skuFinal,
           nombre: producto.nombre,
           categoria: producto.categoria,
           precio: parsed.data.precio,
           costo: producto.costo,
-          codigoBarras: parsed.data.codigoBarras,
+          codigoBarras: codigoBarras ?? null,
           varianteTitulo: parsed.data.opcionValor,
           grupoOpciones: producto.grupoOpciones,
           grupoVariantes: producto.grupoVariantes,
@@ -1434,11 +1456,12 @@ export async function productosRoutes(app: FastifyInstance) {
     if (shopifyError) {
       return reply.code(201).send({
         ...nuevaVariante,
+        avisos,
         _warning: `Variante creada localmente, pero no se pudo sincronizar con Shopify: ${shopifyError}. Se sincronizará cuando conectes este producto.`,
       });
     }
 
-    return reply.code(201).send(nuevaVariante);
+    return reply.code(201).send({ ...nuevaVariante, avisos });
   });
 
   // Importar productos desde CSV

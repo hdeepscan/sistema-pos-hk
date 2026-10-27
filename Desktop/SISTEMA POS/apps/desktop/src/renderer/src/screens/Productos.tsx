@@ -9,7 +9,14 @@ import type { ColumnaExport } from "../lib/export";
 import { mensajeError } from "../lib/errores";
 import { electronAPI } from "../lib/electron-api";
 import { NuevoProductoInteligente } from "./NuevoProductoInteligente";
-import { FILTRO_TODAS, coincideFiltroLote, opcionesFiltroLote, skuConNuevosValores, valoresDeTitulo } from "../lib/variantes-lote";
+import {
+  FILTRO_TODAS,
+  coincideFiltroLote,
+  opcionesFiltroLote,
+  skuConNuevosValores,
+  skuParaVariante,
+  valoresDeTitulo,
+} from "../lib/variantes-lote";
 import type { EtiquetaFormato } from "../../../shared/api-types";
 import { formatearVariante } from "@sistema-pos/shared";
 import {
@@ -1682,10 +1689,11 @@ function EditorVariante({
 
 function VariantesCard({ producto, onActualizado }: { producto: ProductoDetalle; onActualizado: () => void }) {
   const [mostrarForm, setMostrarForm] = useState(false);
-  const [opciones, setOpciones] = useState<{ name: string; values: string[] }[]>([]);
+  const [opcionesShopify, setOpciones] = useState<{ name: string; values: string[] }[]>([]);
   const [valores, setValores] = useState<Record<string, string>>({});
   const [modoOtro, setModoOtro] = useState<Record<string, boolean>>({});
-  const [sku, setSku] = useState("");
+  // null = el SKU se arma solo con los valores elegidos; texto = lo escribió el usuario.
+  const [skuManual, setSkuManual] = useState<string | null>(null);
   const [codigoBarras, setCodigoBarras] = useState("");
   const [precio, setPrecio] = useState(String(producto.precio));
   const [error, setError] = useState<string | null>(null);
@@ -1701,8 +1709,16 @@ function VariantesCard({ producto, onActualizado }: { producto: ProductoDetalle;
       ),
     [producto]
   );
-  const nombresOpciones =
-    opciones.length > 0 ? opciones.map((o) => o.name) : (producto.grupoOpciones ?? "").split("|").filter(Boolean);
+  // Opciones del producto: las de Shopify o, si no está en Shopify, las que se definieron al
+  // crearlo (Talla|Color) con los valores que ya usan sus variantes.
+  const opciones = useMemo(() => {
+    if (opcionesShopify.length > 0) return opcionesShopify;
+    const nombres = (producto.grupoOpciones ?? "").split("|").filter(Boolean);
+    const valoresPorVariante = todas.map((v) => valoresDeTitulo(v.varianteTitulo));
+    if (nombres.length === 0 || valoresPorVariante.some((vs) => vs.length !== nombres.length)) return [];
+    return nombres.map((name, i) => ({ name, values: [...new Set(valoresPorVariante.map((vs) => vs[i]))] }));
+  }, [opcionesShopify, producto.grupoOpciones, todas]);
+  const nombresOpciones = opciones.map((o) => o.name);
 
   // Carga las opciones reales del producto en Shopify (Color, Talla...) para
   // pedir un valor por cada una y evitar el error "add option values".
@@ -1714,10 +1730,25 @@ function VariantesCard({ producto, onActualizado }: { producto: ProductoDetalle;
       .catch(() => setOpciones([]));
   }, [producto.id, producto.shopifyProductId]);
 
+  // Une los valores en el orden de las opciones del producto ("Rojo / M").
+  const listaValores = opciones.length > 0 ? opciones.map((o) => (valores[o.name] ?? "").trim()) : [(valores.__unico ?? "").trim()];
+  const skuAuto = listaValores.some(Boolean)
+    ? skuParaVariante(producto.sku, valoresDeTitulo(producto.varianteTitulo), listaValores.filter(Boolean))
+    : "";
+  const sku = skuManual ?? skuAuto;
+
+  function abrirFormulario() {
+    if (!mostrarForm) {
+      setSkuManual(null);
+      setCodigoBarras(generarCodigoBarrasEan13());
+      setPrecio(String(producto.precio));
+      setError(null);
+    }
+    setMostrarForm((v) => !v);
+  }
+
   async function guardar(e: React.FormEvent) {
     e.preventDefault();
-    // Une los valores en el orden de las opciones del producto ("Rojo / M").
-    const listaValores = opciones.length > 0 ? opciones.map((o) => (valores[o.name] ?? "").trim()) : [(valores.__unico ?? "").trim()];
     if (listaValores.some((v) => !v)) {
       setError("Completa el valor de cada opcion");
       return;
@@ -1725,17 +1756,18 @@ function VariantesCard({ producto, onActualizado }: { producto: ProductoDetalle;
     setGuardando(true);
     setError(null);
     try {
-      await api.post(`/productos/${producto.id}/variantes`, {
+      const { data } = await api.post<{ sku: string; avisos?: string[]; _warning?: string }>(`/productos/${producto.id}/variantes`, {
         opcionValor: listaValores.join(" / "),
-        sku,
-        codigoBarras: codigoBarras || undefined,
+        sku: sku.trim() || undefined,
+        codigoBarras: codigoBarras.trim() || undefined,
         precio: Number(precio),
       });
       setMostrarForm(false);
       setValores({});
       setModoOtro({});
-      setSku("");
+      setSkuManual(null);
       setCodigoBarras("");
+      setAviso([`✓ Variante creada con SKU ${data.sku}.`, ...(data.avisos ?? []), data._warning ?? ""].filter(Boolean).join(" "));
       onActualizado();
     } catch (err: any) {
       setError(mensajeError(err, "No se pudo crear la variante"));
@@ -1750,7 +1782,7 @@ function VariantesCard({ producto, onActualizado }: { producto: ProductoDetalle;
       titulo="Variantes"
       subtitulo="Tallas, colores u otras opciones de este producto"
       aside={
-        <button className="secondary" type="button" onClick={() => setMostrarForm((v) => !v)}>
+        <button className="secondary" type="button" onClick={abrirFormulario}>
           {mostrarForm ? "Cancelar" : "+ Agregar variante"}
         </button>
       }
@@ -1812,15 +1844,28 @@ function VariantesCard({ producto, onActualizado }: { producto: ProductoDetalle;
           )}
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
-              SKU nuevo
+              SKU
             </label>
-            <input value={sku} onChange={(e) => setSku(e.target.value)} required style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
+            <input
+              value={sku}
+              onChange={(e) => setSkuManual(e.target.value)}
+              placeholder="Se genera solo al elegir la variante"
+              style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }}
+            />
+            <small style={{ fontSize: 11, color: "#2563eb" }}>
+              {skuManual === null ? "Se genera solo. Puedes cambiarlo si quieres." : "Si ya existe, el sistema le agrega un número para que no se repita."}
+            </small>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
-              Codigo de barras (opcional)
+              Codigo de barras
             </label>
-            <input value={codigoBarras} onChange={(e) => setCodigoBarras(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
+            <div style={{ display: "flex", gap: 6 }}>
+              <input value={codigoBarras} onChange={(e) => setCodigoBarras(e.target.value)} placeholder="Opcional" style={{ flex: 1, height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
+              <button type="button" className="var-btn-generar-nuevo" onClick={() => setCodigoBarras(generarCodigoBarrasEan13())}>
+                Generar
+              </button>
+            </div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
