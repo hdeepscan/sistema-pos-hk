@@ -14,6 +14,8 @@ interface ResultadoImportacion {
   revisados: number;
   importados: number;
   productos: ResultadoProducto[];
+  // Variantes nuevas creadas en Shopify en productos que ya estaban en CENTRALA.
+  variantesNuevas?: { producto: string; variante: string; sku: string }[];
 }
 
 const ETIQUETA: Record<ResultadoProducto['estado'], string> = {
@@ -49,7 +51,8 @@ export default function ImportarProductosShopify() {
       <div className="card">
         <h3 style={{ marginTop: 0 }}>Productos creados en Shopify</h3>
         <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 0 }}>
-          Cada minuto CENTRALA trae automáticamente los productos nuevos creados en Shopify. Con este botón revisas
+          Cada minuto CENTRALA trae automáticamente los productos y las variantes nuevas creadas en Shopify (si una
+          variante viene sin SKU, CENTRALA le genera uno y lo guarda también en Shopify). Con este botón revisas
           todo el catálogo de Shopify, importas lo que falte (con su stock de la sucursal ecommerce) y ves por qué
           algún producto no se pudo importar.
         </p>
@@ -66,7 +69,24 @@ export default function ImportarProductosShopify() {
               {resultado.revisados} producto(s) revisados en Shopify · {resultado.importados} importado(s)
               {conProblema.length > 0 && ` · ${conProblema.length} sin importar`}
             </p>
-            {resultado.productos.length === 0 && <p style={{ margin: 0 }}>Todos los productos de Shopify ya están en CENTRALA.</p>}
+            {resultado.productos.length === 0 && !resultado.variantesNuevas?.length && (
+              <p style={{ margin: 0 }}>Todos los productos de Shopify ya están en CENTRALA.</p>
+            )}
+            {!!resultado.variantesNuevas?.length && (
+              <div style={{ margin: '0 0 10px' }}>
+                <p style={{ margin: '0 0 4px', color: 'var(--success, #16a34a)' }}>
+                  {resultado.variantesNuevas.length} variante(s) nueva(s) traída(s) a productos que ya existían:
+                </p>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  {resultado.variantesNuevas.map((v) => (
+                    <li key={v.sku}>
+                      {v.producto}
+                      {v.variante ? ` (${v.variante})` : ''} · SKU {v.sku}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {[...importados, ...conProblema].length > 0 && (
               <table style={{ width: '100%' }}>

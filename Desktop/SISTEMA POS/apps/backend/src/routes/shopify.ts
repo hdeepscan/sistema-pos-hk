@@ -604,7 +604,11 @@ export async function shopifyRoutes(app: FastifyInstance) {
     }
     try {
       const { importarProductosFaltantesDeShopify } = await import("../lib/shopify-productos-nuevos.js");
-      return await importarProductosFaltantesDeShopify(request.user.empresaId, { todos: true });
+      const { importarVariantesNuevasDeShopify } = await import("../lib/shopify-variantes-nuevas.js");
+      const resultado = await importarProductosFaltantesDeShopify(request.user.empresaId, { todos: true });
+      // También las variantes nuevas de productos que ya estaban en CENTRALA.
+      const variantes = await importarVariantesNuevasDeShopify(request.user.empresaId, { todos: true });
+      return { ...resultado, variantesNuevas: variantes.detalle };
     } catch (err) {
       return reply.code(502).send({ error: err instanceof Error ? err.message : "Error consultando Shopify" });
     }
