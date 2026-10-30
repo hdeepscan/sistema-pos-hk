@@ -935,6 +935,8 @@ function DetalleProducto({
       const { data } = await api.delete(`/productos/${producto.id}`);
       if (data?.shopifyError) {
         alert(`${data.mensaje}\n\nOjo: hubo un problema al eliminar en Shopify: ${data.shopifyError}`);
+      } else if (data?.archivado) {
+        alert(data.mensaje);
       }
       onEliminado();
     } catch (err: any) {

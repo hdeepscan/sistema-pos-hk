@@ -43,6 +43,19 @@ const EditarVarianteSchema = z.object({
   precio: z.number().nonnegative().optional(),
 });
 
+// Qué historial tienen estos productos (ventas, compras, cotizaciones). Si tienen alguno no se
+// pueden borrar: la base de datos lo impide para no perder ese historial.
+async function historialDeProductos(ids: string[]): Promise<string[]> {
+  const [ventas, compras, cotizaciones] = await Promise.all([
+    prisma.ventaItem.count({ where: { productoId: { in: ids } } }),
+    prisma.compraItem.count({ where: { productoId: { in: ids } } }),
+    prisma.lineaCotizacion.count({ where: { productoId: { in: ids } } }),
+  ]);
+  return [ventas > 0 && "ventas", compras > 0 && "compras", cotizaciones > 0 && "cotizaciones"].filter(
+    (x): x is string => !!x
+  );
+}
+
 function valoresDeTitulo(titulo: string | null): string[] {
   return titulo ? titulo.split("/").map((v) => v.trim()).filter(Boolean) : [];
 }
@@ -695,17 +708,25 @@ export async function productosRoutes(app: FastifyInstance) {
       }
     }
 
-    // 2) Borrado local. Si hay ventas asociadas, se archiva en vez de borrar.
-    const conVentas = await prisma.ventaItem.count({ where: { productoId: { in: ids } } });
-    let archivado = false;
-    if (conVentas > 0) {
+    // 2) Borrado local. Si aparece en ventas, compras o cotizaciones se archiva en vez de
+    //    borrar (borrarlo dañaría ese historial y la base de datos lo rechaza).
+    const historial = await historialDeProductos(ids);
+    let archivado = historial.length > 0;
+    if (!archivado) {
+      try {
+        await prisma.$transaction([
+          prisma.movimientoInventario.deleteMany({ where: { productoId: { in: ids } } }),
+          prisma.producto.deleteMany({ where: { id: { in: ids }, empresaId } }),
+        ]);
+      } catch (err: any) {
+        // Otra referencia que no conocemos: se archiva en vez de fallar.
+        if (err?.code !== "P2003") throw err;
+        request.log.warn(err, "[productos] No se pudo borrar; se archiva");
+        archivado = true;
+      }
+    }
+    if (archivado) {
       await prisma.producto.updateMany({ where: { id: { in: ids } }, data: { activo: false } });
-      archivado = true;
-    } else {
-      await prisma.$transaction([
-        prisma.movimientoInventario.deleteMany({ where: { productoId: { in: ids } } }),
-        prisma.producto.deleteMany({ where: { id: { in: ids }, empresaId } }),
-      ]);
     }
 
     registrarAuditoria({
@@ -723,8 +744,8 @@ export async function productosRoutes(app: FastifyInstance) {
       variantesEliminadas: ids.length,
       shopifyError,
       mensaje: archivado
-        ? "El producto tenia ventas asociadas: se archivo (ya no aparece) y se elimino de Shopify."
-        : "Producto eliminado del POS y de Shopify.",
+        ? `El producto tiene ${historial.length > 0 ? historial.join(", ") : "historial"} asociado(s): se archivó (queda inactivo y ya no aparece en el punto de venta) para no perder ese historial.`
+        : "Producto eliminado.",
     };
   });
 
@@ -855,9 +876,11 @@ export async function productosRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: "Es la unica variante: usa 'Eliminar producto' para borrar el producto completo." });
     }
 
-    const conVentas = await prisma.ventaItem.count({ where: { productoId: id } });
-    if (conVentas > 0) {
-      return reply.code(409).send({ error: "Esta variante tiene ventas asociadas y no se puede eliminar sin perder el historial." });
+    const historialVariante = await historialDeProductos([id]);
+    if (historialVariante.length > 0) {
+      return reply.code(409).send({
+        error: `Esta variante tiene ${historialVariante.join(", ")} asociado(s) y no se puede eliminar sin perder ese historial. Puedes desactivarla.`,
+      });
     }
 
     // Eliminar la variante en Shopify (si aplica).
