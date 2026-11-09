@@ -169,6 +169,32 @@ const modalStyles = `
     margin-top: 4px;
   }
 
+  .admin-recuperar {
+    display: block;
+    margin: 14px auto 0;
+    padding: 4px 8px;
+    border: none;
+    background: none;
+    background-image: none;
+    box-shadow: none;
+    color: #4f46e5;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: 0;
+    cursor: pointer;
+  }
+  .admin-recuperar:hover:not(:disabled) { text-decoration: underline; }
+  .admin-recuperar-ok {
+    margin: 14px 0 0;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: #ecfdf5;
+    color: #065f46;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
   .admin-error-box {
     background: linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(220, 38, 38, 0.05) 100%);
     border: 1px solid rgba(239, 68, 68, 0.25);
@@ -233,6 +259,8 @@ export function AdminLoginModal({ isOpen, onClose }: AdminLoginModalProps) {
   const [mostrarPassword, setMostrarPassword] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [recuperando, setRecuperando] = useState(false);
+  const [correoEnviado, setCorreoEnviado] = useState(false);
 
   const setSesion = useSesionStore((s) => s.setSesion);
 
@@ -250,11 +278,10 @@ export function AdminLoginModal({ isOpen, onClose }: AdminLoginModalProps) {
       // Usar el endpoint de login normal pero validar que sea admin
       const { data } = await api.post("/auth/login", { email, password });
 
-      // Verificar que sea Super Admin: rol ADMIN o email específico
-      const esAdmin = data.usuario.rol === "ADMIN";
-      const esOwner = data.usuario.email === "hnieto@deepscan.com.co";
-      if (!esAdmin && !esOwner) {
-        setError("Solo Super Admin puede acceder aquí");
+      // Solo el dueño de la plataforma (el servidor lo decide). Antes entraba cualquier
+      // administrador de una empresa cliente.
+      if (!data.usuario.esSuperAdmin) {
+        setError("Esta sección es solo para el administrador de la plataforma");
         setCargando(false);
         return;
       }
@@ -280,6 +307,24 @@ export function AdminLoginModal({ isOpen, onClose }: AdminLoginModalProps) {
       setError(errorMsg);
     } finally {
       setCargando(false);
+    }
+  }
+
+  // Envía el enlace para crear una contraseña nueva (dura 1 hora).
+  async function enviarRecuperacion() {
+    if (!email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+      setError("Escribe tu correo arriba y vuelve a tocar \"¿Olvidaste tu contraseña?\"");
+      return;
+    }
+    setRecuperando(true);
+    setError(null);
+    try {
+      await api.post("/auth/forgot-password", { email });
+      setCorreoEnviado(true);
+    } catch (err) {
+      setError(mensajeError(err, "No se pudo enviar el correo de recuperación"));
+    } finally {
+      setRecuperando(false);
     }
   }
 
@@ -361,6 +406,22 @@ export function AdminLoginModal({ isOpen, onClose }: AdminLoginModalProps) {
               <span>{cargando ? "Verificando..." : "Entrar"}</span>
             </button>
           </form>
+
+          {correoEnviado ? (
+            <p className="admin-recuperar-ok">
+              Si el correo es correcto, te llegó un enlace para crear una contraseña nueva. Dura 1 hora; revisa también
+              la carpeta de spam.
+            </p>
+          ) : (
+            <button
+              type="button"
+              className="admin-recuperar"
+              onClick={() => void enviarRecuperacion()}
+              disabled={cargando || recuperando}
+            >
+              {recuperando ? "Enviando..." : "¿Olvidaste tu contraseña?"}
+            </button>
+          )}
         </div>
       </div>
     </>

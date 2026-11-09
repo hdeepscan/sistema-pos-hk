@@ -16,7 +16,7 @@ interface RegistroDatos {
 interface SesionState {
   apiBaseUrl: string;
   token: string | null;
-  usuario: { id: string; nombre: string; email: string; rol: string; permisos: string[] } | null;
+  usuario: { id: string; nombre: string; email: string; rol: string; permisos: string[]; esSuperAdmin?: boolean } | null;
   empresa: { id: string; nombre: string; limiteUsuarios?: number; fechaVencimiento?: string } | null;
   sucursales: Sucursal[];
   sucursalActivaId: string | null;

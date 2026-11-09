@@ -6,6 +6,7 @@ import { hashPassword, verifyPassword } from "../lib/password.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
 import { mensajeDeValidacion } from "../lib/errores.js";
 import { asegurarSucursalInicial } from "../lib/sucursal-inicial.js";
+import { esSuperAdmin } from "../lib/super-admin.js";
 
 function permisosDe(usuario: { rol: keyof typeof PERMISOS_POR_ROL; permisos: string[] }) {
   return usuario.permisos.length > 0 ? usuario.permisos : PERMISOS_POR_ROL[usuario.rol];
@@ -75,6 +76,7 @@ export async function authRoutes(app: FastifyInstance) {
           email: usuario.email,
           rol: usuario.rol,
           permisos: permisosDe(usuario),
+          esSuperAdmin: esSuperAdmin(usuario),
         },
         empresa: {
           id: usuario.empresa.id,
@@ -146,6 +148,7 @@ export async function authRoutes(app: FastifyInstance) {
         email: usuario.email,
         rol: usuario.rol,
         permisos: permisosDe(usuario),
+        esSuperAdmin: esSuperAdmin(usuario),
       },
       empresa: {
         id: empresa.id,
@@ -187,10 +190,11 @@ export async function authRoutes(app: FastifyInstance) {
         const { Resend } = await import("resend");
         const resend = new Resend(process.env.RESEND_API_KEY);
 
-        const resetLink = `https://centrala.up.railway.app/reset-password?token=${resetToken}`;
+        // La web usa rutas con # (HashRouter): sin el # el enlace abría el inicio de sesión.
+        const resetLink = `https://centrala.up.railway.app/#/reset-password?token=${resetToken}`;
 
         await resend.emails.send({
-          from: process.env.EMAIL_FROM || "noreply@centrala-pos.com",
+          from: process.env.EMAIL_FROM || "centrala_correos@centrala.com.co",
           to: email,
           subject: "Recupera tu contraseña en Centrala POS",
           html: `

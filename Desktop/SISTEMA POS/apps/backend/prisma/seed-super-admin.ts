@@ -4,8 +4,12 @@ import * as bcrypt from "bcrypt";
 const prisma = new PrismaClient();
 
 async function main() {
-  const SUPER_ADMIN_EMAIL = "hnieto@deepscan.com.co";
-  const SUPER_ADMIN_PASSWORD = "SuperAdmin@2024!HK";
+  const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL || "hnieto@deepscan.com.co";
+  // La contraseña ya no va escrita en el código: se pasa al ejecutar el script.
+  const SUPER_ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD;
+  if (!SUPER_ADMIN_PASSWORD || SUPER_ADMIN_PASSWORD.length < 10) {
+    throw new Error("Define SUPER_ADMIN_PASSWORD (mínimo 10 caracteres) para crear el super admin");
+  }
 
   try {
     // Verificar si ya existe
@@ -49,7 +53,6 @@ async function main() {
         passwordHash,
         empresaId: empresa.id,
         rol: "ADMIN",
-        es_super_admin: true,
         activo: true,
       },
     });
@@ -57,7 +60,6 @@ async function main() {
     console.log(`\n✅ SUPER ADMIN CREADO EXITOSAMENTE`);
     console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
     console.log(`Email:    ${superAdmin.email}`);
-    console.log(`Password: ${SUPER_ADMIN_PASSWORD}`);
     console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
   } catch (error) {
     console.error("Error creando Super Admin:", error);

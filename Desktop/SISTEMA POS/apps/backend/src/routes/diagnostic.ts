@@ -1,12 +1,28 @@
 import type { FastifyInstance } from "fastify";
 import nodemailer from "nodemailer";
+import { prisma } from "../lib/prisma.js";
+import { esSuperAdmin } from "../lib/super-admin.js";
 
 /**
  * Rutas de diagnóstico para debugging (production-safe)
- * No requiere autenticación
+ * Solo para el super admin
  */
 
 export async function diagnosticRoutes(app: FastifyInstance) {
+  // Antes no pedía sesión: cualquiera podía usar el servidor para enviar correos de prueba
+  // a cualquier dirección. Ahora solo el super admin.
+  app.addHook("preHandler", async (request, reply) => {
+    await app.authenticate(request, reply);
+    if (reply.sent) return;
+    const usuario = await prisma.usuario.findUnique({
+      where: { id: request.user.usuarioId },
+      select: { email: true },
+    });
+    if (!usuario || !esSuperAdmin(usuario)) {
+      return reply.code(403).send({ error: "Solo el administrador de la plataforma" });
+    }
+  });
+
   /**
    * Endpoint de prueba de SMTP
    * GET /diagnostic/test-email?to=email@example.com

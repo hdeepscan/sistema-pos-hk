@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { PrismaClient } from "@prisma/client";
 import * as bcrypt from "bcrypt";
 import { construirCorreoAcceso, generarPasswordTemporal } from "../lib/email-bienvenida.js";
+import { esSuperAdmin } from "../lib/super-admin.js";
 
 const prisma = new PrismaClient();
 
@@ -20,12 +21,19 @@ const verificarSuperAdmin = async (request: FastifyRequest, reply: FastifyReply)
 
     const usuario = await prisma.usuario.findUnique({
       where: { id: usuarioId },
-      select: { id: true, email: true },
+      select: { id: true, email: true, activo: true },
     });
 
     if (!usuario) {
       console.error(`🔴 ADMIN MIDDLEWARE: Usuario no encontrado en BD - ID: ${usuarioId}`);
       return reply.code(401).send({ error: "No autorizado - Usuario no encontrado" });
+    }
+
+    // Antes bastaba con haber iniciado sesión: el administrador de cualquier empresa cliente
+    // podía usar el panel. Ahora solo el super admin.
+    if (!usuario.activo || !esSuperAdmin(usuario)) {
+      console.warn(`⚠️ ADMIN MIDDLEWARE: acceso denegado a ${usuario.email}`);
+      return reply.code(403).send({ error: "Solo el administrador de la plataforma puede usar esta sección" });
     }
 
     console.log(`✅ ADMIN ACCESS GRANTED para ${usuario.email}`);
