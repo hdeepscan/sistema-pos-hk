@@ -171,6 +171,8 @@ export const CrearProductoSchema = z.object({
   impuestoPorcentaje: z.number().min(0).max(100).optional(),
   precio: z.number().nonnegative(),
   costo: z.number().nonnegative().default(0),
+  // Precio al por mayor (null = no se vende al por mayor).
+  precioMayorista: z.number().nonnegative().nullable().optional(),
   codigoBarras: z.string().optional(),
   activo: z.boolean().optional(),
   proveedorId: z.string().nullable().optional(),

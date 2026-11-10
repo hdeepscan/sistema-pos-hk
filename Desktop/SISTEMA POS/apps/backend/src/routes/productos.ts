@@ -25,6 +25,7 @@ import {
   obtenerOpcionesShopifyProducto,
 } from "../lib/shopify.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
+import { escribirPrecioMayoristaEnShopify } from "../lib/shopify-precio-mayorista.js";
 import { mensajeDeValidacion } from "../lib/errores.js";
 import {
   actualizarVarianteEnShopify,
@@ -1254,6 +1255,34 @@ export async function productosRoutes(app: FastifyInstance) {
 
     let actualizado = await prisma.producto.update({ where: { id }, data: datosProducto });
 
+    // El precio mayorista es del producto (igual para todas sus variantes), como el metacampo de
+    // Shopify: se copia a las hermanas y se escribe en Shopify.
+    let avisoMayorista: string | undefined;
+    const mayoristaAntes = producto.precioMayorista === null ? null : Number(producto.precioMayorista);
+    if (datosProducto.precioMayorista !== undefined && datosProducto.precioMayorista !== mayoristaAntes) {
+      if (producto.shopifyProductId || producto.grupoVariantes) {
+        await prisma.producto.updateMany({
+          where: {
+            empresaId,
+            ...(producto.shopifyProductId
+              ? { shopifyProductId: producto.shopifyProductId }
+              : { grupoVariantes: producto.grupoVariantes }),
+          },
+          data: { precioMayorista: datosProducto.precioMayorista },
+        });
+      }
+      if (producto.shopifyProductId) {
+        try {
+          await escribirPrecioMayoristaEnShopify(empresaId, producto.shopifyProductId, datosProducto.precioMayorista ?? null);
+        } catch (err) {
+          request.log.error(err);
+          avisoMayorista = `El precio mayorista se guardó en CENTRALA, pero no se pudo escribir en Shopify: ${
+            err instanceof Error ? err.message : "error desconocido"
+          }`;
+        }
+      }
+    }
+
     if (sucursalIds !== undefined) {
       // La disponibilidad se comparte entre todas las variantes del mismo
       // producto de Shopify (misma prenda, distintos talle/color).
@@ -1321,7 +1350,7 @@ export async function productosRoutes(app: FastifyInstance) {
       }
     }
 
-    return actualizado;
+    return avisoMayorista ? { ...actualizado, _warning: avisoMayorista } : actualizado;
   });
 
   // Sube una imagen (JSON: { dataUrl: "data:image/png;base64,...." }) y la

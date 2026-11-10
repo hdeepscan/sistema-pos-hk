@@ -29,6 +29,21 @@ export default function ImportarProductosShopify() {
   const [resultado, setResultado] = useState<ResultadoImportacion | null>(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mayoristas, setMayoristas] = useState<{ revisados: number; actualizados: number } | null>(null);
+  const [cargandoMayoristas, setCargandoMayoristas] = useState(false);
+
+  async function traerMayoristas() {
+    setCargandoMayoristas(true);
+    setError(null);
+    try {
+      const { data } = await api.post<{ revisados: number; actualizados: number }>('/shopify/precios-mayoristas/sincronizar');
+      setMayoristas(data);
+    } catch (err) {
+      setError(mensajeError(err));
+    } finally {
+      setCargandoMayoristas(false);
+    }
+  }
 
   async function importar() {
     setCargando(true);
@@ -57,9 +72,23 @@ export default function ImportarProductosShopify() {
           algún producto no se pudo importar.
         </p>
 
-        <button type="button" onClick={() => void importar()} disabled={cargando}>
-          {cargando ? 'Revisando Shopify...' : 'Traer productos nuevos de Shopify'}
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button type="button" onClick={() => void importar()} disabled={cargando}>
+            {cargando ? 'Revisando Shopify...' : 'Traer productos nuevos de Shopify'}
+          </button>
+          <button type="button" className="secondary" onClick={() => void traerMayoristas()} disabled={cargandoMayoristas}>
+            {cargandoMayoristas ? 'Leyendo precios...' : 'Traer precios mayoristas'}
+          </button>
+        </div>
+        <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '8px 0 0' }}>
+          El precio mayorista se lee del metacampo de producto "Precio Mayorista" de Shopify. Se actualiza solo cada
+          minuto en los productos que cambian; el botón revisa todo el catálogo.
+        </p>
+        {mayoristas && (
+          <p style={{ fontSize: 13, margin: '8px 0 0', color: 'var(--success, #16a34a)' }}>
+            {mayoristas.revisados} producto(s) revisados · precio mayorista actualizado en {mayoristas.actualizados} variante(s)
+          </p>
+        )}
 
         {error && <p className="error-text">{error}</p>}
 

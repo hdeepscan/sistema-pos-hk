@@ -222,6 +222,8 @@ model Producto {
   impuestoPorcentaje Decimal @db.Decimal(5, 2) @default(0)
   precio        Decimal  @db.Decimal(12, 2)
   costo         Decimal  @db.Decimal(12, 2) @default(0)
+  // Precio al por mayor. Si la tienda está en Shopify se toma del metacampo "Precio Mayorista".
+  precioMayorista Decimal? @db.Decimal(12, 2)
   codigoBarras  String?
   activo        Boolean  @default(true)
   creadoEn      DateTime @default(now())

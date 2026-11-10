@@ -51,15 +51,50 @@ export async function importarVariantesNuevasDeShopify(
   const resultado: ResultadoVariantesNuevas = { importadas: 0, detalle: [] };
   let after: string | null = null;
 
+  // Paso 1, liviano: productos modificados y cuántas variantes tiene cada uno en Shopify. (Pedir
+  // las variantes de 50 productos en una sola consulta supera el límite de costo de Shopify.)
+  const candidatos: { id: string; titulo: string }[] = [];
   for (let pagina = 0; pagina < (opciones.todos ? PAGINAS_TODOS : PAGINAS_POLLER); pagina++) {
     const data: any = await client.query({
       query: `
-        query ProductosModificados($after: String, $filtro: String, $locationId: ID!, $conUbicacion: Boolean!) {
-          products(first: 50, after: $after, sortKey: UPDATED_AT, reverse: true, query: $filtro) {
+        query ProductosModificados($after: String, $filtro: String) {
+          products(first: 100, after: $after, sortKey: UPDATED_AT, reverse: true, query: $filtro) {
             pageInfo { hasNextPage endCursor }
-            nodes {
-              id
-              title
+            nodes { id title variantsCount { count } }
+          }
+        }
+      `,
+      variables: { after, filtro },
+    });
+    const productos: any[] = data?.products?.nodes ?? [];
+    if (productos.length === 0) break;
+
+    // Solo interesan los que ya están en CENTRALA y tienen en Shopify más variantes que las vinculadas.
+    const ids = productos.map((p) => idNumerico(p.id));
+    const vinculadas = await prisma.producto.groupBy({
+      by: ["shopifyProductId"],
+      where: { empresaId, shopifyProductId: { in: ids }, shopifyVariantId: { not: null }, activo: true },
+      _count: { _all: true },
+    });
+    const porProducto = new Map(vinculadas.map((v) => [v.shopifyProductId, v._count._all]));
+    for (const p of productos) {
+      const locales = porProducto.get(idNumerico(p.id));
+      if (locales !== undefined && (p.variantsCount?.count ?? 0) > locales) {
+        candidatos.push({ id: idNumerico(p.id), titulo: p.title });
+      }
+    }
+
+    if (!data.products.pageInfo.hasNextPage) break;
+    after = data.products.pageInfo.endCursor;
+  }
+
+  // Paso 2: las variantes de cada producto que tiene alguna nueva, de a un producto por consulta.
+  for (const { id, titulo } of candidatos) {
+    try {
+      const data: any = await client.query({
+        query: `
+          query VariantesProducto($id: ID!, $locationId: ID!, $conUbicacion: Boolean!) {
+            product(id: $id) {
               variants(first: 100) {
                 nodes {
                   id
@@ -79,31 +114,20 @@ export async function importarVariantesNuevasDeShopify(
               }
             }
           }
-        }
-      `,
-      variables: {
-        after,
-        filtro,
-        locationId: locationId ? `gid://shopify/Location/${idNumerico(locationId)}` : "gid://shopify/Location/0",
-        conUbicacion: !!locationId,
-      },
-    });
-    const productos: any[] = data?.products?.nodes ?? [];
-    if (productos.length === 0) break;
-
-    for (const p of productos) {
-      try {
-        await importarVariantesDeProducto(client, empresaId, config.sucursalEcommerceId, idNumerico(p.id), p.variants?.nodes ?? [], resultado);
-      } catch (err) {
-        console.error(
-          `[shopify-variantes-nuevas] "${p.title}": no se pudieron importar sus variantes nuevas:`,
-          err instanceof Error ? err.message : err
-        );
-      }
+        `,
+        variables: {
+          id: `gid://shopify/Product/${id}`,
+          locationId: locationId ? `gid://shopify/Location/${idNumerico(locationId)}` : "gid://shopify/Location/0",
+          conUbicacion: !!locationId,
+        },
+      });
+      await importarVariantesDeProducto(client, empresaId, config.sucursalEcommerceId, id, data?.product?.variants?.nodes ?? [], resultado);
+    } catch (err) {
+      console.error(
+        `[shopify-variantes-nuevas] "${titulo}": no se pudieron importar sus variantes nuevas:`,
+        err instanceof Error ? err.message : err
+      );
     }
-
-    if (!data.products.pageInfo.hasNextPage) break;
-    after = data.products.pageInfo.endCursor;
   }
 
   if (!opciones.todos) ultimaRevision.set(empresaId, inicio);

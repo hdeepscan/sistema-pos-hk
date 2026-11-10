@@ -77,6 +77,7 @@ interface Producto {
   activo: boolean;
   precio: string | number;
   costo: string | number;
+  precioMayorista?: string | number | null;
   codigoBarras: string | null;
   imagenUrl: string | null;
   varianteTitulo: string | null;
@@ -891,6 +892,9 @@ function DetalleProducto({
   const [proveedorId, setProveedorId] = useState(producto.proveedorId ?? "");
   const [precio, setPrecio] = useState(String(producto.precio));
   const [costo, setCosto] = useState(String(producto.costo));
+  const [precioMayorista, setPrecioMayorista] = useState(
+    producto.precioMayorista == null ? "" : String(Number(producto.precioMayorista))
+  );
   const [sku, setSku] = useState(producto.sku);
   const [codigoBarras, setCodigoBarras] = useState(producto.codigoBarras ?? "");
   const [impuesto, setImpuesto] = useState(String(producto.impuestoPorcentaje ?? 0));
@@ -962,7 +966,11 @@ function DetalleProducto({
     setError(null);
     setMensaje(null);
     try {
-      await api.patch(`/productos/${producto.id}`, {
+      if (precioMayorista !== "" && Number(precioMayorista) >= Number(precio)) {
+        setError("El precio mayorista debe ser menor que el precio de venta");
+        return;
+      }
+      const { data } = await api.patch<{ _warning?: string }>(`/productos/${producto.id}`, {
         nombre,
         categoria: categoria || null,
         marca: marca || null,
@@ -970,6 +978,7 @@ function DetalleProducto({
         sku,
         precio: Number(precio),
         costo: Number(costo || 0),
+        precioMayorista: precioMayorista === "" ? null : Number(precioMayorista),
         codigoBarras: codigoBarras || null,
         impuestoPorcentaje: Number(impuesto || 0),
         stockMinimo: Number(stockMinimo || 0),
@@ -980,7 +989,9 @@ function DetalleProducto({
         const dataUrl = await leerArchivoComoDataUrl(archivoImagen);
         await api.post(`/productos/${producto.id}/imagen`, { dataUrl });
       }
-      setMensaje("Cambios guardados" + (producto.shopifyProductId ? " y sincronizados con Shopify" : ""));
+      setMensaje(
+        data?._warning ?? "Cambios guardados" + (producto.shopifyProductId ? " y sincronizados con Shopify" : "")
+      );
       onActualizado();
     } catch (err: any) {
       setError(mensajeError(err, "No se pudo guardar"));
@@ -1128,6 +1139,25 @@ function DetalleProducto({
               Precio de venta
             </label>
             <input type="number" step="0.01" value={precio} onChange={(e) => setPrecio(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              Precio mayorista
+            </label>
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              value={precioMayorista}
+              onChange={(e) => setPrecioMayorista(e.target.value)}
+              placeholder="Vacío = no se vende al por mayor"
+              style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }}
+            />
+            <small style={{ fontSize: 11, color: "#64748b" }}>
+              {producto.shopifyProductId
+                ? "Se sincroniza con el metacampo \"Precio Mayorista\" de Shopify"
+                : "Igual para todas las variantes"}
+            </small>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>

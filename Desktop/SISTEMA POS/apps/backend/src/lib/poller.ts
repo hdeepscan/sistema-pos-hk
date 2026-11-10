@@ -4,6 +4,7 @@ import { emitPedidoShopify, emitVentaCreada, emitInventarioActualizado } from ".
 import { conciliarInventario } from "./shopify-conciliacion.js";
 import { importarProductosNuevosDeShopify } from "./shopify-productos-nuevos.js";
 import { importarVariantesNuevasDeShopify } from "./shopify-variantes-nuevas.js";
+import { sincronizarPreciosMayoristas } from "./shopify-precio-mayorista.js";
 import { archivarProductosEliminadosEnShopify } from "./shopify-productos-eliminados.js";
 
 const INTERVALO_MS = 60_000;
@@ -11,6 +12,7 @@ const INTERVALO_MS = 60_000;
 const CICLOS_CONCILIACION = Math.max(1, Number(process.env.SHOPIFY_CONCILIACION_MINUTOS) || 15);
 let timer: ReturnType<typeof setInterval> | undefined;
 let ciclo = 0;
+let revisando = false;
 
 // Crea una Venta real (canal SHOPIFY) a partir de un pedido de Shopify, para
 // que aparezca en el modulo de Ventas junto a las del punto fisico. Descuenta
@@ -212,6 +214,16 @@ async function revisarTodasLasEmpresas() {
       console.error(`[poller] Error importando variantes nuevas de la empresa ${empresaId}:`, err instanceof Error ? err.message : err);
     }
 
+    // Precio mayorista (metacampo de Shopify) de los productos modificados.
+    try {
+      const { actualizados } = await sincronizarPreciosMayoristas(empresaId);
+      if (actualizados > 0) {
+        console.log(`[poller] Empresa ${empresaId.slice(0, 8)}: precio mayorista actualizado en ${actualizados} variante(s)`);
+      }
+    } catch (err) {
+      console.error(`[poller] Error leyendo precios mayoristas de la empresa ${empresaId}:`, err instanceof Error ? err.message : err);
+    }
+
     // Productos eliminados en Shopify: se archivan en CENTRALA (cada 15 minutos).
     if (tocaConciliar) {
       try {
@@ -242,6 +254,12 @@ async function revisarTodasLasEmpresas() {
 export function iniciarPollerShopify() {
   if (timer) return;
   timer = setInterval(() => {
-    void revisarTodasLasEmpresas();
+    // Si la revisión anterior sigue en curso (ej. la primera lectura completa del catálogo), se
+    // salta este minuto: dos revisiones a la vez podrían importar lo mismo dos veces.
+    if (revisando) return;
+    revisando = true;
+    void revisarTodasLasEmpresas().finally(() => {
+      revisando = false;
+    });
   }, INTERVALO_MS);
 }
