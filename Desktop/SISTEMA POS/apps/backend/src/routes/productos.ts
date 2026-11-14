@@ -1307,6 +1307,29 @@ export async function productosRoutes(app: FastifyInstance) {
       });
     }
 
+    // Precio, SKU o código cambiados en CENTRALA: se escriben en la variante de Shopify revisando
+    // la respuesta. Antes se enviaban sin revisar y, si Shopify no los aceptaba, nadie se enteraba
+    // y los precios quedaban distintos en cada lado.
+    let avisoVariante: string | undefined;
+    const cambioVariante =
+      (datosProducto.precio !== undefined && datosProducto.precio !== Number(producto.precio)) ||
+      (datosProducto.sku !== undefined && datosProducto.sku !== producto.sku) ||
+      (datosProducto.codigoBarras !== undefined && (datosProducto.codigoBarras || null) !== producto.codigoBarras);
+    if (cambioVariante && actualizado.shopifyProductId && actualizado.shopifyVariantId) {
+      try {
+        await actualizarVarianteEnShopify(empresaId, actualizado.shopifyProductId, actualizado.shopifyVariantId, {
+          sku: actualizado.sku,
+          codigoBarras: actualizado.codigoBarras,
+          precio: Number(actualizado.precio),
+        });
+      } catch (err) {
+        request.log.error(err);
+        avisoVariante = `Se guardó en CENTRALA, pero Shopify no aceptó el cambio de precio/SKU/código: ${
+          err instanceof Error ? err.message : "error desconocido"
+        }. Revisa el producto en Shopify.`;
+      }
+    }
+
     const conShopify = await empujarProductoAShopify(actualizado);
     if (conShopify.shopifyProductId !== actualizado.shopifyProductId) {
       actualizado = await prisma.producto.update({
@@ -1352,7 +1375,8 @@ export async function productosRoutes(app: FastifyInstance) {
       }
     }
 
-    return avisoMayorista ? { ...actualizado, _warning: avisoMayorista } : actualizado;
+    const avisos = [avisoVariante, avisoMayorista].filter(Boolean).join(" ");
+    return avisos ? { ...actualizado, _warning: avisos } : actualizado;
   });
 
   // Sube una imagen (JSON: { dataUrl: "data:image/png;base64,...." }) y la

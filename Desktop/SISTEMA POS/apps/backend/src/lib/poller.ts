@@ -5,6 +5,7 @@ import { conciliarInventario } from "./shopify-conciliacion.js";
 import { importarProductosNuevosDeShopify } from "./shopify-productos-nuevos.js";
 import { importarVariantesNuevasDeShopify } from "./shopify-variantes-nuevas.js";
 import { sincronizarPreciosMayoristas } from "./shopify-precio-mayorista.js";
+import { sincronizarPreciosDesdeShopify } from "./shopify-precios.js";
 import { archivarProductosEliminadosEnShopify } from "./shopify-productos-eliminados.js";
 
 const INTERVALO_MS = 60_000;
@@ -212,6 +213,13 @@ async function revisarTodasLasEmpresas() {
       }
     } catch (err) {
       console.error(`[poller] Error importando variantes nuevas de la empresa ${empresaId}:`, err instanceof Error ? err.message : err);
+    }
+
+    // Precio de venta cambiado en Shopify.
+    try {
+      await sincronizarPreciosDesdeShopify(empresaId);
+    } catch (err) {
+      console.error(`[poller] Error leyendo precios de la empresa ${empresaId}:`, err instanceof Error ? err.message : err);
     }
 
     // Precio mayorista (metacampo de Shopify) de los productos modificados.

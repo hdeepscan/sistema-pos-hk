@@ -165,7 +165,8 @@ export type CrearSucursalInput = z.infer<typeof CrearSucursalSchema>;
 export const CrearProductoSchema = z.object({
   sku: z.string().min(1),
   nombre: z.string().min(1),
-  categoria: z.string().optional(),
+  // null = sin categoría / sin código (antes null era rechazado y no dejaba guardar el producto).
+  categoria: z.string().nullable().optional(),
   marca: z.string().nullable().optional(),
   descripcion: z.string().nullable().optional(),
   impuestoPorcentaje: z.number().min(0).max(100).optional(),
@@ -173,7 +174,7 @@ export const CrearProductoSchema = z.object({
   costo: z.number().nonnegative().default(0),
   // Precio al por mayor (null = no se vende al por mayor).
   precioMayorista: z.number().nonnegative().nullable().optional(),
-  codigoBarras: z.string().optional(),
+  codigoBarras: z.string().nullable().optional(),
   activo: z.boolean().optional(),
   proveedorId: z.string().nullable().optional(),
   // Stock minimo para el recordatorio de reposicion (0 = sin aviso).

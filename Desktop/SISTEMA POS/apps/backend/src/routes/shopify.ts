@@ -614,6 +614,26 @@ export async function shopifyRoutes(app: FastifyInstance) {
     }
   });
 
+  // Trae de Shopify el precio de venta y el precio mayorista de todo el catálogo.
+  app.post("/shopify/precios/sincronizar", async (request, reply) => {
+    if (!request.user.permisos.includes("productos.administrar")) {
+      return reply.code(403).send({ error: "No tienes permiso para administrar productos" });
+    }
+    try {
+      const { sincronizarPreciosDesdeShopify } = await import("../lib/shopify-precios.js");
+      const { sincronizarPreciosMayoristas } = await import("../lib/shopify-precio-mayorista.js");
+      const venta = await sincronizarPreciosDesdeShopify(request.user.empresaId, { todos: true });
+      const mayorista = await sincronizarPreciosMayoristas(request.user.empresaId, { todos: true });
+      return {
+        revisadas: venta.revisadas,
+        preciosActualizados: venta.actualizadas,
+        mayoristasActualizados: mayorista.actualizados,
+      };
+    } catch (err) {
+      return reply.code(502).send({ error: err instanceof Error ? err.message : "Error consultando Shopify" });
+    }
+  });
+
   // Trae de Shopify el precio mayorista (metacampo) de todo el catálogo.
   app.post("/shopify/precios-mayoristas/sincronizar", async (request, reply) => {
     if (!request.user.permisos.includes("productos.administrar")) {

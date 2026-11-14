@@ -29,14 +29,18 @@ export default function ImportarProductosShopify() {
   const [resultado, setResultado] = useState<ResultadoImportacion | null>(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [mayoristas, setMayoristas] = useState<{ revisados: number; actualizados: number } | null>(null);
+  const [mayoristas, setMayoristas] = useState<{
+    revisadas: number;
+    preciosActualizados: { nombre: string; antes: number; ahora: number }[];
+    mayoristasActualizados: number;
+  } | null>(null);
   const [cargandoMayoristas, setCargandoMayoristas] = useState(false);
 
   async function traerMayoristas() {
     setCargandoMayoristas(true);
     setError(null);
     try {
-      const { data } = await api.post<{ revisados: number; actualizados: number }>('/shopify/precios-mayoristas/sincronizar');
+      const { data } = await api.post('/shopify/precios/sincronizar');
       setMayoristas(data);
     } catch (err) {
       setError(mensajeError(err));
@@ -77,17 +81,29 @@ export default function ImportarProductosShopify() {
             {cargando ? 'Revisando Shopify...' : 'Traer productos nuevos de Shopify'}
           </button>
           <button type="button" className="secondary" onClick={() => void traerMayoristas()} disabled={cargandoMayoristas}>
-            {cargandoMayoristas ? 'Leyendo precios...' : 'Traer precios mayoristas'}
+            {cargandoMayoristas ? 'Leyendo precios...' : 'Traer precios de Shopify'}
           </button>
         </div>
         <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '8px 0 0' }}>
-          El precio mayorista se lee del metacampo de producto "Precio Mayorista" de Shopify. Se actualiza solo cada
-          minuto en los productos que cambian; el botón revisa todo el catálogo.
+          Si cambias un precio en Shopify, CENTRALA lo trae solo en 1 o 2 minutos (también el precio mayorista, del
+          metacampo "Precio Mayorista"). El botón revisa todo el catálogo de una vez.
         </p>
         {mayoristas && (
-          <p style={{ fontSize: 13, margin: '8px 0 0', color: 'var(--success, #16a34a)' }}>
-            {mayoristas.revisados} producto(s) revisados · precio mayorista actualizado en {mayoristas.actualizados} variante(s)
-          </p>
+          <div style={{ fontSize: 13, margin: '8px 0 0' }}>
+            <p style={{ margin: 0, color: 'var(--success, #16a34a)' }}>
+              {mayoristas.revisadas} variante(s) revisadas · {mayoristas.preciosActualizados.length} precio(s) de venta
+              actualizados · precio mayorista actualizado en {mayoristas.mayoristasActualizados} variante(s)
+            </p>
+            {mayoristas.preciosActualizados.length > 0 && (
+              <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+                {mayoristas.preciosActualizados.slice(0, 30).map((p, i) => (
+                  <li key={i}>
+                    {p.nombre}: ${p.antes.toLocaleString('es-CO')} → ${p.ahora.toLocaleString('es-CO')}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         )}
 
         {error && <p className="error-text">{error}</p>}
