@@ -263,6 +263,8 @@ export async function crearProductoEnShopify(
             price: String(producto.precio),
             barcode: producto.codigoBarras || undefined,
             inventory_management: "shopify",
+            // Sin stock no se vende (nunca "seguir vendiendo cuando no haya stock").
+            inventory_policy: "deny",
           },
         ],
       },
@@ -304,6 +306,7 @@ export async function crearProductoConVariantesEnShopify(
       price: String(v.precio),
       barcode: v.codigoBarras || undefined,
       inventory_management: "shopify",
+      inventory_policy: "deny",
     };
   });
 
@@ -836,6 +839,10 @@ export async function crearVarianteEnShopify(
         sku: args.sku,
         price: String(args.precio),
         barcode: args.codigoBarras || undefined,
+        // Antes la variante se creaba sin seguimiento de inventario: Shopify la vendía sin
+        // límite aunque CENTRALA y Shopify dijeran 0 unidades.
+        inventory_management: "shopify",
+        inventory_policy: "deny",
       },
     }),
   });

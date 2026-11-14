@@ -614,6 +614,38 @@ export async function shopifyRoutes(app: FastifyInstance) {
     }
   });
 
+  // Variantes que la tienda online vende aunque no haya stock ("seguir vendiendo" o sin
+  // seguimiento de inventario).
+  app.get("/shopify/venta-sin-stock", async (request, reply) => {
+    try {
+      const { buscarVentaSinStock } = await import("../lib/shopify-venta-sin-stock.js");
+      return await buscarVentaSinStock(request.user.empresaId);
+    } catch (err) {
+      return reply.code(502).send({ error: err instanceof Error ? err.message : "Error consultando Shopify" });
+    }
+  });
+
+  app.post("/shopify/venta-sin-stock/corregir", async (request, reply) => {
+    if (!request.user.permisos.includes("productos.administrar")) {
+      return reply.code(403).send({ error: "No tienes permiso para administrar productos" });
+    }
+    const { variantIds } = (request.body ?? {}) as { variantIds?: string[] };
+    try {
+      const { corregirVentaSinStock } = await import("../lib/shopify-venta-sin-stock.js");
+      const r = await corregirVentaSinStock(request.user.empresaId, Array.isArray(variantIds) ? variantIds : undefined);
+      registrarAuditoria({
+        empresaId: request.user.empresaId,
+        usuarioId: request.user.usuarioId,
+        accion: "SHOPIFY_NO_VENDER_SIN_STOCK",
+        entidad: "ShopifyConfig",
+        detalle: `${r.corregidas} variante(s) dejadas en 'no vender sin stock'`,
+      });
+      return r;
+    } catch (err) {
+      return reply.code(502).send({ error: err instanceof Error ? err.message : "Error consultando Shopify" });
+    }
+  });
+
   // Trae de Shopify el precio de venta y el precio mayorista de todo el catálogo.
   app.post("/shopify/precios/sincronizar", async (request, reply) => {
     if (!request.user.permisos.includes("productos.administrar")) {

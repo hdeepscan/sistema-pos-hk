@@ -1,6 +1,7 @@
 import ShopifySetupWizard from '../components/ShopifySetupWizard';
 import ConciliacionShopify from '../components/ConciliacionShopify';
 import ImportarProductosShopify from '../components/ImportarProductosShopify';
+import VentaSinStockShopify from '../components/VentaSinStockShopify';
 
 /**
  * Pantalla de integración Shopify
@@ -11,6 +12,7 @@ export default function Shopify() {
     <>
       <ShopifySetupWizard />
       <ImportarProductosShopify />
+      <VentaSinStockShopify />
       <ConciliacionShopify />
     </>
   );
