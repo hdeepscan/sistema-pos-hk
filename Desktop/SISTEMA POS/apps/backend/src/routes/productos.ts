@@ -243,6 +243,8 @@ export async function productosRoutes(app: FastifyInstance) {
       include: { inventario: true },
       orderBy: { varianteTitulo: "asc" },
     });
+    // Tallas en orden numérico (6, 10, 14), no como texto (10, 14, 6).
+    unidades.sort((a, b) => (a.varianteTitulo ?? "").localeCompare(b.varianteTitulo ?? "", "es", { numeric: true }));
     const sucursales = await prisma.sucursal.findMany({
       where: { empresaId, activo: true },
       select: { id: true, nombre: true },

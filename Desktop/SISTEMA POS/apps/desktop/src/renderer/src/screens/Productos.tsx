@@ -370,12 +370,16 @@ function InventarioSection({ producto, onActualizado }: { producto: ProductoDeta
   const [loteSucursal, setLoteSucursal] = useState("todas");
   const [loteFiltro, setLoteFiltro] = useState(FILTRO_TODAS);
 
+  // Se vuelve a cargar cuando cambian las variantes (agregar o editar una talla), no solo al
+  // abrir el producto: antes una variante nueva no aparecía aquí hasta recargar la página.
+  const firmaVariantes = [producto, ...producto.variantes].map((v) => `${v.id}:${v.varianteTitulo ?? ""}`).join("|");
   const cargar = useCallback(() => {
     api
       .get(`/productos/${producto.id}/inventario`)
       .then(({ data }) => setData(data))
       .catch(() => setData(null));
-  }, [producto.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [producto.id, firmaVariantes]);
 
   useEffect(() => {
     cargar();
