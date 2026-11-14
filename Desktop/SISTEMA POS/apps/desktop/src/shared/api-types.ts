@@ -90,6 +90,8 @@ export interface EtiquetaData {
   sku: string;
   precio: number;
   copias: number;
+  // Nombre de la tienda, para el formato "rollo1marca".
+  empresa?: string;
 }
 
 // Tamaño/disposicion del papel al imprimir etiquetas:
@@ -97,7 +99,8 @@ export interface EtiquetaData {
 // - rollo1: rollo termico de etiquetas 50x25mm, 1 columna (media hoja)
 // - carta: hoja tamaño carta (impresora normal), varias etiquetas por hoja
 // - zebra3: Zebra ZT230, etiquetas ~33.3x25mm, 3 columnas (3 al ancho, 100mm total)
-export type EtiquetaFormato = "rollo2" | "rollo1" | "carta" | "zebra3";
+// - rollo1marca: igual que rollo1, con el nombre de la tienda arriba
+export type EtiquetaFormato = "rollo2" | "rollo1" | "rollo1marca" | "carta" | "zebra3";
 
 export interface ReporteCajaData {
   empresaNombre: string;

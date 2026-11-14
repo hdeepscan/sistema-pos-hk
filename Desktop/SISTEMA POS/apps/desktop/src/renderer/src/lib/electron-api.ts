@@ -336,6 +336,7 @@ export const electronAPI = {
       const configs: Record<string, any> = {
         rollo2: { labelW: 50, labelH: 25, cols: 2, pageW: 100, pageH: 25 },
         rollo1: { labelW: 50, labelH: 25, cols: 1, pageW: 50, pageH: 25 },
+        rollo1marca: { labelW: 50, labelH: 25, cols: 1, pageW: 50, pageH: 25 },
         carta: { labelW: 50, labelH: 25, cols: 4, pageW: 210, pageH: 297 }, // A4: 4 cols x filas variables
         zebra3: { labelW: 32, labelH: 25, cols: 3, pageW: 98, pageH: 25, gap: 1, margin: 0 },
       };
@@ -530,7 +531,7 @@ export const electronAPI = {
       } else if (formato === "rollo2") {
         // Rollo2: 2 etiquetas en una fila = 1 página
         etiquetasPerPagina = 2;
-      } else if (formato === "rollo1") {
+      } else if (formato === "rollo1" || formato === "rollo1marca") {
         // Rollo1: 1 etiqueta = 1 página
         etiquetasPerPagina = 1;
       }
@@ -692,12 +693,21 @@ export const electronAPI = {
         carta: { nombre: "11pt", variante: "8pt", sku: "7pt", precio: "14pt", barcodeH: "12mm" },
         rollo2: { nombre: "9pt", variante: "7pt", sku: "6pt", precio: "12pt", barcodeH: "10mm" },
         rollo1: { nombre: "9pt", variante: "7pt", sku: "6pt", precio: "12pt", barcodeH: "10mm" },
+        // Con la marca arriba: textos un poco más pequeños y el código 1 mm más bajo para que todo
+        // quepa en los 25 mm. El ancho del código (lo que importa al escanear) no cambia.
+        rollo1marca: { nombre: "8pt", variante: "6.5pt", sku: "6pt", precio: "11pt", barcodeH: "9mm" },
       };
       const fs = fontsizes[formato as keyof typeof fontsizes] || fontsizes.zebra3;
 
       // Nombre
       const nombre = document.createElement("div");
-      nombre.textContent = (item.nombre || "").substring(0, 20);
+      // En los rollos de 50 mm caben más letras; se corta con "…" solo si no cabe.
+      const esRollo = formato === "rollo1" || formato === "rollo2" || formato === "rollo1marca";
+      const maxTexto = esRollo ? 34 : 20;
+      nombre.textContent = (item.nombre || "").substring(0, maxTexto);
+      nombre.style.whiteSpace = "nowrap";
+      nombre.style.overflow = "hidden";
+      nombre.style.textOverflow = "ellipsis";
       nombre.style.fontSize = fs.nombre;
       nombre.style.fontWeight = "bold";
       nombre.style.color = "#000000";
@@ -709,7 +719,10 @@ export const electronAPI = {
       let varianteDiv = null;
       if (item.variante && item.variante.trim().length > 0) {
         varianteDiv = document.createElement("div");
-        varianteDiv.textContent = (item.variante || "").substring(0, 20);
+        varianteDiv.textContent = (item.variante || "").substring(0, maxTexto);
+        varianteDiv.style.whiteSpace = "nowrap";
+        varianteDiv.style.overflow = "hidden";
+        varianteDiv.style.textOverflow = "ellipsis";
         varianteDiv.style.fontSize = fs.variante;
         varianteDiv.style.color = "#000000";
         varianteDiv.style.textAlign = "center";
@@ -733,6 +746,17 @@ export const electronAPI = {
           svg.style.height = "100%";
           svg.style.maxWidth = "95%";
           svg.style.maxHeight = fs.barcodeH;
+          if (formato === "rollo1marca") {
+            // Barras del mismo ancho que en "1 por fila" (lo que importa para escanear), solo
+            // 1 mm más bajas: se estira el alto sin encoger el ancho.
+            const vb = svg.viewBox?.baseVal;
+            if (vb && vb.width && vb.height) {
+              svg.setAttribute("preserveAspectRatio", "none");
+              svg.style.width = `${(vb.width / vb.height) * 10}mm`;
+              svg.style.height = fs.barcodeH;
+              svg.style.maxWidth = "95%";
+            }
+          }
         }
       } else {
         const skuText = document.createElement("div");
@@ -752,6 +776,23 @@ export const electronAPI = {
       precio.style.textAlign = "center";
       precio.style.width = "100%";
 
+      if (formato === "rollo1marca" && item.empresa) {
+        const marca = document.createElement("div");
+        marca.textContent = String(item.empresa).toUpperCase().substring(0, 30);
+        marca.style.fontSize = "6.5pt";
+        marca.style.fontWeight = "800";
+        marca.style.letterSpacing = "0.08em";
+        marca.style.color = "#000000";
+        marca.style.textAlign = "center";
+        marca.style.width = "100%";
+        marca.style.lineHeight = "1.0";
+        marca.style.whiteSpace = "nowrap";
+        marca.style.overflow = "hidden";
+        marca.style.textOverflow = "ellipsis";
+        marca.style.borderBottom = "0.3mm solid #000000";
+        marca.style.paddingBottom = "0.3mm";
+        labelDiv.appendChild(marca);
+      }
       labelDiv.appendChild(nombre);
       if (varianteDiv) labelDiv.appendChild(varianteDiv);
       labelDiv.appendChild(barcodeDiv);

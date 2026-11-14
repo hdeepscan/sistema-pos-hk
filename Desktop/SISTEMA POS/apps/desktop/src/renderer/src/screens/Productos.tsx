@@ -53,6 +53,11 @@ const FORMATOS_ETIQUETA: { valor: EtiquetaFormato; titulo: string; detalle: stri
     detalle: "Etiquetas 50 × 25 mm en rollo termico, una sola por fila (media hoja).",
   },
   {
+    valor: "rollo1marca",
+    titulo: "Rollo · 1 por fila con tu marca",
+    detalle: "Igual que 1 por fila, con el nombre de tu tienda arriba de la etiqueta.",
+  },
+  {
     valor: "zebra3",
     titulo: "Zebra ZT230 · 3 por fila",
     detalle: "Impresora Zebra ZT230, 3 etiquetas por fila (~33.3 × 25 mm), optimizado para rollo de 104mm de ancho.",
@@ -1242,6 +1247,7 @@ function EtiquetaCard({ producto, onActualizado }: { producto: ProductoDetalle; 
 
   const [copias, setCopias] = useState<Record<string, number>>(() => ({ [producto.id]: 1 }));
   const [formato, setFormato] = useState<EtiquetaFormato>("rollo2");
+  const empresa = useSesionStore((s) => s.empresa);
   const [imprimiendo, setImprimiendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mensaje, setMensaje] = useState<string | null>(null);
@@ -1330,6 +1336,7 @@ function EtiquetaCard({ producto, onActualizado }: { producto: ProductoDetalle; 
           sku: u.sku,
           precio: Number(u.precio),
           copias: copias[u.id],
+          empresa: empresa?.nombre,
         }));
       if (items.length === 0) {
         setError("Elige al menos una etiqueta para imprimir.");

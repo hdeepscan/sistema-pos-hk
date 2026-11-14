@@ -26,6 +26,7 @@ const THERMAL_PRINTER_CONFIGS = {
 const LABEL_CONFIGS = {
   "rollo2": { widthMm: 50, heightMm: 25 },
   "rollo1": { widthMm: 50, heightMm: 25 },
+  "rollo1marca": { widthMm: 50, heightMm: 25 },
   "carta": { widthMm: 210, heightMm: 297 },
   "zebra3": { widthMm: 30, heightMm: 25 },
 } as const;
@@ -258,8 +259,10 @@ function formatoEtiqueta(
     };
   }
 
-  const cols = formato === "rollo1" ? 1 : 2;
+  const cols = formato === "rollo1" || formato === "rollo1marca" ? 1 : 2;
   const ancho = a * cols;
+  // Con la marca arriba, el código un poco más bajo (no más angosto) para que todo quepa.
+  const altoCodigo = formato === "rollo1marca" ? h * 0.42 : h * 0.52;
 
   return {
     pageSize: {
@@ -270,7 +273,7 @@ function formatoEtiqueta(
       @page { size: ${ancho}mm ${h}mm; margin: 0; }
       .hoja { display: grid; grid-template-columns: repeat(${cols}, ${a}mm); }
       .etiqueta { width: ${a}mm; height: ${h}mm; }
-      .barcode svg { width: ${a - 3}mm; height: ${h * 0.52}mm; }
+      .barcode svg { width: ${a - 3}mm; height: ${altoCodigo}mm; }
     `,
   };
 }
@@ -285,6 +288,7 @@ function etiquetasHtml(
     .map(
       (e) => `
       <div class="etiqueta">
+        ${formato === "rollo1marca" && e.empresa ? `<div class="marca">${escapeHtml(e.empresa)}</div>` : ""}
         <div class="nombre">${escapeHtml(e.nombre)}</div>
         ${e.variante ? `<div class="variante">${escapeHtml(e.variante)}</div>` : ""}
         <div class="barcode">${e.svgCodigoBarras}</div>
@@ -312,6 +316,11 @@ function etiquetasHtml(
           }
           .variante { font-size: 7.5px; line-height: 1.1; text-align: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
           .barcode { line-height: 0; margin: 0.3mm 0; }
+          .marca {
+            font-size: 7px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; line-height: 1.1;
+            max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            border-bottom: 0.3mm solid #000; padding-bottom: 0.2mm; margin-bottom: 0.2mm;
+          }
           .precio { font-size: 13px; font-weight: 800; line-height: 1.1; }
           ${css}
         </style>
