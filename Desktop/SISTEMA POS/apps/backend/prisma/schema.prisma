@@ -270,6 +270,9 @@ model InventarioSucursal {
   sucursalId  String
   sucursal    Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
   cantidad    Int      @default(0)
+  // Solo en la sucursal ecommerce: unidades cuando CENTRALA y Shopify coincidieron por última vez.
+  // Con esto la conciliación sabe qué lado cambió (Shopify, CENTRALA o los dos).
+  shopifyBase Int?
   actualizadoEn DateTime @updatedAt
 
   @@unique([productoId, sucursalId])

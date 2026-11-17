@@ -10,7 +10,8 @@ import { archivarProductosEliminadosEnShopify } from "./shopify-productos-elimin
 
 const INTERVALO_MS = 60_000;
 // Cada cuántos ciclos (minutos) se corrige Shopify para igualar a CENTRALA.
-const CICLOS_CONCILIACION = Math.max(1, Number(process.env.SHOPIFY_CONCILIACION_MINUTOS) || 15);
+// Cada 5 minutos: un cambio de stock hecho en Shopify llega a CENTRALA en ese tiempo.
+const CICLOS_CONCILIACION = Math.max(1, Number(process.env.SHOPIFY_CONCILIACION_MINUTOS) || 5);
 let timer: ReturnType<typeof setInterval> | undefined;
 let ciclo = 0;
 let revisando = false;
@@ -85,7 +86,12 @@ export async function crearVentaDesdeShopify(empresaId: string, sucursalEcommerc
       const nuevaCantidad = Math.max(0, (invActual?.cantidad ?? 0) - item.cantidad);
       await tx.inventarioSucursal.upsert({
         where: { productoId_sucursalId: { productoId: item.productoId, sucursalId: sucursalEcommerceId } },
-        update: { cantidad: nuevaCantidad },
+        // El pedido ya descontó en Shopify: la base de la conciliación baja igual (si no, la
+        // conciliación vería la venta como un cambio de cada lado y la contaría dos veces).
+        update: {
+          cantidad: nuevaCantidad,
+          ...(invActual?.shopifyBase != null ? { shopifyBase: invActual.shopifyBase - item.cantidad } : {}),
+        },
         create: { productoId: item.productoId, sucursalId: sucursalEcommerceId, cantidad: nuevaCantidad },
       });
       await tx.movimientoInventario.create({
@@ -247,9 +253,10 @@ async function revisarTodasLasEmpresas() {
     if (!tocaConciliar || algunPedidoFallo) continue;
     try {
       const r = await conciliarInventario(empresaId, true);
-      if (r.corregidos > 0 || r.omitido) {
+      if (r.corregidos > 0 || r.corregidosCentrala > 0 || r.omitido) {
         console.log(
-          `[conciliacion] Empresa ${empresaId.slice(0, 8)}: ${r.corregidos} corregido(s) de ${r.diferencias.length} diferencia(s)` +
+          `[conciliacion] Empresa ${empresaId.slice(0, 8)}: ${r.corregidos} a Shopify, ${r.corregidosCentrala} a CENTRALA, ` +
+            `${r.sinHistorial} sin historial, de ${r.diferencias.length} diferencia(s)` +
             (r.omitido ? ` — ${r.omitido}` : "")
         );
       }

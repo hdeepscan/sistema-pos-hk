@@ -341,7 +341,7 @@ export async function shopifyRoutes(app: FastifyInstance) {
       return reply.code(403).send({ error: "No tienes permiso para administrar inventario" });
     }
     try {
-      const r = await conciliarInventario(request.user.empresaId, true);
+      const r = await conciliarInventario(request.user.empresaId, "shopify", request.user.usuarioId);
       return reply.code(200).send({
         exito: !r.omitido,
         productosActualizados: r.corregidos,

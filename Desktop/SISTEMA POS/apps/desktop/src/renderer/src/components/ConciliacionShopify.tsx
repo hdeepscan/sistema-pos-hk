@@ -156,7 +156,9 @@ export default function ConciliacionShopify() {
         <h3 style={{ marginTop: 0, marginBottom: 4 }}>Inventario CENTRALA ↔ Shopify</h3>
         <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 0 }}>
           Solo se sincroniza el stock de la <strong>sucursal ecommerce</strong> de CENTRALA con <strong>una ubicación</strong> de
-          Shopify. Cada venta se envía al instante y cada 15 minutos el sistema corrige Shopify para que quede igual a CENTRALA.
+          Shopify. Cada venta se envía al instante, y cada 5 minutos se sincroniza en los dos sentidos: si cargas stock en
+          Shopify pasa a CENTRALA, y si lo cargas en CENTRALA pasa a Shopify. Si ves diferencias que no se corrigen solas
+          (de antes de esta sincronización), elige una vez cuál lado tiene la cantidad correcta con los botones.
         </p>
 
         <div className="cs-vinculo">

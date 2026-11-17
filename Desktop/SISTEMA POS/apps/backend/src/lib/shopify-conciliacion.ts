@@ -18,6 +18,8 @@ interface FilaProducto {
   centrala: number;
 }
 
+type Diferencia = FilaProducto & { shopify: number; diferencia: number };
+
 export interface ResultadoConciliacion {
   revisadoEn: string;
   sucursal: { id: string; nombre: string } | null;
@@ -25,11 +27,14 @@ export interface ResultadoConciliacion {
   totalShopify: number;
   totalVinculados: number;
   coinciden: number;
-  diferencias: (FilaProducto & { shopify: number; diferencia: number })[];
+  diferencias: Diferencia[];
   noEnShopify: FilaProducto[];
   sinVincular: { sku: string | null; inventoryItemId: string; shopify: number }[];
   corregidos: number;
   corregidosCentrala: number;
+  // Diferencias sin historial (de antes de la sincronización en dos sentidos): la automática no
+  // sabe qué lado tiene razón y no las toca; se corrigen con los botones.
+  sinHistorial: number;
   fallidos: string[];
   omitido: string | null;
 }
@@ -73,9 +78,23 @@ async function descartarAjustesViejos(empresaId: string) {
   });
 }
 
+// Recuerda en qué valor quedaron de acuerdo CENTRALA y Shopify (base de la próxima comparación).
+async function guardarBase(productoId: string, sucursalId: string, valor: number, centrala: number) {
+  await prisma.inventarioSucursal.upsert({
+    where: { productoId_sucursalId: { productoId, sucursalId } },
+    update: { shopifyBase: valor },
+    create: { productoId, sucursalId, cantidad: Math.max(0, centrala), shopifyBase: valor },
+  });
+}
+
 /**
  * Compara el stock de la sucursal ecommerce de CENTRALA con el "available" de su ubicación
  * en Shopify.
+ * - modo "auto" (cada pocos minutos): sincroniza en los dos sentidos. Con la base (el valor en que
+ *   coincidieron la última vez) sabe qué lado cambió: un cambio hecho en Shopify pasa a CENTRALA,
+ *   uno hecho en CENTRALA pasa a Shopify, y si cambiaron los dos se suman ambos cambios.
+ *   Antes la automática siempre dejaba Shopify igual a CENTRALA: el stock que se cargaba en
+ *   Shopify se borraba en la siguiente revisión.
  * - modo "revisar": solo informa.
  * - modo "shopify": corrige Shopify para que quede igual a CENTRALA (también conecta a la
  *   ubicación los artículos que no estaban en ella).
@@ -84,10 +103,10 @@ async function descartarAjustesViejos(empresaId: string) {
  */
 export async function conciliarInventario(
   empresaId: string,
-  modo: boolean | "revisar" | "shopify" | "centrala",
+  modo: boolean | "auto" | "revisar" | "shopify" | "centrala",
   usuarioId?: string
 ): Promise<ResultadoConciliacion> {
-  const accion = modo === true ? "shopify" : modo === false ? "revisar" : modo;
+  const accion = modo === true ? "auto" : modo === false ? "revisar" : modo;
   // Conectar a la ubicación artículos que no están en ella solo se hace a pedido del usuario
   // (en tiendas con varias ubicaciones puede ser intencional que no estén).
   const conectarFaltantes = modo === "shopify";
@@ -113,13 +132,16 @@ export async function conciliarInventario(
       sku: true,
       varianteTitulo: true,
       shopifyInventoryItemId: true,
-      inventario: { where: { sucursalId: config.sucursalEcommerceId }, select: { cantidad: true } },
+      inventario: { where: { sucursalId: config.sucursalEcommerceId }, select: { cantidad: true, shopifyBase: true } },
     },
     orderBy: { nombre: "asc" },
   });
 
   const nivelPorItem = new Map(niveles.map((n) => [n.inventoryItemId, n]));
-  const diferencias: ResultadoConciliacion["diferencias"] = [];
+  const diferencias: Diferencia[] = [];
+  const basePorProducto = new Map<string, number | null>();
+  // Los que coinciden con una base desactualizada: la base pasa a ser el valor actual.
+  const coincidenSinBase: { productoId: string; valor: number }[] = [];
   const noEnShopify: (FilaProducto & { inventoryItemId: string })[] = [];
 
   for (const p of productos) {
@@ -130,7 +152,12 @@ export async function conciliarInventario(
       noEnShopify.push({ ...fila, inventoryItemId: p.shopifyInventoryItemId! });
       continue;
     }
-    if (nivel.disponible === Math.max(0, centrala)) continue;
+    const base = p.inventario[0]?.shopifyBase ?? null;
+    basePorProducto.set(p.id, base);
+    if (nivel.disponible === Math.max(0, centrala)) {
+      if (base !== nivel.disponible) coincidenSinBase.push({ productoId: p.id, valor: nivel.disponible });
+      continue;
+    }
     diferencias.push({ ...fila, shopify: nivel.disponible, diferencia: nivel.disponible - centrala });
   }
 
@@ -141,14 +168,69 @@ export async function conciliarInventario(
 
   let corregidos = 0;
   let corregidosCentrala = 0;
+  let sinHistorial = 0;
   const fallidos: string[] = [];
   let omitido: string | null = null;
+
+  if (accion !== "revisar") {
+    for (const c of coincidenSinBase) {
+      const centrala = productos.find((p) => p.id === c.productoId)?.inventario[0]?.cantidad ?? 0;
+      await guardarBase(c.productoId, config.sucursalEcommerceId, c.valor, centrala);
+    }
+  }
 
   if (accion !== "revisar" && (diferencias.length > 0 || (conectarFaltantes && noEnShopify.length > 0))) {
     // Si una venta de CENTRALA aún no llegó a Shopify, corregir ahora contaría mal.
     const enCurso = await revisarColaInventario(empresaId);
     if (enCurso > 0) {
       omitido = `Hay ${enCurso} ajuste(s) de ventas recientes enviándose a Shopify. Espera un minuto y vuelve a intentar.`;
+    } else if (accion === "auto") {
+      const aShopify: { d: Diferencia; objetivo: number }[] = [];
+      const aCentrala: { d: Diferencia; objetivo: number }[] = [];
+      for (const d of diferencias) {
+        const base = basePorProducto.get(d.productoId) ?? null;
+        if (base === null) {
+          sinHistorial++;
+          continue;
+        }
+        // Cambio de cada lado desde que coincidieron; se aplican los dos.
+        const objetivo = Math.max(0, d.centrala + d.shopify - base);
+        if (objetivo !== d.shopify) aShopify.push({ d, objetivo });
+        if (objetivo !== d.centrala) aCentrala.push({ d, objetivo });
+      }
+
+      const okShopify = new Set<string>();
+      if (aShopify.length > 0) {
+        const cambios = aShopify.map(({ d, objetivo }) => ({
+          inventoryItemId: productos.find((p) => p.id === d.productoId)!.shopifyInventoryItemId!,
+          locationId,
+          delta: objetivo - d.shopify,
+          changeFromQuantity: d.shopify,
+          nombre: d.nombre,
+          productoId: d.productoId,
+        }));
+        const r = await aplicarCambios(client, cambios);
+        corregidos = r.aplicados;
+        fallidos.push(...r.fallidos);
+        for (const c of cambios) if (!r.fallidosItems.includes(c.inventoryItemId)) okShopify.add(c.productoId);
+      }
+      // CENTRALA solo se mueve si Shopify ya quedó en el mismo valor: si Shopify rechazó su parte,
+      // ninguno de los dos cambia y la próxima revisión lo vuelve a intentar (sin contar doble).
+      const shopifyListo = (d: Diferencia, objetivo: number) => objetivo === d.shopify || okShopify.has(d.productoId);
+      corregidosCentrala = await fijarCentrala(
+        empresaId,
+        config.sucursalEcommerceId,
+        aCentrala.filter(({ d, objetivo }) => shopifyListo(d, objetivo)),
+        usuarioId,
+        "Cambio hecho en Shopify"
+      );
+      for (const d of diferencias) {
+        const base = basePorProducto.get(d.productoId) ?? null;
+        if (base === null) continue;
+        const objetivo = Math.max(0, d.centrala + d.shopify - base);
+        if (shopifyListo(d, objetivo)) await guardarBase(d.productoId, config.sucursalEcommerceId, objetivo, objetivo);
+      }
+      await descartarAjustesViejos(empresaId);
     } else if (accion === "shopify") {
       const cambios = diferencias.map((d) => ({
         inventoryItemId: productos.find((p) => p.id === d.productoId)!.shopifyInventoryItemId!,
@@ -160,6 +242,12 @@ export async function conciliarInventario(
       const r = await aplicarCambios(client, cambios);
       corregidos = r.aplicados;
       fallidos.push(...r.fallidos);
+      for (const d of diferencias) {
+        const item = productos.find((p) => p.id === d.productoId)!.shopifyInventoryItemId!;
+        if (!r.fallidosItems.includes(item)) {
+          await guardarBase(d.productoId, config.sucursalEcommerceId, Math.max(0, d.centrala), d.centrala);
+        }
+      }
       // Artículos que no estaban conectados a la ubicación: se conectan y se fija el stock.
       for (const p of conectarFaltantes ? noEnShopify : []) {
         try {
@@ -171,7 +259,16 @@ export async function conciliarInventario(
       }
       await descartarAjustesViejos(empresaId);
     } else if (accion === "centrala") {
-      corregidosCentrala = await igualarCentrala(empresaId, config.sucursalEcommerceId, diferencias, usuarioId);
+      corregidosCentrala = await fijarCentrala(
+        empresaId,
+        config.sucursalEcommerceId,
+        diferencias.map((d) => ({ d, objetivo: Math.max(0, d.shopify) })),
+        usuarioId,
+        "Igualado con Shopify"
+      );
+      for (const d of diferencias) {
+        await guardarBase(d.productoId, config.sucursalEcommerceId, Math.max(0, d.shopify), d.shopify);
+      }
       await descartarAjustesViejos(empresaId);
     }
   }
@@ -188,24 +285,27 @@ export async function conciliarInventario(
     sinVincular,
     corregidos,
     corregidosCentrala,
+    sinHistorial,
     fallidos,
     omitido,
   };
 }
 
-// Deja el stock de la sucursal ecommerce igual al de Shopify. No se envía nada a Shopify.
-async function igualarCentrala(
+// Fija el stock de la sucursal ecommerce de CENTRALA (con movimiento de ajuste). No envía nada a Shopify.
+async function fijarCentrala(
   empresaId: string,
   sucursalId: string,
-  diferencias: ResultadoConciliacion["diferencias"],
-  usuarioId?: string
+  cambios: { d: Diferencia; objetivo: number }[],
+  usuarioId: string | undefined,
+  motivo: string
 ): Promise<number> {
+  if (cambios.length === 0) return 0;
   const responsable =
     usuarioId ??
     (await prisma.usuario.findFirst({ where: { empresaId, rol: "ADMIN", activo: true }, orderBy: { creadoEn: "asc" } }))?.id;
   let aplicados = 0;
-  for (const d of diferencias) {
-    const nueva = Math.max(0, d.shopify);
+  for (const { d, objetivo } of cambios) {
+    const nueva = Math.max(0, objetivo);
     await prisma.$transaction(async (tx) => {
       await tx.inventarioSucursal.upsert({
         where: { productoId_sucursalId: { productoId: d.productoId, sucursalId } },
@@ -219,7 +319,7 @@ async function igualarCentrala(
             sucursalId,
             tipo: "AJUSTE",
             cantidad: Math.abs(nueva - d.centrala),
-            motivo: `Igualado con Shopify (${d.centrala} → ${nueva})`,
+            motivo: `${motivo} (${d.centrala} → ${nueva})`,
             usuarioId: responsable,
           },
         });
@@ -234,10 +334,11 @@ async function igualarCentrala(
 async function aplicarCambios(
   client: ShopifyGraphQLClient,
   cambios: { inventoryItemId: string; locationId: string; delta: number; changeFromQuantity: number; nombre: string }[]
-): Promise<{ aplicados: number; fallidos: string[] }> {
+): Promise<{ aplicados: number; fallidos: string[]; fallidosItems: string[] }> {
   const referencia = `gid://centrala/InventorySyncJob/${Date.now()}`;
   let aplicados = 0;
   const fallidos: string[] = [];
+  const fallidosItems: string[] = [];
 
   for (let i = 0; i < cambios.length; i += MAX_CAMBIOS_POR_LOTE) {
     const lote = cambios.slice(i, i + MAX_CAMBIOS_POR_LOTE);
@@ -256,6 +357,7 @@ async function aplicarCambios(
           aplicados++;
         } catch (err) {
           fallidos.push(cambio.nombre);
+          fallidosItems.push(cambio.inventoryItemId);
           console.warn(
             `[conciliacion] No se corrigió el item ${cambio.inventoryItemId}: ${err instanceof Error ? err.message : err}`
           );
@@ -264,5 +366,5 @@ async function aplicarCambios(
     }
   }
 
-  return { aplicados, fallidos };
+  return { aplicados, fallidos, fallidosItems };
 }

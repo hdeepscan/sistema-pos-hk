@@ -316,6 +316,7 @@ export class ShopifySyncService {
       // se aplicó aunque su respuesta se perdiera: no se vuelve a descontar.
       if (typeof datos.changeFromQuantity === "number" && actual === datos.changeFromQuantity + cantidad) {
         console.log(`[Sync] Ajuste ya aplicado en un intento anterior (Item=${shopifyInventoryItemId})`);
+        await this.moverBaseConciliacion(shopifyInventoryItemId, cantidad);
         return;
       }
       await (prisma as any).shopifySyncQueue.update({
@@ -341,6 +342,7 @@ export class ShopifySyncService {
         throw new Error(`Error Shopify: ${errores.map((e: any) => e.message).join(", ")}`);
       }
 
+      await this.moverBaseConciliacion(shopifyInventoryItemId, cantidad);
       console.log(`[Sync] ✅ Inventario sincronizado exitosamente`);
     } catch (error) {
       console.error(`[Sync] ❌ Error sincronizando inventario:`, error);
@@ -383,6 +385,28 @@ export class ShopifySyncService {
   /**
    * Sincronizar actualización de producto con Shopify
    */
+  // El ajuste ya quedó en los dos lados: la base de la conciliación (último valor en que
+  // coincidieron) se mueve igual, para que la conciliación no lo cuente como un cambio nuevo.
+  private async moverBaseConciliacion(shopifyInventoryItemId: string, delta: number): Promise<void> {
+    try {
+      const config = await prisma.shopifyConfig.findUnique({
+        where: { empresaId: this.empresaId },
+        select: { sucursalEcommerceId: true },
+      });
+      const producto = await prisma.producto.findFirst({
+        where: { empresaId: this.empresaId, shopifyInventoryItemId },
+        select: { id: true },
+      });
+      if (!config || !producto) return;
+      await prisma.inventarioSucursal.updateMany({
+        where: { productoId: producto.id, sucursalId: config.sucursalEcommerceId, shopifyBase: { not: null } },
+        data: { shopifyBase: { increment: delta } },
+      });
+    } catch (err) {
+      console.warn("[Sync] No se pudo actualizar la base de conciliación:", err instanceof Error ? err.message : err);
+    }
+  }
+
   private async sincronizarProducto(datos: Record<string, any>): Promise<void> {
     if (!this.client) throw new Error("Cliente GraphQL no disponible");
 
