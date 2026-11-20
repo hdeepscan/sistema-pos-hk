@@ -2,7 +2,7 @@ import type { PropsWithChildren } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useSesionStore, usePermiso, useTemaStore } from "../lib/store";
-import { usePedidoShopify } from "../lib/socket";
+import { useMensajeNuevo, usePedidoShopify } from "../lib/socket";
 import { api } from "../lib/api";
 import { reproducir } from "../lib/sonidos";
 import type { PedidoShopifyEvent } from "@sistema-pos/shared";
@@ -38,6 +38,7 @@ import {
   BookOpen,
   LogOut,
   LineChart,
+  MessageCircle,
 } from "lucide-react";
 
 const INTERVALO_CREDITOS_MS = 5 * 60 * 1000;
@@ -59,6 +60,8 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
   const puedeVerReportes = usePermiso("reportes.ver");
   const puedeAdministrarConfiguracion = usePermiso("configuracion.administrar");
   const puedeVerContabilidad = usePermiso("contabilidad.ver");
+  const puedeAtenderMensajes = usePermiso("mensajes.atender");
+  const [mensajesNoLeidos, setMensajesNoLeidos] = useState(0);
   const sucursalActiva = sucursales.find((s) => s.id === sucursalActivaId);
   const [alertas, setAlertas] = useState<(PedidoShopifyEvent & { toastId: string })[]>([]);
   const [creditosVencidos, setCreditosVencidos] = useState(0);
@@ -96,6 +99,23 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
       .then(({ data }) => setPedidosPendientes(data.pendientes))
       .catch(() => {});
   }, []);
+
+  // Conversaciones con mensajes sin leer (Messenger, Instagram, WhatsApp).
+  const cargarMensajesNoLeidos = useCallback(() => {
+    if (!puedeAtenderMensajes) return;
+    api
+      .get<{ total: number }>("/mensajeria/resumen")
+      .then(({ data }) => setMensajesNoLeidos(data.total))
+      .catch(() => {});
+  }, [puedeAtenderMensajes]);
+
+  useEffect(() => {
+    cargarMensajesNoLeidos();
+    const timer = setInterval(cargarMensajesNoLeidos, INTERVALO_CREDITOS_MS);
+    return () => clearInterval(timer);
+  }, [cargarMensajesNoLeidos]);
+
+  useMensajeNuevo(useCallback(() => cargarMensajesNoLeidos(), [cargarMensajesNoLeidos]));
 
   useEffect(() => {
     cargarPendientesShopify();
@@ -286,6 +306,15 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
             <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1 }}>
               <span>Creditos</span>
               {creditosVencidos > 0 && <span className="badge danger" style={{ marginLeft: "auto" }}>{creditosVencidos}</span>}
+            </div>
+          </NavLink>
+        )}
+        {puedeAtenderMensajes && (
+          <NavLink to="/mensajes" data-module="mensajes" className="flex items-center gap-3">
+            <MessageCircle size={20} className="flex-shrink-0" />
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1 }}>
+              <span>Mensajes</span>
+              {mensajesNoLeidos > 0 && <span className="badge danger" style={{ marginLeft: "auto" }}>{mensajesNoLeidos}</span>}
             </div>
           </NavLink>
         )}

@@ -31,6 +31,7 @@ export const PERMISOS = [
   "cotizaciones.crear",
   "cotizaciones.editar",
   "cotizaciones.eliminar",
+  "mensajes.atender",
 ] as const;
 export type Permiso = (typeof PERMISOS)[number];
 
@@ -50,6 +51,7 @@ export const ETIQUETAS_PERMISOS: Record<Permiso, string> = {
   "usuarios.administrar": "Administrar usuarios",
   "devoluciones.realizar": "Realizar devoluciones",
   "descuentos.aplicar": "Aplicar descuentos",
+  "mensajes.atender": "Ver y responder mensajes (Messenger, Instagram, WhatsApp)",
   "facturas.anular": "Anular facturas",
   "ventas.sin_stock": "Vender sin existencias",
   "caja.administrar": "Abrir y cerrar caja",
@@ -84,6 +86,7 @@ export const PERMISOS_POR_ROL: Record<RolUsuario, Permiso[]> = {
     "cotizaciones.crear",
     "cotizaciones.editar",
     "cotizaciones.eliminar",
+    "mensajes.atender",
   ],
   SUPERVISOR: [
     "ventas.ver",
@@ -104,6 +107,7 @@ export const PERMISOS_POR_ROL: Record<RolUsuario, Permiso[]> = {
     "cotizaciones.crear",
     "cotizaciones.editar",
     "cotizaciones.eliminar",
+    "mensajes.atender",
   ],
   CAJERO: [
     "ventas.ver",
@@ -112,6 +116,7 @@ export const PERMISOS_POR_ROL: Record<RolUsuario, Permiso[]> = {
     "creditos.administrar",
     "descuentos.aplicar",
     "caja.administrar",
+    "mensajes.atender",
   ],
   BODEGA: ["inventario.administrar", "productos.administrar", "reportes.ver"],
 };

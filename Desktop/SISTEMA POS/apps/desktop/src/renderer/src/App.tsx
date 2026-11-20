@@ -37,6 +37,8 @@ import CuentasBancarias from "./screens/CuentasBancarias";
 import Calendario from "./screens/Calendario";
 import Contabilidad from "./screens/Contabilidad";
 import Cotizaciones from "./screens/Cotizaciones";
+import Mensajes from "./screens/Mensajes";
+import EliminarDatos from "./screens/legal/EliminarDatos";
 import CheckoutPage from "./screens/CheckoutPage";
 import Suscripcion from "./screens/Suscripcion";
 import SuperAdminAnalytics from "./screens/SuperAdminAnalytics";
@@ -189,6 +191,7 @@ export default function App() {
           <Route path="/legal/terminos" element={<TerminosCondiciones />} />
           <Route path="/legal/cookies" element={<PoliticaCookies />} />
           <Route path="/legal/reembolsos" element={<PoliticaReembolsos />} />
+          <Route path="/legal/eliminar-datos" element={<EliminarDatos />} />
 
           {/* Ruta comodín de Login - DESPUÉS de todas las rutas específicas */}
           <Route path="*" element={<Login />} />
@@ -279,6 +282,7 @@ export default function App() {
           <Route path="/calendario" element={<Calendario />} />
           <Route path="/contabilidad" element={<Contabilidad />} />
           <Route path="/cotizaciones" element={<Cotizaciones />} />
+          <Route path="/mensajes" element={<Mensajes />} />
           <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="/admin/analytics" element={<SuperAdminAnalytics />} />
           <Route path="/perfil" element={<PerfilSettings />} />

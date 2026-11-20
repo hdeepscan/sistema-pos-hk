@@ -38,6 +38,8 @@ import { rutasPagos } from "./routes/pagos.js";
 import { rutasValidar } from "./routes/validar.js";
 import { rutasWebhook } from "./routes/webhook.js";
 import { diagnosticRoutes } from "./routes/diagnostic.js";
+import { mensajeriaRoutes, mensajeriaCallbackRoutes } from "./routes/mensajeria.js";
+import { webhooksMetaRoutes } from "./routes/webhooks-meta.js";
 import adminRoutes from "./routes/admin.js";
 import { iniciarPollerShopify } from "./lib/poller.js";
 import { iniciarBackupAutomatico } from "./lib/auto-backup.js";
@@ -78,6 +80,9 @@ await app.register(rutasPagos);
 await app.register(rutasValidar);
 await app.register(rutasWebhook);
 await app.register(diagnosticRoutes);
+await app.register(mensajeriaRoutes);
+await app.register(mensajeriaCallbackRoutes);
+await app.register(webhooksMetaRoutes);
 await app.register(adminRoutes, { prefix: "/admin" });
 
 app.get("/health", async () => ({ ok: true }));

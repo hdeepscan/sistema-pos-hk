@@ -46,3 +46,11 @@ export function emitVentaCreada(empresaId: string, payload: VentaCreadaEvent) {
 export function emitPedidoShopify(empresaId: string, payload: PedidoShopifyEvent) {
   io?.to(empresaRoom(empresaId)).emit("shopify:pedido-nuevo", payload);
 }
+
+// Mensajería: llegó o se envió un mensaje en una conversación de la empresa.
+export function emitMensajeNuevo(
+  empresaId: string,
+  payload: { conversacionId: string; mensajeId: string; tipoCanal: string }
+) {
+  io?.to(empresaRoom(empresaId)).emit("mensajeria:mensaje", payload);
+}

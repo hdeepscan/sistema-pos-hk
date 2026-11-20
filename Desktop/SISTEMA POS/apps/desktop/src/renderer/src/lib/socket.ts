@@ -50,3 +50,14 @@ export function usePedidoShopify(handler: (event: PedidoShopifyEvent) => void) {
     };
   }, [handler]);
 }
+
+export function useMensajeNuevo(handler: (event: { conversacionId: string; mensajeId: string; tipoCanal: string }) => void) {
+  useEffect(() => {
+    const s = socket;
+    if (!s) return;
+    s.on("mensajeria:mensaje", handler);
+    return () => {
+      s.off("mensajeria:mensaje", handler);
+    };
+  }, [handler]);
+}

@@ -14,6 +14,7 @@ export function MobileMenu() {
   const puedeVerReportes = usePermiso("reportes.ver");
   const puedeAdministrarConfiguracion = usePermiso("configuracion.administrar");
   const puedeVerContabilidad = usePermiso("contabilidad.ver");
+  const puedeAtenderMensajes = usePermiso("mensajes.atender");
   const sucursalActiva = sucursales.find((s) => s.id === sucursalActivaId);
 
   const cerrarMenu = () => setAbierto(false);
@@ -21,6 +22,7 @@ export function MobileMenu() {
   const modules = [
     { path: "/pos", label: "Punto de Venta", icon: "💰" },
     puedeVerVentas && { path: "/ventas", label: "Ventas", icon: "📊" },
+    puedeAtenderMensajes && { path: "/mensajes", label: "Mensajes", icon: "💬" },
     { path: "/caja", label: "Caja", icon: "🏦" },
     { path: "/notificaciones", label: "Notificaciones", icon: "🔔" },
     puedeAdministrarProductos && { path: "/productos", label: "Productos", icon: "📦" },

@@ -1321,3 +1321,75 @@ model MovimientoCaja {
   @@index([fecha])
   @@map("movimientos_caja")
 }
+
+// ---------- Mensajería (Messenger, Instagram, WhatsApp) ----------
+// Tablas nuevas e independientes: no tienen llaves hacia las tablas existentes (empresa y cliente
+// se guardan como id), así agregarlas no toca nada de lo que ya hay.
+
+// Una cuenta conectada por una empresa: página de Facebook (MESSENGER), cuenta de Instagram
+// (INSTAGRAM) o número de WhatsApp (WHATSAPP). El token de Meta se guarda cifrado.
+model CanalMensajeria {
+  id            String   @id @default(uuid())
+  empresaId     String
+  tipo          String   // MESSENGER | INSTAGRAM | WHATSAPP
+  externoId     String   // id de la página, de la cuenta de Instagram o del número
+  paginaId      String?  // Instagram: página de Facebook a la que está vinculada
+  nombre        String
+  usuario       String?  // @usuario de Instagram o número de WhatsApp
+  fotoUrl       String?
+  tokenCifrado  String
+  activo        Boolean  @default(true)
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  conversaciones ConversacionMensajeria[]
+
+  @@unique([tipo, externoId])
+  @@index([empresaId])
+  @@map("canales_mensajeria")
+}
+
+model ConversacionMensajeria {
+  id                 String    @id @default(uuid())
+  empresaId          String
+  canalId            String
+  canal              CanalMensajeria @relation(fields: [canalId], references: [id], onDelete: Cascade)
+  contactoExternoId  String    // id del cliente en Messenger/Instagram, o su número en WhatsApp
+  contactoNombre     String?
+  contactoUsuario    String?
+  contactoFoto       String?
+  clienteId          String?   // cliente de CENTRALA vinculado
+  asignadoAId        String?   // usuario de CENTRALA que la atiende
+  estado             String    @default("ABIERTA") // ABIERTA | CERRADA
+  noLeidos           Int       @default(0)
+  ultimoMensajeEn    DateTime  @default(now())
+  ultimoMensajeTexto String?
+  // Último mensaje del cliente: Meta solo deja responder libremente durante 24 horas después.
+  ultimoEntranteEn   DateTime?
+  creadoEn           DateTime  @default(now())
+
+  mensajes MensajeMensajeria[]
+
+  @@unique([canalId, contactoExternoId])
+  @@index([empresaId, ultimoMensajeEn])
+  @@map("conversaciones_mensajeria")
+}
+
+model MensajeMensajeria {
+  id             String   @id @default(uuid())
+  empresaId      String
+  conversacionId String
+  conversacion   ConversacionMensajeria @relation(fields: [conversacionId], references: [id], onDelete: Cascade)
+  direccion      String   // ENTRANTE | SALIENTE
+  tipo           String   @default("TEXTO") // TEXTO | IMAGEN | AUDIO | VIDEO | ARCHIVO | OTRO
+  texto          String?
+  adjuntoUrl     String?
+  externoId      String?  @unique // id del mensaje en Meta (evita guardarlo dos veces)
+  estado         String   @default("ENVIADO") // ENVIADO | LEIDO | ERROR
+  error          String?
+  usuarioId      String?  // quién lo respondió desde CENTRALA
+  creadoEn       DateTime @default(now())
+
+  @@index([conversacionId, creadoEn])
+  @@map("mensajes_mensajeria")
+}
