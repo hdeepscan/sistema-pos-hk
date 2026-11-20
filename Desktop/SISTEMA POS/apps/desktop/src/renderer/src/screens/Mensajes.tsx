@@ -97,6 +97,7 @@ export default function Mensajes() {
   const [aviso, setAviso] = useState<string | null>(null);
   const [mostrarCanales, setMostrarCanales] = useState(false);
   const [cargando, setCargando] = useState(true);
+  const [importando, setImportando] = useState(false);
   const finRef = useRef<HTMLDivElement>(null);
 
   // Resultado de conectar con Facebook (vuelve con ?conectados= o ?error=).
@@ -193,6 +194,25 @@ export default function Mensajes() {
     }
   }
 
+  async function traerHistorial() {
+    setImportando(true);
+    setError(null);
+    try {
+      const { data } = await api.post<{ conversaciones: number; mensajes: number; errores: string[] }>(
+        "/mensajeria/canales/importar"
+      );
+      setAviso(
+        `✓ ${data.conversaciones} conversación(es) revisadas, ${data.mensajes} mensaje(s) nuevos traídos.` +
+          (data.errores.length ? ` No se pudo con: ${data.errores.join(" · ")}` : "")
+      );
+      cargarConversaciones();
+    } catch (err) {
+      setError(mensajeError(err, "No se pudieron traer las conversaciones"));
+    } finally {
+      setImportando(false);
+    }
+  }
+
   async function desconectar(canal: Canal) {
     if (!confirm(`¿Desconectar ${canal.usuario || canal.nombre}? Dejarán de llegar sus mensajes a CENTRALA.`)) return;
     try {
@@ -267,6 +287,11 @@ export default function Mensajes() {
               <button type="button" onClick={() => void conectarMeta()}>
                 Conectar Facebook e Instagram
               </button>
+              {!sinCanales && (
+                <button type="button" className="secondary" onClick={() => void traerHistorial()} disabled={importando}>
+                  {importando ? "Trayendo conversaciones..." : "Traer conversaciones recientes"}
+                </button>
+              )}
               <button type="button" className="secondary" disabled title="Muy pronto">
                 Conectar WhatsApp (próximamente)
               </button>

@@ -12,7 +12,7 @@ import {
   URL_PLATAFORMA,
   WEBHOOK_META,
 } from "../lib/meta-mensajeria.js";
-import { enviarTextoMeta, VENTANA_RESPUESTA_MS } from "../lib/mensajeria.js";
+import { enviarTextoMeta, importarHistorial, VENTANA_RESPUESTA_MS } from "../lib/mensajeria.js";
 import { emitMensajeNuevo } from "../lib/ws.js";
 
 const CANALES = ["MESSENGER", "INSTAGRAM", "WHATSAPP"] as const;
@@ -115,6 +115,16 @@ export async function mensajeriaCallbackRoutes(app: FastifyInstance) {
         }
       }
 
+      // Trae en segundo plano las conversaciones que ya existían (la pantalla se actualiza sola).
+      void (async () => {
+        const canales = await prisma.canalMensajeria.findMany({ where: { empresaId, activo: true } });
+        for (const c of canales) {
+          await importarHistorial(c.id).catch((err) =>
+            console.error(`[mensajeria] No se pudo traer el historial de ${c.nombre}:`, err instanceof Error ? err.message : err)
+          );
+        }
+      })();
+
       registrarAuditoria({
         empresaId,
         usuarioId,
@@ -202,6 +212,28 @@ export async function mensajeriaRoutes(app: FastifyInstance) {
       entidadId: id,
     });
     return { ok: true };
+  });
+
+  // Trae las conversaciones recientes de todos los canales conectados (historial).
+  app.post("/mensajeria/canales/importar", async (request, reply) => {
+    if (!puedeAtender(request.user.permisos)) return reply.code(403).send({ error: "No tienes permiso" });
+    const canales = await prisma.canalMensajeria.findMany({
+      where: { empresaId: request.user.empresaId, activo: true, tipo: { in: ["MESSENGER", "INSTAGRAM"] } },
+    });
+    let conversaciones = 0;
+    let mensajes = 0;
+    const errores: string[] = [];
+    for (const c of canales) {
+      try {
+        const r = await importarHistorial(c.id);
+        conversaciones += r.conversaciones;
+        mensajes += r.mensajes;
+      } catch (err) {
+        request.log.error(err);
+        errores.push(`${c.usuario || c.nombre}: ${err instanceof Error ? err.message : "error"}`);
+      }
+    }
+    return { conversaciones, mensajes, errores };
   });
 
   // No leídos por canal (para las pestañas y el menú).

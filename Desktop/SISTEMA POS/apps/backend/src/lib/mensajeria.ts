@@ -167,3 +167,123 @@ export async function enviarTextoMeta(
   });
   return r.message_id;
 }
+
+// ---------- Historial: conversaciones que ya existían antes de conectar ----------
+
+const CONVERSACIONES_MAX = 100;
+const MENSAJES_POR_CONVERSACION = 25;
+
+function adjuntoDe(m: any): { tipo: string; url: string | null } {
+  const a = m.attachments?.data?.[0];
+  if (!a) return { tipo: m.message ? "TEXTO" : "OTRO", url: null };
+  if (a.image_data?.url) return { tipo: "IMAGEN", url: a.image_data.url };
+  if (a.video_data?.url) return { tipo: "VIDEO", url: a.video_data.url };
+  if (a.mime_type?.startsWith("audio")) return { tipo: "AUDIO", url: a.file_url ?? null };
+  return { tipo: "ARCHIVO", url: a.file_url ?? null };
+}
+
+/**
+ * Trae las conversaciones recientes de una página (Messenger) o de su Instagram, con sus últimos
+ * mensajes. No marca nada como no leído: es historial. Los mensajes ya guardados no se repiten.
+ */
+export async function importarHistorial(canalId: string): Promise<{ conversaciones: number; mensajes: number }> {
+  const canal = await prisma.canalMensajeria.findUnique({ where: { id: canalId } });
+  if (!canal || !canal.activo || (canal.tipo !== "MESSENGER" && canal.tipo !== "INSTAGRAM")) {
+    return { conversaciones: 0, mensajes: 0 };
+  }
+  const token = descifrar(canal.tokenCifrado);
+  const paginaId = canal.tipo === "INSTAGRAM" ? canal.paginaId ?? canal.externoId : canal.externoId;
+  let conversaciones = 0;
+  let mensajesNuevos = 0;
+  let after: string | undefined;
+
+  while (conversaciones < CONVERSACIONES_MAX) {
+    const data: any = await graph(`${paginaId}/conversations`, {
+      token,
+      params: {
+        platform: canal.tipo === "INSTAGRAM" ? "instagram" : "messenger",
+        fields: `participants,updated_time,messages.limit(${MENSAJES_POR_CONVERSACION}){id,created_time,from,message,attachments}`,
+        limit: "25",
+        ...(after ? { after } : {}),
+      },
+    });
+    const lista: any[] = data?.data ?? [];
+    if (lista.length === 0) break;
+
+    for (const conv of lista) {
+      const participantes: any[] = conv.participants?.data ?? [];
+      const contacto = participantes.find((p) => p.id !== canal.externoId && p.id !== paginaId);
+      if (!contacto?.id) continue;
+      const mensajes: any[] = (conv.messages?.data ?? []).slice().reverse(); // de más antiguo a más reciente
+      if (mensajes.length === 0) continue;
+
+      let conversacion = await prisma.conversacionMensajeria.findUnique({
+        where: { canalId_contactoExternoId: { canalId: canal.id, contactoExternoId: String(contacto.id) } },
+      });
+      if (!conversacion) {
+        const perfil =
+          canal.tipo === "INSTAGRAM"
+            ? { nombre: contacto.name || contacto.username || null, usuario: contacto.username ? `@${contacto.username}` : null, foto: null }
+            : { nombre: contacto.name || null, usuario: null, foto: null };
+        const conPerfil = perfil.nombre ? perfil : await perfilContacto(canal.tipo as TipoCanal, String(contacto.id), token);
+        conversacion = await prisma.conversacionMensajeria.create({
+          data: {
+            empresaId: canal.empresaId,
+            canalId: canal.id,
+            contactoExternoId: String(contacto.id),
+            contactoNombre: conPerfil.nombre,
+            contactoUsuario: conPerfil.usuario,
+            contactoFoto: conPerfil.foto,
+          },
+        });
+      }
+
+      let ultimo: { fecha: Date; resumen: string } | null = null;
+      let ultimoEntrante: Date | null = null;
+      for (const m of mensajes) {
+        const fecha = new Date(m.created_time);
+        const saliente = String(m.from?.id) === canal.externoId || String(m.from?.id) === paginaId;
+        const adj = adjuntoDe(m);
+        const texto: string | null = m.message || null;
+        if (!saliente) ultimoEntrante = fecha;
+        ultimo = {
+          fecha,
+          resumen: texto ?? (adj.tipo === "IMAGEN" ? "📷 Foto" : adj.tipo === "AUDIO" ? "🎤 Audio" : adj.tipo === "VIDEO" ? "🎬 Video" : "📎 Adjunto"),
+        };
+        if (await prisma.mensajeMensajeria.findUnique({ where: { externoId: String(m.id) } })) continue;
+        await prisma.mensajeMensajeria.create({
+          data: {
+            empresaId: canal.empresaId,
+            conversacionId: conversacion.id,
+            direccion: saliente ? "SALIENTE" : "ENTRANTE",
+            tipo: texto ? "TEXTO" : adj.tipo,
+            texto,
+            adjuntoUrl: adj.url,
+            externoId: String(m.id),
+            creadoEn: fecha,
+          },
+        });
+        mensajesNuevos++;
+      }
+
+      if (ultimo && ultimo.fecha >= conversacion.ultimoMensajeEn) {
+        await prisma.conversacionMensajeria.update({
+          where: { id: conversacion.id },
+          data: {
+            ultimoMensajeEn: ultimo.fecha,
+            ultimoMensajeTexto: ultimo.resumen,
+            ...(ultimoEntrante && (!conversacion.ultimoEntranteEn || ultimoEntrante > conversacion.ultimoEntranteEn)
+              ? { ultimoEntranteEn: ultimoEntrante }
+              : {}),
+          },
+        });
+      }
+      conversaciones++;
+    }
+
+    after = data?.paging?.cursors?.after;
+    if (!data?.paging?.next || !after) break;
+  }
+
+  return { conversaciones, mensajes: mensajesNuevos };
+}
