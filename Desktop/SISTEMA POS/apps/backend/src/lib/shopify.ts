@@ -880,7 +880,8 @@ export async function revisarPedidosNuevos(empresaId: string): Promise<OrdenShop
     `https://${shopDomain}/admin/api/${API_VERSION}/orders.json?status=any&created_at_min=${desde.toISOString()}&limit=50`,
     { headers: { "X-Shopify-Access-Token": token } }
   );
-  if (!res.ok) return [];
+  // Antes un error aquí devolvía "sin pedidos" en silencio y nadie se enteraba.
+  if (!res.ok) throw new Error(`Shopify no entregó los pedidos (${res.status}): ${(await res.text()).slice(0, 200)}`);
   const data = (await res.json()) as { orders: OrdenShopify[] };
 
   await prisma.shopifyConfig.update({ where: { empresaId }, data: { ultimaAlertaOrdenes: new Date() } });

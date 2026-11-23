@@ -608,7 +608,10 @@ export async function shopifyRoutes(app: FastifyInstance) {
       const resultado = await importarProductosFaltantesDeShopify(request.user.empresaId, { todos: true });
       // También las variantes nuevas de productos que ya estaban en CENTRALA.
       const variantes = await importarVariantesNuevasDeShopify(request.user.empresaId, { todos: true });
-      return { ...resultado, variantesNuevas: variantes.detalle };
+      // Ventas de Shopify que entraron antes de que existiera el producto: se completan.
+      const { completarVentasShopify } = await import("../lib/shopify-ventas-completar.js");
+      const lineasCompletadas = await completarVentasShopify(request.user.empresaId).catch(() => 0);
+      return { ...resultado, variantesNuevas: variantes.detalle, lineasCompletadas };
     } catch (err) {
       return reply.code(502).send({ error: err instanceof Error ? err.message : "Error consultando Shopify" });
     }
@@ -644,6 +647,12 @@ export async function shopifyRoutes(app: FastifyInstance) {
     } catch (err) {
       return reply.code(502).send({ error: err instanceof Error ? err.message : "Error consultando Shopify" });
     }
+  });
+
+  // Estado de la sincronización automática (último resultado de cada paso).
+  app.get("/shopify/sincronizacion/estado", async (request) => {
+    const { estadoSincronizacion } = await import("../lib/sincronizacion-estado.js");
+    return estadoSincronizacion(request.user.empresaId);
   });
 
   // Trae de Shopify el precio de venta y el precio mayorista de todo el catálogo.

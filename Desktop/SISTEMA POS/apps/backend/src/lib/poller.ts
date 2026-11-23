@@ -6,6 +6,8 @@ import { importarProductosNuevosDeShopify } from "./shopify-productos-nuevos.js"
 import { importarVariantesNuevasDeShopify } from "./shopify-variantes-nuevas.js";
 import { sincronizarPreciosMayoristas } from "./shopify-precio-mayorista.js";
 import { sincronizarPreciosDesdeShopify } from "./shopify-precios.js";
+import { completarVentasShopify } from "./shopify-ventas-completar.js";
+import { registrarPaso } from "./sincronizacion-estado.js";
 import { archivarProductosEliminadosEnShopify } from "./shopify-productos-eliminados.js";
 
 const INTERVALO_MS = 60_000;
@@ -148,6 +150,7 @@ async function revisarTodasLasEmpresas() {
   }
   for (const { empresaId, sucursalEcommerceId } of configs) {
     let algunPedidoFallo = false;
+    let nuevosProductos = false;
     try {
       const ordenes = await revisarPedidosNuevos(empresaId);
       for (const orden of ordenes) {
@@ -195,37 +198,69 @@ async function revisarTodasLasEmpresas() {
           console.error(`[poller] No se pudo crear la venta del pedido ${orden.name}:`, err);
         });
       }
+      registrarPaso(empresaId, "pedidos", !algunPedidoFallo, algunPedidoFallo ? "Algún pedido no se pudo registrar como venta" : null);
     } catch (err) {
       console.error(`[poller] Error revisando pedidos de la empresa ${empresaId}:`, err);
-      // Sin los pedidos al día, corregir Shopify podría devolverle unidades ya vendidas allá.
-      continue;
+      registrarPaso(empresaId, "pedidos", false, err instanceof Error ? err.message : String(err));
+      // Sin los pedidos al día no se concilia el inventario, pero lo demás (productos nuevos,
+      // precios...) sigue: antes un error aquí detenía también la importación de productos.
+      algunPedidoFallo = true;
     }
 
     // Productos creados directamente en Shopify: se traen a CENTRALA con su stock.
     try {
-      const importados = await importarProductosNuevosDeShopify(empresaId);
+      const resultado = await importarProductosNuevosDeShopify(empresaId);
+      const importados = resultado.importados;
+      registrarPaso(empresaId, "productosNuevos", true, importados > 0 ? `${importados} importado(s)` : null);
+      if (importados > 0) nuevosProductos = true;
+      // Productos que no se pudieron traer (ej. SKU repetido): queda a la vista en la pantalla de Shopify.
+      const omitidos = resultado.productos.filter((p) => p.estado === "omitido" || p.estado === "error");
+      if (omitidos.length > 0) {
+        registrarPaso(
+          empresaId,
+          "productosOmitidos",
+          false,
+          omitidos.slice(0, 5).map((p) => `${p.titulo}: ${p.motivo ?? p.estado}`).join(" · ")
+        );
+      }
       if (importados > 0) {
         console.log(`[poller] Empresa ${empresaId.slice(0, 8)}: ${importados} producto(s) nuevo(s) importado(s) desde Shopify`);
       }
     } catch (err) {
       console.error(`[poller] Error importando productos nuevos de la empresa ${empresaId}:`, err instanceof Error ? err.message : err);
+      registrarPaso(empresaId, "productosNuevos", false, err instanceof Error ? err.message : String(err));
     }
 
     // Variantes nuevas creadas en Shopify en productos que ya están en CENTRALA.
     try {
       const { importadas } = await importarVariantesNuevasDeShopify(empresaId);
+      registrarPaso(empresaId, "variantesNuevas", true, importadas > 0 ? `${importadas} importada(s)` : null);
+      if (importadas > 0) nuevosProductos = true;
       if (importadas > 0) {
         console.log(`[poller] Empresa ${empresaId.slice(0, 8)}: ${importadas} variante(s) nueva(s) importada(s) desde Shopify`);
       }
     } catch (err) {
       console.error(`[poller] Error importando variantes nuevas de la empresa ${empresaId}:`, err instanceof Error ? err.message : err);
+      registrarPaso(empresaId, "variantesNuevas", false, err instanceof Error ? err.message : String(err));
+    }
+
+    // Pedidos que entraron antes de que existiera el producto en CENTRALA: completar sus líneas.
+    if (nuevosProductos) {
+      try {
+        const agregadas = await completarVentasShopify(empresaId);
+        if (agregadas > 0) registrarPaso(empresaId, "ventasCompletadas", true, `${agregadas} línea(s) agregadas a ventas de Shopify`);
+      } catch (err) {
+        registrarPaso(empresaId, "ventasCompletadas", false, err instanceof Error ? err.message : String(err));
+      }
     }
 
     // Precio de venta cambiado en Shopify.
     try {
       await sincronizarPreciosDesdeShopify(empresaId);
+      registrarPaso(empresaId, "precios", true);
     } catch (err) {
       console.error(`[poller] Error leyendo precios de la empresa ${empresaId}:`, err instanceof Error ? err.message : err);
+      registrarPaso(empresaId, "precios", false, err instanceof Error ? err.message : String(err));
     }
 
     // Precio mayorista (metacampo de Shopify) de los productos modificados.
@@ -253,6 +288,12 @@ async function revisarTodasLasEmpresas() {
     if (!tocaConciliar || algunPedidoFallo) continue;
     try {
       const r = await conciliarInventario(empresaId, true);
+      registrarPaso(
+        empresaId,
+        "inventario",
+        !r.omitido && r.fallidos.length === 0,
+        r.omitido ?? (r.fallidos.length ? `No se pudo corregir: ${r.fallidos.slice(0, 5).join(", ")}` : null)
+      );
       if (r.corregidos > 0 || r.corregidosCentrala > 0 || r.omitido) {
         console.log(
           `[conciliacion] Empresa ${empresaId.slice(0, 8)}: ${r.corregidos} a Shopify, ${r.corregidosCentrala} a CENTRALA, ` +
@@ -262,6 +303,7 @@ async function revisarTodasLasEmpresas() {
       }
     } catch (err) {
       console.error(`[conciliacion] Error en la empresa ${empresaId}:`, err instanceof Error ? err.message : err);
+      registrarPaso(empresaId, "inventario", false, err instanceof Error ? err.message : String(err));
     }
   }
 }

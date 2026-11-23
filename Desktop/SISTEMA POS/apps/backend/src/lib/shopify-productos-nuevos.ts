@@ -105,10 +105,10 @@ export async function importarProductosFaltantesDeShopify(
 }
 
 // Usado por el poller cada minuto.
-export async function importarProductosNuevosDeShopify(empresaId: string): Promise<number> {
+export async function importarProductosNuevosDeShopify(empresaId: string): Promise<ResultadoImportacion> {
   const config = await prisma.shopifyConfig.findUnique({ where: { empresaId }, select: { accessToken: true } });
-  if (!config?.accessToken) return 0;
-  return (await importarProductosFaltantesDeShopify(empresaId)).importados;
+  if (!config?.accessToken) return { revisados: 0, importados: 0, productos: [] };
+  return importarProductosFaltantesDeShopify(empresaId);
 }
 
 /**

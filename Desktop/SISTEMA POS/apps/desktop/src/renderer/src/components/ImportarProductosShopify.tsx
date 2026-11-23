@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { mensajeError } from '../lib/errores';
 
@@ -16,6 +16,71 @@ interface ResultadoImportacion {
   productos: ResultadoProducto[];
   // Variantes nuevas creadas en Shopify en productos que ya estaban en CENTRALA.
   variantesNuevas?: { producto: string; variante: string; sku: string }[];
+  lineasCompletadas?: number;
+}
+
+interface EstadoPaso {
+  ultimaVez: string;
+  ok: boolean;
+  detalle: string | null;
+}
+
+const PASOS: [string, string][] = [
+  ['pedidos', 'Pedidos de la tienda online'],
+  ['productosNuevos', 'Productos nuevos'],
+  ['productosOmitidos', 'Productos que no se pudieron traer'],
+  ['variantesNuevas', 'Variantes nuevas'],
+  ['ventasCompletadas', 'Ventas completadas'],
+  ['precios', 'Precios'],
+  ['inventario', 'Inventario (cada 5 minutos)'],
+];
+
+function haceCuanto(fecha: string): string {
+  const min = Math.round((Date.now() - new Date(fecha).getTime()) / 60000);
+  if (min < 1) return 'hace un momento';
+  if (min < 60) return `hace ${min} min`;
+  const h = Math.round(min / 60);
+  return `hace ${h} h`;
+}
+
+// Último resultado de cada paso de la sincronización automática (cada minuto).
+function EstadoSincronizacion() {
+  const [estado, setEstado] = useState<Record<string, EstadoPaso> | null>(null);
+  useEffect(() => {
+    const cargar = () =>
+      api
+        .get<Record<string, EstadoPaso>>('/shopify/sincronizacion/estado')
+        .then(({ data }) => setEstado(data))
+        .catch(() => setEstado(null));
+    cargar();
+    const t = setInterval(cargar, 60_000);
+    return () => clearInterval(t);
+  }, []);
+  if (!estado) return null;
+  const pasos = PASOS.filter(([clave]) => estado[clave]);
+  return (
+    <div style={{ margin: '0 0 16px', padding: '10px 12px', borderRadius: 10, background: 'var(--bg-secondary, #f8fafc)', fontSize: 13 }}>
+      <strong style={{ display: 'block', marginBottom: 6 }}>Sincronización automática</strong>
+      {pasos.length === 0 ? (
+        <span style={{ color: 'var(--text-muted)' }}>Todavía no ha corrido desde el último reinicio del servidor (corre cada minuto).</span>
+      ) : (
+        <ul style={{ margin: 0, paddingLeft: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {pasos.map(([clave, nombre]) => {
+            const p = estado[clave];
+            return (
+              <li key={clave}>
+                <span style={{ color: p.ok ? 'var(--success, #16a34a)' : 'var(--danger, #dc2626)', fontWeight: 700 }}>
+                  {p.ok ? '✓' : '✗'}
+                </span>{' '}
+                {nombre} <span style={{ color: 'var(--text-muted)' }}>· {haceCuanto(p.ultimaVez)}</span>
+                {p.detalle && <div style={{ marginLeft: 18, color: p.ok ? 'var(--text-muted)' : 'var(--danger, #dc2626)' }}>{p.detalle}</div>}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 const ETIQUETA: Record<ResultadoProducto['estado'], string> = {
@@ -69,6 +134,7 @@ export default function ImportarProductosShopify() {
     <div style={{ maxWidth: 800, margin: '24px auto', padding: '0 24px' }}>
       <div className="card">
         <h3 style={{ marginTop: 0 }}>Productos creados en Shopify</h3>
+        <EstadoSincronizacion />
         <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 0 }}>
           Cada minuto CENTRALA trae automáticamente los productos y las variantes nuevas creadas en Shopify (si una
           variante viene sin SKU, CENTRALA le genera uno y lo guarda también en Shopify). Con este botón revisas
@@ -116,6 +182,12 @@ export default function ImportarProductosShopify() {
             </p>
             {resultado.productos.length === 0 && !resultado.variantesNuevas?.length && (
               <p style={{ margin: 0 }}>Todos los productos de Shopify ya están en CENTRALA.</p>
+            )}
+            {!!resultado.lineasCompletadas && (
+              <p style={{ margin: '0 0 8px', color: 'var(--success, #16a34a)' }}>
+                {resultado.lineasCompletadas} producto(s) agregados a ventas de Shopify que habían entrado antes de que el
+                producto existiera en CENTRALA.
+              </p>
             )}
             {!!resultado.variantesNuevas?.length && (
               <div style={{ margin: '0 0 10px' }}>
