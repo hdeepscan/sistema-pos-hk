@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import { mensajeError } from '../lib/errores';
 
@@ -219,7 +220,15 @@ export default function ImportarProductosShopify() {
                 <tbody>
                   {[...importados, ...conProblema, ...recientes].map((p) => (
                     <tr key={p.shopifyProductId}>
-                      <td>{p.titulo}</td>
+                      <td>
+                        {p.estado === 'importado' || p.estado === 'reactivado' || p.estado === 'ya_existe' ? (
+                          <Link to={`/productos?buscar=${encodeURIComponent(p.titulo)}`} title="Ver en Productos">
+                            {p.titulo}
+                          </Link>
+                        ) : (
+                          p.titulo
+                        )}
+                      </td>
                       <td
                         style={{
                           color:

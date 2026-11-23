@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { api } from "../lib/api";
 import { useSesionStore } from "../lib/store";
 import { leerArchivoComoDataUrl } from "../lib/files";
@@ -127,7 +128,9 @@ function Miniatura({ url, size = 40 }: { url: string | null; size?: number }) {
 
 export default function Productos() {
   const [productos, setProductos] = useState<Producto[]>([]);
-  const [busqueda, setBusqueda] = useState("");
+  const location = useLocation();
+  // Se puede abrir ya filtrado: /productos?buscar=Body%20Morela (desde la pantalla de Shopify).
+  const [busqueda, setBusqueda] = useState(() => new URLSearchParams(location.search).get("buscar") ?? "");
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
   const [detalle, setDetalle] = useState<ProductoDetalle | null>(null);
   const [colecciones, setColecciones] = useState<Coleccion[]>([]);

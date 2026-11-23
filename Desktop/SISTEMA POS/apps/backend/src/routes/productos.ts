@@ -57,6 +57,11 @@ async function historialDeProductos(ids: string[]): Promise<string[]> {
   );
 }
 
+// Texto para buscar: sin tildes y en minúsculas ("Mórela" → "morela").
+function normalizarBusqueda(texto: string): string {
+  return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
 function valoresDeTitulo(titulo: string | null): string[] {
   return titulo ? titulo.split("/").map((v) => v.trim()).filter(Boolean) : [];
 }
@@ -127,21 +132,14 @@ export async function productosRoutes(app: FastifyInstance) {
     const { empresaId } = request.user;
     const { q, sucursalId } = request.query as { q?: string; sucursalId?: string };
     // Cada palabra debe aparecer en algún campo: "blusa negro m" encuentra esa variante exacta.
-    const terminos = (q ?? "").trim().split(/\s+/).filter(Boolean);
-    const productos = await prisma.producto.findMany({
+    // Se compara sin tildes ni mayúsculas, y "sesgos" encuentra "sesgo": antes "morela" no
+    // encontraba "Mórela" y parecía que el producto no existía.
+    const terminos = (q ?? "").trim().split(/\s+/).filter(Boolean).map(normalizarBusqueda);
+    const productosTodos = await prisma.producto.findMany({
       where: {
         empresaId,
         activo: true,
         AND: [
-          ...terminos.map((t) => ({
-            OR: [
-              { nombre: { contains: t, mode: "insensitive" as const } },
-              { sku: { contains: t, mode: "insensitive" as const } },
-              { codigoBarras: { contains: t, mode: "insensitive" as const } },
-              { categoria: { contains: t, mode: "insensitive" as const } },
-              { varianteTitulo: { contains: t, mode: "insensitive" as const } },
-            ],
-          })),
           ...(sucursalId
             ? [{ OR: [{ sucursalesDisponibles: { none: {} } }, { sucursalesDisponibles: { some: { sucursalId } } }] }]
             : []),
@@ -150,6 +148,17 @@ export async function productosRoutes(app: FastifyInstance) {
       include: sucursalId ? { inventario: { where: { sucursalId } } } : undefined,
       orderBy: { nombre: "asc" },
     });
+    const productos =
+      terminos.length === 0
+        ? productosTodos
+        : productosTodos.filter((p) => {
+            const texto = normalizarBusqueda(
+              [p.nombre, p.sku, p.codigoBarras, p.categoria, p.varianteTitulo, p.marca].filter(Boolean).join(" ")
+            );
+            return terminos.every(
+              (t) => texto.includes(t) || (t.length > 3 && t.endsWith("s") && texto.includes(t.slice(0, -1)))
+            );
+          });
     // stockSucursal solo viene cuando se pide con sucursalId (lo usa el POS
     // para avisar de falta de existencias antes de cobrar).
     return productos.map((p) => {
