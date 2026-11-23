@@ -12,6 +12,9 @@ import { ShopifyGraphQLClient } from "./shopify-graphql.js";
 const MAX_PAGINAS = 10;
 // Revisión completa desde el botón: hasta 10.000 productos.
 const MAX_PAGINAS_TODOS = 100;
+// En la revisión completa se listan los productos creados en Shopify en estos días aunque ya
+// estuvieran en CENTRALA, para que se vea que llegaron.
+const DIAS_RECIENTES = 14;
 
 // Productos que no se importan (SKU ya usado en CENTRALA): se recuerdan para no
 // consultarlos ni registrarlos en el log cada minuto.
@@ -24,7 +27,7 @@ function idNumerico(id: string): string {
 export interface ResultadoProducto {
   shopifyProductId: string;
   titulo: string;
-  estado: "importado" | "ya_existe" | "omitido" | "error";
+  estado: "importado" | "ya_existe" | "reactivado" | "omitido" | "error";
   motivo?: string;
   variantes?: number;
 }
@@ -53,6 +56,8 @@ export async function importarProductosFaltantesDeShopify(
   const filtro = opciones.todos ? "" : `created_at:>'${config.creadoEn.toISOString()}'`;
   const maxPaginas = opciones.todos ? MAX_PAGINAS_TODOS : MAX_PAGINAS;
   const faltantes: { id: string; titulo: string }[] = [];
+  const reactivados: ResultadoProducto[] = [];
+  const recientesYaEstaban: ResultadoProducto[] = [];
   let revisados = 0;
   let after: string | null = null;
 
@@ -62,23 +67,39 @@ export async function importarProductosFaltantesDeShopify(
         query ProductosRecientes($after: String, $filtro: String) {
           products(first: 100, after: $after, sortKey: CREATED_AT, reverse: true, query: $filtro) {
             pageInfo { hasNextPage endCursor }
-            nodes { id title }
+            nodes { id title status createdAt }
           }
         }
       `,
       variables: { after, filtro: filtro || null },
     });
-    const nodos: { id: string; title: string }[] = data?.products?.nodes ?? [];
+    const nodos: { id: string; title: string; status: string; createdAt: string }[] = data?.products?.nodes ?? [];
     if (nodos.length === 0) break;
     revisados += nodos.length;
     const ids = nodos.map((n) => idNumerico(n.id));
 
     const existentes = await prisma.producto.findMany({
       where: { empresaId, shopifyProductId: { in: ids } },
-      select: { shopifyProductId: true },
-      distinct: ["shopifyProductId"],
+      select: { shopifyProductId: true, activo: true },
     });
     const conocidos = new Set(existentes.map((p) => p.shopifyProductId));
+    const conAlgunaActiva = new Set(existentes.filter((p) => p.activo).map((p) => p.shopifyProductId));
+
+    if (opciones.todos) {
+      for (const n of nodos) {
+        const id = idNumerico(n.id);
+        if (!conocidos.has(id)) continue;
+        // Está en CENTRALA pero archivado, y en Shopify sigue a la venta: antes el botón lo daba
+        // por "ya importado" y no se veía en ningún lado. Se reactiva.
+        if (!conAlgunaActiva.has(id) && n.status !== "ARCHIVED") {
+          await prisma.producto.updateMany({ where: { empresaId, shopifyProductId: id }, data: { activo: true } });
+          reactivados.push({ shopifyProductId: id, titulo: n.title, estado: "reactivado", motivo: "Estaba archivado en CENTRALA" });
+        } else if (Date.now() - new Date(n.createdAt).getTime() < DIAS_RECIENTES * 24 * 60 * 60 * 1000) {
+          // Recientes que ya estaban: se listan para que se vea que sí llegaron.
+          recientesYaEstaban.push({ shopifyProductId: id, titulo: n.title, estado: "ya_existe" });
+        }
+      }
+    }
     const nuevosPagina = nodos
       .map((n) => ({ id: idNumerico(n.id), titulo: n.title }))
       .filter((n) => !conocidos.has(n.id) && (opciones.todos || !omitidos.has(`${empresaId}:${n.id}`)));
@@ -101,7 +122,8 @@ export async function importarProductosFaltantesDeShopify(
     }
   }
 
-  return { revisados, importados: productos.filter((p) => p.estado === "importado").length, productos };
+  productos.push(...reactivados, ...recientesYaEstaban);
+  return { revisados, importados: productos.filter((p) => p.estado === "importado" || p.estado === "reactivado").length, productos };
 }
 
 // Usado por el poller cada minuto.

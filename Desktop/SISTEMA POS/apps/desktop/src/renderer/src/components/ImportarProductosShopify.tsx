@@ -5,7 +5,7 @@ import { mensajeError } from '../lib/errores';
 interface ResultadoProducto {
   shopifyProductId: string;
   titulo: string;
-  estado: 'importado' | 'ya_existe' | 'omitido' | 'error';
+  estado: 'importado' | 'ya_existe' | 'reactivado' | 'omitido' | 'error';
   motivo?: string;
   variantes?: number;
 }
@@ -85,7 +85,8 @@ function EstadoSincronizacion() {
 
 const ETIQUETA: Record<ResultadoProducto['estado'], string> = {
   importado: 'Importado',
-  ya_existe: 'Ya estaba',
+  ya_existe: 'Ya estaba en CENTRALA',
+  reactivado: 'Reactivado',
   omitido: 'No importado',
   error: 'Error',
 };
@@ -128,7 +129,8 @@ export default function ImportarProductosShopify() {
   }
 
   const conProblema = resultado?.productos.filter((p) => p.estado === 'omitido' || p.estado === 'error') ?? [];
-  const importados = resultado?.productos.filter((p) => p.estado === 'importado') ?? [];
+  const importados = resultado?.productos.filter((p) => p.estado === 'importado' || p.estado === 'reactivado') ?? [];
+  const recientes = resultado?.productos.filter((p) => p.estado === 'ya_existe') ?? [];
 
   return (
     <div style={{ maxWidth: 800, margin: '24px auto', padding: '0 24px' }}>
@@ -205,7 +207,7 @@ export default function ImportarProductosShopify() {
               </div>
             )}
 
-            {[...importados, ...conProblema].length > 0 && (
+            {[...importados, ...conProblema, ...recientes].length > 0 && (
               <table style={{ width: '100%' }}>
                 <thead>
                   <tr>
@@ -215,13 +217,28 @@ export default function ImportarProductosShopify() {
                   </tr>
                 </thead>
                 <tbody>
-                  {[...importados, ...conProblema].map((p) => (
+                  {[...importados, ...conProblema, ...recientes].map((p) => (
                     <tr key={p.shopifyProductId}>
                       <td>{p.titulo}</td>
-                      <td style={{ color: p.estado === 'importado' ? 'var(--success, #16a34a)' : 'var(--danger, #dc2626)' }}>
+                      <td
+                        style={{
+                          color:
+                            p.estado === 'importado' || p.estado === 'reactivado'
+                              ? 'var(--success, #16a34a)'
+                              : p.estado === 'ya_existe'
+                                ? 'var(--text-muted)'
+                                : 'var(--danger, #dc2626)',
+                        }}
+                      >
                         {ETIQUETA[p.estado]}
                       </td>
-                      <td>{p.estado === 'importado' ? `${p.variantes} variante(s)` : p.motivo}</td>
+                      <td>
+                        {p.estado === 'importado'
+                          ? `${p.variantes} variante(s)`
+                          : p.estado === 'ya_existe'
+                            ? 'Creado en Shopify estos días; ya está activo en CENTRALA'
+                            : p.motivo}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
