@@ -88,6 +88,10 @@ export async function sincronizarPreciosMayoristas(
             pageInfo { hasNextPage endCursor }
             nodes {
               id
+              title
+              productType
+              vendor
+              descriptionHtml
               metafields(first: 15) { nodes { namespace key value type definition { name } } }
             }
           }
@@ -100,6 +104,9 @@ export async function sincronizarPreciosMayoristas(
 
     for (const p of productos) {
       revisados++;
+      // Nombre, categoría, marca y descripción vienen de Shopify. Antes no se actualizaban: un
+      // producto importado mientras se creaba quedaba para siempre como "Sin título 21 de nov…".
+      await actualizarDatosProducto(empresaId, p.id.slice(p.id.lastIndexOf("/") + 1), p);
       const precio = precioMayoristaDe(p.metafields?.nodes ?? []);
       // Sin metacampo mayorista en este producto: no se toca lo que tenga CENTRALA.
       if (precio === undefined) continue;
@@ -122,6 +129,54 @@ export async function sincronizarPreciosMayoristas(
 
   ultimaRevision.set(empresaId, inicio);
   return { revisados, actualizados };
+}
+
+export function textoDeHtml(html: string | null | undefined): string | null {
+  if (!html) return null;
+  const texto = html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|li|h\d)>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return texto || null;
+}
+
+async function actualizarDatosProducto(
+  empresaId: string,
+  shopifyProductId: string,
+  p: { title?: string; productType?: string; vendor?: string; descriptionHtml?: string }
+) {
+  const nombre = p.title?.trim();
+  if (!nombre) return;
+  // Si en Shopify están vacías, se deja lo que la tienda tenga en CENTRALA.
+  const categoria = p.productType?.trim() || undefined;
+  const marca = p.vendor?.trim() || undefined;
+  const descripcion = textoDeHtml(p.descriptionHtml) ?? undefined;
+  const datos = { nombre, categoria, marca, descripcion };
+  const local = await prisma.producto.findFirst({
+    where: { empresaId, shopifyProductId },
+    select: { nombre: true, categoria: true, marca: true, descripcion: true },
+  });
+  if (!local) return;
+  if (
+    local.nombre === nombre &&
+    (categoria === undefined || local.categoria === categoria) &&
+    (marca === undefined || local.marca === marca) &&
+    (descripcion === undefined || local.descripcion === descripcion)
+  ) {
+    return;
+  }
+  await prisma.producto.updateMany({ where: { empresaId, shopifyProductId }, data: datos });
+  if (local.nombre !== datos.nombre) {
+    console.log(`[shopify] Producto renombrado desde Shopify: "${local.nombre}" → "${datos.nombre}"`);
+  }
 }
 
 /** Escribe el precio mayorista en el metacampo del producto en Shopify (crea el valor si no estaba). */

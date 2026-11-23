@@ -1,6 +1,7 @@
 import { prisma } from "./prisma.js";
 import { asegurarUbicacionEcommerce } from "./shopify.js";
 import { ShopifyGraphQLClient } from "./shopify-graphql.js";
+import { textoDeHtml } from "./shopify-precio-mayorista.js";
 
 // Trae a CENTRALA los productos creados directamente en Shopify. Se ejecuta desde el
 // poller (cada minuto) y desde el webhook products/create.
@@ -116,7 +117,12 @@ export async function importarProductosFaltantesDeShopify(
         }
       }
     }
+    // Shopify guarda el producto mientras se crea con un nombre provisional ("Sin título 21 de
+    // nov., 5:48 p.m."). En automático se espera a que tenga su nombre real (máximo 30 min).
+    const provisional = (n: { title: string; createdAt: string }) =>
+      /^(sin t[ií]tulo|untitled)/i.test(n.title.trim()) && Date.now() - new Date(n.createdAt).getTime() < 30 * 60_000;
     const nuevosPagina = nodos
+      .filter((n) => opciones.todos || !provisional(n))
       .map((n) => ({ id: idNumerico(n.id), titulo: n.title }))
       .filter((n) => !conocidos.has(n.id) && (opciones.todos || !omitidos.has(`${empresaId}:${n.id}`)));
     faltantes.push(...nuevosPagina);
@@ -283,7 +289,7 @@ export async function importarProductoShopify(empresaId: string, shopifyProductI
         data: {
           empresaId,
           nombre: producto.title,
-          descripcion: producto.descriptionHtml || null,
+          descripcion: textoDeHtml(producto.descriptionHtml),
           categoria: producto.productType || null,
           marca: producto.vendor || null,
           activo: producto.status !== "ARCHIVED",

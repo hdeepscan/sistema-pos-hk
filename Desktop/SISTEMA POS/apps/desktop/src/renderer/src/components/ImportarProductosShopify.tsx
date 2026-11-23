@@ -151,12 +151,12 @@ export default function ImportarProductosShopify() {
             {cargando ? 'Revisando Shopify...' : 'Traer productos nuevos de Shopify'}
           </button>
           <button type="button" className="secondary" onClick={() => void traerMayoristas()} disabled={cargandoMayoristas}>
-            {cargandoMayoristas ? 'Leyendo precios...' : 'Traer precios de Shopify'}
+            {cargandoMayoristas ? 'Leyendo precios...' : 'Actualizar nombres y precios'}
           </button>
         </div>
         <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '8px 0 0' }}>
-          Si cambias un precio en Shopify, CENTRALA lo trae solo en 1 o 2 minutos (también el precio mayorista, del
-          metacampo "Precio Mayorista"). El botón revisa todo el catálogo de una vez.
+          Si cambias en Shopify el nombre, la categoría, la descripción o el precio (también el mayorista, del metacampo
+          "Precio Mayorista"), CENTRALA lo trae solo en 1 o 2 minutos. Este botón revisa todo el catálogo de una vez.
         </p>
         {mayoristas && (
           <div style={{ fontSize: 13, margin: '8px 0 0' }}>

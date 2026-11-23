@@ -42,13 +42,13 @@ export async function sincronizarPreciosDesdeShopify(
         query PreciosVariantes($after: String, $filtro: String, $n: Int!) {
           productVariants(first: $n, after: $after, query: $filtro) {
             pageInfo { hasNextPage endCursor }
-            nodes { id price }
+            nodes { id price title }
           }
         }
       `,
       variables: { after, filtro, n: POR_PAGINA },
     });
-    const variantes: { id: string; price: string }[] = data?.productVariants?.nodes ?? [];
+    const variantes: { id: string; price: string; title: string }[] = data?.productVariants?.nodes ?? [];
     if (variantes.length === 0) break;
     revisadas += variantes.length;
 
@@ -57,6 +57,15 @@ export async function sincronizarPreciosDesdeShopify(
       where: { empresaId, shopifyVariantId: { in: [...precioPorVariante.keys()] } },
       select: { id: true, nombre: true, varianteTitulo: true, precio: true, shopifyVariantId: true },
     });
+    // Nombre de la variante (talla / color) cambiado en Shopify.
+    const tituloPorVariante = new Map(variantes.map((v) => [idNumerico(v.id), v.title]));
+    for (const p of locales) {
+      const titulo = tituloPorVariante.get(p.shopifyVariantId!);
+      const varianteTitulo = titulo && titulo !== "Default Title" ? titulo : null;
+      if (titulo !== undefined && varianteTitulo !== p.varianteTitulo) {
+        await prisma.producto.update({ where: { id: p.id }, data: { varianteTitulo } });
+      }
+    }
     for (const p of locales) {
       const ahora = precioPorVariante.get(p.shopifyVariantId!);
       if (ahora === undefined || !Number.isFinite(ahora) || ahora === Number(p.precio)) continue;
