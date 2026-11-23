@@ -198,12 +198,9 @@ export default function Mensajes() {
     setImportando(true);
     setError(null);
     try {
-      const { data } = await api.post<{ conversaciones: number; mensajes: number; errores: string[] }>(
-        "/mensajeria/canales/importar"
-      );
+      await api.post("/mensajeria/canales/importar");
       setAviso(
-        `✓ ${data.conversaciones} conversación(es) revisadas, ${data.mensajes} mensaje(s) nuevos traídos.` +
-          (data.errores.length ? ` No se pudo con: ${data.errores.join(" · ")}` : "")
+        "Trayendo el historial en segundo plano. Las conversaciones van apareciendo solas; con muchos chats puede tardar unos minutos."
       );
       cargarConversaciones();
     } catch (err) {
@@ -289,7 +286,7 @@ export default function Mensajes() {
               </button>
               {!sinCanales && (
                 <button type="button" className="secondary" onClick={() => void traerHistorial()} disabled={importando}>
-                  {importando ? "Trayendo conversaciones..." : "Traer conversaciones recientes"}
+                  {importando ? "Iniciando..." : "Traer todo el historial"}
                 </button>
               )}
               <button type="button" className="secondary" disabled title="Muy pronto">

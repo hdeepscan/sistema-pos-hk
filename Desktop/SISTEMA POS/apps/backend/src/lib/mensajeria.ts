@@ -170,8 +170,24 @@ export async function enviarTextoMeta(
 
 // ---------- Historial: conversaciones que ya existían antes de conectar ----------
 
-const CONVERSACIONES_MAX = 100;
-const MENSAJES_POR_CONVERSACION = 25;
+// Historial completo: todas las conversaciones y hasta 500 mensajes por conversación (Meta
+// entrega de a 50; se siguen las páginas).
+const CONVERSACIONES_MAX = 5000;
+const MENSAJES_POR_PAGINA = 50;
+const MENSAJES_MAX_POR_CONVERSACION = 500;
+
+async function todosLosMensajes(conv: any): Promise<any[]> {
+  const mensajes: any[] = [...(conv.messages?.data ?? [])];
+  let siguiente: string | undefined = conv.messages?.paging?.next;
+  while (siguiente && mensajes.length < MENSAJES_MAX_POR_CONVERSACION) {
+    const res = await fetch(siguiente);
+    const data: any = await res.json().catch(() => ({}));
+    if (!res.ok || data?.error) break;
+    mensajes.push(...(data.data ?? []));
+    siguiente = data.paging?.next;
+  }
+  return mensajes;
+}
 
 function adjuntoDe(m: any): { tipo: string; url: string | null } {
   const a = m.attachments?.data?.[0];
@@ -202,7 +218,7 @@ export async function importarHistorial(canalId: string): Promise<{ conversacion
       token,
       params: {
         platform: canal.tipo === "INSTAGRAM" ? "instagram" : "messenger",
-        fields: `participants,updated_time,messages.limit(${MENSAJES_POR_CONVERSACION}){id,created_time,from,message,attachments}`,
+        fields: `participants,updated_time,messages.limit(${MENSAJES_POR_PAGINA}){id,created_time,from,message,attachments}`,
         limit: "25",
         ...(after ? { after } : {}),
       },
@@ -214,7 +230,7 @@ export async function importarHistorial(canalId: string): Promise<{ conversacion
       const participantes: any[] = conv.participants?.data ?? [];
       const contacto = participantes.find((p) => p.id !== canal.externoId && p.id !== paginaId);
       if (!contacto?.id) continue;
-      const mensajes: any[] = (conv.messages?.data ?? []).slice().reverse(); // de más antiguo a más reciente
+      const mensajes: any[] = (await todosLosMensajes(conv)).reverse(); // de más antiguo a más reciente
       if (mensajes.length === 0) continue;
 
       let conversacion = await prisma.conversacionMensajeria.findUnique({
@@ -279,6 +295,8 @@ export async function importarHistorial(canalId: string): Promise<{ conversacion
         });
       }
       conversaciones++;
+      // La bandeja se va llenando mientras se trae el historial.
+      if (conversaciones % 10 === 0) emitMensajeNuevo(canal.empresaId, { conversacionId: "", mensajeId: "", tipoCanal: canal.tipo });
     }
 
     after = data?.paging?.cursors?.after;

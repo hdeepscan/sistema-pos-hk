@@ -220,20 +220,21 @@ export async function mensajeriaRoutes(app: FastifyInstance) {
     const canales = await prisma.canalMensajeria.findMany({
       where: { empresaId: request.user.empresaId, activo: true, tipo: { in: ["MESSENGER", "INSTAGRAM"] } },
     });
-    let conversaciones = 0;
-    let mensajes = 0;
-    const errores: string[] = [];
-    for (const c of canales) {
-      try {
-        const r = await importarHistorial(c.id);
-        conversaciones += r.conversaciones;
-        mensajes += r.mensajes;
-      } catch (err) {
-        request.log.error(err);
-        errores.push(`${c.usuario || c.nombre}: ${err instanceof Error ? err.message : "error"}`);
+    // Con el historial completo puede tardar varios minutos: se hace en segundo plano y la
+    // bandeja se va llenando sola (cada conversación avisa en tiempo real).
+    const empresaId = request.user.empresaId;
+    void (async () => {
+      for (const c of canales) {
+        try {
+          const r = await importarHistorial(c.id);
+          console.log(`[mensajeria] Historial de ${c.usuario || c.nombre}: ${r.conversaciones} conversaciones, ${r.mensajes} mensajes nuevos`);
+        } catch (err) {
+          console.error(`[mensajeria] No se pudo traer el historial de ${c.nombre}:`, err instanceof Error ? err.message : err);
+        }
       }
-    }
-    return { conversaciones, mensajes, errores };
+      emitMensajeNuevo(empresaId, { conversacionId: "", mensajeId: "", tipoCanal: "HISTORIAL" });
+    })();
+    return { enProceso: true, canales: canales.length };
   });
 
   // No leídos por canal (para las pestañas y el menú).
