@@ -67,9 +67,9 @@ export function precioMayoristaDe(metacampos: Metacampo[]): number | null | unde
 export async function sincronizarPreciosMayoristas(
   empresaId: string,
   opciones: { todos?: boolean } = {}
-): Promise<{ revisados: number; actualizados: number }> {
+): Promise<{ revisados: number; actualizados: number; renombrados: number }> {
   const config = await prisma.shopifyConfig.findUnique({ where: { empresaId } });
-  if (!config?.accessToken) return { revisados: 0, actualizados: 0 };
+  if (!config?.accessToken) return { revisados: 0, actualizados: 0, renombrados: 0 };
 
   const inicio = Date.now();
   const previa = ultimaRevision.get(empresaId);
@@ -79,6 +79,7 @@ export async function sincronizarPreciosMayoristas(
 
   let revisados = 0;
   let actualizados = 0;
+  let renombrados = 0;
   let after: string | null = null;
   for (let pagina = 0; pagina < (todos ? PAGINAS_COMPLETO : PAGINAS_RECIENTES); pagina++) {
     const data: any = await client.query({
@@ -106,7 +107,7 @@ export async function sincronizarPreciosMayoristas(
       revisados++;
       // Nombre, categoría, marca y descripción vienen de Shopify. Antes no se actualizaban: un
       // producto importado mientras se creaba quedaba para siempre como "Sin título 21 de nov…".
-      await actualizarDatosProducto(empresaId, p.id.slice(p.id.lastIndexOf("/") + 1), p);
+      if (await actualizarDatosProducto(empresaId, p.id.slice(p.id.lastIndexOf("/") + 1), p)) renombrados++;
       const precio = precioMayoristaDe(p.metafields?.nodes ?? []);
       // Sin metacampo mayorista en este producto: no se toca lo que tenga CENTRALA.
       if (precio === undefined) continue;
@@ -128,7 +129,7 @@ export async function sincronizarPreciosMayoristas(
   }
 
   ultimaRevision.set(empresaId, inicio);
-  return { revisados, actualizados };
+  return { revisados, actualizados, renombrados };
 }
 
 export function textoDeHtml(html: string | null | undefined): string | null {
@@ -152,9 +153,9 @@ async function actualizarDatosProducto(
   empresaId: string,
   shopifyProductId: string,
   p: { title?: string; productType?: string; vendor?: string; descriptionHtml?: string }
-) {
+): Promise<boolean> {
   const nombre = p.title?.trim();
-  if (!nombre) return;
+  if (!nombre) return false;
   // Si en Shopify están vacías, se deja lo que la tienda tenga en CENTRALA.
   const categoria = p.productType?.trim() || undefined;
   const marca = p.vendor?.trim() || undefined;
@@ -164,19 +165,20 @@ async function actualizarDatosProducto(
     where: { empresaId, shopifyProductId },
     select: { nombre: true, categoria: true, marca: true, descripcion: true },
   });
-  if (!local) return;
+  if (!local) return false;
   if (
     local.nombre === nombre &&
     (categoria === undefined || local.categoria === categoria) &&
     (marca === undefined || local.marca === marca) &&
     (descripcion === undefined || local.descripcion === descripcion)
   ) {
-    return;
+    return false;
   }
   await prisma.producto.updateMany({ where: { empresaId, shopifyProductId }, data: datos });
   if (local.nombre !== datos.nombre) {
     console.log(`[shopify] Producto renombrado desde Shopify: "${local.nombre}" → "${datos.nombre}"`);
   }
+  return true;
 }
 
 /** Escribe el precio mayorista en el metacampo del producto en Shopify (crea el valor si no estaba). */

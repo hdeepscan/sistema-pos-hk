@@ -34,6 +34,7 @@ const PASOS: [string, string][] = [
   ['variantesNuevas', 'Variantes nuevas'],
   ['ventasCompletadas', 'Ventas completadas'],
   ['precios', 'Precios'],
+  ['nombres', 'Nombres, categorías y precio mayorista'],
   ['inventario', 'Inventario (cada 5 minutos)'],
 ];
 
@@ -101,6 +102,7 @@ export default function ImportarProductosShopify() {
     revisadas: number;
     preciosActualizados: { nombre: string; antes: number; ahora: number }[];
     mayoristasActualizados: number;
+    renombrados?: number;
   } | null>(null);
   const [cargandoMayoristas, setCargandoMayoristas] = useState(false);
 
@@ -162,7 +164,8 @@ export default function ImportarProductosShopify() {
           <div style={{ fontSize: 13, margin: '8px 0 0' }}>
             <p style={{ margin: 0, color: 'var(--success, #16a34a)' }}>
               {mayoristas.revisadas} variante(s) revisadas · {mayoristas.preciosActualizados.length} precio(s) de venta
-              actualizados · precio mayorista actualizado en {mayoristas.mayoristasActualizados} variante(s)
+              actualizados · precio mayorista actualizado en {mayoristas.mayoristasActualizados} variante(s) ·{' '}
+              {mayoristas.renombrados ?? 0} producto(s) con nombre/datos actualizados desde Shopify
             </p>
             {mayoristas.preciosActualizados.length > 0 && (
               <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>

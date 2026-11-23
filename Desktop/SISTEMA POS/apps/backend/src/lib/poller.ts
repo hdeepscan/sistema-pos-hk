@@ -265,12 +265,20 @@ async function revisarTodasLasEmpresas() {
 
     // Precio mayorista (metacampo de Shopify) de los productos modificados.
     try {
-      const { actualizados } = await sincronizarPreciosMayoristas(empresaId);
+      const { actualizados, renombrados, revisados } = await sincronizarPreciosMayoristas(empresaId);
+      registrarPaso(
+        empresaId,
+        "nombres",
+        true,
+        `${revisados} producto(s) revisados` +
+          (renombrados > 0 ? ` · ${renombrados} actualizado(s) con el nombre/datos de Shopify` : "")
+      );
       if (actualizados > 0) {
         console.log(`[poller] Empresa ${empresaId.slice(0, 8)}: precio mayorista actualizado en ${actualizados} variante(s)`);
       }
     } catch (err) {
       console.error(`[poller] Error leyendo precios mayoristas de la empresa ${empresaId}:`, err instanceof Error ? err.message : err);
+      registrarPaso(empresaId, "nombres", false, err instanceof Error ? err.message : String(err));
     }
 
     // Productos eliminados en Shopify: se archivan en CENTRALA (cada 15 minutos).

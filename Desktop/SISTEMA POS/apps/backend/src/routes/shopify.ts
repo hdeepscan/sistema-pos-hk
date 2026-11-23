@@ -669,6 +669,7 @@ export async function shopifyRoutes(app: FastifyInstance) {
         revisadas: venta.revisadas,
         preciosActualizados: venta.actualizadas,
         mayoristasActualizados: mayorista.actualizados,
+        renombrados: mayorista.renombrados,
       };
     } catch (err) {
       return reply.code(502).send({ error: err instanceof Error ? err.message : "Error consultando Shopify" });
