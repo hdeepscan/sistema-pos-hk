@@ -131,15 +131,25 @@ export default function Productos() {
   const location = useLocation();
   // Se puede abrir ya filtrado: /productos?buscar=Body%20Morela (desde la pantalla de Shopify).
   const [busqueda, setBusqueda] = useState(() => new URLSearchParams(location.search).get("buscar") ?? "");
-  const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
+  // Con ?id= se abre ese producto directamente (desde la pantalla de Shopify).
+  const [seleccionadoId, setSeleccionadoId] = useState<string | null>(() => new URLSearchParams(location.search).get("id"));
+  const [errorLista, setErrorLista] = useState<string | null>(null);
+  const [errorDetalle, setErrorDetalle] = useState<string | null>(null);
   const [detalle, setDetalle] = useState<ProductoDetalle | null>(null);
   const [colecciones, setColecciones] = useState<Coleccion[]>([]);
   const [mostrarNuevo, setMostrarNuevo] = useState(false);
   const [modalImportarAbierto, setModalImportarAbierto] = useState(false);
 
   const cargarLista = useCallback(async () => {
-    const { data } = await api.get<Producto[]>("/productos", { params: busqueda ? { q: busqueda } : undefined });
-    setProductos(data);
+    // Antes, si la lista fallaba, se veía "Sin resultados" sin decir por qué.
+    try {
+      const { data } = await api.get<Producto[]>("/productos", { params: busqueda ? { q: busqueda } : undefined });
+      setProductos(data);
+      setErrorLista(null);
+    } catch (err) {
+      setProductos([]);
+      setErrorLista(mensajeError(err, "No se pudo cargar la lista de productos"));
+    }
   }, [busqueda]);
 
   // Agrupa las variantes de un mismo producto en una sola entrada (por
@@ -165,8 +175,14 @@ export default function Productos() {
   }, []);
 
   const cargarDetalle = useCallback(async (id: string) => {
-    const { data } = await api.get<ProductoDetalle>(`/productos/${id}`);
-    setDetalle(data);
+    try {
+      const { data } = await api.get<ProductoDetalle>(`/productos/${id}`);
+      setDetalle(data);
+      setErrorDetalle(null);
+    } catch (err) {
+      setDetalle(null);
+      setErrorDetalle(mensajeError(err, "No se pudo abrir el producto"));
+    }
   }, []);
 
   useEffect(() => {
@@ -247,7 +263,8 @@ export default function Productos() {
                 </div>
               );
             })}
-            {productosAgrupados.length === 0 && <p className="empty-state">Sin resultados</p>}
+            {errorLista && <p className="error-text">{errorLista}</p>}
+            {productosAgrupados.length === 0 && !errorLista && <p className="empty-state">Sin resultados</p>}
           </div>
         </div>
 
@@ -269,7 +286,9 @@ export default function Productos() {
           />
         ) : (
           <div className="card">
-            <p className="empty-state">Selecciona un producto de la lista para ver su detalle</p>
+            <p className="empty-state">
+              {errorDetalle ?? "Selecciona un producto de la lista para ver su detalle"}
+            </p>
           </div>
         )}
       </div>

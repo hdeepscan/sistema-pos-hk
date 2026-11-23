@@ -30,6 +30,8 @@ export interface ResultadoProducto {
   estado: "importado" | "ya_existe" | "reactivado" | "omitido" | "error";
   motivo?: string;
   variantes?: number;
+  // Para abrir el producto en CENTRALA directamente.
+  productoId?: string;
 }
 
 export interface ResultadoImportacion {
@@ -80,7 +82,7 @@ export async function importarProductosFaltantesDeShopify(
 
     const existentes = await prisma.producto.findMany({
       where: { empresaId, shopifyProductId: { in: ids } },
-      select: { shopifyProductId: true, activo: true },
+      select: { id: true, nombre: true, shopifyProductId: true, activo: true },
     });
     const conocidos = new Set(existentes.map((p) => p.shopifyProductId));
     const conAlgunaActiva = new Set(existentes.filter((p) => p.activo).map((p) => p.shopifyProductId));
@@ -93,10 +95,24 @@ export async function importarProductosFaltantesDeShopify(
         // por "ya importado" y no se veía en ningún lado. Se reactiva.
         if (!conAlgunaActiva.has(id) && n.status !== "ARCHIVED") {
           await prisma.producto.updateMany({ where: { empresaId, shopifyProductId: id }, data: { activo: true } });
-          reactivados.push({ shopifyProductId: id, titulo: n.title, estado: "reactivado", motivo: "Estaba archivado en CENTRALA" });
+          reactivados.push({
+            shopifyProductId: id,
+            titulo: n.title,
+            estado: "reactivado",
+            motivo: "Estaba archivado en CENTRALA",
+            productoId: existentes.find((e) => e.shopifyProductId === id)?.id,
+          });
         } else if (Date.now() - new Date(n.createdAt).getTime() < DIAS_RECIENTES * 24 * 60 * 60 * 1000) {
-          // Recientes que ya estaban: se listan para que se vea que sí llegaron.
-          recientesYaEstaban.push({ shopifyProductId: id, titulo: n.title, estado: "ya_existe" });
+          // Recientes que ya estaban: se listan con su estado real en CENTRALA.
+          const filas = existentes.filter((e) => e.shopifyProductId === id);
+          const activas = filas.filter((e) => e.activo);
+          recientesYaEstaban.push({
+            shopifyProductId: id,
+            titulo: n.title,
+            estado: "ya_existe",
+            motivo: `En CENTRALA como "${filas[0]?.nombre ?? n.title}" · ${activas.length} de ${filas.length} variante(s) activas`,
+            productoId: (activas[0] ?? filas[0])?.id,
+          });
         }
       }
     }
@@ -260,6 +276,7 @@ export async function importarProductoShopify(empresaId: string, shopifyProductI
     prisma.usuario.findFirst({ where: { empresaId, rol: "ADMIN", activo: true }, orderBy: { creadoEn: "asc" } }),
   ]);
 
+  let primerId: string | undefined;
   await prisma.$transaction(async (tx) => {
     for (const fila of filas) {
       const creado = await tx.producto.create({
@@ -284,6 +301,7 @@ export async function importarProductoShopify(empresaId: string, shopifyProductI
         },
       });
 
+      primerId ??= creado.id;
       if (sucursales.length > 0) {
         await tx.inventarioSucursal.createMany({
           data: sucursales.map((s) => ({
@@ -312,5 +330,5 @@ export async function importarProductoShopify(empresaId: string, shopifyProductI
     `[shopify-productos-nuevos] Importado "${producto.title}" (${shopifyProductId}) con ${filas.length} variante(s)`
   );
   omitidos.delete(`${empresaId}:${shopifyProductId}`);
-  return { shopifyProductId, titulo: producto.title, estado: "importado", variantes: filas.length };
+  return { shopifyProductId, titulo: producto.title, estado: "importado", variantes: filas.length, productoId: primerId };
 }

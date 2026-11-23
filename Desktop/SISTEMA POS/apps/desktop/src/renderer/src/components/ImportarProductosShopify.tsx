@@ -9,6 +9,7 @@ interface ResultadoProducto {
   estado: 'importado' | 'ya_existe' | 'reactivado' | 'omitido' | 'error';
   motivo?: string;
   variantes?: number;
+  productoId?: string;
 }
 
 interface ResultadoImportacion {
@@ -222,7 +223,10 @@ export default function ImportarProductosShopify() {
                     <tr key={p.shopifyProductId}>
                       <td>
                         {p.estado === 'importado' || p.estado === 'reactivado' || p.estado === 'ya_existe' ? (
-                          <Link to={`/productos?buscar=${encodeURIComponent(p.titulo)}`} title="Ver en Productos">
+                          <Link
+                            to={p.productoId ? `/productos?id=${p.productoId}` : `/productos?buscar=${encodeURIComponent(p.titulo)}`}
+                            title="Abrir en Productos"
+                          >
                             {p.titulo}
                           </Link>
                         ) : (
@@ -244,9 +248,7 @@ export default function ImportarProductosShopify() {
                       <td>
                         {p.estado === 'importado'
                           ? `${p.variantes} variante(s)`
-                          : p.estado === 'ya_existe'
-                            ? 'Creado en Shopify estos días; ya está activo en CENTRALA'
-                            : p.motivo}
+                          : p.motivo ?? ''}
                       </td>
                     </tr>
                   ))}
