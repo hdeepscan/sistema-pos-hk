@@ -340,6 +340,11 @@ export const CrearClienteSchema = z.object({
   direccion: z.string().optional(),
   cedula: z.string().optional(),
   ciudad: z.string().optional(),
+  // Factura electrónica: tipo de documento TFactura (3 cédula, 6 NIT...), 1 jurídica / 2 natural,
+  // y responsabilidad fiscal (13, 23, 15, 47, 99 o ZZ).
+  tipoDocumento: z.number().int().min(1).max(11).nullable().optional(),
+  tipoPersona: z.number().int().min(1).max(2).nullable().optional(),
+  categoriaImpositiva: z.enum(["13", "23", "15", "47", "99", "ZZ"]).nullable().optional(),
 });
 export type CrearClienteInput = z.infer<typeof CrearClienteSchema>;
 

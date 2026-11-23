@@ -23,6 +23,7 @@ export function MobileMenu() {
     { path: "/pos", label: "Punto de Venta", icon: "💰" },
     puedeVerVentas && { path: "/ventas", label: "Ventas", icon: "📊" },
     puedeAtenderMensajes && { path: "/mensajes", label: "Mensajes", icon: "💬" },
+    puedeVerVentas && { path: "/facturacion", label: "Factura electrónica", icon: "🧾" },
     { path: "/caja", label: "Caja", icon: "🏦" },
     { path: "/notificaciones", label: "Notificaciones", icon: "🔔" },
     puedeAdministrarProductos && { path: "/productos", label: "Productos", icon: "📦" },

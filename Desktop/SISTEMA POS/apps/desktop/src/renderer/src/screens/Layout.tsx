@@ -61,6 +61,7 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
   const puedeAdministrarConfiguracion = usePermiso("configuracion.administrar");
   const puedeVerContabilidad = usePermiso("contabilidad.ver");
   const puedeAtenderMensajes = usePermiso("mensajes.atender");
+  const puedeVerVentasFE = usePermiso("ventas.ver");
   const [mensajesNoLeidos, setMensajesNoLeidos] = useState(0);
   const sucursalActiva = sucursales.find((s) => s.id === sucursalActivaId);
   const [alertas, setAlertas] = useState<(PedidoShopifyEvent & { toastId: string })[]>([]);
@@ -316,6 +317,12 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
               <span>Mensajes</span>
               {mensajesNoLeidos > 0 && <span className="badge danger" style={{ marginLeft: "auto" }}>{mensajesNoLeidos}</span>}
             </div>
+          </NavLink>
+        )}
+        {puedeVerVentasFE && (
+          <NavLink to="/facturacion" data-module="facturacion" className="flex items-center gap-3">
+            <ReceiptText size={20} className="flex-shrink-0" />
+            <span>Factura electrónica</span>
           </NavLink>
         )}
         <NavLink to="/cotizaciones" data-module="cotizaciones" className="flex items-center gap-3">

@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { devolverFactura, programarNotaCredito } from "../lib/facturacion.js";
 import { CrearVentaSchema, DevolucionParcialSchema } from "@sistema-pos/shared";
 import type { MetodoPago, CanalVenta } from "@sistema-pos/shared";
 import type { Prisma } from "@prisma/client";
@@ -716,6 +717,11 @@ export async function ventasRoutes(app: FastifyInstance) {
       }
     }
 
+    // Si la venta tenía factura electrónica, se hace la nota crédito (en segundo plano).
+    void programarNotaCredito(empresaId, id, devolucion.id).catch((err) =>
+      console.error("[facturacion] No se pudo programar la nota crédito:", err)
+    );
+
     return reply.code(201).send({ ...devolucion, detalle });
   });
 
@@ -733,6 +739,23 @@ export async function ventasRoutes(app: FastifyInstance) {
       include: { items: true },
     });
     if (!venta) return reply.code(404).send({ error: "Venta no encontrada" });
+
+    // Una venta con factura electrónica ante la DIAN no se puede borrar: se anula con nota crédito.
+    const facturada = await prisma.comprobanteElectronico.findFirst({
+      where: { ventaId: id, tipo: "FACTURA", estado: { in: ["EMITIDA", "ENVIANDO"] } },
+    });
+    if (facturada) {
+      return reply.code(409).send({
+        error:
+          "Esta venta ya tiene factura electrónica. Para anularla usa \"Devolución parcial\" y devuelve todos los productos: así se genera la nota crédito ante la DIAN.",
+      });
+    }
+    // Facturas que estaban en cola: se cancelan y vuelven al paquete.
+    const enCola = await prisma.comprobanteElectronico.findMany({ where: { ventaId: id } });
+    for (const c of enCola) {
+      if (c.estado === "PENDIENTE") await devolverFactura(c.paqueteId);
+    }
+    if (enCola.length) await prisma.comprobanteElectronico.deleteMany({ where: { ventaId: id } });
 
     // Los items de venta libre no tienen producto: no devuelven stock.
     const itemsConProducto = venta.items.filter(

@@ -14,8 +14,34 @@ interface Cliente {
   direccion: string | null;
   cedula: string | null;
   ciudad: string | null;
+  tipoDocumento?: number | null;
+  tipoPersona?: number | null;
+  categoriaImpositiva?: string | null;
   saldoPendiente: number;
 }
+
+// Datos para la factura electrónica (códigos de TFactura / DIAN).
+const TIPOS_DOCUMENTO = [
+  { v: 3, t: "Cédula de ciudadanía" },
+  { v: 6, t: "NIT" },
+  { v: 5, t: "Cédula de extranjería" },
+  { v: 7, t: "Pasaporte" },
+  { v: 11, t: "PPT (Permiso de protección temporal)" },
+  { v: 9, t: "PEP" },
+  { v: 4, t: "Tarjeta de extranjería" },
+  { v: 2, t: "Tarjeta de identidad" },
+  { v: 1, t: "Registro civil" },
+  { v: 8, t: "Documento extranjero" },
+  { v: 10, t: "NIT de otro país" },
+];
+const RESPONSABILIDADES = [
+  { v: "ZZ", t: "No responsable de IVA (persona natural)" },
+  { v: "99", t: "No aplica - Otros" },
+  { v: "47", t: "Régimen simple de tributación" },
+  { v: "13", t: "Gran contribuyente" },
+  { v: "15", t: "Autorretenedor" },
+  { v: "23", t: "Agente de retención IVA" },
+];
 
 interface CreditoCliente {
   ventaId: string;
@@ -233,6 +259,12 @@ function FormularioCliente({
   const [direccion, setDireccion] = useState(cliente?.direccion ?? "");
   const [cedula, setCedula] = useState(cliente?.cedula ?? "");
   const [ciudad, setCiudad] = useState(cliente?.ciudad ?? "");
+  const [tipoDocumento, setTipoDocumento] = useState<number>(cliente?.tipoDocumento ?? 3);
+  const [tipoPersona, setTipoPersona] = useState<number>(cliente?.tipoPersona ?? (cliente?.tipoDocumento === 6 ? 1 : 2));
+  const [categoriaImpositiva, setCategoriaImpositiva] = useState<string>(
+    cliente?.categoriaImpositiva ?? (cliente?.tipoDocumento === 6 ? "99" : "ZZ")
+  );
+  const esEmpresa = tipoDocumento === 6 || tipoDocumento === 10;
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
@@ -247,6 +279,10 @@ function FormularioCliente({
       direccion: direccion || undefined,
       cedula: cedula || undefined,
       ciudad: ciudad || undefined,
+      // Solo se guardan si hay número de documento (sin él se factura a "Consumidor final").
+      ...(cedula.trim()
+        ? { tipoDocumento, tipoPersona: esEmpresa ? tipoPersona : 2, categoriaImpositiva }
+        : { tipoDocumento: null, tipoPersona: null, categoriaImpositiva: null }),
     };
     try {
       if (cliente) await api.patch(`/clientes/${cliente.id}`, datos);
@@ -266,7 +302,7 @@ function FormularioCliente({
 
   return (
     <div className="modal-backdrop">
-      <div className="card">
+      <div className="card" style={{ maxHeight: "92vh", overflowY: "auto" }}>
         <h4 style={{ marginBottom: 12 }}>{cliente ? "Editar cliente" : "Nuevo cliente"}</h4>
         <form style={{ display: "flex", flexDirection: "column", gap: 12 }} onSubmit={guardar}>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -289,9 +325,62 @@ function FormularioCliente({
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
-              Cedula
+              Tipo de documento
+            </label>
+            <select
+              value={tipoDocumento}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                setTipoDocumento(v);
+                const empresa = v === 6 || v === 10;
+                setTipoPersona(empresa ? 1 : 2);
+                setCategoriaImpositiva(empresa ? "99" : "ZZ");
+              }}
+              style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }}
+            >
+              {TIPOS_DOCUMENTO.map((t) => (
+                <option key={t.v} value={t.v}>
+                  {t.t}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              {esEmpresa ? "NIT (con dígito de verificación, ej. 900123456-7)" : "Número de documento"}
             </label>
             <input value={cedula} onChange={(e) => setCedula(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
+          </div>
+          {esEmpresa && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+                Tipo de persona
+              </label>
+              <select
+                value={tipoPersona}
+                onChange={(e) => setTipoPersona(Number(e.target.value))}
+                style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }}
+              >
+                <option value={1}>Persona jurídica (empresa)</option>
+                <option value={2}>Persona natural</option>
+              </select>
+            </div>
+          )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
+              Responsabilidad fiscal (factura electrónica)
+            </label>
+            <select
+              value={categoriaImpositiva}
+              onChange={(e) => setCategoriaImpositiva(e.target.value)}
+              style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }}
+            >
+              {RESPONSABILIDADES.map((r) => (
+                <option key={r.v} value={r.v}>
+                  {r.t}
+                </option>
+              ))}
+            </select>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <label style={{ fontSize: 12, textTransform: "uppercase", color: "#64748b", fontWeight: 600 }}>
@@ -306,8 +395,8 @@ function FormularioCliente({
             <input value={direccion} onChange={(e) => setDireccion(e.target.value)} style={{ width: "100%", height: 42, padding: "8px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 }} />
           </div>
           <p style={{ fontSize: 12, color: "var(--text-muted)", margin: 0 }}>
-            Todos estos campos son opcionales excepto el nombre — te sirven para segmentar tu base de clientes
-            (ej. por ciudad) si mas adelante quieres conectarla a un CRM.
+            Todos estos campos son opcionales excepto el nombre. Para la factura electrónica usa el documento y el
+            correo (ahí le llega la factura); si no hay documento, se factura a "Consumidor final".
           </p>
           {error && <span className="error-text">{error}</span>}
           <div style={{ display: "flex", gap: 8 }}>

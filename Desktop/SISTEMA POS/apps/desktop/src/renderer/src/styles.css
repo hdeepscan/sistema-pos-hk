@@ -2979,3 +2979,48 @@ button.var-btn-generar-nuevo {
 .msj-form-wa p { margin: 0; font-size: 12px; color: #166534; }
 .msj-form-wa label { display: flex; flex-direction: column; gap: 4px; margin: 0; font-size: 12px; font-weight: 600; color: #334155; }
 .msj-form-wa input { height: 36px; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; font-weight: 400; }
+
+/* ---------- Facturación electrónica ---------- */
+.fe-pagina { display: flex; flex-direction: column; gap: 14px; }
+.fe-pagina h3.fe-titulo { margin: 8px 0 0; font-size: 16px; }
+.fe-resumen { display: grid; grid-template-columns: minmax(200px, 280px) 1fr; gap: 14px; }
+.fe-contador { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; border-left: 4px solid var(--success); }
+.fe-contador-vacio { border-left-color: var(--danger); }
+.fe-contador-numero { font-size: 44px; font-weight: 800; line-height: 1; color: var(--text); }
+.fe-contador-vacio .fe-contador-numero { color: var(--danger); }
+.fe-contador-texto { font-weight: 600; color: var(--text); }
+.fe-contador-detalle, .fe-nota { font-size: 12px; color: var(--text-muted); margin: 0; }
+.fe-conexion { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.fe-conexion h4 { margin: 0; }
+.fe-aviso { margin: 0; padding: 10px 14px; border-radius: 10px; background: var(--success-bg, #f0fdf4); color: #166534; font-size: 14px; }
+.fe-aviso-alerta { background: var(--warning-bg, #fffbeb); color: #92400e; }
+.fe-planes { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.fe-plan { position: relative; display: flex; flex-direction: column; gap: 6px; }
+.fe-plan h4 { margin: 0; font-size: 18px; }
+.fe-plan ul { margin: 6px 0 8px; padding-left: 18px; font-size: 13px; color: var(--text-muted); flex: 1; }
+.fe-plan button { align-self: stretch; }
+.fe-plan-precio { font-size: 26px; font-weight: 800; color: var(--brand); }
+.fe-plan-destacado { border: 2px solid var(--brand); }
+.fe-plan-etiqueta { position: absolute; top: -10px; right: 12px; background: var(--brand); color: #fff; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+.fe-tabla { overflow-x: auto; }
+.fe-error-linea { margin-top: 4px; font-size: 11px; color: var(--danger); max-width: 260px; white-space: normal; }
+.fe-enlace { font-weight: 600; color: var(--brand); white-space: nowrap; }
+.fe-pasos { margin: 0 0 12px; padding-left: 20px; font-size: 13px; color: var(--text-muted); display: flex; flex-direction: column; gap: 4px; }
+@media (max-width: 700px) {
+  .fe-resumen { grid-template-columns: 1fr; }
+}
+
+/* Opción de factura electrónica en el cobro del POS */
+.fe-pos { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-secondary); font-size: 14px; }
+.fe-pos input[type="checkbox"] { width: auto; margin: 0; }
+.fe-pos-label { display: flex; align-items: center; gap: 8px; flex: 1; margin: 0; cursor: pointer; font-weight: 600; color: var(--text); }
+.fe-pos-contador { font-size: 12px; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+.fe-pos-bloqueada { opacity: 0.85; }
+.fe-pos-bloqueada .fe-pos-label { cursor: default; color: var(--text-muted); }
+.fe-pos a, .fe-pos .fe-pos-link { font-size: 12px; font-weight: 700; color: var(--brand); background: none; border: 0; padding: 0; cursor: pointer; white-space: nowrap; }
+.fe-venta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--surface-secondary); border: 1px solid var(--border-light, var(--border)); font-size: 13px; }
+.fe-venta .fe-error-linea { flex-basis: 100%; max-width: none; }
+.fe-venta-nota { flex-basis: 100%; display: flex; gap: 8px; align-items: center; color: var(--text-muted); }
+.fe-resumen > .card, .fe-planes > .card { margin: 0; }
+.fe-pos label.fe-pos-label { flex-direction: row; align-items: center; justify-content: flex-start; text-transform: none; font-size: 14px; letter-spacing: 0; }
+.fe-pos label.fe-pos-label input[type="checkbox"] { width: 18px; height: 18px; min-height: 0; padding: 0; flex: 0 0 auto; box-shadow: none; }

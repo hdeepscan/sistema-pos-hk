@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
 import QRCode from "qrcode";
 import { api } from "../lib/api";
@@ -61,6 +62,15 @@ interface ResultadoVenta {
   metodoPago: MetodoPago;
   cambio: number | null;
   puntosGanados: number;
+  /** Resultado de pedir la factura electrónica (null si no se pidió). */
+  facturaElectronica?: { ok: boolean; texto: string } | null;
+}
+
+interface EstadoFE {
+  conectada: boolean;
+  disponibles: number;
+  puedeEmitir: boolean;
+  paquetes: unknown[];
 }
 
 const DIAS = ["domingo", "lunes", "martes", "miercoles", "jueves", "viernes", "sabado"];
@@ -134,6 +144,35 @@ export default function Pos() {
   const [error, setError] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
   const [ventaExitosa, setVentaExitosa] = useState<ResultadoVenta | null>(null);
+  const navigate = useNavigate();
+  // Factura electrónica: opcional en cada venta, solo con paquete y cuenta de TFactura conectada.
+  const [estadoFE, setEstadoFE] = useState<EstadoFE | null>(null);
+  const [emitirFE, setEmitirFE] = useState(() => {
+    try {
+      return localStorage.getItem("pos.emitirFE") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const cargarEstadoFE = useCallback(() => {
+    api
+      .get<EstadoFE>("/facturacion/estado")
+      .then(({ data }) => setEstadoFE(data))
+      .catch(() => setEstadoFE(null));
+  }, []);
+  useEffect(() => {
+    cargarEstadoFE();
+  }, [cargarEstadoFE]);
+  function cambiarEmitirFE(valor: boolean) {
+    setEmitirFE(valor);
+    try {
+      localStorage.setItem("pos.emitirFE", valor ? "1" : "0");
+    } catch {
+      /* sin almacenamiento local */
+    }
+  }
+  const mostrarOpcionFE = !!estadoFE && (estadoFE.conectada || estadoFE.paquetes.length > 0);
+  const facturarEstaVenta = emitirFE && !!estadoFE?.puedeEmitir;
   const inputCodigoRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -463,9 +502,23 @@ export default function Pos() {
     let sincronizada = true;
     let puntosGanados = 0;
     let impuestoVenta: number | undefined;
+    let facturaElectronica: ResultadoVenta["facturaElectronica"] = null;
     try {
       const { data } = await api.post("/ventas", payload);
       consecutivo = data.consecutivo;
+      if (facturarEstaVenta && data.id) {
+        try {
+          const r = await api.post<{ disponibles: number }>(`/facturacion/ventas/${data.id}/emitir`);
+          facturaElectronica = { ok: true, texto: `Factura electrónica en proceso · quedan ${r.data.disponibles}` };
+          setEstadoFE((e) => (e ? { ...e, disponibles: r.data.disponibles, puedeEmitir: r.data.disponibles > 0 } : e));
+        } catch (errFE) {
+          facturaElectronica = {
+            ok: false,
+            texto: mensajeError(errFE, "No se pudo pedir la factura electrónica. Puedes emitirla después desde Ventas."),
+          };
+          cargarEstadoFE();
+        }
+      }
       puntosGanados = data.puntosGanados ?? 0;
       impuestoVenta = data.impuestoTotal ? Number(data.impuestoTotal) : undefined;
       if (creditoData?.abonoInicial && creditoData.abonoInicial > 0 && data.id) {
@@ -484,6 +537,9 @@ export default function Pos() {
       }
       sincronizada = false;
       await electronAPI.queueAdd({ id: clienteUuid, tipo: "venta", endpoint: "/ventas", payload });
+      if (facturarEstaVenta) {
+        facturaElectronica = { ok: false, texto: "Sin conexión: emite la factura electrónica desde Ventas cuando la venta se sincronice." };
+      }
     }
 
     const config = await electronAPI.getConfig();
@@ -534,7 +590,7 @@ export default function Pos() {
     }
 
     void reproducir("venta");
-    setVentaExitosa({ total, consecutivo, sincronizada, metodoPago, cambio, puntosGanados });
+    setVentaExitosa({ total, consecutivo, sincronizada, metodoPago, cambio, puntosGanados, facturaElectronica });
     limpiarCarrito();
     setContactoNombre("");
     setContactoEmail("");
@@ -1013,6 +1069,27 @@ export default function Pos() {
             </div>
           )}
 
+          {mostrarOpcionFE && estadoFE && (
+            <div className={`fe-pos ${estadoFE.puedeEmitir ? "" : "fe-pos-bloqueada"}`} style={{ marginTop: 10 }}>
+              <label className="fe-pos-label">
+                <input
+                  type="checkbox"
+                  checked={facturarEstaVenta}
+                  disabled={!estadoFE.puedeEmitir}
+                  onChange={(e) => cambiarEmitirFE(e.target.checked)}
+                />
+                Emitir factura electrónica
+              </label>
+              {estadoFE.puedeEmitir ? (
+                <span className="fe-pos-contador">Quedan {estadoFE.disponibles}</span>
+              ) : (
+                <button type="button" className="fe-pos-link" onClick={() => navigate("/facturacion")}>
+                  {estadoFE.conectada ? "Sin facturas · Recargar" : "Conectar TFactura"}
+                </button>
+              )}
+            </div>
+          )}
+
           {error && <p className="error-text" style={{ marginTop: 10 }}>{error}</p>}
           <button
             style={{ width: "100%", marginTop: 12 }}
@@ -1157,9 +1234,10 @@ export default function Pos() {
 
 function VentaExitosaModal({ resultado, onCerrar }: { resultado: ResultadoVenta; onCerrar: () => void }) {
   useEffect(() => {
-    const t = setTimeout(onCerrar, 4500);
+    // Si la factura electrónica no se pudo pedir, el aviso se deja más tiempo en pantalla.
+    const t = setTimeout(onCerrar, resultado.facturaElectronica && !resultado.facturaElectronica.ok ? 9000 : 4500);
     return () => clearTimeout(t);
-  }, [onCerrar]);
+  }, [onCerrar, resultado.facturaElectronica]);
 
   return (
     <div className="modal-backdrop" onClick={onCerrar}>
@@ -1179,6 +1257,18 @@ function VentaExitosaModal({ resultado, onCerrar }: { resultado: ResultadoVenta;
         )}
         {resultado.puntosGanados > 0 && (
           <p style={{ fontSize: 13, color: "var(--brand)", margin: "0 0 4px" }}>+{resultado.puntosGanados} puntos</p>
+        )}
+        {resultado.facturaElectronica && (
+          <p
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              margin: "0 0 6px",
+              color: resultado.facturaElectronica.ok ? "var(--brand)" : "var(--danger)",
+            }}
+          >
+            {resultado.facturaElectronica.texto}
+          </p>
         )}
         <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "0 0 16px" }}>
           {resultado.sincronizada ? `Comprobante No. ${resultado.consecutivo} · ${resultado.metodoPago}` : "Guardada localmente, se sincronizara sola"}

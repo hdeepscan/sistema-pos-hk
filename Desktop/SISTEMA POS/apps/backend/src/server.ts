@@ -42,6 +42,8 @@ import { mensajeriaRoutes, mensajeriaCallbackRoutes } from "./routes/mensajeria.
 import { webhooksMetaRoutes } from "./routes/webhooks-meta.js";
 import adminRoutes from "./routes/admin.js";
 import { iniciarPollerShopify } from "./lib/poller.js";
+import { facturacionRoutes } from "./routes/facturacion.js";
+import { iniciarFacturacionElectronica } from "./lib/facturacion.js";
 import { iniciarBackupAutomatico } from "./lib/auto-backup.js";
 import { iniciarShopifyQueueWorker } from "./lib/shopify-queue-worker.js";
 // bodyLimit ampliado para permitir subir imagenes de producto en base64 y
@@ -83,6 +85,7 @@ await app.register(diagnosticRoutes);
 await app.register(mensajeriaRoutes);
 await app.register(mensajeriaCallbackRoutes);
 await app.register(webhooksMetaRoutes);
+await app.register(facturacionRoutes);
 await app.register(adminRoutes, { prefix: "/admin" });
 
 app.get("/health", async () => ({ ok: true }));
@@ -190,6 +193,7 @@ await app.listen({ port, host: "0.0.0.0" });
 
 initWebSocket(app.server);
 iniciarPollerShopify();
+iniciarFacturacionElectronica();
 iniciarBackupAutomatico();
 iniciarShopifyQueueWorker();
 app.log.info("✅ Shopify Queue Worker iniciado en segundo plano");

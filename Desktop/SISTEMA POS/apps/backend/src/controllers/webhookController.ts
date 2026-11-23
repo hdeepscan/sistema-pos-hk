@@ -2,6 +2,7 @@ import type { FastifyRequest, FastifyReply } from "fastify";
 import { PrismaClient } from "@prisma/client";
 import { enviarEmailBienvenida } from "../services/emailService.js";
 import crypto from "crypto";
+import { acreditarPaquete, PAQUETES } from "../lib/facturacion.js";
 
 const prisma = new PrismaClient();
 
@@ -56,6 +57,14 @@ async function procesarPagoAprobado(transaccion: any) {
 
   try {
     const datosRegistro = pago.datosRegistro ? JSON.parse(pago.datosRegistro) : {};
+
+    if (datosRegistro.tipoCompra === "FACTURACION_ELECTRONICA") {
+      if (!pago.empresaId || !(datosRegistro.paquete in PAQUETES)) {
+        throw new Error(`Compra de facturas sin empresa o paquete válido: ${reference}`);
+      }
+      await acreditarPaquete(pago.empresaId, datosRegistro.paquete, pago.referenciaPago, Number(pago.monto));
+      return;
+    }
 
     if (datosRegistro.tipoCompra === "USUARIOS_ADICIONALES") {
       await procesarUsuariosAdicionales(pago.empresaId, datosRegistro);

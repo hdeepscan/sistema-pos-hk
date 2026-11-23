@@ -49,6 +49,7 @@ enum TipoPlan {
   TRIMESTRAL
   ANUAL
   USUARIOS_ADICIONALES
+  FACTURACION_ELECTRONICA
 }
 
 enum EstadoLicencia {
@@ -77,26 +78,26 @@ enum TipoMovimientoCaja {
 }
 
 model Empresa {
-  id             String   @id @default(uuid())
-  nombre         String
-  plan           String   @default("TRIAL")
-  activo         Boolean  @default(true)
-  fechaRegistro  DateTime @default(now())
+  id            String   @id @default(uuid())
+  nombre        String
+  plan          String   @default("TRIAL")
+  activo        Boolean  @default(true)
+  fechaRegistro DateTime @default(now())
 
   // Suscripción: fecha de vencimiento y tipo de plan actual
-  fechaVencimiento  DateTime?  // null = nunca caduca, para empresas heredadas
-  planSuscripcion   String     @default("TRIAL_5D")  // TRIAL_5D, MENSUAL, TRIMESTRAL, ANUAL
+  fechaVencimiento DateTime? // null = nunca caduca, para empresas heredadas
+  planSuscripcion  String    @default("TRIAL_5D") // TRIAL_5D, MENSUAL, TRIMESTRAL, ANUAL
 
   // Límite de usuarios: base es 2, incrementa al comprar usuarios adicionales ($10,000 COP c/u)
-  limiteUsuarios    Int        @default(2)
+  limiteUsuarios Int @default(2)
 
   // Super Admin Dashboard: información de estado y licencia
-  estado              String    @default("activa")  // activa, prueba, vencida, bloqueada
-  tipo_licencia       String    @default("TRIAL")   // TRIAL, MENSUAL, TRIMESTRAL, ANUAL
-  dias_restantes      Int       @default(30)        // días hasta vencimiento
-  bloqueada_por_admin Boolean   @default(false)     // si Super Admin bloqueó la empresa
-  razon_bloqueo       String?                       // motivo del bloqueo
-  fecha_ultimo_bloqueo DateTime?                    // timestamp del último bloqueo
+  estado               String    @default("activa") // activa, prueba, vencida, bloqueada
+  tipo_licencia        String    @default("TRIAL") // TRIAL, MENSUAL, TRIMESTRAL, ANUAL
+  dias_restantes       Int       @default(30) // días hasta vencimiento
+  bloqueada_por_admin  Boolean   @default(false) // si Super Admin bloqueó la empresa
+  razon_bloqueo        String? // motivo del bloqueo
+  fecha_ultimo_bloqueo DateTime? // timestamp del último bloqueo
 
   // Dias tras la venta a credito en que se considera vencido, si el saldo
   // sigue pendiente. Se aplica como snapshot en Venta.fechaVencimientoCredito
@@ -113,37 +114,37 @@ model Empresa {
   valorPunto    Decimal? @db.Decimal(12, 2)
 
   // Notificaciones de ventas por email
-  emailNotificacionesVentas String?  @db.VarChar(255)
+  emailNotificacionesVentas String? @db.VarChar(255)
 
-  usuarios       Usuario[]
-  sucursales     Sucursal[]
-  productos      Producto[]
-  ventas         Venta[]
-  clientes       Cliente[]
-  proveedores    Proveedor[]
-  gastos         Gasto[]
-  compras        Compra[]
-  colecciones    Coleccion[]
-  shopifyConfig  ShopifyConfig?
-  metaConfig     MetaConfig?
-  gastoPauta     GastoPauta[]
-  auditoria      RegistroAuditoria[]
-  plantillasRecibo PlantillaRecibo[]
-  pedidosShopify  PedidoShopifyNotificacion[]
-  turnosCaja      TurnoCaja[]
-  devolucionesVenta DevolucionVenta[]
-  creditosManuales CreditoManual[]
-  cuentasBancarias CuentaBancaria[]
-  eventosCalendario EventoCalendario[]
-  shopifyLocations ShopifyLocation[]
-  shopifyInventoryItems ShopifyInventoryItem[]
+  usuarios               Usuario[]
+  sucursales             Sucursal[]
+  productos              Producto[]
+  ventas                 Venta[]
+  clientes               Cliente[]
+  proveedores            Proveedor[]
+  gastos                 Gasto[]
+  compras                Compra[]
+  colecciones            Coleccion[]
+  shopifyConfig          ShopifyConfig?
+  metaConfig             MetaConfig?
+  gastoPauta             GastoPauta[]
+  auditoria              RegistroAuditoria[]
+  plantillasRecibo       PlantillaRecibo[]
+  pedidosShopify         PedidoShopifyNotificacion[]
+  turnosCaja             TurnoCaja[]
+  devolucionesVenta      DevolucionVenta[]
+  creditosManuales       CreditoManual[]
+  cuentasBancarias       CuentaBancaria[]
+  eventosCalendario      EventoCalendario[]
+  shopifyLocations       ShopifyLocation[]
+  shopifyInventoryItems  ShopifyInventoryItem[]
   shopifyInventoryLevels ShopifyInventoryLevel[]
-  shopifySyncQueue ShopifySyncQueue[]
-  shopifyWebhookEvents ShopifyWebhookEvent[]
-  cuentasContables CuentaContable[]
-  asientosContables AsientoContable[]
-  cotizaciones     Cotizacion[]
-  licencia         Licencia?
+  shopifySyncQueue       ShopifySyncQueue[]
+  shopifyWebhookEvents   ShopifyWebhookEvent[]
+  cuentasContables       CuentaContable[]
+  asientosContables      AsientoContable[]
+  cotizaciones           Cotizacion[]
+  licencia               Licencia?
 
   @@map("empresas")
 }
@@ -164,98 +165,98 @@ model Usuario {
   creadoEn     DateTime   @default(now())
 
   // Recuperación de contraseña
-  resetPasswordToken String?
+  resetPasswordToken   String?
   resetPasswordExpires DateTime?
 
-  ventas          Venta[]
-  movimientos     MovimientoInventario[]
-  gastos          Gasto[]
-  compras         Compra[]
-  abonos          Abono[]
-  auditoria       RegistroAuditoria[]
-  turnosApertura  TurnoCaja[] @relation("TurnoCajaApertura")
-  turnosCierre    TurnoCaja[] @relation("TurnoCajaCierre")
-  devolucionesVenta DevolucionVenta[]
+  ventas             Venta[]
+  movimientos        MovimientoInventario[]
+  gastos             Gasto[]
+  compras            Compra[]
+  abonos             Abono[]
+  auditoria          RegistroAuditoria[]
+  turnosApertura     TurnoCaja[]            @relation("TurnoCajaApertura")
+  turnosCierre       TurnoCaja[]            @relation("TurnoCajaCierre")
+  devolucionesVenta  DevolucionVenta[]
   pagosCreditoManual PagoCreditoManual[]
-  eventosResponsable EventoCalendario[] @relation("EventoResponsable")
+  eventosResponsable EventoCalendario[]     @relation("EventoResponsable")
 
   @@index([empresaId])
   @@map("usuarios")
 }
 
 model Sucursal {
-  id         String        @id @default(uuid())
-  empresaId  String
-  empresa    Empresa       @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  nombre     String
-  tipo       TipoSucursal  @default(FISICA)
-  direccion  String?
-  activo     Boolean       @default(true)
-  creadoEn   DateTime      @default(now())
+  id        String       @id @default(uuid())
+  empresaId String
+  empresa   Empresa      @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nombre    String
+  tipo      TipoSucursal @default(FISICA)
+  direccion String?
+  activo    Boolean      @default(true)
+  creadoEn  DateTime     @default(now())
 
   // Solo se llena para la sucursal vinculada a Shopify: el id de la ubicacion
   // (location) de Shopify cuyo inventario refleja esta sucursal.
   shopifyLocationId String?
 
-  inventario         InventarioSucursal[]
-  movimientos        MovimientoInventario[]     @relation("MovimientoSucursalOrigen")
-  movimientosDestino MovimientoInventario[]     @relation("MovimientoSucursalDestino")
-  ventas             Venta[]
-  gastos             Gasto[]
-  compras            Compra[]
+  inventario           InventarioSucursal[]
+  movimientos          MovimientoInventario[] @relation("MovimientoSucursalOrigen")
+  movimientosDestino   MovimientoInventario[] @relation("MovimientoSucursalDestino")
+  ventas               Venta[]
+  gastos               Gasto[]
+  compras              Compra[]
   productosDisponibles ProductoSucursal[]
-  turnosCaja         TurnoCaja[]
+  turnosCaja           TurnoCaja[]
 
   @@index([empresaId])
   @@map("sucursales")
 }
 
 model Producto {
-  id            String   @id @default(uuid())
-  empresaId     String
-  empresa       Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  sku           String
-  nombre        String
-  categoria     String?
-  marca         String?
-  descripcion   String?
-  impuestoPorcentaje Decimal @db.Decimal(5, 2) @default(0)
-  precio        Decimal  @db.Decimal(12, 2)
-  costo         Decimal  @db.Decimal(12, 2) @default(0)
+  id                 String   @id @default(uuid())
+  empresaId          String
+  empresa            Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  sku                String
+  nombre             String
+  categoria          String?
+  marca              String?
+  descripcion        String?
+  impuestoPorcentaje Decimal  @default(0) @db.Decimal(5, 2)
+  precio             Decimal  @db.Decimal(12, 2)
+  costo              Decimal  @default(0) @db.Decimal(12, 2)
   // Precio al por mayor. Si la tienda está en Shopify se toma del metacampo "Precio Mayorista".
-  precioMayorista Decimal? @db.Decimal(12, 2)
-  codigoBarras  String?
-  activo        Boolean  @default(true)
-  creadoEn      DateTime @default(now())
+  precioMayorista    Decimal? @db.Decimal(12, 2)
+  codigoBarras       String?
+  activo             Boolean  @default(true)
+  creadoEn           DateTime @default(now())
 
-  shopifyProductId String?
-  shopifyVariantId String?
+  shopifyProductId       String?
+  shopifyVariantId       String?
   shopifyInventoryItemId String?
-  varianteTitulo   String? // ej. "S / Negro", para agrupar variantes del mismo producto Shopify
-  imagenUrl        String?
+  varianteTitulo         String? // ej. "S / Negro", para agrupar variantes del mismo producto Shopify
+  imagenUrl              String?
   // Agrupa variantes creadas localmente (sin Shopify) que pertenecen al mismo
   // producto padre. Para las de Shopify se sigue usando shopifyProductId.
-  grupoVariantes   String?
+  grupoVariantes         String?
   // Nombres de las opciones de variante (ej. "Color|Talla"), en el mismo orden
   // que los valores en varianteTitulo, para mostrar "Color: Rojo / Talla: M".
-  grupoOpciones    String?
+  grupoOpciones          String?
   // Cantidad minima antes de generar un recordatorio de reposicion (0 = sin aviso).
-  stockMinimo      Int      @default(0)
+  stockMinimo            Int     @default(0)
 
-  proveedorId   String?
-  proveedor     Proveedor? @relation(fields: [proveedorId], references: [id])
+  proveedorId String?
+  proveedor   Proveedor? @relation(fields: [proveedorId], references: [id])
 
-  inventario    InventarioSucursal[]
-  movimientos   MovimientoInventario[]
-  ventaItems    VentaItem[]
-  compraItems   CompraItem[]
-  colecciones   ProductoColeccion[]
+  inventario            InventarioSucursal[]
+  movimientos           MovimientoInventario[]
+  ventaItems            VentaItem[]
+  compraItems           CompraItem[]
+  colecciones           ProductoColeccion[]
   // Sin filas = disponible en todas las sucursales (default). Con filas,
   // queda restringido solo a las sucursales listadas.
   sucursalesDisponibles ProductoSucursal[]
   shopifyInventoryItems ShopifyInventoryItem[]
-  shopifySyncQueue ShopifySyncQueue[]
-  lineaCotizaciones LineaCotizacion[]
+  shopifySyncQueue      ShopifySyncQueue[]
+  lineaCotizaciones     LineaCotizacion[]
 
   @@unique([empresaId, sku])
   @@index([empresaId, codigoBarras])
@@ -264,15 +265,15 @@ model Producto {
 }
 
 model InventarioSucursal {
-  id          String   @id @default(uuid())
-  productoId  String
-  producto    Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
-  sucursalId  String
-  sucursal    Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
-  cantidad    Int      @default(0)
+  id            String   @id @default(uuid())
+  productoId    String
+  producto      Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  sucursalId    String
+  sucursal      Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
+  cantidad      Int      @default(0)
   // Solo en la sucursal ecommerce: unidades cuando CENTRALA y Shopify coincidieron por última vez.
   // Con esto la conciliación sabe qué lado cambió (Shopify, CENTRALA o los dos).
-  shopifyBase Int?
+  shopifyBase   Int?
   actualizadoEn DateTime @updatedAt
 
   @@unique([productoId, sucursalId])
@@ -281,19 +282,19 @@ model InventarioSucursal {
 }
 
 model MovimientoInventario {
-  id                 String         @id @default(uuid())
-  productoId         String
-  producto           Producto       @relation(fields: [productoId], references: [id])
-  sucursalId         String
-  sucursal           Sucursal       @relation("MovimientoSucursalOrigen", fields: [sucursalId], references: [id])
-  sucursalDestinoId  String?
-  sucursalDestino    Sucursal?      @relation("MovimientoSucursalDestino", fields: [sucursalDestinoId], references: [id])
-  tipo               TipoMovimiento
-  cantidad           Int
-  motivo             String?
-  usuarioId          String
-  usuario            Usuario        @relation(fields: [usuarioId], references: [id])
-  fecha              DateTime       @default(now())
+  id                String         @id @default(uuid())
+  productoId        String
+  producto          Producto       @relation(fields: [productoId], references: [id])
+  sucursalId        String
+  sucursal          Sucursal       @relation("MovimientoSucursalOrigen", fields: [sucursalId], references: [id])
+  sucursalDestinoId String?
+  sucursalDestino   Sucursal?      @relation("MovimientoSucursalDestino", fields: [sucursalDestinoId], references: [id])
+  tipo              TipoMovimiento
+  cantidad          Int
+  motivo            String?
+  usuarioId         String
+  usuario           Usuario        @relation(fields: [usuarioId], references: [id])
+  fecha             DateTime       @default(now())
 
   @@index([productoId])
   @@index([sucursalId])
@@ -301,31 +302,31 @@ model MovimientoInventario {
 }
 
 model Venta {
-  id            String      @id @default(uuid())
-  clienteUuid   String      @unique // uuid generado en el cliente para deduplicar reintentos offline
-  empresaId     String
-  empresa       Empresa     @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  sucursalId    String
-  sucursal      Sucursal    @relation(fields: [sucursalId], references: [id])
-  usuarioId     String
-  usuario       Usuario     @relation(fields: [usuarioId], references: [id])
-  clienteId     String?
-  cliente       Cliente?    @relation(fields: [clienteId], references: [id])
-  consecutivo   Int
-  total         Decimal     @db.Decimal(12, 2)
+  id               String          @id @default(uuid())
+  clienteUuid      String          @unique // uuid generado en el cliente para deduplicar reintentos offline
+  empresaId        String
+  empresa          Empresa         @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  sucursalId       String
+  sucursal         Sucursal        @relation(fields: [sucursalId], references: [id])
+  usuarioId        String
+  usuario          Usuario         @relation(fields: [usuarioId], references: [id])
+  clienteId        String?
+  cliente          Cliente?        @relation(fields: [clienteId], references: [id])
+  consecutivo      Int
+  total            Decimal         @db.Decimal(12, 2)
   // IVA contenido en el total (los precios incluyen IVA). Se calcula segun el
   // impuesto de cada producto.
-  impuestoTotal Decimal?    @db.Decimal(12, 2)
-  metodoPago    MetodoPago
+  impuestoTotal    Decimal?        @db.Decimal(12, 2)
+  metodoPago       MetodoPago
   // Cuenta bancaria que recibio el pago (tarjeta/transferencia/QR). Permite
   // cuadrar la caja por cuenta automaticamente.
   cuentaBancariaId String?
   cuentaBancaria   CuentaBancaria? @relation(fields: [cuentaBancariaId], references: [id])
-  fecha         DateTime    @default(now())
+  fecha            DateTime        @default(now())
 
   // Solo para metodoPago = EFECTIVO: lo que entrego el cliente y el cambio calculado.
-  dineroRecibido Decimal?   @db.Decimal(12, 2)
-  cambio         Decimal?   @db.Decimal(12, 2)
+  dineroRecibido Decimal? @db.Decimal(12, 2)
+  cambio         Decimal? @db.Decimal(12, 2)
 
   // Solo para metodoPago = CREDITO: snapshot de Empresa.diasVencimientoCredito
   // al momento de la venta, para que cambios futuros en la config no muevan
@@ -342,7 +343,7 @@ model Venta {
 
   // Venta libre: concepto suelto sin producto del inventario (no descuenta
   // stock). Se marca para diferenciarla en el historial y los reportes.
-  ventaLibre    Boolean  @default(false)
+  ventaLibre    Boolean @default(false)
   observaciones String?
 
   // Descuento manual aplicado en el POS (monto en pesos ya calculado) y
@@ -351,8 +352,8 @@ model Venta {
   puntosGanados   Int      @default(0)
   puntosRedimidos Int      @default(0)
 
-  items         VentaItem[]
-  devoluciones  DevolucionVenta[]
+  items        VentaItem[]
+  devoluciones DevolucionVenta[]
 
   @@unique([empresaId, consecutivo])
   @@index([empresaId, sucursalId])
@@ -361,43 +362,49 @@ model Venta {
 }
 
 model VentaItem {
-  id              String   @id @default(uuid())
-  ventaId         String
-  venta           Venta    @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  id               String    @id @default(uuid())
+  ventaId          String
+  venta            Venta     @relation(fields: [ventaId], references: [id], onDelete: Cascade)
   // productoId es null en una "venta libre" (concepto suelto, sin producto del
   // inventario). En ese caso el texto va en descripcionLibre.
-  productoId      String?
-  producto        Producto? @relation(fields: [productoId], references: [id])
+  productoId       String?
+  producto         Producto? @relation(fields: [productoId], references: [id])
   descripcionLibre String?
-  cantidad        Int
-  precioUnitario  Decimal  @db.Decimal(12, 2)
+  cantidad         Int
+  precioUnitario   Decimal   @db.Decimal(12, 2)
   // Cuanto de este item se devolvio. Se lleva aparte (en vez de restarle a
   // "cantidad") para conservar intacto el historial de lo que se vendio
   // originalmente. Lo que sigue en poder del cliente = cantidad - cantidadDevuelta.
-  cantidadDevuelta Int     @default(0)
+  cantidadDevuelta Int       @default(0)
 
   @@index([ventaId])
   @@map("venta_items")
 }
 
 model Cliente {
-  id          String   @id @default(uuid())
-  empresaId   String
-  empresa     Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  nombre      String
-  telefono    String?
-  email       String?
-  direccion   String?
-  cedula      String?
-  ciudad      String?
-  puntos      Int      @default(0)
-  activo      Boolean  @default(true)
-  creadoEn    DateTime @default(now())
+  id                  String   @id @default(uuid())
+  empresaId           String
+  empresa             Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nombre              String
+  telefono            String?
+  email               String?
+  direccion           String?
+  cedula              String?
+  ciudad              String?
+  // Datos para la factura electrónica (DIAN). Sin ellos se factura a "Consumidor final".
+  // tipoDocumento: código TFactura (3 cédula, 6 NIT, 5 cédula extranjería, 7 pasaporte...).
+  // tipoPersona: 1 jurídica, 2 natural. categoriaImpositiva: 13, 23, 15, 47, 99 o ZZ.
+  tipoDocumento       Int?
+  tipoPersona         Int?
+  categoriaImpositiva String?
+  puntos              Int      @default(0)
+  activo              Boolean  @default(true)
+  creadoEn            DateTime @default(now())
 
-  ventas      Venta[]
-  abonos      Abono[]
+  ventas            Venta[]
+  abonos            Abono[]
   movimientosPuntos MovimientoPuntos[]
-  creditosManuales CreditoManual[]
+  creditosManuales  CreditoManual[]
 
   @@index([empresaId])
   @@map("clientes")
@@ -405,33 +412,33 @@ model Cliente {
 
 // Pago que un cliente hace para abonar a su deuda (ventas con metodoPago = CREDITO).
 model Abono {
-  id          String     @id @default(uuid())
-  clienteId   String
-  cliente     Cliente    @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-  monto       Decimal    @db.Decimal(12, 2)
-  metodoPago  MetodoPago @default(EFECTIVO)
-  usuarioId   String
-  usuario     Usuario    @relation(fields: [usuarioId], references: [id])
-  fecha       DateTime   @default(now())
-  referencia  String?
+  id         String     @id @default(uuid())
+  clienteId  String
+  cliente    Cliente    @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  monto      Decimal    @db.Decimal(12, 2)
+  metodoPago MetodoPago @default(EFECTIVO)
+  usuarioId  String
+  usuario    Usuario    @relation(fields: [usuarioId], references: [id])
+  fecha      DateTime   @default(now())
+  referencia String?
 
   @@index([clienteId])
   @@map("abonos")
 }
 
 model Proveedor {
-  id          String   @id @default(uuid())
-  empresaId   String
-  empresa     Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  nombre      String
-  telefono    String?
-  email       String?
-  direccion   String?
-  activo      Boolean  @default(true)
-  creadoEn    DateTime @default(now())
+  id        String   @id @default(uuid())
+  empresaId String
+  empresa   Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nombre    String
+  telefono  String?
+  email     String?
+  direccion String?
+  activo    Boolean  @default(true)
+  creadoEn  DateTime @default(now())
 
-  compras     Compra[]
-  productos   Producto[]
+  compras   Compra[]
+  productos Producto[]
 
   @@index([empresaId])
   @@map("proveedores")
@@ -440,19 +447,19 @@ model Proveedor {
 // Compra a un proveedor. Al registrarla se suma automaticamente el inventario
 // de la sucursal destino (equivalente a un MovimientoInventario tipo ENTRADA).
 model Compra {
-  id           String       @id @default(uuid())
-  empresaId    String
-  empresa      Empresa      @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  proveedorId  String
-  proveedor    Proveedor    @relation(fields: [proveedorId], references: [id])
-  sucursalId   String
-  sucursal     Sucursal     @relation(fields: [sucursalId], references: [id])
-  usuarioId    String
-  usuario      Usuario      @relation(fields: [usuarioId], references: [id])
-  total        Decimal      @db.Decimal(12, 2)
-  fecha        DateTime     @default(now())
+  id          String    @id @default(uuid())
+  empresaId   String
+  empresa     Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  proveedorId String
+  proveedor   Proveedor @relation(fields: [proveedorId], references: [id])
+  sucursalId  String
+  sucursal    Sucursal  @relation(fields: [sucursalId], references: [id])
+  usuarioId   String
+  usuario     Usuario   @relation(fields: [usuarioId], references: [id])
+  total       Decimal   @db.Decimal(12, 2)
+  fecha       DateTime  @default(now())
 
-  items        CompraItem[]
+  items CompraItem[]
 
   @@index([empresaId, sucursalId])
   @@index([proveedorId])
@@ -460,13 +467,13 @@ model Compra {
 }
 
 model CompraItem {
-  id             String   @id @default(uuid())
-  compraId       String
-  compra         Compra   @relation(fields: [compraId], references: [id], onDelete: Cascade)
-  productoId     String
-  producto       Producto @relation(fields: [productoId], references: [id])
-  cantidad       Int
-  costoUnitario  Decimal  @db.Decimal(12, 2)
+  id            String   @id @default(uuid())
+  compraId      String
+  compra        Compra   @relation(fields: [compraId], references: [id], onDelete: Cascade)
+  productoId    String
+  producto      Producto @relation(fields: [productoId], references: [id])
+  cantidad      Int
+  costoUnitario Decimal  @db.Decimal(12, 2)
 
   @@index([compraId])
   @@map("compra_items")
@@ -495,30 +502,30 @@ model Gasto {
 // Credenciales y estado de sincronizacion de la integracion con Shopify
 // (flujo client_credentials, vigente desde 2026). Una por empresa.
 model ShopifyConfig {
-  id                  String    @id @default(uuid())
-  empresaId           String    @unique
-  empresa             Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  shopDomain          String
-  clientId            String
-  clientSecret        String
-  sucursalEcommerceId String
-  accessToken         String?
-  tokenExpiraEn       DateTime?
+  id                   String    @id @default(uuid())
+  empresaId            String    @unique
+  empresa              Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  shopDomain           String
+  clientId             String
+  clientSecret         String
+  sucursalEcommerceId  String
+  accessToken          String?
+  tokenExpiraEn        DateTime?
   ultimaSincronizacion DateTime?
-  ultimaAlertaOrdenes DateTime?
-  creadoEn            DateTime  @default(now())
+  ultimaAlertaOrdenes  DateTime?
+  creadoEn             DateTime  @default(now())
 
   @@map("shopify_config")
 }
 
 // Estado temporal para OAuth (protección CSRF)
 model ShopifyOAuthState {
-  id          String    @id @default(uuid())
-  state       String    @unique
-  empresaId   String
-  shop        String
-  expiradoEn  DateTime
-  creadoEn    DateTime  @default(now())
+  id         String   @id @default(uuid())
+  state      String   @unique
+  empresaId  String
+  shop       String
+  expiradoEn DateTime
+  creadoEn   DateTime @default(now())
 
   @@index([state])
   @@index([empresaId])
@@ -561,16 +568,16 @@ model GastoPauta {
 }
 
 model Coleccion {
-  id                  String    @id @default(uuid())
+  id                  String   @id @default(uuid())
   empresaId           String
-  empresa             Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empresa             Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
   titulo              String
   descripcion         String?
   imagenUrl           String?
   shopifyCollectionId String?
-  creadoEn            DateTime  @default(now())
+  creadoEn            DateTime @default(now())
 
-  productos           ProductoColeccion[]
+  productos ProductoColeccion[]
 
   @@index([empresaId])
   @@index([empresaId, shopifyCollectionId])
@@ -578,11 +585,11 @@ model Coleccion {
 }
 
 model ProductoColeccion {
-  id           String    @id @default(uuid())
-  productoId   String
-  producto     Producto  @relation(fields: [productoId], references: [id], onDelete: Cascade)
-  coleccionId  String
-  coleccion    Coleccion @relation(fields: [coleccionId], references: [id], onDelete: Cascade)
+  id          String    @id @default(uuid())
+  productoId  String
+  producto    Producto  @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  coleccionId String
+  coleccion   Coleccion @relation(fields: [coleccionId], references: [id], onDelete: Cascade)
 
   @@unique([productoId, coleccionId])
   @@index([coleccionId])
@@ -606,16 +613,16 @@ model ProductoSucursal {
 // Historial de acciones relevantes (ventas, usuarios, productos, creditos,
 // gastos) para auditoria: quien hizo que y cuando.
 model RegistroAuditoria {
-  id         String   @id @default(uuid())
-  empresaId  String
-  empresa    Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  usuarioId  String?
-  usuario    Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
-  accion     String
-  entidad    String
-  entidadId  String?
-  detalle    String?
-  fecha      DateTime @default(now())
+  id        String   @id @default(uuid())
+  empresaId String
+  empresa   Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  usuarioId String?
+  usuario   Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  accion    String
+  entidad   String
+  entidadId String?
+  detalle   String?
+  fecha     DateTime @default(now())
 
   @@index([empresaId, fecha])
   @@map("registro_auditoria")
@@ -663,11 +670,11 @@ model CuentaBancaria {
   banco        String?
   numeroCuenta String?
   tipoCuenta   String? // Ahorros, Corriente, Billetera (Nequi/Daviplata), Caja menor, etc.
-  saldoInicial Decimal  @db.Decimal(14, 2) @default(0)
+  saldoInicial Decimal  @default(0) @db.Decimal(14, 2)
   activa       Boolean  @default(true)
   creadoEn     DateTime @default(now())
 
-  ventas       Venta[]
+  ventas Venta[]
 
   @@index([empresaId])
   @@map("cuentas_bancarias")
@@ -786,24 +793,24 @@ enum FrecuenciaPago {
 // Credito/prestamo creado manualmente (sin una venta detras). Se paga en
 // cuotas segun un cronograma generado al crearlo.
 model CreditoManual {
-  id            String   @id @default(uuid())
+  id            String         @id @default(uuid())
   empresaId     String
-  empresa       Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empresa       Empresa        @relation(fields: [empresaId], references: [id], onDelete: Cascade)
   numero        Int // consecutivo por empresa, para referirse al credito
   clienteId     String
-  cliente       Cliente  @relation(fields: [clienteId], references: [id])
-  valorTotal    Decimal  @db.Decimal(12, 2)
+  cliente       Cliente        @relation(fields: [clienteId], references: [id])
+  valorTotal    Decimal        @db.Decimal(12, 2)
   fechaInicio   DateTime
   numeroCuotas  Int
   frecuencia    FrecuenciaPago
   observaciones String?
-  activo        Boolean  @default(true)
-  creadoEn      DateTime @default(now())
+  activo        Boolean        @default(true)
+  creadoEn      DateTime       @default(now())
   // Marcado como abandonado ("no volvio a abonar"); ver Venta.creditoAbandonadoEn.
   abandonadoEn  DateTime?
   notaAbandono  String?
 
-  cuotas        CuotaCredito[]
+  cuotas CuotaCredito[]
 
   @@unique([empresaId, numero])
   @@index([empresaId])
@@ -813,15 +820,15 @@ model CreditoManual {
 
 // Cada cuota del cronograma de un credito manual.
 model CuotaCredito {
-  id             String   @id @default(uuid())
-  creditoId      String
-  credito        CreditoManual @relation(fields: [creditoId], references: [id], onDelete: Cascade)
-  numero         Int // 1, 2, 3...
+  id               String        @id @default(uuid())
+  creditoId        String
+  credito          CreditoManual @relation(fields: [creditoId], references: [id], onDelete: Cascade)
+  numero           Int // 1, 2, 3...
   fechaVencimiento DateTime
-  valor          Decimal  @db.Decimal(12, 2)
-  pagado         Decimal  @db.Decimal(12, 2) @default(0)
+  valor            Decimal       @db.Decimal(12, 2)
+  pagado           Decimal       @default(0) @db.Decimal(12, 2)
 
-  pagos          PagoCreditoManual[]
+  pagos PagoCreditoManual[]
 
   @@index([creditoId])
   @@map("cuotas_credito")
@@ -829,13 +836,13 @@ model CuotaCredito {
 
 // Abono a un credito manual, aplicado a una cuota especifica.
 model PagoCreditoManual {
-  id         String   @id @default(uuid())
-  cuotaId    String
-  cuota      CuotaCredito @relation(fields: [cuotaId], references: [id], onDelete: Cascade)
-  monto      Decimal  @db.Decimal(12, 2)
-  fecha      DateTime @default(now())
-  usuarioId  String
-  usuario    Usuario  @relation(fields: [usuarioId], references: [id])
+  id        String       @id @default(uuid())
+  cuotaId   String
+  cuota     CuotaCredito @relation(fields: [cuotaId], references: [id], onDelete: Cascade)
+  monto     Decimal      @db.Decimal(12, 2)
+  fecha     DateTime     @default(now())
+  usuarioId String
+  usuario   Usuario      @relation(fields: [usuarioId], references: [id])
 
   @@index([cuotaId])
   @@map("pagos_credito_manual")
@@ -843,15 +850,15 @@ model PagoCreditoManual {
 
 // Ubicaciones (warehouses) de Shopify sincronizadas para inventario
 model ShopifyLocation {
-  id                String    @id @default(uuid())
+  id                String   @id @default(uuid())
   empresaId         String
-  empresa           Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  shopifyLocationId String    // Shopify GID: gid://shopify/Location/123456
-  nombre            String    // Ej: "Bodega Principal", "Tienda Física"
-  activa            Boolean   @default(true)
-  creadoEn          DateTime  @default(now())
+  empresa           Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  shopifyLocationId String // Shopify GID: gid://shopify/Location/123456
+  nombre            String // Ej: "Bodega Principal", "Tienda Física"
+  activa            Boolean  @default(true)
+  creadoEn          DateTime @default(now())
 
-  inventoryLevels   ShopifyInventoryLevel[]
+  inventoryLevels ShopifyInventoryLevel[]
 
   @@unique([empresaId, shopifyLocationId])
   @@index([empresaId])
@@ -860,18 +867,18 @@ model ShopifyLocation {
 
 // Items de inventario de Shopify (variantes vinculadas con inventory tracking)
 model ShopifyInventoryItem {
-  id                    String    @id @default(uuid())
-  empresaId             String
-  empresa               Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  shopifyInventoryItemId String   // Shopify GID: gid://shopify/InventoryItem/123456
-  shopifyVariantId      String?   // Shopify GID para la variante
-  productoId            String?   // Vinculo con producto POS si existe
-  producto              Producto? @relation(fields: [productoId], references: [id], onDelete: SetNull)
-  tracked               Boolean   @default(true) // Si Shopify trackea este item
-  requiresShipping      Boolean   @default(true)
-  creadoEn              DateTime  @default(now())
+  id                     String    @id @default(uuid())
+  empresaId              String
+  empresa                Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  shopifyInventoryItemId String // Shopify GID: gid://shopify/InventoryItem/123456
+  shopifyVariantId       String? // Shopify GID para la variante
+  productoId             String? // Vinculo con producto POS si existe
+  producto               Producto? @relation(fields: [productoId], references: [id], onDelete: SetNull)
+  tracked                Boolean   @default(true) // Si Shopify trackea este item
+  requiresShipping       Boolean   @default(true)
+  creadoEn               DateTime  @default(now())
 
-  inventoryLevels       ShopifyInventoryLevel[]
+  inventoryLevels ShopifyInventoryLevel[]
 
   @@unique([empresaId, shopifyInventoryItemId])
   @@index([empresaId, shopifyVariantId])
@@ -881,18 +888,18 @@ model ShopifyInventoryItem {
 
 // Niveles de stock de Shopify por ubicacion
 model ShopifyInventoryLevel {
-  id                 String    @id @default(uuid())
-  empresaId          String
-  empresa            Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  inventoryItemId    String
-  inventoryItem      ShopifyInventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
-  locationId         String
-  location           ShopifyLocation @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  disponible         Int       @default(0)   // Cantidad disponible para venta
-  enMano             Int       @default(0)   // Cantidad fisica en mano
-  comprometida       Int       @default(0)   // Cantidad reservada/pendiente
-  entrante           Int       @default(0)   // Cantidad en transito/entrante
-  actualizadoEn      DateTime  @default(now()) @updatedAt
+  id              String               @id @default(uuid())
+  empresaId       String
+  empresa         Empresa              @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  inventoryItemId String
+  inventoryItem   ShopifyInventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  locationId      String
+  location        ShopifyLocation      @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  disponible      Int                  @default(0) // Cantidad disponible para venta
+  enMano          Int                  @default(0) // Cantidad fisica en mano
+  comprometida    Int                  @default(0) // Cantidad reservada/pendiente
+  entrante        Int                  @default(0) // Cantidad en transito/entrante
+  actualizadoEn   DateTime             @default(now()) @updatedAt
 
   @@unique([inventoryItemId, locationId])
   @@index([empresaId])
@@ -902,35 +909,35 @@ model ShopifyInventoryLevel {
 
 // FASE 4: Cola de sincronización bidireccional
 enum TipoCambioShopify {
-  INVENTORY_UPDATE     // Cambio de stock en POS
-  PRODUCT_UPDATE       // Actualizar producto
-  PRODUCT_CREATE       // Crear nuevo producto
-  PRICE_UPDATE         // Cambiar precio
+  INVENTORY_UPDATE // Cambio de stock en POS
+  PRODUCT_UPDATE // Actualizar producto
+  PRODUCT_CREATE // Crear nuevo producto
+  PRICE_UPDATE // Cambiar precio
 }
 
 enum EstadoSincronizacion {
-  PENDIENTE            // Esperando procesarse
-  PROCESANDO           // Siendo procesado
-  COMPLETADO           // Completado exitosamente
-  ERROR                // Error al procesar
+  PENDIENTE // Esperando procesarse
+  PROCESANDO // Siendo procesado
+  COMPLETADO // Completado exitosamente
+  ERROR // Error al procesar
 }
 
 // Cola de cambios pendientes para sincronizar con Shopify
 model ShopifySyncQueue {
-  id                   String    @id @default(uuid())
-  empresaId            String
-  empresa              Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  productoId           String?
-  producto             Producto? @relation(fields: [productoId], references: [id], onDelete: SetNull)
-  tipo                 TipoCambioShopify
-  estado               EstadoSincronizacion @default(PENDIENTE)
-  datos                String    // JSON con los cambios a sincronizar
-  intentos             Int       @default(0)
-  maxIntentos          Int       @default(3)
-  proximoIntento       DateTime  @default(now())
-  errorMensaje         String?
-  creadoEn             DateTime  @default(now())
-  procesadoEn          DateTime?
+  id             String               @id @default(uuid())
+  empresaId      String
+  empresa        Empresa              @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  productoId     String?
+  producto       Producto?            @relation(fields: [productoId], references: [id], onDelete: SetNull)
+  tipo           TipoCambioShopify
+  estado         EstadoSincronizacion @default(PENDIENTE)
+  datos          String // JSON con los cambios a sincronizar
+  intentos       Int                  @default(0)
+  maxIntentos    Int                  @default(3)
+  proximoIntento DateTime             @default(now())
+  errorMensaje   String?
+  creadoEn       DateTime             @default(now())
+  procesadoEn    DateTime?
 
   @@index([empresaId, estado, proximoIntento])
   @@index([productoId])
@@ -939,16 +946,16 @@ model ShopifySyncQueue {
 
 // Log de webhooks recibidos desde Shopify
 model ShopifyWebhookEvent {
-  id                   String    @id @default(uuid())
-  empresaId            String
-  empresa              Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  tipo                 String    // "products/update", "inventory/update", etc
-  shopifyResourceId    String    // ID del recurso en Shopify
-  shopifyResourceGid   String?   // GID completo (gid://shopify/...)
-  datos                String    // JSON completo del evento
-  procesado            Boolean   @default(false)
-  procesoError         String?
-  creadoEn             DateTime  @default(now())
+  id                 String   @id @default(uuid())
+  empresaId          String
+  empresa            Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  tipo               String // "products/update", "inventory/update", etc
+  shopifyResourceId  String // ID del recurso en Shopify
+  shopifyResourceGid String? // GID completo (gid://shopify/...)
+  datos              String // JSON completo del evento
+  procesado          Boolean  @default(false)
+  procesoError       String?
+  creadoEn           DateTime @default(now())
 
   @@index([empresaId, tipo, creadoEn])
   @@index([empresaId, procesado])
@@ -973,18 +980,18 @@ enum EstadoAsiento {
 
 // Plan de cuentas
 model CuentaContable {
-  id                   String    @id @default(uuid())
-  empresaId            String
-  empresa              Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  codigo               String    // Ej: "1-1-1-001" o "110"
-  nombre               String    // Ej: "Caja"
-  tipo                 TipoCuentaContable
-  descripcion          String?
-  activa               Boolean   @default(true)
-  creadoEn             DateTime  @default(now())
-  actualizadoEn        DateTime  @updatedAt
+  id            String             @id @default(uuid())
+  empresaId     String
+  empresa       Empresa            @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  codigo        String // Ej: "1-1-1-001" o "110"
+  nombre        String // Ej: "Caja"
+  tipo          TipoCuentaContable
+  descripcion   String?
+  activa        Boolean            @default(true)
+  creadoEn      DateTime           @default(now())
+  actualizadoEn DateTime           @updatedAt
 
-  asientos             LineaAsiento[]
+  asientos LineaAsiento[]
 
   @@unique([empresaId, codigo])
   @@index([empresaId, tipo])
@@ -993,20 +1000,20 @@ model CuentaContable {
 
 // Asientos contables (movimientos contables)
 model AsientoContable {
-  id                   String    @id @default(uuid())
-  empresaId            String
-  empresa              Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  fecha                DateTime
-  descripcion          String
-  referencia           String?   // Ref a venta, factura, etc
-  estado               EstadoAsiento @default(BORRADOR)
-  totalDebe            Decimal   @default(0)
-  totalHaber           Decimal   @default(0)
-  creadoEn             DateTime  @default(now())
-  actualizadoEn        DateTime  @updatedAt
-  contabilizadoEn      DateTime?
+  id              String        @id @default(uuid())
+  empresaId       String
+  empresa         Empresa       @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  fecha           DateTime
+  descripcion     String
+  referencia      String? // Ref a venta, factura, etc
+  estado          EstadoAsiento @default(BORRADOR)
+  totalDebe       Decimal       @default(0)
+  totalHaber      Decimal       @default(0)
+  creadoEn        DateTime      @default(now())
+  actualizadoEn   DateTime      @updatedAt
+  contabilizadoEn DateTime?
 
-  lineas               LineaAsiento[]
+  lineas LineaAsiento[]
 
   @@index([empresaId, fecha])
   @@index([empresaId, estado])
@@ -1016,15 +1023,15 @@ model AsientoContable {
 
 // Líneas del asiento (debe/haber)
 model LineaAsiento {
-  id                   String    @id @default(uuid())
-  asientoId            String
-  asiento              AsientoContable @relation(fields: [asientoId], references: [id], onDelete: Cascade)
-  cuentaId             String
-  cuenta               CuentaContable @relation(fields: [cuentaId], references: [id], onDelete: Restrict)
-  descripcion          String?
-  debe                 Decimal   @default(0)
-  haber                Decimal   @default(0)
-  orden                Int       @default(0) // Orden en el asiento
+  id          String          @id @default(uuid())
+  asientoId   String
+  asiento     AsientoContable @relation(fields: [asientoId], references: [id], onDelete: Cascade)
+  cuentaId    String
+  cuenta      CuentaContable  @relation(fields: [cuentaId], references: [id], onDelete: Restrict)
+  descripcion String?
+  debe        Decimal         @default(0)
+  haber       Decimal         @default(0)
+  orden       Int             @default(0) // Orden en el asiento
 
   @@index([asientoId])
   @@index([cuentaId])
@@ -1041,47 +1048,47 @@ enum EstadoCotizacion {
 }
 
 model Cotizacion {
-  id                  String    @id @default(uuid())
-  empresaId           String
-  empresa             Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  id        String  @id @default(uuid())
+  empresaId String
+  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
   // Consecutivo por empresa (COT-000001). No es único global: cada empresa tiene su
   // propia numeración (antes era @unique y la segunda empresa no podía crear cotizaciones).
-  numero              String
-  secuencial          Int       // Para generar próximo número
+  numero     String
+  secuencial Int // Para generar próximo número
 
   // Cliente
-  clienteNombre       String
-  clienteEmail        String?
-  clienteTelefono     String?
-  clienteEmpresa      String?
-  clienteDireccion    String?
-  clienteTipoDocumento   String?  // NIT, CC, CE, PASAPORTE
+  clienteNombre          String
+  clienteEmail           String?
+  clienteTelefono        String?
+  clienteEmpresa         String?
+  clienteDireccion       String?
+  clienteTipoDocumento   String? // NIT, CC, CE, PASAPORTE
   clienteNumeroDocumento String?
 
   // Datos comerciales
-  estado              EstadoCotizacion @default(BORRADOR)
-  fechaCreacion       DateTime  @default(now())
-  fechaVigencia       DateTime? // Hasta cuándo es válida
+  estado        EstadoCotizacion @default(BORRADOR)
+  fechaCreacion DateTime         @default(now())
+  fechaVigencia DateTime? // Hasta cuándo es válida
 
   // Montos
-  subtotal            Decimal   @db.Decimal(14, 2) @default(0)
-  descuentoPorcentaje Decimal   @db.Decimal(5, 2)  @default(0) // %
-  descuentoValor      Decimal   @db.Decimal(14, 2) @default(0) // Valor fijo
-  impuestoPorcentaje  Decimal   @db.Decimal(5, 2)  @default(0) // % (IVA)
-  impuestoValor       Decimal   @db.Decimal(14, 2) @default(0) // Valor calculado
-  total               Decimal   @db.Decimal(14, 2) @default(0)
+  subtotal            Decimal @default(0) @db.Decimal(14, 2)
+  descuentoPorcentaje Decimal @default(0) @db.Decimal(5, 2) // %
+  descuentoValor      Decimal @default(0) @db.Decimal(14, 2) // Valor fijo
+  impuestoPorcentaje  Decimal @default(0) @db.Decimal(5, 2) // % (IVA)
+  impuestoValor       Decimal @default(0) @db.Decimal(14, 2) // Valor calculado
+  total               Decimal @default(0) @db.Decimal(14, 2)
 
   // Notas
-  comentarios         String?
-  condicionesPago     String?   // Contado, crédito, plazos
-  firmaBase64         String?   @db.Text // Imagen PNG (data URL) de la firma para el PDF
+  comentarios     String?
+  condicionesPago String? // Contado, crédito, plazos
+  firmaBase64     String? @db.Text // Imagen PNG (data URL) de la firma para el PDF
 
   // Auditoría
-  creadoPor           String?
-  actualizadoEn       DateTime  @updatedAt
+  creadoPor     String?
+  actualizadoEn DateTime @updatedAt
 
-  lineas              LineaCotizacion[]
+  lineas LineaCotizacion[]
 
   @@index([empresaId, numero])
   @@index([empresaId, estado])
@@ -1091,20 +1098,20 @@ model Cotizacion {
 
 // Líneas de cotización (productos)
 model LineaCotizacion {
-  id                  String    @id @default(uuid())
-  cotizacionId        String
-  cotizacion          Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  id           String     @id @default(uuid())
+  cotizacionId String
+  cotizacion   Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
 
-  productoId          String
-  producto            Producto  @relation(fields: [productoId], references: [id], onDelete: Restrict)
+  productoId String
+  producto   Producto @relation(fields: [productoId], references: [id], onDelete: Restrict)
 
-  cantidad            Decimal   @db.Decimal(12, 4) @default(1)
-  precioUnitario      Decimal   @db.Decimal(14, 2)
-  descuentoPorcentaje Decimal   @db.Decimal(5, 2)  @default(0)
-  descuentoValor      Decimal   @db.Decimal(14, 2) @default(0)
-  subtotal            Decimal   @db.Decimal(14, 2) // cantidad * precio - descuento
+  cantidad            Decimal @default(1) @db.Decimal(12, 4)
+  precioUnitario      Decimal @db.Decimal(14, 2)
+  descuentoPorcentaje Decimal @default(0) @db.Decimal(5, 2)
+  descuentoValor      Decimal @default(0) @db.Decimal(14, 2)
+  subtotal            Decimal @db.Decimal(14, 2) // cantidad * precio - descuento
 
-  orden               Int       @default(0)
+  orden Int @default(0)
 
   @@index([cotizacionId])
   @@index([productoId])
@@ -1114,21 +1121,21 @@ model LineaCotizacion {
 // ========== LICENCIAS Y PAGOS ==========
 
 model Licencia {
-  id                String         @id @default(uuid())
-  empresa           Empresa        @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  empresaId         String         @unique
+  id        String  @id @default(uuid())
+  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empresaId String  @unique
 
   estado            EstadoLicencia @default(ACTIVA)
   usuariosIncluidos Int            @default(2)
   usuariosActuales  Int            @default(1)
 
-  fechaActivacion   DateTime       @default(now())
-  fechaVencimiento  DateTime
+  fechaActivacion  DateTime @default(now())
+  fechaVencimiento DateTime
 
-  suscripcion       Suscripcion?
+  suscripcion Suscripcion?
 
-  creado            DateTime       @default(now())
-  actualizado       DateTime       @updatedAt
+  creado      DateTime @default(now())
+  actualizado DateTime @updatedAt
 
   @@index([empresaId])
   @@index([estado])
@@ -1137,51 +1144,51 @@ model Licencia {
 }
 
 model Suscripcion {
-  id                String         @id @default(uuid())
-  licencia          Licencia       @relation(fields: [licenciaId], references: [id], onDelete: Cascade)
-  licenciaId        String         @unique
+  id         String   @id @default(uuid())
+  licencia   Licencia @relation(fields: [licenciaId], references: [id], onDelete: Cascade)
+  licenciaId String   @unique
 
-  tipoPlan          TipoPlan
-  precioBase        Decimal        @db.Decimal(14, 2)
-  precioTotal       Decimal        @db.Decimal(14, 2)
+  tipoPlan    TipoPlan
+  precioBase  Decimal  @db.Decimal(14, 2)
+  precioTotal Decimal  @db.Decimal(14, 2)
 
-  fechaInicio       DateTime       @default(now())
+  fechaInicio            DateTime @default(now())
   fechaProxiamRenovacion DateTime
 
-  activa            Boolean        @default(true)
-  renovacionAutomatica Boolean     @default(true)
+  activa               Boolean @default(true)
+  renovacionAutomatica Boolean @default(true)
 
-  creado            DateTime       @default(now())
-  actualizado       DateTime       @updatedAt
+  creado      DateTime @default(now())
+  actualizado DateTime @updatedAt
 
   @@index([licenciaId])
   @@map("suscripciones")
 }
 
 model Pago {
-  id                String         @id @default(uuid())
-  empresaId         String?
+  id        String  @id @default(uuid())
+  empresaId String?
 
-  referenciaPago    String         @unique
-  estado            EstadoPago     @default(PENDIENTE)
+  referenciaPago String     @unique
+  estado         EstadoPago @default(PENDIENTE)
 
-  moneda            String         @default("COP")
-  monto             Decimal        @db.Decimal(14, 2)
+  moneda String  @default("COP")
+  monto  Decimal @db.Decimal(14, 2)
 
-  tipoPlan          TipoPlan
-  usuariosAdicionales Int          @default(0)
+  tipoPlan            TipoPlan
+  usuariosAdicionales Int      @default(0)
 
-  metodoPago        String         @default("Wompi")
-  transaccionId     String?
+  metodoPago    String  @default("Wompi")
+  transaccionId String?
 
-  fechaPago         DateTime?
-  respuestaPayU     String?
+  fechaPago     DateTime?
+  respuestaPayU String?
 
   // Datos temporales de registro para flujo de registro (JSON stringified con empresaNombre, adminNombre, adminEmail, adminPassword)
-  datosRegistro     String?
+  datosRegistro String?
 
-  creado            DateTime       @default(now())
-  actualizado       DateTime       @updatedAt
+  creado      DateTime @default(now())
+  actualizado DateTime @updatedAt
 
   @@index([empresaId])
   @@index([estado])
@@ -1190,20 +1197,20 @@ model Pago {
 }
 
 model PrecioPlan {
-  id                String         @id @default(uuid())
-  tipoPlan          TipoPlan       @unique
+  id       String   @id @default(uuid())
+  tipoPlan TipoPlan @unique
 
-  precio            Decimal        @db.Decimal(14, 2)
-  descuento         Decimal        @db.Decimal(14, 2) @default(0)
-  precioFinal       Decimal        @db.Decimal(14, 2)
+  precio      Decimal @db.Decimal(14, 2)
+  descuento   Decimal @default(0) @db.Decimal(14, 2)
+  precioFinal Decimal @db.Decimal(14, 2)
 
-  diasDuracion      Int            // 30 para mensual, 90 para trimestral, 365 para anual
-  precioXUsuarioAdicional Decimal  @db.Decimal(14, 2) @default(5000)
+  diasDuracion            Int // 30 para mensual, 90 para trimestral, 365 para anual
+  precioXUsuarioAdicional Decimal @default(5000) @db.Decimal(14, 2)
 
-  activo            Boolean        @default(true)
+  activo Boolean @default(true)
 
-  creado            DateTime       @default(now())
-  actualizado       DateTime       @updatedAt
+  creado      DateTime @default(now())
+  actualizado DateTime @updatedAt
 
   @@map("precios_planes")
 }
@@ -1212,13 +1219,13 @@ model PrecioPlan {
 
 // Auditoría de acciones administrativas (creación de clientes, extensión de licencias, etc)
 model AdminAuditoria {
-  id              String   @id @default(uuid())
-  super_admin_id  String   // ID del usuario Super Admin que realizó la acción
-  accion          String   // CREAR_CLIENTE, EXTENDER_LICENCIA, RESET_PASSWORD, BLOQUEAR_CLIENTE, etc
-  entidad         String   // Tabla afectada: empresas, usuarios, etc
-  entidad_id      String   // ID del registro afectado
-  detalles        String?  // JSON con datos de la acción
-  fecha           DateTime @default(now())
+  id             String   @id @default(uuid())
+  super_admin_id String // ID del usuario Super Admin que realizó la acción
+  accion         String // CREAR_CLIENTE, EXTENDER_LICENCIA, RESET_PASSWORD, BLOQUEAR_CLIENTE, etc
+  entidad        String // Tabla afectada: empresas, usuarios, etc
+  entidad_id     String // ID del registro afectado
+  detalles       String? // JSON con datos de la acción
+  fecha          DateTime @default(now())
 
   @@index([super_admin_id])
   @@index([fecha])
@@ -1229,72 +1236,72 @@ model AdminAuditoria {
 // ========== MÓDULO CAJA - CIERRE CIEGO AUTOMÁTICO ==========
 
 model TurnoCaja {
-  id                String              @id @default(uuid())
-  empresaId         String
-  empresa           Empresa             @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  id        String  @id @default(uuid())
+  empresaId String
+  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
-  sucursalId        String
-  sucursal          Sucursal            @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
+  sucursalId String
+  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
 
   usuarioAperturaId String
-  usuarioApertura   Usuario             @relation("TurnoCajaApertura", fields: [usuarioAperturaId], references: [id])
+  usuarioApertura   Usuario @relation("TurnoCajaApertura", fields: [usuarioAperturaId], references: [id])
 
-  usuarioCierreId   String?
-  usuarioCierre     Usuario?            @relation("TurnoCajaCierre", fields: [usuarioCierreId], references: [id])
+  usuarioCierreId String?
+  usuarioCierre   Usuario? @relation("TurnoCajaCierre", fields: [usuarioCierreId], references: [id])
 
-  estado            EstadoTurnoCaja     @default(ABIERTA)
-  saldoInicial      Decimal             @db.Decimal(14, 2) @default(0) // Efectivo físico al abrir
+  estado       EstadoTurnoCaja @default(ABIERTA)
+  saldoInicial Decimal         @default(0) @db.Decimal(14, 2) // Efectivo físico al abrir
 
   // Saldos iniciales de los demás canales (no son efectivo)
-  saldoInicialTarjeta       Decimal     @db.Decimal(14, 2) @default(0)
-  saldoInicialTransferencia Decimal     @db.Decimal(14, 2) @default(0)
-  saldoInicialCredito       Decimal     @db.Decimal(14, 2) @default(0)
-  saldoInicialOtro          Decimal     @db.Decimal(14, 2) @default(0)
+  saldoInicialTarjeta       Decimal @default(0) @db.Decimal(14, 2)
+  saldoInicialTransferencia Decimal @default(0) @db.Decimal(14, 2)
+  saldoInicialCredito       Decimal @default(0) @db.Decimal(14, 2)
+  saldoInicialOtro          Decimal @default(0) @db.Decimal(14, 2)
 
   // Ventas por método de pago (sumadas en tiempo real)
-  ventasEfectivo    Decimal             @db.Decimal(14, 2) @default(0)
-  ventasTarjeta     Decimal             @db.Decimal(14, 2) @default(0)
-  ventasTransferencia Decimal           @db.Decimal(14, 2) @default(0)
-  ventasCredito     Decimal             @db.Decimal(14, 2) @default(0)
-  ventasOtro        Decimal             @db.Decimal(14, 2) @default(0)
+  ventasEfectivo      Decimal @default(0) @db.Decimal(14, 2)
+  ventasTarjeta       Decimal @default(0) @db.Decimal(14, 2)
+  ventasTransferencia Decimal @default(0) @db.Decimal(14, 2)
+  ventasCredito       Decimal @default(0) @db.Decimal(14, 2)
+  ventasOtro          Decimal @default(0) @db.Decimal(14, 2)
 
-  ingresos          Decimal             @db.Decimal(14, 2) @default(0)
-  egresos           Decimal             @db.Decimal(14, 2) @default(0)
+  ingresos Decimal @default(0) @db.Decimal(14, 2)
+  egresos  Decimal @default(0) @db.Decimal(14, 2)
 
   // EFECTIVO: Cierre ciego (saldo inicial + ventas efectivo + ingresos - egresos)
-  esperadoEfectivo  Decimal             @db.Decimal(14, 2) @default(0)
-  reportadoEfectivo Decimal?            @db.Decimal(14, 2) // Lo que el cajero contó
-  diferenciaEfectivo Decimal?           @db.Decimal(14, 2) // reportado - esperado
+  esperadoEfectivo   Decimal  @default(0) @db.Decimal(14, 2)
+  reportadoEfectivo  Decimal? @db.Decimal(14, 2) // Lo que el cajero contó
+  diferenciaEfectivo Decimal? @db.Decimal(14, 2) // reportado - esperado
 
   // TARJETA
-  esperadoTarjeta   Decimal             @db.Decimal(14, 2) @default(0)
-  reportadoTarjeta  Decimal?            @db.Decimal(14, 2) // Monto en datáfono
-  diferenciaTarjeta Decimal?            @db.Decimal(14, 2)
+  esperadoTarjeta   Decimal  @default(0) @db.Decimal(14, 2)
+  reportadoTarjeta  Decimal? @db.Decimal(14, 2) // Monto en datáfono
+  diferenciaTarjeta Decimal? @db.Decimal(14, 2)
 
   // TRANSFERENCIA
-  esperadoTransferencia Decimal         @db.Decimal(14, 2) @default(0)
-  reportadoTransferencia Decimal?       @db.Decimal(14, 2) // Monto visto en banco
-  diferenciaTransferencia Decimal?      @db.Decimal(14, 2)
+  esperadoTransferencia   Decimal  @default(0) @db.Decimal(14, 2)
+  reportadoTransferencia  Decimal? @db.Decimal(14, 2) // Monto visto en banco
+  diferenciaTransferencia Decimal? @db.Decimal(14, 2)
 
   // CRÉDITO (Fiado)
-  esperadoCredito   Decimal             @db.Decimal(14, 2) @default(0)
-  reportadoCredito  Decimal?            @db.Decimal(14, 2) // Monto reportado
-  diferenciaCredito Decimal?            @db.Decimal(14, 2)
+  esperadoCredito   Decimal  @default(0) @db.Decimal(14, 2)
+  reportadoCredito  Decimal? @db.Decimal(14, 2) // Monto reportado
+  diferenciaCredito Decimal? @db.Decimal(14, 2)
 
   // OTRO
-  esperadoOtro      Decimal             @db.Decimal(14, 2) @default(0)
-  reportadoOtro     Decimal?            @db.Decimal(14, 2) // Monto reportado
-  diferenciaOtro    Decimal?            @db.Decimal(14, 2)
+  esperadoOtro   Decimal  @default(0) @db.Decimal(14, 2)
+  reportadoOtro  Decimal? @db.Decimal(14, 2) // Monto reportado
+  diferenciaOtro Decimal? @db.Decimal(14, 2)
 
-  observaciones     String?
+  observaciones String?
 
-  fechaApertura     DateTime            @default(now())
-  fechaCierre       DateTime?
+  fechaApertura DateTime  @default(now())
+  fechaCierre   DateTime?
 
-  movimientos       MovimientoCaja[]
+  movimientos MovimientoCaja[]
 
-  creado            DateTime            @default(now())
-  actualizado       DateTime            @updatedAt
+  creado      DateTime @default(now())
+  actualizado DateTime @updatedAt
 
   @@index([empresaId])
   @@index([sucursalId])
@@ -1304,17 +1311,17 @@ model TurnoCaja {
 }
 
 model MovimientoCaja {
-  id              String              @id @default(uuid())
-  turnoId         String
-  turno           TurnoCaja           @relation(fields: [turnoId], references: [id], onDelete: Cascade)
+  id      String    @id @default(uuid())
+  turnoId String
+  turno   TurnoCaja @relation(fields: [turnoId], references: [id], onDelete: Cascade)
 
-  tipo            TipoMovimientoCaja
-  monto           Decimal             @db.Decimal(14, 2)
-  concepto        String              // "Pago proveedor", "Sencillo", "Retirada", etc
+  tipo     TipoMovimientoCaja
+  monto    Decimal            @db.Decimal(14, 2)
+  concepto String // "Pago proveedor", "Sencillo", "Retirada", etc
 
-  fecha           DateTime            @default(now())
+  fecha DateTime @default(now())
 
-  creado          DateTime            @default(now())
+  creado DateTime @default(now())
 
   @@index([turnoId])
   @@index([tipo])
@@ -1331,11 +1338,11 @@ model MovimientoCaja {
 model CanalMensajeria {
   id            String   @id @default(uuid())
   empresaId     String
-  tipo          String   // MESSENGER | INSTAGRAM | WHATSAPP
-  externoId     String   // id de la página, de la cuenta de Instagram o del número
-  paginaId      String?  // Instagram: página de Facebook a la que está vinculada
+  tipo          String // MESSENGER | INSTAGRAM | WHATSAPP
+  externoId     String // id de la página, de la cuenta de Instagram o del número
+  paginaId      String? // Instagram: página de Facebook a la que está vinculada
   nombre        String
-  usuario       String?  // @usuario de Instagram o número de WhatsApp
+  usuario       String? // @usuario de Instagram o número de WhatsApp
   fotoUrl       String?
   tokenCifrado  String
   activo        Boolean  @default(true)
@@ -1350,23 +1357,23 @@ model CanalMensajeria {
 }
 
 model ConversacionMensajeria {
-  id                 String    @id @default(uuid())
+  id                 String          @id @default(uuid())
   empresaId          String
   canalId            String
   canal              CanalMensajeria @relation(fields: [canalId], references: [id], onDelete: Cascade)
-  contactoExternoId  String    // id del cliente en Messenger/Instagram, o su número en WhatsApp
+  contactoExternoId  String // id del cliente en Messenger/Instagram, o su número en WhatsApp
   contactoNombre     String?
   contactoUsuario    String?
   contactoFoto       String?
-  clienteId          String?   // cliente de CENTRALA vinculado
-  asignadoAId        String?   // usuario de CENTRALA que la atiende
-  estado             String    @default("ABIERTA") // ABIERTA | CERRADA
-  noLeidos           Int       @default(0)
-  ultimoMensajeEn    DateTime  @default(now())
+  clienteId          String? // cliente de CENTRALA vinculado
+  asignadoAId        String? // usuario de CENTRALA que la atiende
+  estado             String          @default("ABIERTA") // ABIERTA | CERRADA
+  noLeidos           Int             @default(0)
+  ultimoMensajeEn    DateTime        @default(now())
   ultimoMensajeTexto String?
   // Último mensaje del cliente: Meta solo deja responder libremente durante 24 horas después.
   ultimoEntranteEn   DateTime?
-  creadoEn           DateTime  @default(now())
+  creadoEn           DateTime        @default(now())
 
   mensajes MensajeMensajeria[]
 
@@ -1376,20 +1383,87 @@ model ConversacionMensajeria {
 }
 
 model MensajeMensajeria {
-  id             String   @id @default(uuid())
+  id             String                 @id @default(uuid())
   empresaId      String
   conversacionId String
   conversacion   ConversacionMensajeria @relation(fields: [conversacionId], references: [id], onDelete: Cascade)
-  direccion      String   // ENTRANTE | SALIENTE
-  tipo           String   @default("TEXTO") // TEXTO | IMAGEN | AUDIO | VIDEO | ARCHIVO | OTRO
+  direccion      String // ENTRANTE | SALIENTE
+  tipo           String                 @default("TEXTO") // TEXTO | IMAGEN | AUDIO | VIDEO | ARCHIVO | OTRO
   texto          String?
   adjuntoUrl     String?
-  externoId      String?  @unique // id del mensaje en Meta (evita guardarlo dos veces)
-  estado         String   @default("ENVIADO") // ENVIADO | LEIDO | ERROR
+  externoId      String?                @unique // id del mensaje en Meta (evita guardarlo dos veces)
+  estado         String                 @default("ENVIADO") // ENVIADO | LEIDO | ERROR
   error          String?
-  usuarioId      String?  // quién lo respondió desde CENTRALA
-  creadoEn       DateTime @default(now())
+  usuarioId      String? // quién lo respondió desde CENTRALA
+  creadoEn       DateTime               @default(now())
 
   @@index([conversacionId, creadoEn])
   @@map("mensajes_mensajeria")
+}
+
+// ---------- Facturación electrónica (TFactura, aliado de CADENA) ----------
+
+// Conexión de cada empresa con su cuenta de TFactura. Las claves se guardan cifradas.
+model FacturacionConfig {
+  id                   String    @id @default(uuid())
+  empresaId            String    @unique
+  activo               Boolean   @default(true)
+  usuarioCifrado       String
+  passwordCifrado      String
+  identificadorCifrado String
+  clavePublicaCifrada  String
+  // Si los precios de CENTRALA ya incluyen IVA (lo normal): se envía a TFactura el precio sin IVA.
+  preciosIncluyenIva   Boolean   @default(true)
+  ultimaPrueba         DateTime?
+  ultimaPruebaOk       Boolean?
+  ultimaPruebaMensaje  String?
+  creadoEn             DateTime  @default(now())
+  actualizadoEn        DateTime  @updatedAt
+
+  @@map("facturacion_config")
+}
+
+// Paquete de facturas compradas (50, 100 o recarga de 10). Cada paquete dura 30 días y lo que
+// sobra se puede usar 1 mes más: venceEn = compra + 60 días.
+model PaqueteFacturacion {
+  id             String   @id @default(uuid())
+  empresaId      String
+  tipo           String // P50 | P100 | RECARGA10 | CORTESIA
+  cantidad       Int
+  usadas         Int      @default(0)
+  precio         Decimal  @db.Decimal(12, 2)
+  referenciaPago String?  @unique
+  periodoHasta   DateTime // fin de los 30 días del paquete (para el recordatorio de renovación)
+  venceEn        DateTime // fin del mes extra para usar lo que sobró
+  creadoEn       DateTime @default(now())
+
+  @@index([empresaId, venceEn])
+  @@map("paquetes_facturacion")
+}
+
+// Factura electrónica o nota crédito de una venta. Se emite en segundo plano con reintentos.
+model ComprobanteElectronico {
+  id             String    @id @default(uuid())
+  empresaId      String
+  ventaId        String
+  devolucionId   String?   @unique
+  tipo           String // FACTURA | NOTA_CREDITO
+  estado         String    @default("PENDIENTE") // PENDIENTE | ENVIANDO | EMITIDA | ERROR
+  paqueteId      String?
+  intentos       Int       @default(0)
+  proximoIntento DateTime  @default(now())
+  ultimoError    String?
+  movimientoId   Int?
+  numero         String?
+  cufe           String?
+  urlPdf         String?
+  total          Decimal?  @db.Decimal(12, 2)
+  emitidaEn      DateTime?
+  creadoEn       DateTime  @default(now())
+  actualizadoEn  DateTime  @updatedAt
+
+  @@index([empresaId, creadoEn])
+  @@index([ventaId])
+  @@index([estado, proximoIntento])
+  @@map("comprobantes_electronicos")
 }

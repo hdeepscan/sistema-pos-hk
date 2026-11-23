@@ -38,6 +38,7 @@ import Calendario from "./screens/Calendario";
 import Contabilidad from "./screens/Contabilidad";
 import Cotizaciones from "./screens/Cotizaciones";
 import Mensajes from "./screens/Mensajes";
+import FacturacionElectronica from "./screens/FacturacionElectronica";
 import EliminarDatos from "./screens/legal/EliminarDatos";
 import CheckoutPage from "./screens/CheckoutPage";
 import Suscripcion from "./screens/Suscripcion";
@@ -283,6 +284,7 @@ export default function App() {
           <Route path="/contabilidad" element={<Contabilidad />} />
           <Route path="/cotizaciones" element={<Cotizaciones />} />
           <Route path="/mensajes" element={<Mensajes />} />
+          <Route path="/facturacion" element={<FacturacionElectronica />} />
           <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="/admin/analytics" element={<SuperAdminAnalytics />} />
           <Route path="/perfil" element={<PerfilSettings />} />

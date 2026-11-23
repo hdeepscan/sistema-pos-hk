@@ -831,6 +831,8 @@ function DetalleVenta({
           <div style={{ fontSize: 20, fontWeight: 700 }}>${Number(venta.total).toLocaleString("es-CO")}</div>
         </div>
 
+        <FacturaElectronicaVenta ventaId={venta.id} refrescar={venta.total} />
+
         {error && <p className="error-text" style={{ marginTop: 10 }}>{error}</p>}
 
         {modoDevolucion && (
@@ -895,6 +897,108 @@ function DetalleVenta({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+interface ComprobanteVenta {
+  id: string;
+  tipo: "FACTURA" | "NOTA_CREDITO";
+  estado: "PENDIENTE" | "ENVIANDO" | "EMITIDA" | "ERROR";
+  numero: string | null;
+  urlPdf: string | null;
+  ultimoError: string | null;
+}
+
+// Factura electrónica de la venta: estado, PDF y botón para emitirla si no se pidió al cobrar.
+function FacturaElectronicaVenta({ ventaId, refrescar }: { ventaId: string; refrescar: unknown }) {
+  const [comprobantes, setComprobantes] = useState<ComprobanteVenta[] | null>(null);
+  const [estado, setEstado] = useState<{ conectada: boolean; disponibles: number; puedeEmitir: boolean } | null>(null);
+  const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const cargar = useCallback(() => {
+    api
+      .get<ComprobanteVenta[]>(`/facturacion/ventas/${ventaId}`)
+      .then(({ data }) => setComprobantes(data))
+      .catch(() => setComprobantes([]));
+  }, [ventaId]);
+
+  useEffect(() => {
+    cargar();
+    api
+      .get("/facturacion/estado")
+      .then(({ data }) => setEstado(data))
+      .catch(() => setEstado(null));
+  }, [cargar, refrescar]);
+
+  // Mientras se envía a la DIAN, se revisa cada 5 segundos.
+  useEffect(() => {
+    if (!comprobantes?.some((c) => c.estado === "PENDIENTE" || c.estado === "ENVIANDO")) return;
+    const t = setInterval(cargar, 5000);
+    return () => clearInterval(t);
+  }, [comprobantes, cargar]);
+
+  async function emitir() {
+    setEnviando(true);
+    setError(null);
+    try {
+      await api.post(`/facturacion/ventas/${ventaId}/emitir`);
+      cargar();
+    } catch (err) {
+      setError(mensajeError(err, "No se pudo emitir la factura electrónica"));
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  if (!comprobantes || (!estado?.conectada && comprobantes.length === 0)) return null;
+  const factura = [...comprobantes].reverse().find((c) => c.tipo === "FACTURA");
+  const notas = comprobantes.filter((c) => c.tipo === "NOTA_CREDITO");
+  const textoEstado = (c: ComprobanteVenta) =>
+    c.estado === "EMITIDA" ? "emitida" : c.estado === "ERROR" ? "con error" : "enviándose a la DIAN...";
+
+  return (
+    <div className="fe-venta">
+      <strong>Factura electrónica:</strong>{" "}
+      {factura ? (
+        <>
+          <span className={`badge ${factura.estado === "EMITIDA" ? "success" : factura.estado === "ERROR" ? "danger" : "warning"}`}>
+            {factura.numero ? `${factura.numero} · ` : ""}
+            {textoEstado(factura)}
+          </span>
+          {factura.urlPdf && (
+            <a className="fe-enlace" href={factura.urlPdf} target="_blank" rel="noreferrer">
+              Ver PDF
+            </a>
+          )}
+          {factura.estado === "ERROR" && (
+            <>
+              <span className="fe-error-linea">{factura.ultimoError}</span>
+              <button type="button" className="secondary" disabled={enviando || !estado?.puedeEmitir} onClick={emitir}>
+                {enviando ? "Enviando..." : "Reintentar"}
+              </button>
+            </>
+          )}
+        </>
+      ) : estado?.puedeEmitir ? (
+        <button type="button" className="secondary" disabled={enviando} onClick={emitir}>
+          {enviando ? "Enviando..." : `Emitir factura electrónica (quedan ${estado.disponibles})`}
+        </button>
+      ) : (
+        <span className="fe-nota">sin emitir · no quedan facturas en el paquete</span>
+      )}
+      {notas.map((n) => (
+        <div key={n.id} className="fe-venta-nota">
+          Nota crédito {n.numero ?? ""}: {textoEstado(n)}
+          {n.urlPdf && (
+            <a className="fe-enlace" href={n.urlPdf} target="_blank" rel="noreferrer">
+              Ver PDF
+            </a>
+          )}
+        </div>
+      ))}
+      {error && <p className="error-text" style={{ margin: "6px 0 0" }}>{error}</p>}
     </div>
   );
 }

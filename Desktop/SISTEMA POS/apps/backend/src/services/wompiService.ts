@@ -18,7 +18,9 @@ const WOMPI_CONFIG = {
 export interface WompiOrderData {
   empresaId: string;
   referenciaPago: string;
-  tipoPlan: "TRIAL_5D" | "MENSUAL" | "TRIMESTRAL" | "ANUAL" | "USUARIOS_ADICIONALES";
+  tipoPlan: "TRIAL_5D" | "MENSUAL" | "TRIMESTRAL" | "ANUAL" | "USUARIOS_ADICIONALES" | "FACTURACION_ELECTRONICA";
+  /** Ruta de la app a la que vuelve el cliente tras pagar (por defecto la de suscripción). */
+  redirectPath?: string;
   monto: number;
   usuariosAdicionales?: number;
   email: string;
@@ -116,7 +118,7 @@ export class WompiService {
 
       // URL de redirección tras pago exitoso (usa variable de entorno)
       const appUrl = process.env.SHOPIFY_APP_URL || "https://centrala.up.railway.app";
-      const redirectUrl = `${appUrl}/#/checkout?pago=exitoso`;
+      const redirectUrl = `${appUrl}/#${datos.redirectPath ?? "/checkout?pago=exitoso"}`;
 
       // Usar Wompi Web Checkout dinámico (/p/ con parámetros + signature:integrity + redirect)
       const checkoutUrl = `https://checkout.wompi.co/p/?public-key=${this.publicKey}&currency=COP&amount-in-cents=${monto}&reference=${referenciaPago}&redirect-url=${encodeURIComponent(redirectUrl)}&signature:integrity=${firma}`;
