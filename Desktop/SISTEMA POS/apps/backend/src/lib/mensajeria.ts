@@ -49,6 +49,7 @@ async function perfilContacto(tipo: TipoCanal, contactoId: string, token: string
  * guarda una sola vez (por su id de Meta) y se avisa en tiempo real a la empresa.
  */
 export async function procesarAvisoMeta(cuerpo: any): Promise<void> {
+  if (cuerpo?.object === "whatsapp_business_account") return procesarAvisoWhatsApp(cuerpo);
   const tipo: TipoCanal | null = cuerpo?.object === "page" ? "MESSENGER" : cuerpo?.object === "instagram" ? "INSTAGRAM" : null;
   if (!tipo) return;
 
@@ -151,13 +152,121 @@ async function procesarEvento(
   emitMensajeNuevo(canal.empresaId, { conversacionId: conversacion.id, mensajeId: guardado.id, tipoCanal: tipo });
 }
 
-/** Envía un texto por Messenger o Instagram. Devuelve el id del mensaje en Meta. */
+// ---------- WhatsApp ----------
+
+const TIPO_WHATSAPP: Record<string, string> = {
+  text: "TEXTO",
+  image: "IMAGEN",
+  audio: "AUDIO",
+  voice: "AUDIO",
+  video: "VIDEO",
+  document: "ARCHIVO",
+  sticker: "IMAGEN",
+};
+
+/**
+ * Avisos de WhatsApp: mensajes que llegan (value.messages) y estados de los enviados
+ * (value.statuses: entregado, leído, fallido). El canal se identifica por el id del número.
+ */
+async function procesarAvisoWhatsApp(cuerpo: any): Promise<void> {
+  for (const entrada of cuerpo.entry ?? []) {
+    for (const cambio of entrada.changes ?? []) {
+      const valor = cambio.value ?? {};
+      const numeroId = valor.metadata?.phone_number_id;
+      if (!numeroId) continue;
+      const canal = await prisma.canalMensajeria.findUnique({
+        where: { tipo_externoId: { tipo: "WHATSAPP", externoId: String(numeroId) } },
+      });
+      if (!canal || !canal.activo) continue;
+
+      for (const estado of valor.statuses ?? []) {
+        if (!estado.id) continue;
+        const nuevo = estado.status === "read" ? "LEIDO" : estado.status === "failed" ? "ERROR" : null;
+        if (!nuevo) continue;
+        await prisma.mensajeMensajeria.updateMany({
+          where: { externoId: String(estado.id), empresaId: canal.empresaId },
+          data: {
+            estado: nuevo,
+            ...(nuevo === "ERROR" ? { error: estado.errors?.[0]?.title || estado.errors?.[0]?.message || "No se pudo entregar" } : {}),
+          },
+        });
+      }
+
+      const nombres = new Map<string, string>(
+        (valor.contacts ?? []).map((c: any) => [String(c.wa_id), c.profile?.name ?? ""])
+      );
+      for (const m of valor.messages ?? []) {
+        try {
+          if (!m.id || !m.from) continue;
+          if (await prisma.mensajeMensajeria.findUnique({ where: { externoId: String(m.id) } })) continue;
+          const contactoId = String(m.from);
+          const tipoMensaje = TIPO_WHATSAPP[m.type] ?? "OTRO";
+          const texto: string | null =
+            m.text?.body ?? m.image?.caption ?? m.video?.caption ?? m.document?.caption ?? m.button?.text ?? m.interactive?.button_reply?.title ?? null;
+          const fecha = m.timestamp ? new Date(Number(m.timestamp) * 1000) : new Date();
+          const resumen =
+            texto ?? (tipoMensaje === "IMAGEN" ? "📷 Foto" : tipoMensaje === "AUDIO" ? "🎤 Audio" : tipoMensaje === "VIDEO" ? "🎬 Video" : "📎 Adjunto");
+
+          let conversacion = await prisma.conversacionMensajeria.findUnique({
+            where: { canalId_contactoExternoId: { canalId: canal.id, contactoExternoId: contactoId } },
+          });
+          if (!conversacion) {
+            conversacion = await prisma.conversacionMensajeria.create({
+              data: {
+                empresaId: canal.empresaId,
+                canalId: canal.id,
+                contactoExternoId: contactoId,
+                contactoNombre: nombres.get(contactoId) || null,
+                contactoUsuario: `+${contactoId}`,
+              },
+            });
+          }
+          const guardado = await prisma.mensajeMensajeria.create({
+            data: {
+              empresaId: canal.empresaId,
+              conversacionId: conversacion.id,
+              direccion: "ENTRANTE",
+              tipo: tipoMensaje,
+              texto,
+              externoId: String(m.id),
+              creadoEn: fecha,
+            },
+          });
+          await prisma.conversacionMensajeria.update({
+            where: { id: conversacion.id },
+            data: {
+              ultimoMensajeEn: fecha,
+              ultimoMensajeTexto: resumen,
+              ultimoEntranteEn: fecha,
+              noLeidos: { increment: 1 },
+              estado: "ABIERTA",
+              ...(nombres.get(contactoId) && !conversacion.contactoNombre ? { contactoNombre: nombres.get(contactoId) } : {}),
+            },
+          });
+          emitMensajeNuevo(canal.empresaId, { conversacionId: conversacion.id, mensajeId: guardado.id, tipoCanal: "WHATSAPP" });
+        } catch (err) {
+          console.error("[mensajeria] No se pudo procesar un mensaje de WhatsApp:", err instanceof Error ? err.message : err);
+        }
+      }
+    }
+  }
+}
+
+/** Envía un texto por Messenger, Instagram o WhatsApp. Devuelve el id del mensaje en Meta. */
 export async function enviarTextoMeta(
   canal: { tipo: string; externoId: string; paginaId: string | null; tokenCifrado: string },
   contactoId: string,
   texto: string
 ): Promise<string> {
   const token = descifrar(canal.tokenCifrado);
+  if (canal.tipo === "WHATSAPP") {
+    const r = await graph<{ messages: { id: string }[] }>(`${canal.externoId}/messages`, {
+      metodo: "POST",
+      token,
+      cuerpo: { messaging_product: "whatsapp", recipient_type: "individual", to: contactoId, type: "text", text: { body: texto } },
+    });
+    return r.messages?.[0]?.id;
+  }
   // Instagram (conectado con la página de Facebook) se envía por la página.
   const remitente = canal.tipo === "INSTAGRAM" ? canal.paginaId ?? canal.externoId : canal.externoId;
   const r = await graph<{ message_id: string }>(`${remitente}/messages`, {

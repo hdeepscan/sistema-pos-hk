@@ -98,6 +98,11 @@ export default function Mensajes() {
   const [mostrarCanales, setMostrarCanales] = useState(false);
   const [cargando, setCargando] = useState(true);
   const [importando, setImportando] = useState(false);
+  const [formWhatsapp, setFormWhatsapp] = useState(false);
+  const [waNumeroId, setWaNumeroId] = useState("");
+  const [waCuentaId, setWaCuentaId] = useState("");
+  const [waToken, setWaToken] = useState("");
+  const [conectandoWa, setConectandoWa] = useState(false);
   const finRef = useRef<HTMLDivElement>(null);
 
   // Resultado de conectar con Facebook (vuelve con ?conectados= o ?error=).
@@ -210,6 +215,27 @@ export default function Mensajes() {
     }
   }
 
+  async function conectarWhatsapp(e: React.FormEvent) {
+    e.preventDefault();
+    setConectandoWa(true);
+    setError(null);
+    try {
+      const { data } = await api.post<{ nombre: string; numero: string | null }>("/mensajeria/whatsapp/conectar", {
+        phoneNumberId: waNumeroId,
+        wabaId: waCuentaId,
+        token: waToken,
+      });
+      setAviso(`✓ WhatsApp conectado: ${data.nombre}${data.numero ? ` (${data.numero})` : ""}.`);
+      setFormWhatsapp(false);
+      setWaToken("");
+      cargarCanales();
+    } catch (err) {
+      setError(mensajeError(err, "No se pudo conectar WhatsApp"));
+    } finally {
+      setConectandoWa(false);
+    }
+  }
+
   async function desconectar(canal: Canal) {
     if (!confirm(`¿Desconectar ${canal.usuario || canal.nombre}? Dejarán de llegar sus mensajes a CENTRALA.`)) return;
     try {
@@ -279,6 +305,34 @@ export default function Mensajes() {
               ))}
             </ul>
           )}
+          {puedeConfigurar && formWhatsapp && (
+            <form className="msj-form-wa" onSubmit={conectarWhatsapp}>
+              <p>
+                Mientras Meta aprueba el botón de conexión, el número se conecta con los datos de la sección WhatsApp de la app
+                de Meta. La clave de acceso se guarda cifrada.
+              </p>
+              <label>
+                <span>Identificador del número (Phone Number ID)</span>
+                <input value={waNumeroId} onChange={(e) => setWaNumeroId(e.target.value.trim())} inputMode="numeric" required />
+              </label>
+              <label>
+                <span>Identificador de la cuenta de WhatsApp Business (WABA ID)</span>
+                <input value={waCuentaId} onChange={(e) => setWaCuentaId(e.target.value.trim())} inputMode="numeric" required />
+              </label>
+              <label>
+                <span>Clave de acceso (token)</span>
+                <input type="password" value={waToken} onChange={(e) => setWaToken(e.target.value)} autoComplete="off" required />
+              </label>
+              <div className="msj-canales-acciones">
+                <button type="submit" disabled={conectandoWa}>
+                  {conectandoWa ? "Conectando..." : "Conectar número"}
+                </button>
+                <button type="button" className="secondary" onClick={() => setFormWhatsapp(false)}>
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          )}
           {puedeConfigurar ? (
             <div className="msj-canales-acciones">
               <button type="button" onClick={() => void conectarMeta()}>
@@ -289,8 +343,8 @@ export default function Mensajes() {
                   {importando ? "Iniciando..." : "Traer todo el historial"}
                 </button>
               )}
-              <button type="button" className="secondary" disabled title="Muy pronto">
-                Conectar WhatsApp (próximamente)
+              <button type="button" className="secondary" onClick={() => setFormWhatsapp((v) => !v)}>
+                Conectar WhatsApp
               </button>
             </div>
           ) : (
@@ -309,7 +363,7 @@ export default function Mensajes() {
           >
             {p.etiqueta}
             {(noLeidasPor[p.valor] ?? 0) > 0 && <span className="msj-contador">{noLeidasPor[p.valor]}</span>}
-            {p.valor === "WHATSAPP" && <span className="msj-pronto">Pronto</span>}
+            {p.valor === "WHATSAPP" && !canales.some((c) => c.tipo === "WHATSAPP") && <span className="msj-pronto">Pronto</span>}
           </button>
         ))}
       </div>
@@ -381,7 +435,7 @@ export default function Mensajes() {
                     {m.texto && <p>{m.texto}</p>}
                     <span className="msj-burbuja-hora">
                       {hora(m.creadoEn)}
-                      {m.direccion === "SALIENTE" && (m.estado === "LEIDO" ? " · Visto" : "")}
+                      {m.direccion === "SALIENTE" && (m.estado === "LEIDO" ? " · Visto" : m.estado === "ERROR" ? " · No entregado" : "")}
                     </span>
                   </div>
                 ))}

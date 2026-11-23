@@ -183,6 +183,61 @@ export async function mensajeriaRoutes(app: FastifyInstance) {
     return { url: url.toString() };
   });
 
+  // Conectar un número de WhatsApp a mano (pruebas, mientras Meta aprueba el botón de conexión):
+  // id del número, id de la cuenta de WhatsApp Business y la clave de acceso (se guarda cifrada).
+  app.post("/mensajeria/whatsapp/conectar", async (request, reply) => {
+    if (!puedeConfigurar(request.user.permisos)) {
+      return reply.code(403).send({ error: "No tienes permiso para conectar canales" });
+    }
+    const body = (request.body ?? {}) as { phoneNumberId?: string; wabaId?: string; token?: string };
+    const phoneNumberId = String(body.phoneNumberId ?? "").trim();
+    const wabaId = String(body.wabaId ?? "").trim();
+    const token = String(body.token ?? "").trim();
+    if (!/^\d+$/.test(phoneNumberId) || !/^\d+$/.test(wabaId) || token.length < 20) {
+      return reply.code(400).send({ error: "Revisa el identificador del número, el de la cuenta y la clave de acceso" });
+    }
+    try {
+      const numero = await graph<{ display_phone_number?: string; verified_name?: string }>(phoneNumberId, {
+        token,
+        params: { fields: "display_phone_number,verified_name" },
+      });
+      // Recibir los mensajes de esta cuenta de WhatsApp en el webhook de CENTRALA.
+      await graph(`${wabaId}/subscribed_apps`, { metodo: "POST", token });
+
+      const existente = await prisma.canalMensajeria.findUnique({
+        where: { tipo_externoId: { tipo: "WHATSAPP", externoId: phoneNumberId } },
+      });
+      if (existente && existente.empresaId !== request.user.empresaId && existente.activo) {
+        return reply.code(409).send({ error: "Ese número ya está conectado en otra cuenta de CENTRALA" });
+      }
+      const datos = {
+        empresaId: request.user.empresaId,
+        tipo: "WHATSAPP",
+        externoId: phoneNumberId,
+        paginaId: wabaId,
+        nombre: numero.verified_name || "WhatsApp",
+        usuario: numero.display_phone_number ?? null,
+        tokenCifrado: cifrar(token),
+        activo: true,
+      };
+      const canal = existente
+        ? await prisma.canalMensajeria.update({ where: { id: existente.id }, data: datos })
+        : await prisma.canalMensajeria.create({ data: datos });
+      registrarAuditoria({
+        empresaId: request.user.empresaId,
+        usuarioId: request.user.usuarioId,
+        accion: "MENSAJERIA_CONECTAR_WHATSAPP",
+        entidad: "CanalMensajeria",
+        entidadId: canal.id,
+        detalle: numero.display_phone_number ?? phoneNumberId,
+      });
+      return { ok: true, nombre: datos.nombre, numero: datos.usuario };
+    } catch (err) {
+      request.log.error(err);
+      return reply.code(502).send({ error: `Meta no aceptó los datos: ${err instanceof Error ? err.message : "error"}` });
+    }
+  });
+
   app.get("/mensajeria/canales", async (request, reply) => {
     if (!puedeAtender(request.user.permisos) && !puedeConfigurar(request.user.permisos)) {
       return reply.code(403).send({ error: "No tienes permiso para ver los mensajes" });
@@ -325,9 +380,6 @@ export async function mensajeriaRoutes(app: FastifyInstance) {
       return reply.code(409).send({
         error: "Pasaron más de 24 horas desde el último mensaje del cliente: Meta no permite responder hasta que vuelva a escribir.",
       });
-    }
-    if (conversacion.canal.tipo === "WHATSAPP") {
-      return reply.code(501).send({ error: "WhatsApp todavía no está disponible" });
     }
 
     try {
