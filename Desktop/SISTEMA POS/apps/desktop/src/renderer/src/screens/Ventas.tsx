@@ -832,6 +832,7 @@ function DetalleVenta({
         </div>
 
         <FacturaElectronicaVenta ventaId={venta.id} refrescar={venta.total} />
+        <EnviarVentaPorChat ventaId={venta.id} />
 
         {error && <p className="error-text" style={{ marginTop: 10 }}>{error}</p>}
 
@@ -999,6 +1000,67 @@ function FacturaElectronicaVenta({ ventaId, refrescar }: { ventaId: string; refr
         </div>
       ))}
       {error && <p className="error-text" style={{ margin: "6px 0 0" }}>{error}</p>}
+    </div>
+  );
+}
+
+// Enviar el resumen o la factura electrónica al cliente por su chat (Messenger, Instagram, WhatsApp).
+function EnviarVentaPorChat({ ventaId }: { ventaId: string }) {
+  const puedeAtender = usePermiso("mensajes.atender");
+  const [conv, setConv] = useState<{ id: string; tipoCanal: string; contacto: string | null; ventanaAbierta: boolean } | null>(null);
+  const [enviando, setEnviando] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!puedeAtender) return;
+    api
+      .get(`/mensajeria/ventas/${ventaId}/conversacion`)
+      .then(({ data }) => setConv(data.conversacion))
+      .catch(() => setConv(null));
+  }, [ventaId, puedeAtender]);
+
+  if (!conv) return null;
+  const canal = conv.tipoCanal === "WHATSAPP" ? "WhatsApp" : conv.tipoCanal === "INSTAGRAM" ? "Instagram" : "Messenger";
+
+  async function enviar(tipo: "resumen" | "factura") {
+    if (!conv) return;
+    setEnviando(tipo);
+    setError(null);
+    setAviso(null);
+    try {
+      const { data } = await api.post(`/mensajeria/conversaciones/${conv.id}/compras/${ventaId}/${tipo}`);
+      setAviso(
+        tipo === "resumen"
+          ? `Resumen enviado por ${canal}.`
+          : data.estado === "ENVIADA"
+            ? `Factura enviada por ${canal}.`
+            : `La factura se enviará sola por ${canal} apenas la DIAN la apruebe.`
+      );
+    } catch (err) {
+      setError(mensajeError(err, "No se pudo enviar"));
+    } finally {
+      setEnviando(null);
+    }
+  }
+
+  return (
+    <div className="fe-venta">
+      <strong>Enviar por {canal}{conv.contacto ? ` a ${conv.contacto}` : ""}:</strong>
+      {conv.ventanaAbierta ? (
+        <>
+          <button type="button" className="secondary" disabled={!!enviando} onClick={() => void enviar("resumen")}>
+            {enviando === "resumen" ? "Enviando..." : "Resumen de la compra"}
+          </button>
+          <button type="button" className="secondary" disabled={!!enviando} onClick={() => void enviar("factura")}>
+            {enviando === "factura" ? "Enviando..." : "Factura electrónica"}
+          </button>
+        </>
+      ) : (
+        <span className="fe-nota">el cliente no ha escrito en las últimas 24 horas (Meta no deja escribirle hasta que vuelva a escribir)</span>
+      )}
+      {aviso && <span className="fe-venta-nota" style={{ color: "var(--success)" }}>{aviso}</span>}
+      {error && <span className="fe-error-linea">{error}</span>}
     </div>
   );
 }

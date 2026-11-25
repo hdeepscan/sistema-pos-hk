@@ -63,6 +63,8 @@ export function Redactor({
   respuestas,
   onEnviado,
   onGestionarRespuestas,
+  onProducto,
+  onCompras,
 }: {
   conversacionId: string;
   contactoNombre: string | null;
@@ -70,6 +72,8 @@ export function Redactor({
   respuestas: RespuestaRapida[];
   onEnviado: () => void;
   onGestionarRespuestas: () => void;
+  onProducto: () => void;
+  onCompras: () => void;
 }) {
   const [texto, setTexto] = useState("");
   const [archivo, setArchivo] = useState<Archivo | null>(null);
@@ -295,6 +299,12 @@ export function Redactor({
               onClick={() => setMostrarRapidas((v) => !v)}
             >
               ⚡
+            </button>
+            <button type="button" className="msj-herramienta" title="Enviar un producto (foto, precio y tallas)" onClick={onProducto}>
+              📦
+            </button>
+            <button type="button" className="msj-herramienta" title="Compras del cliente: resumen o factura" onClick={onCompras}>
+              🧾
             </button>
             <input
               ref={inputArchivo}

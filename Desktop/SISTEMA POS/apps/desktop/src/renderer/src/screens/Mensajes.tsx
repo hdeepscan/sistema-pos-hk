@@ -7,6 +7,8 @@ import { mensajeError } from "../lib/errores";
 import { avisosMensajes } from "../lib/mensajes-avisos";
 import { Redactor, type RespuestaRapida } from "../components/mensajes/Redactor";
 import { ConfigMensajes } from "../components/mensajes/ConfigMensajes";
+import { EnviarProducto } from "../components/mensajes/EnviarProducto";
+import { ComprasChat } from "../components/mensajes/ComprasChat";
 
 type TipoCanal = "MESSENGER" | "INSTAGRAM" | "WHATSAPP";
 
@@ -99,6 +101,7 @@ export default function Mensajes() {
   const [respuestas, setRespuestas] = useState<RespuestaRapida[]>([]);
   const [config, setConfig] = useState<null | "rapidas" | "bienvenida" | "avisos">(null);
   const [fotoGrande, setFotoGrande] = useState<string | null>(null);
+  const [modulo, setModulo] = useState<null | "producto" | "compras">(null);
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [mostrarCanales, setMostrarCanales] = useState(false);
@@ -475,6 +478,8 @@ export default function Mensajes() {
                   tipoCanal={actual.tipoCanal}
                   respuestas={respuestas}
                   onGestionarRespuestas={() => setConfig("rapidas")}
+                  onProducto={() => setModulo("producto")}
+                  onCompras={() => setModulo("compras")}
                   onEnviado={() => {
                     cargarMensajes(actual.id);
                     cargarConversaciones();
@@ -497,6 +502,28 @@ export default function Mensajes() {
             respuestas={respuestas}
             onRespuestasCambiadas={cargarRespuestas}
             onCerrar={() => setConfig(null)}
+          />
+        )}
+
+        {actual && modulo === "producto" && (
+          <EnviarProducto
+            conversacionId={actual.id}
+            tipoCanal={actual.tipoCanal}
+            onCerrar={() => setModulo(null)}
+            onEnviado={() => {
+              cargarMensajes(actual.id);
+              cargarConversaciones();
+            }}
+          />
+        )}
+        {actual && modulo === "compras" && (
+          <ComprasChat
+            conversacionId={actual.id}
+            onCerrar={() => setModulo(null)}
+            onEnviado={() => {
+              cargarMensajes(actual.id);
+              cargarConversaciones();
+            }}
           />
         )}
 

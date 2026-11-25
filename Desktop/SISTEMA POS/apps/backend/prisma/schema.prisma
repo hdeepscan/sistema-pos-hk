@@ -1447,24 +1447,26 @@ model PaqueteFacturacion {
 
 // Factura electrónica o nota crédito de una venta. Se emite en segundo plano con reintentos.
 model ComprobanteElectronico {
-  id             String    @id @default(uuid())
-  empresaId      String
-  ventaId        String
-  devolucionId   String?   @unique
-  tipo           String // FACTURA | NOTA_CREDITO
-  estado         String    @default("PENDIENTE") // PENDIENTE | ENVIANDO | EMITIDA | ERROR
-  paqueteId      String?
-  intentos       Int       @default(0)
-  proximoIntento DateTime  @default(now())
-  ultimoError    String?
-  movimientoId   Int?
-  numero         String?
-  cufe           String?
-  urlPdf         String?
-  total          Decimal?  @db.Decimal(12, 2)
-  emitidaEn      DateTime?
-  creadoEn       DateTime  @default(now())
-  actualizadoEn  DateTime  @updatedAt
+  id                    String    @id @default(uuid())
+  empresaId             String
+  ventaId               String
+  devolucionId          String?   @unique
+  // Conversación de Mensajes a la que se envía el PDF apenas la DIAN la apruebe.
+  enviarAConversacionId String?
+  tipo                  String // FACTURA | NOTA_CREDITO
+  estado                String    @default("PENDIENTE") // PENDIENTE | ENVIANDO | EMITIDA | ERROR
+  paqueteId             String?
+  intentos              Int       @default(0)
+  proximoIntento        DateTime  @default(now())
+  ultimoError           String?
+  movimientoId          Int?
+  numero                String?
+  cufe                  String?
+  urlPdf                String?
+  total                 Decimal?  @db.Decimal(12, 2)
+  emitidaEn             DateTime?
+  creadoEn              DateTime  @default(now())
+  actualizadoEn         DateTime  @updatedAt
 
   @@index([empresaId, creadoEn])
   @@index([ventaId])

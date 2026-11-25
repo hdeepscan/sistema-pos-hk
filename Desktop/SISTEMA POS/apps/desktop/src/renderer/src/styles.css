@@ -3113,3 +3113,34 @@ label.msj-interruptor input { width: 18px; height: 18px; min-height: 0; margin: 
   .msj { height: auto; }
   .msj-cuerpo.con-chat .msj-chat { height: calc(100dvh - 24px); min-height: 420px; }
 }
+/* Mensajes: enviar productos y compras */
+.msj-prod-lista { display: flex; flex-direction: column; gap: 6px; max-height: 55vh; overflow-y: auto; }
+.msj-prod { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 10px; background: var(--card-bg, #fff); color: inherit; text-align: left; box-shadow: none; min-height: 0; font-weight: 400; }
+.msj-prod:hover { border-color: #93c5fd; background: #eff6ff; }
+.msj-prod-foto { width: 48px; height: 48px; flex: 0 0 48px; border-radius: 8px; overflow: hidden; background: #f1f5f9; display: flex; align-items: center; justify-content: center; font-size: 22px; }
+.msj-prod-foto img { width: 100%; height: 100%; object-fit: cover; }
+.msj-prod-texto { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.msj-prod-texto strong { color: var(--text, #0f172a); }
+.msj-prod-texto span { color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msj-prod-previa { display: flex; gap: 12px; align-items: flex-start; }
+.msj-prod-previa img { width: 140px; height: 140px; object-fit: cover; border-radius: 10px; flex-shrink: 0; }
+.msj-prod-previa textarea { flex: 1; min-width: 0; }
+.msj-volver-lista { align-self: flex-start; color: #0b5bd3; }
+.msj-compras { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.msj-compras li { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 10px; }
+.msj-compra-datos { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.msj-compra-datos span { color: #64748b; }
+.msj-compra-acciones { display: flex; flex-wrap: wrap; gap: 8px; }
+.msj-compra-acciones button { font-size: 13px; }
+@media (max-width: 640px) {
+  .msj-prod-previa { flex-direction: column; }
+  .msj-prod-previa img { width: 100%; height: 200px; }
+  .msj-herramienta { width: 34px; height: 34px; font-size: 16px; }
+}
+.msj-config .msj-btn-link.msj-volver-lista { color: #0b5bd3; }
+@media (max-width: 640px) {
+  /* En el celular los botones van en una fila arriba y la caja de texto queda ancha. */
+  .msj-redactor .msj-escribir { flex-wrap: wrap; }
+  .msj-redactor .msj-herramientas { flex-basis: 100%; }
+  .msj-redactor .msj-escribir textarea { flex: 1 1 0; min-width: 0; }
+}

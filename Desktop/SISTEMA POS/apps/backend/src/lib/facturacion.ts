@@ -129,14 +129,27 @@ export class ErrorFacturacion extends Error {
  * Pide la factura electrónica de una venta: toma 1 del paquete y la deja en cola. Se envía a
  * TFactura en segundo plano (y se reintenta si TFactura no responde).
  */
-export async function solicitarFacturaVenta(empresaId: string, ventaId: string) {
+export async function solicitarFacturaVenta(
+  empresaId: string,
+  ventaId: string,
+  opciones: { enviarAConversacionId?: string } = {}
+) {
   const venta = await prisma.venta.findFirst({ where: { id: ventaId, empresaId }, select: { id: true } });
   if (!venta) throw new ErrorFacturacion("Venta no encontrada", 404);
 
   const existente = await prisma.comprobanteElectronico.findFirst({
     where: { ventaId, tipo: "FACTURA", estado: { not: "ERROR" } },
   });
-  if (existente) return existente;
+  if (existente) {
+    // Ya estaba pedida: si se pidió enviarla por el chat, se envía apenas quede emitida.
+    if (opciones.enviarAConversacionId && existente.estado !== "EMITIDA") {
+      return prisma.comprobanteElectronico.update({
+        where: { id: existente.id },
+        data: { enviarAConversacionId: opciones.enviarAConversacionId },
+      });
+    }
+    return existente;
+  }
 
   const config = await prisma.facturacionConfig.findUnique({ where: { empresaId } });
   if (!config?.activo) {
@@ -159,10 +172,17 @@ export async function solicitarFacturaVenta(empresaId: string, ventaId: string) 
   const comprobante = fallido
     ? await prisma.comprobanteElectronico.update({
         where: { id: fallido.id },
-        data: { estado: "PENDIENTE", paqueteId, proximoIntento: new Date(), ultimoError: null, intentos: 0 },
+        data: {
+          estado: "PENDIENTE",
+          paqueteId,
+          proximoIntento: new Date(),
+          ultimoError: null,
+          intentos: 0,
+          ...(opciones.enviarAConversacionId ? { enviarAConversacionId: opciones.enviarAConversacionId } : {}),
+        },
       })
     : await prisma.comprobanteElectronico.create({
-        data: { empresaId, ventaId, tipo: "FACTURA", paqueteId },
+        data: { empresaId, ventaId, tipo: "FACTURA", paqueteId, enviarAConversacionId: opciones.enviarAConversacionId ?? null },
       });
   void procesarComprobante(comprobante.id);
   return comprobante;
@@ -301,6 +321,13 @@ export async function procesarComprobante(comprobanteId: string): Promise<void> 
           ultimoError: null,
         },
       });
+      // Pedida desde el chat: se le envía el PDF al cliente apenas la DIAN la aprueba.
+      if (c.enviarAConversacionId && c.tipo === "FACTURA") {
+        const { enviarFacturaChat } = await import("./mensajeria-modulos.js");
+        await enviarFacturaChat(c.empresaId, c.id, c.enviarAConversacionId).catch((err) =>
+          console.error(`[facturacion] Factura emitida, pero no se pudo enviar por el chat: ${err instanceof Error ? err.message : err}`)
+        );
+      }
     } catch (err) {
       const mensaje = err instanceof Error ? err.message : String(err);
       const reintentable = err instanceof ErrorTFactura ? err.reintentable : false;

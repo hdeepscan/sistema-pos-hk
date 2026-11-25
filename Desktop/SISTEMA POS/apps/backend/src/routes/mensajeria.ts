@@ -22,6 +22,18 @@ import {
 } from "../lib/mensajeria.js";
 import { convertirAudio, guardarAdjunto, TAMANO_MAX_ENVIO, TAMANO_MAX_IMAGEN, tipoDeMime } from "../lib/mensajeria-medios.js";
 import { dentroDeHorario, type Horario } from "../lib/mensajeria-automatizaciones.js";
+import {
+  buscarProductosChat,
+  comprasDeConversacion,
+  conversacionAbierta,
+  conversacionDeVenta,
+  enviarFacturaChat,
+  enviarProductoChat,
+  enviarResumenCompraChat,
+  ErrorChat,
+  fichaProducto,
+} from "../lib/mensajeria-modulos.js";
+import { ErrorFacturacion, saldoFacturacion, solicitarFacturaVenta } from "../lib/facturacion.js";
 
 const MIMES_PERMITIDOS = /^(image\/(jpeg|png|webp|gif)|audio\/(webm|ogg|mpeg|mp4|aac|wav|x-m4a)|video\/mp4|application\/pdf)$/;
 import { emitMensajeNuevo } from "../lib/ws.js";
@@ -658,6 +670,122 @@ export async function mensajeriaRoutes(app: FastifyInstance) {
       detalle: `Bienvenida ${datos.bienvenidaActiva ? "activa" : "apagada"}, fuera de horario ${datos.ausenciaActiva ? "activo" : "apagado"}`,
     });
     return { ok: true };
+  });
+
+  // ---------- Conexión con Productos, Ventas y Facturación electrónica ----------
+
+  const responderError = (reply: any, err: unknown, respaldo: string) => {
+    if (err instanceof ErrorChat || err instanceof ErrorFacturacion) return reply.code(err.status).send({ error: err.message });
+    if (err instanceof ErrorMeta || err instanceof ErrorMetaLocal) return reply.code(502).send({ error: `Meta no aceptó el mensaje: ${err.message}` });
+    app.log.error(err);
+    return reply.code(500).send({ error: respaldo });
+  };
+
+  app.get("/mensajeria/productos", async (request, reply) => {
+    if (!puedeAtender(request.user.permisos)) return reply.code(403).send({ error: "No tienes permiso" });
+    const { q } = request.query as { q?: string };
+    return buscarProductosChat(request.user.empresaId, String(q ?? ""));
+  });
+
+  app.get("/mensajeria/productos/:id/ficha", async (request, reply) => {
+    if (!puedeAtender(request.user.permisos)) return reply.code(403).send({ error: "No tienes permiso" });
+    const { id } = request.params as { id: string };
+    try {
+      const f = await fichaProducto(request.user.empresaId, id);
+      return { texto: f.texto, imagen: f.imagen, variantes: f.grupo.variantes, stock: f.grupo.stock };
+    } catch (err) {
+      return responderError(reply, err, "No se pudo armar la ficha del producto");
+    }
+  });
+
+  app.post("/mensajeria/conversaciones/:id/producto", async (request, reply) => {
+    if (!puedeAtender(request.user.permisos)) return reply.code(403).send({ error: "No tienes permiso para responder" });
+    const { id } = request.params as { id: string };
+    const b = (request.body ?? {}) as { productoId?: string; texto?: string; conFoto?: boolean };
+    if (!b.productoId) return reply.code(400).send({ error: "Elige un producto" });
+    try {
+      await enviarProductoChat(request.user.empresaId, id, b.productoId, {
+        texto: b.texto,
+        conFoto: b.conFoto,
+        usuarioId: request.user.usuarioId,
+      });
+      return { ok: true };
+    } catch (err) {
+      return responderError(reply, err, "No se pudo enviar el producto");
+    }
+  });
+
+  app.get("/mensajeria/conversaciones/:id/compras", async (request, reply) => {
+    if (!puedeAtender(request.user.permisos)) return reply.code(403).send({ error: "No tienes permiso" });
+    const { id } = request.params as { id: string };
+    try {
+      const [r, config, saldo] = await Promise.all([
+        comprasDeConversacion(request.user.empresaId, id),
+        prisma.facturacionConfig.findUnique({ where: { empresaId: request.user.empresaId }, select: { activo: true } }),
+        saldoFacturacion(request.user.empresaId),
+      ]);
+      const conectada = !!config?.activo;
+      return {
+        ...r,
+        facturacion: { conectada, disponibles: saldo.disponibles, puedeEmitir: conectada && saldo.disponibles > 0 },
+      };
+    } catch (err) {
+      return responderError(reply, err, "No se pudieron cargar las compras");
+    }
+  });
+
+  app.post("/mensajeria/conversaciones/:id/compras/:ventaId/resumen", async (request, reply) => {
+    if (!puedeAtender(request.user.permisos)) return reply.code(403).send({ error: "No tienes permiso para responder" });
+    const { id, ventaId } = request.params as { id: string; ventaId: string };
+    try {
+      await enviarResumenCompraChat(request.user.empresaId, id, ventaId, request.user.usuarioId);
+      return { ok: true };
+    } catch (err) {
+      return responderError(reply, err, "No se pudo enviar el resumen");
+    }
+  });
+
+  // Factura electrónica por el chat: si ya está emitida se envía el PDF; si no, se emite (gasta 1
+  // del paquete) y el PDF sale solo apenas la DIAN la apruebe.
+  app.post("/mensajeria/conversaciones/:id/compras/:ventaId/factura", async (request, reply) => {
+    if (!puedeAtender(request.user.permisos)) return reply.code(403).send({ error: "No tienes permiso para responder" });
+    const { id, ventaId } = request.params as { id: string; ventaId: string };
+    const empresaId = request.user.empresaId;
+    try {
+      await conversacionAbierta(empresaId, id);
+      const venta = await prisma.venta.findFirst({ where: { id: ventaId, empresaId }, select: { id: true } });
+      if (!venta) return reply.code(404).send({ error: "Venta no encontrada" });
+      const emitida = await prisma.comprobanteElectronico.findFirst({
+        where: { ventaId, tipo: "FACTURA", estado: "EMITIDA" },
+        orderBy: { creadoEn: "desc" },
+      });
+      if (emitida) {
+        await enviarFacturaChat(empresaId, emitida.id, id, request.user.usuarioId);
+        return { estado: "ENVIADA" };
+      }
+      if (!request.user.permisos.includes("ventas.crear") && !request.user.permisos.includes("ventas.editar")) {
+        return reply.code(403).send({ error: "No tienes permiso para emitir facturas" });
+      }
+      const c = await solicitarFacturaVenta(empresaId, ventaId, { enviarAConversacionId: id });
+      registrarAuditoria({
+        empresaId,
+        usuarioId: request.user.usuarioId,
+        accion: "FACTURA_ELECTRONICA_SOLICITADA",
+        entidad: "Venta",
+        entidadId: ventaId,
+        detalle: "Pedida desde Mensajes para enviarla por el chat",
+      });
+      return { estado: c.estado === "EMITIDA" ? "ENVIADA" : "EN_PROCESO" };
+    } catch (err) {
+      return responderError(reply, err, "No se pudo enviar la factura");
+    }
+  });
+
+  // Desde el detalle de una venta: ¿con qué conversación se le puede escribir a ese cliente?
+  app.get("/mensajeria/ventas/:ventaId/conversacion", async (request, reply) => {
+    if (!puedeAtender(request.user.permisos)) return { conversacion: null };
+    const { ventaId } = request.params as { ventaId: string };
+    return { conversacion: await conversacionDeVenta(request.user.empresaId, ventaId) };
   });
 
   // Vincular un cliente de CENTRALA, asignar a un usuario o cerrar la conversación.
