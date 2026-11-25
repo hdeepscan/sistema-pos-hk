@@ -50,7 +50,16 @@ export function emitPedidoShopify(empresaId: string, payload: PedidoShopifyEvent
 // Mensajería: llegó o se envió un mensaje en una conversación de la empresa.
 export function emitMensajeNuevo(
   empresaId: string,
-  payload: { conversacionId: string; mensajeId: string; tipoCanal: string }
+  payload: {
+    conversacionId: string;
+    mensajeId: string;
+    tipoCanal: string;
+    // Para el aviso emergente: quién escribió y qué dijo (solo en mensajes que llegan).
+    direccion?: "ENTRANTE" | "SALIENTE";
+    contacto?: string | null;
+    foto?: string | null;
+    resumen?: string | null;
+  }
 ) {
   io?.to(empresaRoom(empresaId)).emit("mensajeria:mensaje", payload);
 }

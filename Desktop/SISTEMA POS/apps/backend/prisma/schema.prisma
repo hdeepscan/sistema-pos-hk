@@ -1373,6 +1373,8 @@ model ConversacionMensajeria {
   ultimoMensajeTexto String?
   // Último mensaje del cliente: Meta solo deja responder libremente durante 24 horas después.
   ultimoEntranteEn   DateTime?
+  // Última vez que se envió el mensaje automático de "fuera de horario" (para no repetirlo).
+  ultimaAusenciaEn   DateTime?
   creadoEn           DateTime        @default(now())
 
   mensajes MensajeMensajeria[]
@@ -1395,6 +1397,8 @@ model MensajeMensajeria {
   estado         String                 @default("ENVIADO") // ENVIADO | LEIDO | ERROR
   error          String?
   usuarioId      String? // quién lo respondió desde CENTRALA
+  // Enviado por una automatización (bienvenida, fuera de horario).
+  automatico     Boolean                @default(false)
   creadoEn       DateTime               @default(now())
 
   @@index([conversacionId, creadoEn])
@@ -1466,4 +1470,50 @@ model ComprobanteElectronico {
   @@index([ventaId])
   @@index([estado, proximoIntento])
   @@map("comprobantes_electronicos")
+}
+
+// ---------- Mensajería: adjuntos, respuestas rápidas y automatizaciones ----------
+
+// Fotos, audios y documentos de la bandeja. Se guardan aquí porque Meta necesita un enlace público
+// para enviarlos y porque los enlaces de Meta de lo que llega vencen.
+model AdjuntoMensajeria {
+  id        String   @id @default(uuid())
+  empresaId String
+  mime      String
+  nombre    String?
+  tamano    Int
+  datos     Bytes
+  creadoEn  DateTime @default(now())
+
+  @@index([empresaId])
+  @@map("adjuntos_mensajeria")
+}
+
+// Mensajes predeterminados ("respuestas rápidas") de cada empresa.
+model RespuestaRapida {
+  id        String   @id @default(uuid())
+  empresaId String
+  atajo     String // se busca escribiendo "/" + atajo
+  texto     String
+  orden     Int      @default(0)
+  creadoEn  DateTime @default(now())
+
+  @@index([empresaId])
+  @@map("respuestas_rapidas_mensajeria")
+}
+
+// Mensajes automáticos: bienvenida al primer mensaje y aviso fuera del horario de atención.
+model AutomatizacionMensajeria {
+  id               String   @id @default(uuid())
+  empresaId        String   @unique
+  bienvenidaActiva Boolean  @default(false)
+  bienvenidaTexto  String?
+  ausenciaActiva   Boolean  @default(false)
+  ausenciaTexto    String?
+  // { "1": { "abre": "08:00", "cierra": "18:00" }, ... } (0 = domingo). Día ausente = cerrado.
+  horario          Json?
+  zonaHoraria      String   @default("America/Bogota")
+  actualizadoEn    DateTime @updatedAt
+
+  @@map("automatizaciones_mensajeria")
 }

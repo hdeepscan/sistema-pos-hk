@@ -11,6 +11,7 @@ import { electronAPI } from "../lib/electron-api";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { MobileMenu } from "../components/MobileMenu";
 import { ToastContainer } from "../components/ToastContainer";
+import { AvisosMensajes } from "../components/AvisosMensajes";
 import { SubscriptionCard } from "../components/SubscriptionCard";
 import { SubscriptionGuard } from "../components/SubscriptionGuard";
 import {
@@ -216,6 +217,7 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
       <div className="app-shell">
         {/* Toast Container - Notificaciones Globales */}
         <ToastContainer />
+        <AvisosMensajes activo={puedeAtenderMensajes} />
 
       {/* Menú Hamburguesa para Mobile */}
       {isMobile && (

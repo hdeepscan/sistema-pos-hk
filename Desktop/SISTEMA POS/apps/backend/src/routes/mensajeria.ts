@@ -12,7 +12,18 @@ import {
   URL_PLATAFORMA,
   WEBHOOK_META,
 } from "../lib/meta-mensajeria.js";
-import { enviarTextoMeta, importarHistorial, VENTANA_RESPUESTA_MS } from "../lib/mensajeria.js";
+import {
+  enviarAdjuntoMeta,
+  enviarTextoMeta,
+  ErrorMetaLocal,
+  importarHistorial,
+  resumenDe,
+  VENTANA_RESPUESTA_MS,
+} from "../lib/mensajeria.js";
+import { convertirAudio, guardarAdjunto, TAMANO_MAX_ENVIO, TAMANO_MAX_IMAGEN, tipoDeMime } from "../lib/mensajeria-medios.js";
+import { dentroDeHorario, type Horario } from "../lib/mensajeria-automatizaciones.js";
+
+const MIMES_PERMITIDOS = /^(image\/(jpeg|png|webp|gif)|audio\/(webm|ogg|mpeg|mp4|aac|wav|x-m4a)|video\/mp4|application\/pdf)$/;
 import { emitMensajeNuevo } from "../lib/ws.js";
 
 const CANALES = ["MESSENGER", "INSTAGRAM", "WHATSAPP"] as const;
@@ -20,6 +31,31 @@ const CANALES = ["MESSENGER", "INSTAGRAM", "WHATSAPP"] as const;
 // Regreso de Facebook después de que la tienda autoriza su página e Instagram. No lleva sesión de
 // CENTRALA (viene de Facebook): la empresa sale del "state" firmado al iniciar la conexión.
 export async function mensajeriaCallbackRoutes(app: FastifyInstance) {
+  // Fotos, audios y documentos de la bandeja. Es público (sin sesión) porque Meta descarga de aquí
+  // lo que se envía; el enlace lleva un identificador imposible de adivinar.
+  app.get("/mensajeria/adjuntos/:id", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!/^[0-9a-f-]{36}$/i.test(id)) return reply.code(404).send();
+    const a = await prisma.adjuntoMensajeria.findUnique({ where: { id } });
+    if (!a) return reply.code(404).send();
+    const datos = Buffer.from(a.datos);
+    reply.header("Content-Type", a.mime);
+    reply.header("Cache-Control", "private, max-age=31536000, immutable");
+    reply.header("Accept-Ranges", "bytes");
+    reply.header("X-Content-Type-Options", "nosniff");
+    if (a.nombre) reply.header("Content-Disposition", `inline; filename="${a.nombre.replace(/[^\w.\- ]/g, "_")}"`);
+    // Safari necesita poder pedir partes del audio para reproducirlo.
+    const rango = /^bytes=(\d*)-(\d*)$/.exec(String(request.headers.range ?? ""));
+    if (rango && (rango[1] || rango[2])) {
+      const inicio = rango[1] ? Number(rango[1]) : Math.max(0, datos.length - Number(rango[2]));
+      const fin = rango[1] && rango[2] ? Math.min(Number(rango[2]), datos.length - 1) : datos.length - 1;
+      if (inicio >= datos.length || inicio > fin) return reply.code(416).header("Content-Range", `bytes */${datos.length}`).send();
+      reply.code(206).header("Content-Range", `bytes ${inicio}-${fin}/${datos.length}`);
+      return reply.send(datos.subarray(inicio, fin + 1));
+    }
+    return reply.send(datos);
+  });
+
   app.get("/mensajeria/meta/callback", async (request, reply) => {
     const q = request.query as Record<string, string | undefined>;
     const volver = (params: Record<string, string>) =>
@@ -398,13 +434,230 @@ export async function mensajeriaRoutes(app: FastifyInstance) {
         where: { id },
         data: { ultimoMensajeEn: mensaje.creadoEn, ultimoMensajeTexto: texto, noLeidos: 0 },
       });
-      emitMensajeNuevo(conversacion.empresaId, { conversacionId: id, mensajeId: mensaje.id, tipoCanal: conversacion.canal.tipo });
+      emitMensajeNuevo(conversacion.empresaId, {
+        conversacionId: id,
+        mensajeId: mensaje.id,
+        tipoCanal: conversacion.canal.tipo,
+        direccion: "SALIENTE",
+      });
       return mensaje;
     } catch (err) {
       request.log.error(err);
       const msg = err instanceof ErrorMeta ? err.message : "No se pudo enviar el mensaje";
       return reply.code(502).send({ error: `Meta no aceptó el mensaje: ${msg}` });
     }
+  });
+
+  // Enviar una foto, nota de voz, video o documento (llega en base64 desde el navegador).
+  app.post("/mensajeria/conversaciones/:id/adjuntos", { bodyLimit: 30 * 1024 * 1024 }, async (request, reply) => {
+    if (!puedeAtender(request.user.permisos)) return reply.code(403).send({ error: "No tienes permiso para responder" });
+    const { id } = request.params as { id: string };
+    const body = (request.body ?? {}) as { mime?: string; nombre?: string; datos?: string; texto?: string };
+    const mime = String(body.mime ?? "").split(";")[0].trim().toLowerCase();
+    if (!MIMES_PERMITIDOS.test(mime)) {
+      return reply.code(400).send({ error: "Ese tipo de archivo no se puede enviar. Usa fotos (JPG, PNG), audios o PDF." });
+    }
+    let datos: Buffer = Buffer.from(String(body.datos ?? ""), "base64");
+    if (datos.length === 0) return reply.code(400).send({ error: "El archivo está vacío" });
+    const tipo = tipoDeMime(mime);
+    const limite = tipo === "IMAGEN" ? TAMANO_MAX_IMAGEN : TAMANO_MAX_ENVIO;
+    if (datos.length > limite) {
+      return reply.code(400).send({ error: `El archivo pesa más de ${Math.round(limite / 1024 / 1024)} MB` });
+    }
+    const texto = String(body.texto ?? "").trim().slice(0, 1000) || null;
+
+    const conversacion = await prisma.conversacionMensajeria.findFirst({
+      where: { id, empresaId: request.user.empresaId },
+      include: { canal: true },
+    });
+    if (!conversacion || !conversacion.canal.activo) return reply.code(404).send({ error: "Conversación no encontrada" });
+    const abierta =
+      !!conversacion.ultimoEntranteEn && Date.now() - conversacion.ultimoEntranteEn.getTime() < VENTANA_RESPUESTA_MS;
+    if (!abierta) {
+      return reply.code(409).send({
+        error: "Pasaron más de 24 horas desde el último mensaje del cliente: Meta no permite responder hasta que vuelva a escribir.",
+      });
+    }
+
+    let mimeFinal = mime;
+    let nombre = body.nombre?.slice(0, 120) || null;
+    if (tipo === "AUDIO") {
+      try {
+        const c = await convertirAudio(datos, mime, conversacion.canal.tipo);
+        datos = c.datos;
+        mimeFinal = c.mime;
+        nombre = `nota-de-voz.${c.ext}`;
+      } catch (err) {
+        request.log.error(err);
+        return reply.code(500).send({ error: err instanceof Error ? err.message : "No se pudo preparar el audio" });
+      }
+    }
+
+    const guardado = await guardarAdjunto(conversacion.empresaId, datos, mimeFinal, nombre);
+    try {
+      const externoId = await enviarAdjuntoMeta(conversacion.canal, conversacion.contactoExternoId, {
+        tipo,
+        url: guardado.url,
+        nombre,
+        texto,
+      });
+      const mensaje = await prisma.mensajeMensajeria.create({
+        data: {
+          empresaId: conversacion.empresaId,
+          conversacionId: id,
+          direccion: "SALIENTE",
+          tipo,
+          // En WhatsApp el texto va como pie de foto; en los demás canales se manda aparte.
+          texto: conversacion.canal.tipo === "WHATSAPP" && tipo !== "AUDIO" ? texto : null,
+          adjuntoUrl: guardado.url,
+          externoId,
+          usuarioId: request.user.usuarioId,
+        },
+      });
+      let ultimo = mensaje;
+      if (texto && !(conversacion.canal.tipo === "WHATSAPP" && tipo !== "AUDIO")) {
+        const externoTexto = await enviarTextoMeta(conversacion.canal, conversacion.contactoExternoId, texto);
+        ultimo = await prisma.mensajeMensajeria.create({
+          data: {
+            empresaId: conversacion.empresaId,
+            conversacionId: id,
+            direccion: "SALIENTE",
+            texto,
+            externoId: externoTexto,
+            usuarioId: request.user.usuarioId,
+          },
+        });
+      }
+      await prisma.conversacionMensajeria.update({
+        where: { id },
+        data: { ultimoMensajeEn: ultimo.creadoEn, ultimoMensajeTexto: resumenDe(ultimo.tipo, ultimo.texto), noLeidos: 0 },
+      });
+      emitMensajeNuevo(conversacion.empresaId, {
+        conversacionId: id,
+        mensajeId: ultimo.id,
+        tipoCanal: conversacion.canal.tipo,
+        direccion: "SALIENTE",
+      });
+      return mensaje;
+    } catch (err) {
+      request.log.error(err);
+      await prisma.adjuntoMensajeria.delete({ where: { id: guardado.id } }).catch(() => {});
+      const msg = err instanceof ErrorMeta || err instanceof ErrorMetaLocal ? err.message : "No se pudo enviar el archivo";
+      return reply.code(502).send({ error: `Meta no aceptó el archivo: ${msg}` });
+    }
+  });
+
+  // ---------- Respuestas rápidas (mensajes predeterminados) ----------
+
+  app.get("/mensajeria/respuestas", async (request, reply) => {
+    if (!puedeAtender(request.user.permisos)) return reply.code(403).send({ error: "No tienes permiso" });
+    return prisma.respuestaRapida.findMany({
+      where: { empresaId: request.user.empresaId },
+      orderBy: [{ orden: "asc" }, { atajo: "asc" }],
+      select: { id: true, atajo: true, texto: true, orden: true },
+    });
+  });
+
+  const leerRespuesta = (body: unknown) => {
+    const b = (body ?? {}) as { atajo?: string; texto?: string };
+    const atajo = String(b.atajo ?? "")
+      .trim()
+      .replace(/^\/+/, "")
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .slice(0, 30);
+    const texto = String(b.texto ?? "").trim().slice(0, 1000);
+    return { atajo, texto };
+  };
+
+  app.post("/mensajeria/respuestas", async (request, reply) => {
+    if (!puedeAtender(request.user.permisos)) return reply.code(403).send({ error: "No tienes permiso" });
+    const { atajo, texto } = leerRespuesta(request.body);
+    if (!atajo || !texto) return reply.code(400).send({ error: "Escribe el atajo y el mensaje" });
+    const total = await prisma.respuestaRapida.count({ where: { empresaId: request.user.empresaId } });
+    if (total >= 200) return reply.code(400).send({ error: "Máximo 200 respuestas rápidas" });
+    return prisma.respuestaRapida.create({
+      data: { empresaId: request.user.empresaId, atajo, texto, orden: total },
+      select: { id: true, atajo: true, texto: true, orden: true },
+    });
+  });
+
+  app.put("/mensajeria/respuestas/:id", async (request, reply) => {
+    if (!puedeAtender(request.user.permisos)) return reply.code(403).send({ error: "No tienes permiso" });
+    const { id } = request.params as { id: string };
+    const { atajo, texto } = leerRespuesta(request.body);
+    if (!atajo || !texto) return reply.code(400).send({ error: "Escribe el atajo y el mensaje" });
+    const r = await prisma.respuestaRapida.updateMany({ where: { id, empresaId: request.user.empresaId }, data: { atajo, texto } });
+    if (r.count === 0) return reply.code(404).send({ error: "Respuesta no encontrada" });
+    return { ok: true };
+  });
+
+  app.delete("/mensajeria/respuestas/:id", async (request, reply) => {
+    if (!puedeAtender(request.user.permisos)) return reply.code(403).send({ error: "No tienes permiso" });
+    const { id } = request.params as { id: string };
+    await prisma.respuestaRapida.deleteMany({ where: { id, empresaId: request.user.empresaId } });
+    return { ok: true };
+  });
+
+  // ---------- Automatizaciones (bienvenida y fuera de horario) ----------
+
+  app.get("/mensajeria/automatizaciones", async (request, reply) => {
+    if (!puedeAtender(request.user.permisos)) return reply.code(403).send({ error: "No tienes permiso" });
+    const c = await prisma.automatizacionMensajeria.findUnique({ where: { empresaId: request.user.empresaId } });
+    const config = {
+      bienvenidaActiva: c?.bienvenidaActiva ?? false,
+      bienvenidaTexto: c?.bienvenidaTexto ?? "",
+      ausenciaActiva: c?.ausenciaActiva ?? false,
+      ausenciaTexto: c?.ausenciaTexto ?? "",
+      horario: (c?.horario as Horario | null) ?? null,
+      zonaHoraria: c?.zonaHoraria ?? "America/Bogota",
+    };
+    return { ...config, abiertoAhora: dentroDeHorario(config.horario, config.zonaHoraria) };
+  });
+
+  app.put("/mensajeria/automatizaciones", async (request, reply) => {
+    if (!puedeConfigurar(request.user.permisos)) {
+      return reply.code(403).send({ error: "Solo el administrador puede cambiar los mensajes automáticos" });
+    }
+    const b = (request.body ?? {}) as Record<string, unknown>;
+    const hora = /^([01]?\d|2[0-3]):[0-5]\d$/;
+    let horario: Horario | null = null;
+    if (b.horario && typeof b.horario === "object") {
+      horario = {};
+      for (const [dia, v] of Object.entries(b.horario as Record<string, any>)) {
+        if (!/^[0-6]$/.test(dia)) continue;
+        if (v && hora.test(String(v.abre)) && hora.test(String(v.cierra))) {
+          (horario as any)[dia] = { abre: String(v.abre), cierra: String(v.cierra) };
+        } else {
+          (horario as any)[dia] = null;
+        }
+      }
+    }
+    const datos = {
+      bienvenidaActiva: b.bienvenidaActiva === true,
+      bienvenidaTexto: String(b.bienvenidaTexto ?? "").trim().slice(0, 1000) || null,
+      ausenciaActiva: b.ausenciaActiva === true,
+      ausenciaTexto: String(b.ausenciaTexto ?? "").trim().slice(0, 1000) || null,
+      horario: (horario ?? undefined) as any,
+    };
+    if (datos.bienvenidaActiva && !datos.bienvenidaTexto) return reply.code(400).send({ error: "Escribe el mensaje de bienvenida" });
+    if (datos.ausenciaActiva && (!datos.ausenciaTexto || !horario)) {
+      return reply.code(400).send({ error: "Para el mensaje fuera de horario escribe el texto y el horario de atención" });
+    }
+    await prisma.automatizacionMensajeria.upsert({
+      where: { empresaId: request.user.empresaId },
+      create: { empresaId: request.user.empresaId, ...datos },
+      update: datos,
+    });
+    registrarAuditoria({
+      empresaId: request.user.empresaId,
+      usuarioId: request.user.usuarioId,
+      accion: "MENSAJERIA_AUTOMATIZACIONES",
+      entidad: "AutomatizacionMensajeria",
+      entidadId: request.user.empresaId,
+      detalle: `Bienvenida ${datos.bienvenidaActiva ? "activa" : "apagada"}, fuera de horario ${datos.ausenciaActiva ? "activo" : "apagado"}`,
+    });
+    return { ok: true };
   });
 
   // Vincular un cliente de CENTRALA, asignar a un usuario o cerrar la conversación.

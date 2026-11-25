@@ -3024,3 +3024,92 @@ button.var-btn-generar-nuevo {
 .fe-resumen > .card, .fe-planes > .card { margin: 0; }
 .fe-pos label.fe-pos-label { flex-direction: row; align-items: center; justify-content: flex-start; text-transform: none; font-size: 14px; letter-spacing: 0; }
 .fe-pos label.fe-pos-label input[type="checkbox"] { width: 18px; height: 18px; min-height: 0; padding: 0; flex: 0 0 auto; box-shadow: none; }
+
+/* ---------- Mensajes: adjuntos, notas de voz, respuestas rápidas y avisos ---------- */
+.msj-encabezado-acciones { display: flex; gap: 8px; flex-wrap: wrap; }
+.msj-redactor { position: relative; border-top: 1px solid var(--border, #e2e8f0); background: var(--card-bg, #fff); }
+.msj-redactor.arrastrando { outline: 2px dashed #0b5bd3; outline-offset: -4px; background: #eff6ff; }
+.msj-redactor .msj-escribir { border-top: 0; align-items: flex-end; }
+.msj-herramientas { display: flex; gap: 4px; align-self: center; }
+.msj-herramienta, .msj-microfono { width: 38px; height: 38px; min-height: 0; padding: 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 18px; background: #f1f5f9; color: #334155; border: 1px solid #e2e8f0; box-shadow: none; flex: 0 0 auto; }
+.msj-herramienta:hover, .msj-herramienta.activa { background: #e0e7ff; border-color: #c7d2fe; }
+.msj-microfono { align-self: center; background: #0b5bd3; color: #fff; border-color: #0b5bd3; width: 44px; height: 44px; }
+.msj-grabando { display: flex; align-items: center; gap: 10px; padding: 12px 14px; font-size: 14px; font-weight: 600; color: #b91c1c; }
+.msj-grabando > span:nth-child(2) { flex: 1; }
+.msj-grabando-punto { width: 10px; height: 10px; border-radius: 50%; background: #dc2626; animation: msj-latido 1s infinite; }
+@keyframes msj-latido { 50% { opacity: 0.25; } }
+.msj-adjunto-previo { display: flex; align-items: center; gap: 10px; margin: 10px 10px 0; padding: 8px; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; font-size: 13px; }
+.msj-adjunto-previo img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; }
+.msj-adjunto-icono { width: 56px; height: 56px; display: flex; align-items: center; justify-content: center; font-size: 26px; background: #e2e8f0; border-radius: 8px; }
+.msj-adjunto-nombre { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msj-redactor-error { margin: 8px 10px 0; padding: 6px 10px; border-radius: 8px; background: #fef2f2; color: #991b1b; font-size: 12.5px; }
+.msj-rapidas { position: absolute; left: 10px; right: 10px; bottom: calc(100% + 6px); max-height: 300px; overflow-y: auto; background: var(--card-bg, #fff); border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.15); z-index: 5; padding: 6px; }
+.msj-rapidas-cabecera { display: flex; justify-content: space-between; align-items: center; padding: 4px 8px 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b; }
+.msj-rapidas-vacio { margin: 6px 8px 10px; font-size: 13px; color: #64748b; }
+.msj-rapida { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; padding: 8px 10px; border: 0; border-radius: 8px; background: transparent; color: inherit; text-align: left; box-shadow: none; min-height: 0; font-weight: 400; }
+.msj-rapida strong { font-size: 13px; color: #0b5bd3; }
+.msj-rapida span { font-size: 13px; color: #475569; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.msj-rapida:hover, .msj-rapida.activa { background: #eff6ff; }
+.msj-burbuja.con-medio { padding: 4px; }
+.msj-burbuja.con-medio p, .msj-burbuja.con-medio .msj-burbuja-hora, .msj-burbuja.con-medio .msj-automatico { padding: 0 8px; }
+.msj-burbuja.con-medio .msj-burbuja-hora { padding-bottom: 4px; }
+.msj-foto-btn { padding: 0; border: 0; background: none; box-shadow: none; min-height: 0; cursor: zoom-in; display: block; }
+.msj-foto { max-width: 260px; max-height: 320px; width: 100%; object-fit: cover; border-radius: 10px; display: block; }
+.msj-audio { width: 260px; max-width: 100%; height: 40px; }
+.msj-video { max-width: 280px; width: 100%; border-radius: 10px; }
+.msj-archivo { display: inline-block; padding: 8px 12px; font-weight: 600; color: inherit; text-decoration: underline; }
+.msj-automatico { font-size: 10.5px; font-weight: 700; opacity: 0.85; }
+.msj-foto-grande { position: fixed; inset: 0; z-index: 1000; background: rgba(15, 23, 42, 0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; cursor: zoom-out; }
+.msj-foto-grande img { max-width: 100%; max-height: 85vh; border-radius: 10px; }
+.msj-foto-grande a { color: #fff; font-size: 14px; }
+/* Ventana de configuración */
+.msj-config { width: 640px; max-width: 94vw; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+.msj-config-cabecera { display: flex; justify-content: space-between; align-items: center; }
+.msj-config-cabecera h4 { margin: 0; }
+.msj-config-pestanas { display: flex; gap: 6px; overflow-x: auto; }
+.msj-config-pestanas .msj-pestana { flex-shrink: 0; }
+.msj-config-cuerpo { display: flex; flex-direction: column; gap: 10px; }
+.msj-config-cuerpo textarea { width: 100%; resize: vertical; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 10px; font: inherit; font-size: 14px; }
+.msj-config-ayuda { margin: 0; font-size: 13px; color: #64748b; }
+.msj-config-ok { font-size: 13px; color: #047857; font-weight: 600; }
+.msj-config-form { display: flex; flex-direction: column; gap: 10px; }
+.msj-config-form label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: #334155; }
+.msj-config-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.msj-config-lista li { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; padding: 10px; border: 1px solid #e2e8f0; border-radius: 10px; }
+.msj-config-lista li > div:first-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 13px; }
+.msj-config-lista li strong { color: #0b5bd3; }
+.msj-config-lista li span { color: #475569; white-space: pre-wrap; }
+.msj-config-vacio { padding: 14px; border: 1px dashed #cbd5e1; border-radius: 10px; text-align: center; font-size: 13px; color: #64748b; }
+.msj-config-vacio p { margin: 0 0 8px; }
+label.msj-interruptor { display: flex; flex-direction: row; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--text, #0f172a); margin: 0; cursor: pointer; }
+label.msj-interruptor input { width: 18px; height: 18px; min-height: 0; margin: 0; flex: 0 0 auto; }
+.msj-horario { display: flex; flex-direction: column; gap: 6px; }
+.msj-horario-dia { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 10px; border: 1px solid #e2e8f0; border-radius: 10px; }
+.msj-horario-horas { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #475569; }
+.msj-horario-horas input { width: 110px; height: 34px; padding: 4px 6px; }
+.msj-horario-cerrado { font-size: 13px; color: #94a3b8; }
+/* Aviso emergente de mensaje nuevo (en cualquier pantalla) */
+.msj-avisos { position: fixed; right: 16px; bottom: 16px; z-index: 2000; display: flex; flex-direction: column; gap: 8px; width: 340px; max-width: calc(100vw - 32px); }
+.msj-aviso-pop { position: relative; display: flex; gap: 10px; padding: 12px 34px 12px 12px; border-radius: 14px; background: var(--card-bg, #fff); border: 1px solid #e2e8f0; box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18); cursor: pointer; animation: msj-entrar 0.25s ease-out; }
+@keyframes msj-entrar { from { transform: translateY(16px); opacity: 0; } }
+.msj-aviso-pop-avatar { width: 42px; height: 42px; flex: 0 0 42px; border-radius: 50%; border: 2px solid; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #e2e8f0; font-weight: 700; color: #334155; }
+.msj-aviso-pop-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.msj-aviso-pop-texto { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.msj-aviso-pop-fila { display: flex; justify-content: space-between; gap: 8px; font-size: 13.5px; }
+.msj-aviso-pop-fila strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text, #0f172a); }
+.msj-aviso-pop-fila span { font-size: 11px; font-weight: 700; flex-shrink: 0; }
+.msj-aviso-pop-texto p { margin: 0; font-size: 13px; color: #475569; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.msj-aviso-pop-accion { font-size: 11px; color: #0b5bd3; font-weight: 600; }
+.msj-aviso-pop-cerrar { position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; min-height: 0; padding: 0; border-radius: 50%; border: 0; background: transparent; color: #94a3b8; font-size: 18px; line-height: 1; box-shadow: none; }
+@media (max-width: 640px) {
+  .msj-avisos { left: 12px; right: 12px; top: 12px; bottom: auto; width: auto; }
+  .msj-audio { width: 220px; }
+  .msj-horario-dia { flex-wrap: wrap; }
+}
+.msj-rapidas-cabecera .msj-btn-link { color: #0b5bd3; }
+@media (max-width: 760px) {
+  /* En el celular el chat ocupa la pantalla: los mensajes se desplazan por dentro y la caja de
+     respuesta queda siempre abajo a la vista. La ficha del cliente queda debajo. */
+  .msj { height: auto; }
+  .msj-cuerpo.con-chat .msj-chat { height: calc(100dvh - 24px); min-height: 420px; }
+}

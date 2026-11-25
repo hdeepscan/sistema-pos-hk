@@ -4,6 +4,9 @@ import { api } from "../lib/api";
 import { usePermiso } from "../lib/store";
 import { useMensajeNuevo } from "../lib/socket";
 import { mensajeError } from "../lib/errores";
+import { avisosMensajes } from "../lib/mensajes-avisos";
+import { Redactor, type RespuestaRapida } from "../components/mensajes/Redactor";
+import { ConfigMensajes } from "../components/mensajes/ConfigMensajes";
 
 type TipoCanal = "MESSENGER" | "INSTAGRAM" | "WHATSAPP";
 
@@ -37,6 +40,8 @@ interface Mensaje {
   texto: string | null;
   adjuntoUrl: string | null;
   estado: string;
+  error?: string | null;
+  automatico?: boolean;
   creadoEn: string;
 }
 
@@ -91,8 +96,9 @@ export default function Mensajes() {
   const [seleccionada, setSeleccionada] = useState<string | null>(null);
   const [mensajes, setMensajes] = useState<Mensaje[]>([]);
   const [cliente, setCliente] = useState<ClienteResumen | null>(null);
-  const [texto, setTexto] = useState("");
-  const [enviando, setEnviando] = useState(false);
+  const [respuestas, setRespuestas] = useState<RespuestaRapida[]>([]);
+  const [config, setConfig] = useState<null | "rapidas" | "bienvenida" | "avisos">(null);
+  const [fotoGrande, setFotoGrande] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [mostrarCanales, setMostrarCanales] = useState(false);
@@ -115,6 +121,11 @@ export default function Mensajes() {
       navigate("/mensajes", { replace: true });
     } else if (params.get("error")) {
       setError(params.get("error"));
+      navigate("/mensajes", { replace: true });
+    } else if (params.get("c")) {
+      // Desde el aviso emergente o la notificación del navegador: abrir esa conversación.
+      setSeleccionada(params.get("c"));
+      setPestana("TODOS");
       navigate("/mensajes", { replace: true });
     }
   }, [location.search, navigate]);
@@ -145,9 +156,25 @@ export default function Mensajes() {
       .catch((err) => setError(mensajeError(err)));
   }, []);
 
+  const cargarRespuestas = useCallback(() => {
+    api
+      .get<RespuestaRapida[]>("/mensajeria/respuestas")
+      .then(({ data }) => setRespuestas(data))
+      .catch(() => setRespuestas([]));
+  }, []);
+
   useEffect(() => {
     cargarCanales();
-  }, [cargarCanales]);
+    cargarRespuestas();
+  }, [cargarCanales, cargarRespuestas]);
+
+  // La conversación abierta no genera aviso emergente (ya se está viendo).
+  useEffect(() => {
+    avisosMensajes.conversacionAbierta = seleccionada;
+    return () => {
+      avisosMensajes.conversacionAbierta = null;
+    };
+  }, [seleccionada]);
 
   useEffect(() => {
     const t = setTimeout(cargarConversaciones, buscar ? 300 : 0);
@@ -158,9 +185,21 @@ export default function Mensajes() {
     if (seleccionada) cargarMensajes(seleccionada);
   }, [seleccionada, cargarMensajes]);
 
+  // En el celular, al abrir una conversación se lleva el chat a la vista.
   useEffect(() => {
-    finRef.current?.scrollIntoView({ block: "end" });
-  }, [mensajes]);
+    if (seleccionada && window.innerWidth <= 760) {
+      document.querySelector(".msj-chat")?.scrollIntoView({ block: "start" });
+    }
+  }, [seleccionada]);
+
+  // Baja al último mensaje moviendo solo la lista del chat (no toda la página, en el celular).
+  const bajarAlFinal = useCallback(() => {
+    const lista = finRef.current?.parentElement;
+    if (lista) lista.scrollTop = lista.scrollHeight;
+  }, []);
+  useEffect(() => {
+    bajarAlFinal();
+  }, [mensajes, bajarAlFinal]);
 
   // Tiempo real: un mensaje nuevo refresca la lista y, si es de la conversación abierta, el chat.
   useMensajeNuevo(
@@ -247,23 +286,6 @@ export default function Mensajes() {
     }
   }
 
-  async function enviar(e: React.FormEvent) {
-    e.preventDefault();
-    if (!actual || !texto.trim()) return;
-    setEnviando(true);
-    setError(null);
-    try {
-      await api.post(`/mensajeria/conversaciones/${actual.id}/mensajes`, { texto });
-      setTexto("");
-      cargarMensajes(actual.id);
-      cargarConversaciones();
-    } catch (err) {
-      setError(mensajeError(err, "No se pudo enviar el mensaje"));
-    } finally {
-      setEnviando(false);
-    }
-  }
-
   const sinCanales = canales.length === 0;
 
   return (
@@ -273,9 +295,14 @@ export default function Mensajes() {
           <h2>Mensajes</h2>
           <p>Messenger, Instagram y WhatsApp en un solo lugar</p>
         </div>
-        <button type="button" className="secondary" onClick={() => setMostrarCanales((v) => !v)}>
-          Canales conectados ({canales.length})
-        </button>
+        <div className="msj-encabezado-acciones">
+          <button type="button" className="secondary" onClick={() => setConfig("rapidas")}>
+            ⚡ Respuestas y avisos
+          </button>
+          <button type="button" className="secondary" onClick={() => setMostrarCanales((v) => !v)}>
+            Canales conectados ({canales.length})
+          </button>
+        </div>
       </div>
 
       {aviso && <div className="msj-aviso">{aviso}</div>}
@@ -426,14 +453,14 @@ export default function Mensajes() {
               </div>
               <div className="msj-burbujas">
                 {mensajes.map((m) => (
-                  <div key={m.id} className={`msj-burbuja ${m.direccion === "SALIENTE" ? "saliente" : "entrante"}`}>
-                    {m.tipo === "IMAGEN" && m.adjuntoUrl ? (
-                      <img src={m.adjuntoUrl} alt="Foto" className="msj-foto" />
-                    ) : m.tipo !== "TEXTO" && !m.texto ? (
-                      <em>{m.tipo === "AUDIO" ? "🎤 Audio" : m.tipo === "VIDEO" ? "🎬 Video" : "📎 Adjunto"}</em>
-                    ) : null}
+                  <div
+                    key={m.id}
+                    className={`msj-burbuja ${m.direccion === "SALIENTE" ? "saliente" : "entrante"}${m.tipo !== "TEXTO" && m.adjuntoUrl ? " con-medio" : ""}`}
+                  >
+                    {m.automatico && <span className="msj-automatico">🤖 Respuesta automática</span>}
+                    <ContenidoAdjunto mensaje={m} onVerFoto={setFotoGrande} onCargado={bajarAlFinal} />
                     {m.texto && <p>{m.texto}</p>}
-                    <span className="msj-burbuja-hora">
+                    <span className="msj-burbuja-hora" title={m.estado === "ERROR" && m.error ? m.error : undefined}>
                       {hora(m.creadoEn)}
                       {m.direccion === "SALIENTE" && (m.estado === "LEIDO" ? " · Visto" : m.estado === "ERROR" ? " · No entregado" : "")}
                     </span>
@@ -442,24 +469,17 @@ export default function Mensajes() {
                 <div ref={finRef} />
               </div>
               {actual.ventanaAbierta ? (
-                <form className="msj-escribir" onSubmit={enviar}>
-                  <textarea
-                    value={texto}
-                    onChange={(e) => setTexto(e.target.value)}
-                    placeholder="Escribe una respuesta…"
-                    rows={2}
-                    maxLength={1000}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        void enviar(e);
-                      }
-                    }}
-                  />
-                  <button type="submit" disabled={enviando || !texto.trim()}>
-                    {enviando ? "Enviando..." : "Enviar"}
-                  </button>
-                </form>
+                <Redactor
+                  conversacionId={actual.id}
+                  contactoNombre={actual.contactoNombre}
+                  tipoCanal={actual.tipoCanal}
+                  respuestas={respuestas}
+                  onGestionarRespuestas={() => setConfig("rapidas")}
+                  onEnviado={() => {
+                    cargarMensajes(actual.id);
+                    cargarConversaciones();
+                  }}
+                />
               ) : (
                 <div className="msj-ventana-cerrada">
                   Pasaron más de 24 horas desde el último mensaje del cliente. Meta no permite responder hasta que vuelva a
@@ -469,6 +489,25 @@ export default function Mensajes() {
             </>
           )}
         </div>
+
+        {config && (
+          <ConfigMensajes
+            pestanaInicial={config}
+            puedeConfigurar={puedeConfigurar}
+            respuestas={respuestas}
+            onRespuestasCambiadas={cargarRespuestas}
+            onCerrar={() => setConfig(null)}
+          />
+        )}
+
+        {fotoGrande && (
+          <div className="msj-foto-grande" onClick={() => setFotoGrande(null)}>
+            <img src={fotoGrande} alt="Foto" />
+            <a href={fotoGrande} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
+              Abrir en otra pestaña
+            </a>
+          </div>
+        )}
 
         {/* Ficha del cliente */}
         {actual && (
@@ -484,6 +523,39 @@ export default function Mensajes() {
       </div>
     </div>
   );
+}
+
+function ContenidoAdjunto({
+  mensaje: m,
+  onVerFoto,
+  onCargado,
+}: {
+  mensaje: Mensaje;
+  onVerFoto: (url: string) => void;
+  onCargado: () => void;
+}) {
+  if (m.tipo === "TEXTO") return null;
+  if (!m.adjuntoUrl) {
+    return m.texto ? null : <em>{m.tipo === "IMAGEN" ? "📷 Foto" : m.tipo === "AUDIO" ? "🎤 Audio" : m.tipo === "VIDEO" ? "🎬 Video" : "📎 Adjunto"}</em>;
+  }
+  switch (m.tipo) {
+    case "IMAGEN":
+      return (
+        <button type="button" className="msj-foto-btn" onClick={() => onVerFoto(m.adjuntoUrl!)}>
+          <img src={m.adjuntoUrl} alt="Foto" className="msj-foto" onLoad={onCargado} />
+        </button>
+      );
+    case "AUDIO":
+      return <audio className="msj-audio" controls preload="metadata" src={m.adjuntoUrl} />;
+    case "VIDEO":
+      return <video className="msj-video" controls preload="metadata" src={m.adjuntoUrl} />;
+    default:
+      return (
+        <a className="msj-archivo" href={m.adjuntoUrl} target="_blank" rel="noreferrer">
+          📄 Ver documento
+        </a>
+      );
+  }
 }
 
 function PanelCliente({

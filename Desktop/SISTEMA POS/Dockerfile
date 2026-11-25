@@ -2,8 +2,8 @@
 
 WORKDIR /app
 
-# Install PostgreSQL client tools (pg_dump, psql) for backup/restore functionality
-RUN apt-get update && apt-get install -y postgresql-client && rm -rf /var/lib/apt/lists/*
+# PostgreSQL client tools (pg_dump, psql) for backup/restore, and ffmpeg to convert voice notes for WhatsApp/Instagram
+RUN apt-get update && apt-get install -y postgresql-client ffmpeg && rm -rf /var/lib/apt/lists/*
 
 # Copy package files for dependency installation
 COPY package*.json ./

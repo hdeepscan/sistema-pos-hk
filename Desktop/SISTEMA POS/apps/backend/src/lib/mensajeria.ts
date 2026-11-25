@@ -1,6 +1,22 @@
 import { prisma } from "./prisma.js";
 import { descifrar, graph } from "./meta-mensajeria.js";
 import { emitMensajeNuevo } from "./ws.js";
+import { copiarAdjuntoMeta, copiarAdjuntoWhatsapp } from "./mensajeria-medios.js";
+import { ejecutarAutomatizaciones } from "./mensajeria-automatizaciones.js";
+
+export function resumenDe(tipo: string, texto: string | null): string {
+  return texto ?? (tipo === "IMAGEN" ? "📷 Foto" : tipo === "AUDIO" ? "🎤 Audio" : tipo === "VIDEO" ? "🎬 Video" : "📎 Adjunto");
+}
+
+/** Copia el adjunto a CENTRALA en segundo plano y actualiza el mensaje cuando termina. */
+function copiarEnSegundoPlano(empresaId: string, mensajeId: string, copiar: () => Promise<string | null>) {
+  void copiar()
+    .then(async (url) => {
+      if (!url) return;
+      await prisma.mensajeMensajeria.update({ where: { id: mensajeId }, data: { adjuntoUrl: url } });
+    })
+    .catch((err) => console.error("[mensajeria] No se pudo copiar un adjunto:", err instanceof Error ? err.message : err));
+}
 
 // Bandeja de mensajes: guarda lo que llega de Messenger e Instagram y envía las respuestas.
 
@@ -108,8 +124,9 @@ async function procesarEvento(
   const tipoMensaje = mensaje.text ? "TEXTO" : adjunto ? tipoAdjunto(adjunto.type) : "OTRO";
   const texto: string | null = mensaje.text ?? null;
   const fecha = evento.timestamp ? new Date(Number(evento.timestamp)) : new Date();
-  const resumen = texto ?? (tipoMensaje === "IMAGEN" ? "📷 Foto" : tipoMensaje === "AUDIO" ? "🎤 Audio" : tipoMensaje === "VIDEO" ? "🎬 Video" : "📎 Adjunto");
+  const resumen = resumenDe(tipoMensaje, texto);
 
+  let esNueva = false;
   let conversacion = await prisma.conversacionMensajeria.findUnique({
     where: { canalId_contactoExternoId: { canalId: canal.id, contactoExternoId: contactoId } },
   });
@@ -125,6 +142,7 @@ async function procesarEvento(
         contactoFoto: perfil.foto,
       },
     });
+    esNueva = true;
   }
 
   const guardado = await prisma.mensajeMensajeria.create({
@@ -149,7 +167,24 @@ async function procesarEvento(
     },
   });
 
-  emitMensajeNuevo(canal.empresaId, { conversacionId: conversacion.id, mensajeId: guardado.id, tipoCanal: tipo });
+  const urlOriginal: string | undefined = adjunto?.payload?.url;
+  if (urlOriginal) copiarEnSegundoPlano(canal.empresaId, guardado.id, () => copiarAdjuntoMeta(canal.empresaId, urlOriginal));
+
+  emitMensajeNuevo(canal.empresaId, {
+    conversacionId: conversacion.id,
+    mensajeId: guardado.id,
+    tipoCanal: tipo,
+    direccion: esEco ? "SALIENTE" : "ENTRANTE",
+    contacto: conversacion.contactoNombre || conversacion.contactoUsuario,
+    foto: conversacion.contactoFoto,
+    resumen,
+  });
+
+  if (!esEco) {
+    void ejecutarAutomatizaciones(canal.empresaId, conversacion.id, esNueva).catch((err) =>
+      console.error("[mensajeria] Error en la respuesta automática:", err instanceof Error ? err.message : err)
+    );
+  }
 }
 
 // ---------- WhatsApp ----------
@@ -204,9 +239,9 @@ async function procesarAvisoWhatsApp(cuerpo: any): Promise<void> {
           const texto: string | null =
             m.text?.body ?? m.image?.caption ?? m.video?.caption ?? m.document?.caption ?? m.button?.text ?? m.interactive?.button_reply?.title ?? null;
           const fecha = m.timestamp ? new Date(Number(m.timestamp) * 1000) : new Date();
-          const resumen =
-            texto ?? (tipoMensaje === "IMAGEN" ? "📷 Foto" : tipoMensaje === "AUDIO" ? "🎤 Audio" : tipoMensaje === "VIDEO" ? "🎬 Video" : "📎 Adjunto");
+          const resumen = resumenDe(tipoMensaje, texto);
 
+          let esNueva = false;
           let conversacion = await prisma.conversacionMensajeria.findUnique({
             where: { canalId_contactoExternoId: { canalId: canal.id, contactoExternoId: contactoId } },
           });
@@ -220,6 +255,7 @@ async function procesarAvisoWhatsApp(cuerpo: any): Promise<void> {
                 contactoUsuario: `+${contactoId}`,
               },
             });
+            esNueva = true;
           }
           const guardado = await prisma.mensajeMensajeria.create({
             data: {
@@ -243,7 +279,24 @@ async function procesarAvisoWhatsApp(cuerpo: any): Promise<void> {
               ...(nombres.get(contactoId) && !conversacion.contactoNombre ? { contactoNombre: nombres.get(contactoId) } : {}),
             },
           });
-          emitMensajeNuevo(canal.empresaId, { conversacionId: conversacion.id, mensajeId: guardado.id, tipoCanal: "WHATSAPP" });
+          const medio = m[m.type];
+          if (medio?.id && tipoMensaje !== "TEXTO") {
+            const token = descifrar(canal.tokenCifrado);
+            copiarEnSegundoPlano(canal.empresaId, guardado.id, () =>
+              copiarAdjuntoWhatsapp(canal.empresaId, String(medio.id), token, medio.filename ?? null)
+            );
+          }
+          emitMensajeNuevo(canal.empresaId, {
+            conversacionId: conversacion.id,
+            mensajeId: guardado.id,
+            tipoCanal: "WHATSAPP",
+            direccion: "ENTRANTE",
+            contacto: conversacion.contactoNombre || nombres.get(contactoId) || conversacion.contactoUsuario,
+            resumen,
+          });
+          void ejecutarAutomatizaciones(canal.empresaId, conversacion.id, esNueva).catch((err) =>
+            console.error("[mensajeria] Error en la respuesta automática:", err instanceof Error ? err.message : err)
+          );
         } catch (err) {
           console.error("[mensajeria] No se pudo procesar un mensaje de WhatsApp:", err instanceof Error ? err.message : err);
         }
@@ -276,6 +329,45 @@ export async function enviarTextoMeta(
   });
   return r.message_id;
 }
+
+/** Envía una foto, audio, video o documento (por enlace público). Devuelve el id del mensaje en Meta. */
+export async function enviarAdjuntoMeta(
+  canal: { tipo: string; externoId: string; paginaId: string | null; tokenCifrado: string },
+  contactoId: string,
+  adjunto: { tipo: "IMAGEN" | "AUDIO" | "VIDEO" | "ARCHIVO"; url: string; nombre?: string | null; texto?: string | null }
+): Promise<string> {
+  const token = descifrar(canal.tokenCifrado);
+  if (canal.tipo === "WHATSAPP") {
+    const tipo = { IMAGEN: "image", AUDIO: "audio", VIDEO: "video", ARCHIVO: "document" }[adjunto.tipo];
+    const medio: Record<string, string> = { link: adjunto.url };
+    // El audio no lleva texto en WhatsApp: el texto se manda aparte.
+    if (adjunto.texto && adjunto.tipo !== "AUDIO") medio.caption = adjunto.texto;
+    if (adjunto.tipo === "ARCHIVO" && adjunto.nombre) medio.filename = adjunto.nombre;
+    const r = await graph<{ messages: { id: string }[] }>(`${canal.externoId}/messages`, {
+      metodo: "POST",
+      token,
+      cuerpo: { messaging_product: "whatsapp", recipient_type: "individual", to: contactoId, type: tipo, [tipo]: medio },
+    });
+    return r.messages?.[0]?.id;
+  }
+  if (canal.tipo === "INSTAGRAM" && adjunto.tipo === "ARCHIVO") {
+    throw new ErrorMetaLocal("Instagram no permite enviar documentos: envía una foto o un enlace.");
+  }
+  const remitente = canal.tipo === "INSTAGRAM" ? canal.paginaId ?? canal.externoId : canal.externoId;
+  const tipo = { IMAGEN: "image", AUDIO: "audio", VIDEO: "video", ARCHIVO: "file" }[adjunto.tipo];
+  const r = await graph<{ message_id: string }>(`${remitente}/messages`, {
+    metodo: "POST",
+    token,
+    cuerpo: {
+      recipient: { id: contactoId },
+      messaging_type: "RESPONSE",
+      message: { attachment: { type: tipo, payload: { url: adjunto.url, is_reusable: false } } },
+    },
+  });
+  return r.message_id;
+}
+
+export class ErrorMetaLocal extends Error {}
 
 // ---------- Historial: conversaciones que ya existían antes de conectar ----------
 

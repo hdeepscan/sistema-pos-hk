@@ -51,7 +51,17 @@ export function usePedidoShopify(handler: (event: PedidoShopifyEvent) => void) {
   }, [handler]);
 }
 
-export function useMensajeNuevo(handler: (event: { conversacionId: string; mensajeId: string; tipoCanal: string }) => void) {
+export interface EventoMensaje {
+  conversacionId: string;
+  mensajeId: string;
+  tipoCanal: string;
+  direccion?: "ENTRANTE" | "SALIENTE";
+  contacto?: string | null;
+  foto?: string | null;
+  resumen?: string | null;
+}
+
+export function useMensajeNuevo(handler: (event: EventoMensaje) => void) {
   useEffect(() => {
     const s = socket;
     if (!s) return;
