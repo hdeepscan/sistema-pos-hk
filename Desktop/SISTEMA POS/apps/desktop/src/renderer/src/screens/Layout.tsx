@@ -1,6 +1,6 @@
 import type { PropsWithChildren } from "react";
 import { useCallback, useEffect, useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useSesionStore, usePermiso, useTemaStore } from "../lib/store";
 import { useMensajeNuevo, usePedidoShopify } from "../lib/socket";
 import { api } from "../lib/api";
@@ -9,7 +9,7 @@ import type { PedidoShopifyEvent } from "@sistema-pos/shared";
 import logo from "../assets/CENTRALA.pdf.png";
 import { electronAPI } from "../lib/electron-api";
 import { ThemeToggle } from "../components/ThemeToggle";
-import { MobileMenu } from "../components/MobileMenu";
+import { InstalarAppBanner } from "../components/InstalarAppBanner";
 import { ToastContainer } from "../components/ToastContainer";
 import { AvisosMensajes } from "../components/AvisosMensajes";
 import { SubscriptionCard } from "../components/SubscriptionCard";
@@ -40,6 +40,9 @@ import {
   LogOut,
   LineChart,
   MessageCircle,
+  Menu,
+  X,
+  Monitor,
 } from "lucide-react";
 
 const INTERVALO_CREDITOS_MS = 5 * 60 * 1000;
@@ -75,6 +78,24 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
   const [update, setUpdate] = useState<{ estado: string; version?: string; porcentaje?: number } | null>(null);
   const [diasRestantes, setDiasRestantes] = useState<number | null>(null);
   const navigate = useNavigate();
+  const location = useLocation();
+  // Celular: el mismo menú lateral se abre como cajón desde la izquierda.
+  const [menuAbierto, setMenuAbierto] = useState(false);
+
+  useEffect(() => {
+    setMenuAbierto(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!isMobile || !menuAbierto) return;
+    const cerrarConEsc = (e: KeyboardEvent) => e.key === "Escape" && setMenuAbierto(false);
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", cerrarConEsc);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", cerrarConEsc);
+    };
+  }, [isMobile, menuAbierto]);
 
   // Calcular días restantes de suscripción
   useEffect(() => {
@@ -219,14 +240,58 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
         <ToastContainer />
         <AvisosMensajes activo={puedeAtenderMensajes} />
 
-      {/* Menú Hamburguesa para Mobile */}
+      {/* Celular: barra superior con menú, marca y notificaciones */}
       {isMobile && (
-        <div style={{ position: "fixed", top: 16, left: 16, zIndex: 1000 }}>
-          <MobileMenu />
-        </div>
+        <header className="mobile-topbar">
+          <button
+            type="button"
+            className="mobile-topbar-boton"
+            onClick={() => setMenuAbierto(true)}
+            aria-label="Abrir menú"
+          >
+            <Menu size={22} />
+            {mensajesNoLeidos + creditosVencidos + alertasCobro + eventosHoy > 0 && <span className="mobile-topbar-punto" />}
+          </button>
+          <div className="mobile-topbar-marca">
+            <img src={logo} alt="" />
+            <div>
+              <strong>CENTRALA</strong>
+              <span>{sucursalActiva?.nombre ?? empresa?.nombre}</span>
+            </div>
+          </div>
+          {puedeAtenderMensajes ? (
+            <NavLink to="/mensajes" className="mobile-topbar-boton" aria-label="Mensajes">
+              <MessageCircle size={21} />
+              {mensajesNoLeidos > 0 && <span className="mobile-topbar-contador">{mensajesNoLeidos > 99 ? "99+" : mensajesNoLeidos}</span>}
+            </NavLink>
+          ) : (
+            <NavLink to="/notificaciones" className="mobile-topbar-boton" aria-label="Notificaciones">
+              <Bell size={21} />
+              {alertasCobro > 0 && <span className="mobile-topbar-contador">{alertasCobro}</span>}
+            </NavLink>
+          )}
+        </header>
       )}
 
-      {!isMobile && <aside className="sidebar">
+      {isMobile && menuAbierto && <div className="sidebar-overlay" onClick={() => setMenuAbierto(false)} />}
+
+      <aside
+        className={`sidebar${isMobile ? " sidebar--drawer" : ""}${isMobile && menuAbierto ? " abierta" : ""}`}
+        aria-hidden={isMobile && !menuAbierto ? true : undefined}
+        onClick={
+          isMobile
+            ? (e) => {
+                // Al tocar una opción del menú, se cierra el cajón.
+                if ((e.target as HTMLElement).closest("a")) setMenuAbierto(false);
+              }
+            : undefined
+        }
+      >
+        {isMobile && (
+          <button type="button" className="sidebar-cerrar" onClick={() => setMenuAbierto(false)} aria-label="Cerrar menú">
+            <X size={20} />
+          </button>
+        )}
         <div className="sidebar-brand" style={{ padding: "28px 16px", borderBottom: "1px solid rgba(34, 197, 94, 0.08)", display: "flex", flexDirection: "column", alignItems: "center" }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, width: "100%" }}>
             <div style={{ borderRadius: 20, padding: 16, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px rgba(34, 197, 94, 0.1)" }}>
@@ -430,13 +495,26 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
           <span>Mi Perfil</span>
         </NavLink>
 
+        {isMobile && setIsMobile && (
+          <button
+            className="secondary"
+            type="button"
+            onClick={() => setIsMobile(null)}
+            style={{ marginBottom: 8, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+          >
+            <Monitor size={18} />
+            <span>Usar vista de escritorio</span>
+          </button>
+        )}
+
         <button className="secondary" onClick={cerrarSesion} type="button" style={{ marginTop: 0, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
           <LogOut size={20} />
           <span>Cerrar sesion</span>
         </button>
-      </aside>}
-      {/* Si está en mobile, no mostrar sidebar */}
+      </aside>
+
       <main className="main-content">
+        {isMobile && <InstalarAppBanner />}
         {update && (update.estado === "disponible" || update.estado === "descargando" || update.estado === "listo-para-instalar") && (
           <div className="card" style={{ marginBottom: 16, borderLeft: "4px solid var(--brand, #4f46e5)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -497,7 +575,7 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
       </main>
 
       {alertas.length > 0 && (
-        <div style={{ position: "fixed", top: 16, right: 16, display: "flex", flexDirection: "column", gap: 8, zIndex: 100, width: 340 }}>
+        <div className="pedido-alertas" style={{ position: "fixed", top: 16, right: 16, display: "flex", flexDirection: "column", gap: 8, zIndex: 100, width: 340 }}>
           {alertas.map((a) => (
             <div key={a.toastId} className="card pedido-alerta">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
@@ -535,8 +613,8 @@ export default function Layout({ children, isMobile = false, setIsMobile }: Layo
         </div>
       )}
 
-      {/* Botón flotante mejorado para cambiar vista Desktop/Móvil */}
-      {setIsMobile && (
+      {/* Botón flotante para cambiar vista Desktop/Móvil (en el celular esta opción vive dentro del menú) */}
+      {setIsMobile && !isMobile && (
         <div
           style={{
             position: "fixed",

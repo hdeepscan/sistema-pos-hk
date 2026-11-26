@@ -227,7 +227,7 @@ export default function PosMobile({ onToggleMobile }: { onToggleMobile?: () => v
       {/* Header minimalista */}
       <div className="pos-mobile-header">
         <div>
-          <h2 style={{ margin: 0 }}>POS Móvil</h2>
+          <h2 style={{ margin: 0 }}>Punto de venta</h2>
           <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0" }}>
             {sucursalActiva?.nombre}
           </p>

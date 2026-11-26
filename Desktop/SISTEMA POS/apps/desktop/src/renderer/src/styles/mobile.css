@@ -1,0 +1,518 @@
+/* =====================================================================
+   CENTRALA · Capa responsive para celular / PWA
+   Se importa de último en main.tsx, así que gana sobre los estilos base.
+   - Barra superior + menú lateral tipo cajón (clases, aplican cuando la vista es "Móvil").
+   - Reglas globales @media (max-width: 768px) para que TODAS las pantallas
+     se acomoden sin tener que tocarlas una por una.
+   ===================================================================== */
+
+/* ---------- Barra superior (solo vista Móvil) ---------- */
+
+.mobile-topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: calc(56px + env(safe-area-inset-top, 0px));
+  padding: env(safe-area-inset-top, 0px) 10px 0;
+  background: var(--surface, #fff);
+  border-bottom: 1px solid var(--border-light, #e5e7eb);
+  box-shadow: 0 1px 8px rgba(15, 23, 42, 0.06);
+}
+
+.mobile-topbar-boton {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text, #0f172a);
+  box-shadow: none;
+  text-decoration: none;
+}
+
+.mobile-topbar-boton:hover:not(:disabled),
+.mobile-topbar-boton:active {
+  background: var(--surface-secondary, #f1f5f9);
+  transform: none;
+  box-shadow: none;
+}
+
+.mobile-topbar-boton.active {
+  color: var(--brand, #3b82f6);
+}
+
+.mobile-topbar-punto {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--danger, #ef4444);
+  border: 2px solid var(--surface, #fff);
+}
+
+.mobile-topbar-contador {
+  position: absolute;
+  top: 3px;
+  right: 1px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--danger, #ef4444);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+
+.mobile-topbar-marca {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.mobile-topbar-marca img {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.mobile-topbar-marca div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.mobile-topbar-marca strong {
+  font-family: "Montserrat", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  color: var(--text-primary, #0f172a);
+}
+
+.mobile-topbar-marca span {
+  font-size: 11.5px;
+  color: var(--text-muted, #64748b);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Con barra superior, el contenido arranca debajo de ella. */
+.mobile-topbar ~ .main-content {
+  padding-top: calc(56px + env(safe-area-inset-top, 0px) + 14px);
+}
+
+/* POS móvil: ocupa exacto el alto de la pantalla debajo de la barra, con el carrito fijo abajo. */
+.mobile-topbar ~ .main-content:has(.pos-mobile) {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: calc(56px + env(safe-area-inset-top, 0px)) 0 0;
+  overflow: hidden;
+}
+
+.mobile-topbar ~ .main-content:has(.pos-mobile) > :not(.pos-mobile) {
+  flex-shrink: 0;
+}
+
+.mobile-topbar ~ .main-content:has(.pos-mobile) > .card,
+.mobile-topbar ~ .main-content:has(.pos-mobile) > .pwa-banner {
+  margin: 10px 10px 0;
+}
+
+.mobile-topbar ~ .main-content .pos-mobile {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+
+.mobile-topbar ~ .main-content .pos-mobile-footer {
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+}
+
+/* ---------- Menú lateral como cajón (vista Móvil) ---------- */
+
+.sidebar.sidebar--drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 1001;
+  width: min(300px, 86vw);
+  padding: calc(14px + env(safe-area-inset-top, 0px)) 12px calc(16px + env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  background: var(--surface, #fff);
+  transform: translateX(-105%);
+  visibility: hidden;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 0.28s;
+  box-shadow: 0 0 40px rgba(15, 23, 42, 0.18);
+}
+
+.sidebar.sidebar--drawer.abierta {
+  transform: translateX(0);
+  visibility: visible;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s;
+}
+
+.sidebar.sidebar--drawer::before {
+  display: none;
+}
+
+/* En el cajón la marca va compacta para que quepan más opciones. */
+.sidebar--drawer .sidebar-brand {
+  flex-direction: row !important;
+  padding: 4px 44px 14px 6px !important;
+}
+
+.sidebar--drawer .sidebar-brand > div {
+  flex-direction: row !important;
+  gap: 10px !important;
+}
+
+.sidebar--drawer .sidebar-brand > div > div:first-child {
+  padding: 0 !important;
+  box-shadow: none !important;
+}
+
+.sidebar--drawer .sidebar-brand img {
+  width: 38px !important;
+  height: 38px !important;
+}
+
+.sidebar--drawer .sidebar-brand > div > div:last-child {
+  text-align: left !important;
+}
+
+.sidebar--drawer a {
+  padding: 11px 10px;
+  font-size: 14.5px;
+}
+
+.sidebar-cerrar {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  right: 10px;
+  z-index: 2;
+  width: 38px;
+  height: 38px;
+  min-height: 0;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 10px;
+  background: var(--surface-secondary, #f1f5f9);
+  color: var(--text, #0f172a);
+  box-shadow: none;
+}
+
+.sidebar-cerrar:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+}
+
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(15, 23, 42, 0.45);
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* ---------- Aviso "Instalar app" ---------- */
+
+.pwa-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 10px 8px 10px 12px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #eff6ff 0%, #ecfeff 100%);
+  border: 1px solid #bfdbfe;
+}
+
+.pwa-banner-icono {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.pwa-banner-texto {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: #334155;
+}
+
+.pwa-banner-texto strong {
+  font-size: 13.5px;
+  color: #0f172a;
+}
+
+.pwa-banner-accion {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+.pwa-banner-cerrar {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  min-height: 0;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  box-shadow: none;
+}
+
+.pwa-banner-cerrar:hover:not(:disabled) {
+  background: rgba(15, 23, 42, 0.06);
+  transform: none;
+  box-shadow: none;
+}
+
+/* =====================================================================
+   Reglas globales para pantallas pequeñas
+   ===================================================================== */
+
+@media (max-width: 768px) {
+  html,
+  body {
+    -webkit-text-size-adjust: 100%;
+    overflow-x: hidden;
+  }
+
+  body {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .app-shell {
+    display: block;
+    min-height: 100dvh;
+  }
+
+  /* Las decoraciones animadas de fondo gastan batería en el celular. */
+  .app-shell::before,
+  .app-shell::after,
+  .sidebar::before {
+    animation: none;
+  }
+
+  .main-content {
+    padding: 16px 12px calc(24px + env(safe-area-inset-bottom, 0px));
+    min-width: 0;
+    overflow-x: hidden;
+  }
+
+  /* --- Encabezados y barras de herramientas --- */
+  .page-header {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .page-header > * {
+    min-width: 0;
+  }
+
+  .page-header h1,
+  .page-header h2 {
+    font-size: 19px;
+    line-height: 1.25;
+  }
+
+  .toolbar {
+    flex-wrap: wrap;
+  }
+
+  /* --- Tarjetas --- */
+  .card {
+    padding: 14px;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .card:hover {
+    transform: none;
+  }
+
+  /* --- Tablas: se desplazan de lado dentro de su tarjeta en vez de romper la página --- */
+  table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+    font-size: 13px;
+  }
+
+  th {
+    padding: 8px 10px;
+  }
+
+  td {
+    padding: 10px;
+  }
+
+  tbody tr:hover {
+    box-shadow: none;
+  }
+
+  /* --- Formularios: 16px evita que el iPhone haga zoom al escribir --- */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+    max-width: 100%;
+  }
+
+  button {
+    min-height: 40px;
+  }
+
+  /* --- Grillas con columnas fijas en línea (style={{ gridTemplateColumns: ... }}) se apilan.
+         El calendario (7 días) y las que marquen .grid-fija se respetan. --- */
+  [style*="grid-template-columns"]:not(.grid-fija):not([style*="repeat(7"]) {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  /* Grillas chicas (tarjetas de resumen, filtros cortos): dos columnas se aprovechan mejor. */
+  [style*="minmax(140px"]:not(.grid-fija),
+  [style*="minmax(180px"]:not(.grid-fija) {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+  }
+
+  /* Caja y Gastos traen su propio relleno de escritorio. */
+  .main-content .caja-container,
+  .main-content .gastos-container {
+    min-height: 0;
+    padding: 0;
+  }
+
+  .main-content .caja-grid,
+  .main-content .gastos-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  /* Filas flex en línea con muchos elementos: que bajen de línea en vez de salirse. */
+  .main-content [style*="display: flex"][style*="gap"]:not([style*="flex-direction: column"]):not(.no-wrap) {
+    flex-wrap: wrap;
+  }
+
+  /* Nada en el contenido puede ser más ancho que la pantalla. */
+  .main-content img,
+  .main-content video,
+  .main-content canvas,
+  .main-content iframe {
+    max-width: 100%;
+  }
+
+  /* --- Modales: ocupan el ancho disponible y se desplazan por dentro --- */
+  .modal-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .modal-backdrop > .card,
+  .modal-backdrop > div {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 92dvh !important;
+    overflow-y: auto;
+    border-radius: 18px 18px 0 0 !important;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Modales hechos con position: fixed en línea */
+  [style*="position: fixed"] > .card,
+  [style*="position: fixed"] > [class*="modal"] {
+    max-width: calc(100vw - 16px) !important;
+    max-height: 92dvh;
+    overflow-y: auto;
+  }
+
+  [class*="modal-content"],
+  [class*="-modal "] {
+    width: auto !important;
+    max-width: calc(100vw - 16px) !important;
+    max-height: 92dvh;
+    overflow-y: auto;
+  }
+
+  /* Alertas de pedidos Shopify: a todo el ancho arriba. */
+  .pedido-alertas {
+    left: 8px !important;
+    right: 8px !important;
+    top: calc(64px + env(safe-area-inset-top, 0px)) !important;
+    width: auto !important;
+  }
+
+  /* Pantallas con grillas de clases propias */
+  .fe-resumen {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Mensajes: el chat descuenta la barra superior */
+  .mobile-topbar ~ .main-content .msj-cuerpo.con-chat .msj-chat {
+    height: calc(100dvh - 56px - env(safe-area-inset-top, 0px) - 30px);
+  }
+
+  /* Gráficas: que no se salgan del ancho */
+  .recharts-responsive-container,
+  .recharts-wrapper {
+    max-width: 100% !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .main-content {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .card {
+    padding: 12px;
+  }
+}

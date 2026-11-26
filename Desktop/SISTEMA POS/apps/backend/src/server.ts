@@ -147,11 +147,22 @@ app.get("/*", async (request, reply) => {
         gif: "image/gif",
         svg: "image/svg+xml",
         json: "application/json",
+        webmanifest: "application/manifest+json",
+        ico: "image/x-icon",
+        webp: "image/webp",
+        mp3: "audio/mpeg",
         woff: "font/woff",
         woff2: "font/woff2",
         ttf: "font/ttf",
       };
       reply.header("Content-Type", mimeTypes[ext] || "application/octet-stream");
+      // PWA: el service worker y el index nunca se cachean (cada deploy se ve de una);
+      // los /assets/* llevan hash en el nombre, así que se pueden cachear por un año.
+      if (path === "sw.js" || path === "index.html" || ext === "webmanifest") {
+        reply.header("Cache-Control", "no-cache");
+      } else if (path.startsWith("assets/")) {
+        reply.header("Cache-Control", "public, max-age=31536000, immutable");
+      }
       reply.send(content);
       return;
     } catch (err) {
@@ -164,6 +175,7 @@ app.get("/*", async (request, reply) => {
     try {
       const content = await readFile(indexHtmlPath);
       reply.header("Content-Type", "text/html");
+      reply.header("Cache-Control", "no-cache");
       reply.send(content);
       return;
     } catch (err) {

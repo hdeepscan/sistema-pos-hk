@@ -5,6 +5,10 @@ import App from "./App";
 import "./styles.css";
 import "./styles/typography.css";
 import "./styles/components.css";
+import "./styles/mobile.css";
+import { registrarPWA } from "./lib/pwa";
+
+registrarPWA();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
