@@ -516,3 +516,36 @@
     padding: 12px;
   }
 }
+
+/* ---------- Escáner con cámara ---------- */
+.scanner-camera {
+  height: auto;
+  background: transparent;
+}
+
+.scanner-camera-container {
+  aspect-ratio: 4 / 3;
+  max-height: 52dvh;
+  justify-content: center;
+}
+
+.scanner-camera-message {
+  position: relative;
+  z-index: 2;
+}
+
+.scanner-camera-message p:not(.scanner-camera-submessage) {
+  color: #fff !important;
+  font-size: 15px;
+}
+
+.scanner-camera-message .scanner-camera-submessage {
+  color: #cbd5e1 !important;
+  line-height: 1.45;
+}
+
+.scanner-camera-info {
+  padding: 6px 2px 0;
+  color: var(--text-muted, #64748b);
+  text-align: center;
+}

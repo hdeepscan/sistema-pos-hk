@@ -148,6 +148,7 @@ app.get("/*", async (request, reply) => {
         svg: "image/svg+xml",
         json: "application/json",
         webmanifest: "application/manifest+json",
+        wasm: "application/wasm",
         ico: "image/x-icon",
         webp: "image/webp",
         mp3: "audio/mpeg",
